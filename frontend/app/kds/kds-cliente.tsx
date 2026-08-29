@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState } from "react";
 
 import {
@@ -144,6 +146,14 @@ export default function KdsCliente({ pantalla, sucursalId, semaforo }: Props) {
         <a className="kds-cambiar" href={`/kds?sucursal=${sucursalId}`}>
           Estaciones
         </a>
+        {/* La salida de la pantalla completa. Sin esto, quien entraba al
+            KDS desde el lanzador de módulos quedaba encerrado: los demás
+            enlaces cruzan entre pantallas de cocina y ninguno vuelve al
+            resto del ERP, así que la única salida era el botón atrás del
+            navegador o teclear la URL. */}
+        <Link className="kds-salir" href="/">
+          Salir
+        </Link>
       </header>
 
       {pedidos.length === 0 ? (

@@ -346,6 +346,8 @@ const PDV: Caso[] = [
   ),
   caso("precuenta", () => api.precuenta(UUID)),
   caso("comprobante", () => api.comprobante(UUID)),
+  caso("comprobantesDeVenta", () => api.comprobantesDeVenta(UUID)),
+  caso("saldoDeVenta", () => api.saldoDeVenta(UUID)),
   caso("ticketComprobante", () => api.ticketComprobante(UUID)),
   caso("comanda", () => api.comanda(UUID)),
   caso("cajasAbiertas", () => api.cajasAbiertas(UUID)),

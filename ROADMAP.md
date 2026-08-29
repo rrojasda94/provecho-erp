@@ -92,6 +92,33 @@ mínimo y vigencia por día/hora. **No puede escribir en `venta.descuento_*`**:
 esos campos son el acto humano firmado, y mezclarlos haría imposible auditar
 qué descuento fue manual y cuál automático.
 
+## Parche 0.8.1 — segundo turno de prueba en staging (2026-08-28)
+
+Con la 0.8.0 ya en staging, el turno reportó seis cosas. Cinco son agujeros
+que abrió la propia 0.8.0 —las notas de cocina estiraron las tarjetas del
+KDS, los cupones y descuentos metieron una diferencia entre el total del
+navegador y el del servidor, el overlay de despacho dejó al KDS suelto sin
+salida— y la sexta, el cobro que rechazaba el monto exacto, llevaba ahí
+desde que existe el cobro.
+
+| # | Qué | Estado |
+|---|---|---|
+| 1 | El pedido sale de la cola de cocina al entregarse, no al facturarse; y la categoría sin estación cae en la primera (ADR-078) | ✅ 2026-08-28 |
+| 1 | El aumento se vuelve idempotente (`venta_item.idempotency_key`) | ✅ 2026-08-28 |
+| 2 | La plata se cuantiza a centavos en `rules.a_centavos`, en dominio y frontend | ✅ 2026-08-28 |
+| 2 | El saldo lo dice el servidor: `GET /ventas/{id}/saldo` | ✅ 2026-08-28 |
+| 2 | El efectivo admite sobrepago y el vuelto se guarda (`pago.vuelto`, ADR-077) | ✅ 2026-08-28 |
+| 3 | `GET /ventas/{id}/comprobantes`: uno por cuenta, imprimibles desde el PDV | ✅ 2026-08-28 |
+| 4 | Salida del KDS en las cuatro pantallas (el overlay del PDV sigue con su ×) | ✅ 2026-08-28 |
+| 5 | Techo a la tarjeta del KDS: solo scrollea la lista, el pie queda a la vista | ✅ 2026-08-28 |
+| 6 | Despacho lee el estado de la línea, no la ausencia de estación; lo listo se agrupa arriba | ✅ 2026-08-28 |
+
+Lo que **no** se hizo y se decidió no hacer: entrega parcial de líneas. La
+unidad de despacho sigue siendo el pedido (ADR-044, RN-CUP-004) — la
+trazabilidad que pedía el mozo se resuelve mostrando qué está listo, no
+partiendo la bolsa. Y el comprobante sigue siendo por cuenta y no por pago:
+un pago parcial no tiene líneas propias que declarar a SUNAT.
+
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)
 
 Rama `feat/catalogo-odoo`, sobre v0.6.0. El catálogo pasa al modelo de

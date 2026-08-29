@@ -118,7 +118,32 @@ export type VentaItem = {
   /** Sin esto, reabrir la cuenta perdía la nota y el siguiente guardado la
    * borraba. */
   nota: string | null;
+  /** Lo descontado en esta línea. Hoy siempre 0 desde el PDV —las
+   * promociones viven en `venta_promocion` y el descuento manual en la
+   * venta— pero el contrato lo expone para que reabrir una orden no pueda
+   * reconstruir un total mayor del que se debe. */
+  descuento: string;
   extras: ExtraDeVentaItem[];
+};
+
+/** Un comprobante de la venta. Con la cuenta dividida hay uno por cuenta. */
+export type ComprobanteDeVenta = {
+  id: string;
+  tipo: string;
+  serie: string;
+  correlativo: number;
+  grupo_cobro: number;
+  receptor_num_doc: string | null;
+  receptor_nombre: string | null;
+  estado_emision: string;
+};
+
+/** Lo que queda por cobrar en una cuenta, según el servidor. */
+export type SaldoCuenta = {
+  grupo_cobro: number;
+  total: string;
+  pagado: string;
+  saldo: string;
 };
 
 export type MesaEnMapa = {
@@ -634,6 +659,24 @@ export const api = {
     pedir<{ id: string; tipo: string; serie: string; correlativo: number }>(
       `/sales/ventas/${ventaId}/comprobante`,
     ),
+
+  /** Todos los comprobantes de la venta, uno por cuenta (RN-COM-018).
+   *
+   * El singular devuelve solo el primero. Con la cuenta dividida eso dejaba
+   * al segundo cliente sin poder llevarse su papel, que es justo para lo que
+   * se separó la cuenta. */
+  comprobantesDeVenta: (ventaId: string) =>
+    pedir<ComprobanteDeVenta[]>(`/sales/ventas/${ventaId}/comprobantes`),
+
+  /** Cuánto queda por cobrar en cada cuenta, según el servidor.
+   *
+   * El diálogo de cobro lo pide en vez de sumar el borrador: el total del
+   * navegador no puede saber el flete de una orden reabierta ni el
+   * prorrateo del descuento entre cuentas, y cualquier diferencia terminaba
+   * en un cobro rechazado por exceder el saldo con el "monto exacto" en
+   * pantalla. */
+  saldoDeVenta: (ventaId: string) =>
+    pedir<SaldoCuenta[]>(`/sales/ventas/${ventaId}/saldo`),
 
   /** Lo que se manda a la ticketera de 80 mm (ADR-067). Existe aunque el
    * comprobante siga `pendiente` de llegar a SUNAT: el cliente se lleva su

@@ -52,6 +52,7 @@ from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models import PedidoBorrador
 from src.modules.sales.infrastructure.repositories import (
     ComprobanteRepo,
+    PagoRepo,
     PuntoVentaRepo,
     VentaRepo,
 )
@@ -721,6 +722,7 @@ def agregar_lineas(
         venta_id=venta_id,
         items=[it.model_dump() for it in body.items],
         usuario_id=actor.id,
+        idempotency_key=body.idempotency_key,
     )
     session.commit()
     return venta
@@ -874,10 +876,67 @@ def ver_comprobante(
     _: Usuario = Depends(require_permission(LEER)),
     session: Session = Depends(get_db),
 ):
+    """El primer comprobante de la venta. Se mantiene por compatibilidad: una
+    venta dividida tiene uno por cuenta, y para esas está el plural."""
     comprobante = ComprobanteRepo(session).por_venta(venta_id)
     if comprobante is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "la venta no tiene comprobante")
     return comprobante
+
+
+@router.get(
+    "/ventas/{venta_id}/comprobantes",
+    response_model=list[schemas.ComprobanteOut],
+)
+def ver_comprobantes(
+    venta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Todos los comprobantes de la venta, uno por cuenta (RN-COM-018).
+
+    Cuando la mesa se divide, cada cuenta emite el suyo — eso ya funcionaba,
+    pero el PDV solo podía pedir el singular, que devuelve el primero. El
+    cajero cobraba dos cuentas y solo podía imprimir un comprobante: el
+    segundo cliente se quedaba sin el suyo, que es justo lo que la división
+    de cuenta existe para darle.
+    """
+    exigir_venta(session, venta_id, tenant)
+    return ComprobanteRepo(session).todos_de_venta(venta_id)
+
+
+@router.get("/ventas/{venta_id}/saldo", response_model=list[schemas.SaldoCuentaOut])
+def ver_saldo(
+    venta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Cuánto queda por cobrar en cada cuenta de la venta.
+
+    El PDV calculaba el total del diálogo de cobro en el navegador, sumando
+    las líneas del borrador. Eso ignoraba el descuento de línea, el descuento
+    manual de la orden, el cupón y el flete de una orden reabierta: con
+    cualquiera de los cuatro, el botón "Exacto" ofrecía un número mayor que
+    el saldo real y el cobro se rechazaba por excederlo. Un solo número, y
+    que lo diga quien lo va a validar.
+    """
+    venta = exigir_venta(session, venta_id, tenant)
+    repo = PagoRepo(session)
+    filas = []
+    for grupo in VentaRepo(session).grupos_de_cobro(venta_id):
+        total = ventas.total_a_cobrar(session, venta, grupo)
+        pagado = sum(repo.confirmados(venta_id, grupo), Decimal(0))
+        filas.append(
+            {
+                "grupo_cobro": grupo,
+                "total": total,
+                "pagado": pagado,
+                "saldo": rules.a_centavos(total - pagado),
+            }
+        )
+    return filas
 
 
 @router.post(

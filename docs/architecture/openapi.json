@@ -226,6 +226,18 @@
       "AgregarLineasCreate": {
         "description": "Sumar líneas a una orden ya enviada a cocina (RN-COM-029). Mismo\nshape que los `items` del alta: una mesa que pide de a poco no debería\nobligar a abrir una orden nueva que después se cobra por separado.\n\nTodo lo de una misma llamada entra al KDS como una tanda propia\n(ADR-075): una comanda nueva en la cola, no líneas sueltas dentro de la\npastilla del pedido original.",
         "properties": {
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/VentaItemIn"
@@ -15293,7 +15305,7 @@
                 "type": "number"
               },
               {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d{0,2}0*$",
                 "type": "string"
               }
             ],
@@ -15372,6 +15384,11 @@
             "format": "uuid",
             "title": "Venta Id",
             "type": "string"
+          },
+          "vuelto": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Vuelto",
+            "type": "string"
           }
         },
         "required": [
@@ -15379,6 +15396,7 @@
           "venta_id",
           "medio_pago_id",
           "monto",
+          "vuelto",
           "grupo_cobro",
           "estado"
         ],
@@ -22882,6 +22900,38 @@
         "title": "RolIdIn",
         "type": "object"
       },
+      "SaldoCuentaOut": {
+        "description": "Cuánto queda por cobrar en una cuenta de la venta (RN-COM-018).\n\nEs la cifra que el diálogo de cobro tiene que mostrar: la calcula el\nmismo `total_a_cobrar` que después valida el pago, así que descuento,\ncupón, promoción y flete no pueden discrepar entre pantalla y servidor.",
+        "properties": {
+          "grupo_cobro": {
+            "title": "Grupo Cobro",
+            "type": "integer"
+          },
+          "pagado": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Pagado",
+            "type": "string"
+          },
+          "saldo": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Saldo",
+            "type": "string"
+          },
+          "total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "grupo_cobro",
+          "total",
+          "pagado",
+          "saldo"
+        ],
+        "title": "SaldoCuentaOut",
+        "type": "object"
+      },
       "SemaforoOut": {
         "description": "Umbrales y colores con los que la pantalla pinta el tiempo de espera.\nSon los **resueltos** —lo que Gerencia aprobó o la semilla del módulo—,\nno el contenido crudo de `parametro_empresa`.",
         "properties": {
@@ -27068,6 +27118,12 @@
           "cantidad": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Cantidad",
+            "type": "string"
+          },
+          "descuento": {
+            "default": "0",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Descuento",
             "type": "string"
           },
           "extras": {
@@ -49750,6 +49806,7 @@
     },
     "/api/v1/sales/ventas/{venta_id}/comprobante": {
       "get": {
+        "description": "El primer comprobante de la venta. Se mantiene por compatibilidad: una\nventa dividida tiene uno por cuenta, y para esas está el plural.",
         "operationId": "ver_comprobante_api_v1_sales_ventas__venta_id__comprobante_get",
         "parameters": [
           {
@@ -49791,6 +49848,59 @@
           }
         ],
         "summary": "Ver Comprobante",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/comprobantes": {
+      "get": {
+        "description": "Todos los comprobantes de la venta, uno por cuenta (RN-COM-018).\n\nCuando la mesa se divide, cada cuenta emite el suyo — eso ya funcionaba,\npero el PDV solo podía pedir el singular, que devuelve el primero. El\ncajero cobraba dos cuentas y solo podía imprimir un comprobante: el\nsegundo cliente se quedaba sin el suyo, que es justo lo que la división\nde cuenta existe para darle.",
+        "operationId": "ver_comprobantes_api_v1_sales_ventas__venta_id__comprobantes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/src__modules__sales__api__schemas__ComprobanteOut"
+                  },
+                  "title": "Response Ver Comprobantes Api V1 Sales Ventas  Venta Id  Comprobantes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Comprobantes",
         "tags": [
           "sales"
         ]
@@ -50411,6 +50521,59 @@
           }
         ],
         "summary": "Promociones De Venta",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/api/v1/sales/ventas/{venta_id}/saldo": {
+      "get": {
+        "description": "Cuánto queda por cobrar en cada cuenta de la venta.\n\nEl PDV calculaba el total del diálogo de cobro en el navegador, sumando\nlas líneas del borrador. Eso ignoraba el descuento de línea, el descuento\nmanual de la orden, el cupón y el flete de una orden reabierta: con\ncualquiera de los cuatro, el botón \"Exacto\" ofrecía un número mayor que\nel saldo real y el cobro se rechazaba por excederlo. Un solo número, y\nque lo diga quien lo va a validar.",
+        "operationId": "ver_saldo_api_v1_sales_ventas__venta_id__saldo_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SaldoCuentaOut"
+                  },
+                  "title": "Response Ver Saldo Api V1 Sales Ventas  Venta Id  Saldo Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Saldo",
         "tags": [
           "sales"
         ]

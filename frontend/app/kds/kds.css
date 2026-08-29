@@ -260,6 +260,20 @@
     text-decoration: underline;
 }
 
+/* La salida del KDS. Sin subrayado y con marco: los otros enlaces cruzan
+   entre pantallas de cocina, este se va de la pantalla completa — y quien lo
+   busca (un trabajador que entró a mirar la cola y quiere volver al PDV) lo
+   busca como un botón, no como un enlace más de la fila. */
+.kds-salir {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--kds-texto);
+    text-decoration: none;
+    border: 1px solid var(--kds-borde-fuerte);
+    border-radius: 8px;
+    padding: 0.4rem 0.75rem;
+}
+
 /* --- Tarjetas --- */
 .kds-grid {
     flex: 1;
@@ -268,6 +282,10 @@
     grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
     gap: 0.75rem;
     align-content: start;
+    /* Cada tarjeta mide lo suyo. Sin esto las filas del grid se igualan a la
+       más alta, así que una comanda larga estiraba a sus vecinas y empujaba
+       los botones de todas ellas fuera de la vista. */
+    align-items: start;
 }
 
 .kds-nada {
@@ -286,6 +304,15 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    /* Techo a la tarjeta: lo que pasa de acá scrollea DENTRO de la lista de
+       ítems, no arrastrando la página.
+
+       Sin el techo, una comanda larga —o con notas de cocina, que desde la
+       0.8.0 son un bloque por línea— crecía varias pantallas y dejaba "Todo
+       listo" tan abajo que en cocina no se llegaba: el cocinero tenía que
+       scrollear toda la página con las manos ocupadas para tachar un pedido
+       que ya había preparado. */
+    max-height: calc(100vh - 7rem);
 }
 
 /* El color del borde superior es el estado del PEDIDO completo (el ítem más
@@ -403,6 +430,13 @@
     gap: 0.375rem;
     margin: 0;
     padding: 0;
+    /* Lo único que scrollea de la tarjeta. El pie —acciones y nota del
+       pedido— queda fuera, así que el botón está siempre a la vista.
+       `min-height: 0` es obligatorio: dentro de un flex en columna, un hijo
+       no baja de su tamaño de contenido y `overflow` no llegaría a
+       activarse nunca. */
+    overflow-y: auto;
+    min-height: 0;
 }
 
 /* Ítem + deshacer en la misma fila. El deshacer es angosto a propósito: se
@@ -578,6 +612,17 @@
 
 .kds-avance strong {
     color: var(--kds-texto);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Cuánto del pedido ya está hecho mientras el resto se prepara. En verde
+   como las líneas tachadas y por lo mismo: es lo que el mozo busca de reojo
+   cuando pasa por la barra. */
+.kds-avance-parcial {
+    margin: 0 0 0.25rem;
+    color: var(--kds-verde);
+    font-size: 0.875rem;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
 

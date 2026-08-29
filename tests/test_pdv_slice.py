@@ -38,7 +38,11 @@ from src.modules.sales.infrastructure.models import (
     ProductoComercial,
     PuntoVenta,
 )
-from src.modules.sales.infrastructure.repositories import ComprobanteRepo, VentaRepo
+from src.modules.sales.infrastructure.repositories import (
+    ComprobanteRepo,
+    PagoRepo,
+    VentaRepo,
+)
 from src.modules.users.infrastructure.models import (
     Empresa,
     Grupo,
@@ -168,7 +172,13 @@ def base(session):
     medio = MedioPago(
         empresa_id=empresa.id, nombre="Efectivo", direccion="cobro", tipo="efectivo"
     )
-    session.add_all([usuario, medio])
+    # Un medio sin cajón: es contra este que se prueba que el sobrepago
+    # sigue rechazándose donde no hay vuelto posible (ADR-077).
+    tarjeta = MedioPago(
+        empresa_id=empresa.id, nombre="Visa", direccion="cobro",
+        tipo="tarjeta_credito",
+    )
+    session.add_all([usuario, medio, tarjeta])
     session.flush()
     # Cobrar exige turno de caja abierto (RN-MDP-002). Este archivo prueba el
     # PDV, no la caja: el turno se inserta directo.
@@ -184,6 +194,7 @@ def base(session):
         "punto_venta": punto_venta,
         "usuario": usuario,
         "medio": medio,
+        "tarjeta": tarjeta,
     }
 
 
@@ -345,7 +356,12 @@ def test_cobrar_una_cuenta_no_cierra_la_venta_y_emite_su_comprobante(session, ba
     assert len(ComprobanteRepo(session).todos_de_venta(venta.id)) == 2
 
 
-def test_el_pago_no_puede_exceder_el_saldo_de_su_cuenta(session, base):
+def test_el_pago_no_puede_exceder_el_saldo_en_un_medio_sin_vuelto(session, base):
+    """Sin cajón que devuelva, un monto de más es un error de tecleo.
+
+    Aceptarlo dejaría la tarjeta cobrada por encima de lo consumido y el
+    arqueo sin forma de cuadrar (ADR-077).
+    """
     venta = _crear(
         session,
         base,
@@ -359,11 +375,41 @@ def test_el_pago_no_puede_exceder_el_saldo_de_su_cuenta(session, base):
         ventas_uc.registrar_pago(
             session,
             venta_id=venta.id,
-            medio_pago_id=base["medio"].id,
+            medio_pago_id=base["tarjeta"].id,
             monto=Decimal("50.00"),
             idempotency_key="pago-excede",
             grupo_cobro=1,
         )
+
+
+def test_en_efectivo_el_exceso_es_vuelto_y_cierra_la_cuenta(session, base):
+    """Un billete de 50 por una cuenta de 40 es el caso normal de una caja.
+
+    Rechazarlo obligaba al cajero a teclear el saldo exacto de memoria, que
+    es de donde salía "pongo el monto exacto y me dice que supera el monto a
+    pagar". Lo que entra a la cuenta sigue siendo el saldo: el vuelto salió
+    del cajón y contabilidad no debe asentarlo (ADR-077).
+    """
+    venta = _crear(
+        session,
+        base,
+        [
+            _item(base["productos"][0], precio="40.00", grupo_cobro=1),
+            _item(base["productos"][1], precio="30.00", grupo_cobro=2),
+        ],
+    )
+    pago, venta, comprobante = ventas_uc.registrar_pago(
+        session,
+        venta_id=venta.id,
+        medio_pago_id=base["medio"].id,
+        monto=Decimal("50.00"),
+        idempotency_key="pago-con-vuelto",
+        grupo_cobro=1,
+    )
+    assert pago.monto == Decimal("40.00")
+    assert pago.vuelto == Decimal("10.00")
+    assert comprobante is not None, "la cuenta quedó cubierta"
+    assert venta.estado == "orden", "la cuenta 2 sigue pendiente"
 
 
 def test_pagar_una_cuenta_inexistente_falla(session, base):
@@ -1938,3 +1984,92 @@ def test_el_aumento_confirma_lo_que_sube_la_cuenta_no_el_precio_de_lista(
     # confirmó un sol, aunque de lista entraron 40.
     assert venta.total == Decimal("40.00")
     assert Decimal(confirmadas[-1]["total"]) == Decimal(0)
+
+
+# --- Parche 0.8.1: el cobro rechazaba el monto exacto -------------------------
+def test_el_total_se_cuantiza_a_centavos(session, base):
+    """Un total con cuatro decimales no es cobrable.
+
+    `cantidad` y `precio_unitario` guardan dos decimales cada uno, así que su
+    producto puede traer cuatro: 1.5 × 12.35 = 18.525. El saldo real era
+    18.525 mientras la pantalla —que lee `venta.total`, ya truncado por
+    `Numeric(10,2)`— decía 18.53. Pagar el monto exacto que el cajero tenía
+    delante se rechazaba por exceder el saldo, y pagar un centavo menos
+    dejaba medio centavo imposible de cancelar: la venta atascada en `orden`
+    y sin comprobante.
+    """
+    venta = _crear(
+        session, base, [_item(base["productos"][0], cantidad="1.5", precio="12.35")]
+    )
+    total = ventas_uc.total_a_cobrar(session, venta)
+    assert total == Decimal("18.53")
+    assert venta.total == total
+
+    _pago, venta, comprobante = ventas_uc.registrar_pago(
+        session,
+        venta_id=venta.id,
+        medio_pago_id=base["tarjeta"].id,
+        monto=Decimal("18.53"),
+        idempotency_key="pago-exacto-centavos",
+    )
+    assert comprobante is not None, "el monto exacto de la pantalla tiene que cerrar"
+    assert venta.estado == "pagada"
+
+
+def test_el_saldo_lo_dice_el_servidor_por_cuenta(session, base):
+    """El número que valida el pago es el mismo que lo propone.
+
+    El PDV sumaba el borrador en el navegador y no podía saber el flete de
+    una orden reabierta ni el prorrateo del descuento entre cuentas.
+    """
+    venta = _crear(
+        session,
+        base,
+        [
+            _item(base["productos"][0], precio="40.00", grupo_cobro=1),
+            _item(base["productos"][1], precio="30.00", grupo_cobro=2),
+        ],
+    )
+    ventas_uc.registrar_pago(
+        session,
+        venta_id=venta.id,
+        medio_pago_id=base["medio"].id,
+        monto=Decimal("15.00"),
+        idempotency_key="saldo-parcial",
+        grupo_cobro=1,
+    )
+    assert ventas_uc.total_a_cobrar(session, venta, 1) == Decimal("40.00")
+    pagado = sum(PagoRepo(session).confirmados(venta.id, 1), Decimal(0))
+    assert pagado == Decimal("15.00")
+    assert ventas_uc.total_a_cobrar(session, venta, 2) == Decimal("30.00")
+
+
+def test_cada_cuenta_deja_su_propio_comprobante(session, base):
+    """Pagos separados, comprobantes separados (RN-COM-018).
+
+    Ya se emitía uno por cuenta; lo que faltaba era poder listarlos: el PDV
+    solo pedía el singular, que devuelve el primero, y el segundo cliente se
+    quedaba sin su papel.
+    """
+    venta = _crear(
+        session,
+        base,
+        [
+            _item(base["productos"][0], precio="40.00", grupo_cobro=1),
+            _item(base["productos"][1], precio="30.00", grupo_cobro=2),
+        ],
+    )
+    for grupo, monto in ((1, "40.00"), (2, "30.00")):
+        ventas_uc.registrar_pago(
+            session,
+            venta_id=venta.id,
+            medio_pago_id=base["medio"].id,
+            monto=Decimal(monto),
+            idempotency_key=f"cuenta-{grupo}",
+            grupo_cobro=grupo,
+        )
+    repo = ComprobanteRepo(session)
+    todos = repo.todos_de_venta(venta.id)
+    assert len(todos) == 2
+    assert {c.grupo_cobro for c in todos} == {1, 2}
+    assert len({c.correlativo for c in todos}) == 2, "cada uno con su correlativo"

@@ -1373,8 +1373,18 @@ producción se hace en cocinas de sucursal. Ver
   contacto), sin necesidad de login.
 - **RN-COM-016** Una venta puede cobrarse con más de un medio de pago
   (ej. mitad efectivo, mitad tarjeta) — confirmado 2026-07-20 como caso
-  real del negocio. La suma de `pago.monto` de una venta debe igualar
+  real del negocio. La suma de `pago.monto` de una venta debe **cubrir**
   `venta.total` antes de que la venta pase a `estado=pagada`.
+  *Enmendada el 2026-08-28 (ADR-077) — antes decía "igualar" y no se admitía
+  sobrepago, así que el cajero no podía aceptar un billete de 50 por una
+  cuenta de 33.30: tenía que teclear el saldo exacto de memoria. Ahora, en
+  los medios que pueden devolver la diferencia (hoy solo `efectivo`), un
+  monto mayor al saldo se acepta: `pago.monto` sigue siendo lo que entra a
+  la cuenta —nunca más que el saldo— y la diferencia se guarda en
+  `pago.vuelto`. En los medios que no dan vuelto (tarjeta, billetera,
+  transferencia) el sobrepago se sigue rechazando: ahí no hay cajón que
+  devuelva y aceptarlo solo descuadraría el arqueo. Todos los montos se
+  comparan redondeados a centavos.*
 - **RN-COM-017** Un descuento manual sobre el total de una orden lo
   **autoriza un supervisor o encargado**, nunca el cajero que lo pide, y
   se registra con **motivo** (`cortesia`, `reclamo`, `colaborador`,
@@ -1397,7 +1407,9 @@ producción se hace en cocinas de sucursal. Ver
   vuelve cuenta separada llamando a "mover" (RN-COM-043) con la nueva
   cuenta, no con un campo que se manda al crear la línea: separar la
   cuenta pasa a ser una acción del cobro, no una decisión que había que
-  tomar al pedir.*
+  tomar al pedir.* *Anotada el 2026-08-28 — los comprobantes de una venta se
+  listan con `GET /sales/ventas/{id}/comprobantes`; el singular devuelve
+  solo el primero y dejaba al segundo cliente sin poder llevarse su papel.*
 
 - **RN-COM-019** La **precuenta** es un documento **no fiscal**: no tiene
   serie ni correlativo, no se envía a SUNAT y no cambia el estado de la
