@@ -22,6 +22,7 @@ from src.modules.sales.infrastructure.models.lista_precio import ListaPrecio
 from src.modules.sales.infrastructure.models.medio_pago import MedioPago
 from src.modules.sales.infrastructure.models.mesa import Mesa
 from src.modules.sales.infrastructure.models.pago import Pago
+from src.modules.sales.infrastructure.models.pedido_borrador import PedidoBorrador
 from src.modules.sales.infrastructure.models.precio import Precio
 from src.modules.sales.infrastructure.models.producto_atributo_linea import (
     ProductoAtributoLinea,
@@ -44,6 +45,10 @@ from src.modules.sales.infrastructure.models.producto_opcion_grupo import (
 from src.modules.sales.infrastructure.models.producto_variante_valor import (
     ProductoVarianteValor,
 )
+from src.modules.sales.infrastructure.models.promocion import (
+    Promocion,
+    VentaPromocion,
+)
 from src.modules.sales.infrastructure.models.promocion_cupon import PromocionCupon
 from src.modules.sales.infrastructure.models.punto_venta import PuntoVenta
 from src.modules.sales.infrastructure.models.venta import Venta
@@ -60,6 +65,7 @@ __all__ = [
     "MedioPago",
     "Mesa",
     "Pago",
+    "PedidoBorrador",
     "Precio",
     "ProductoAtributoLinea",
     "ProductoAtributoValor",
@@ -68,8 +74,10 @@ __all__ = [
     "ProductoExclusion",
     "ProductoOpcionGrupo",
     "ProductoVarianteValor",
+    "Promocion",
     "PromocionCupon",
     "PuntoVenta",
     "Venta",
     "VentaItem",
+    "VentaPromocion",
 ]

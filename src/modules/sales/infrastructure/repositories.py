@@ -60,6 +60,35 @@ class VentaRepo:
             q = q.where(VentaItem.grupo_cobro == grupo_cobro)
         return list(self.s.scalars(q))
 
+    def siguiente_tanda(self, venta_id: uuid.UUID) -> int:
+        """El número del próximo envío a cocina de esta venta (ADR-075).
+
+        Empieza en 1 —el alta del pedido— y sube de a uno por cada agregado.
+        Se cuenta contra las líneas vivas: si el agregado se anula entero, el
+        siguiente reusa el número, y no pasa nada porque la tanda solo agrupa
+        lo que está en la cola.
+        """
+        actual = self.s.scalar(
+            select(func.max(VentaItem.tanda)).where(VentaItem.venta_id == venta_id)
+        )
+        return (actual or 0) + 1
+
+    def tanda_ya_registrada(self, idempotency_key: str) -> bool:
+        """¿Este envío a cocina ya entró? (RN-COM-002, ADR-075).
+
+        Se busca en toda la tabla y no dentro de la venta: la clave es única
+        global, igual que la del alta, así que un reintento mal dirigido
+        tampoco puede duplicar nada.
+        """
+        return (
+            self.s.scalar(
+                select(VentaItem.id).where(
+                    VentaItem.idempotency_key == idempotency_key
+                )
+            )
+            is not None
+        )
+
     def grupos_de_cobro(self, venta_id: uuid.UUID) -> list[int]:
         return sorted(
             set(

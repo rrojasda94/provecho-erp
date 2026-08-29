@@ -87,7 +87,7 @@ def env():
         s.add(UsuarioRol(usuario_id=terminal.id, rol_id=rol_terminal.id))
         s.add(UsuarioSucursal(usuario_id=terminal.id, sucursal_id=sucursal.id))
 
-        # El terminal enrolado (ADR-073): sin este secreto en `X-Terminal`,
+        # El terminal enrolado (ADR-079): sin este secreto en `X-Terminal`,
         # el pad no marca — de acá en más, mismo tratamiento que el PIN.
         _, codigo = terminales_uc.crear(s, sucursal_id=sucursal.id, nombre="Pasillo")
         secreto_terminal = terminales_uc.enrolar(s, sucursal_id=sucursal.id, codigo=codigo)
@@ -467,10 +467,10 @@ def test_la_cuenta_del_pad_no_puede_hacer_nada_mas(env):
     assert _crear_turno(client, hterm, ids).status_code == 403
 
 
-# --- Terminal enrolado y evidencia (ADR-073, RN-RRHH-023/024) -------------------
+# --- Terminal enrolado y evidencia (ADR-079, RN-RRHH-023/024) -------------------
 def test_marcar_sin_terminal_autorizado_da_403(env):
     """El PIN correcto no alcanza sin un terminal enrolado para el local:
-    es exactamente el hueco que ADR-073 cierra — la sesión de la cuenta de
+    es exactamente el hueco que ADR-079 cierra — la sesión de la cuenta de
     servicio ya no basta para marcar desde cualquier navegador."""
     client, ids, _ = env
     h = _token(client)

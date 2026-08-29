@@ -3,6 +3,24 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **La renovación de sesión asume una sola instancia de Next** (2026-08-28,
+  ADR-073). `refrescarSesion` coordina las rotaciones con un `Map` de módulo
+  —single-flight más una ventana de gracia de 30 s—, y ese estado vive en **un
+  proceso**. Con un solo servidor cubre todas las cajas, porque todas pegan
+  contra el mismo. Detrás de un balanceador, dos instancias podrían rotar el
+  mismo refresh a la vez y la API leería la segunda como token robado,
+  revocando la sesión del turno. Se resuelve moviendo la coordinación a Redis
+  —que ya está en la infraestructura— el día que haya más de una instancia; no
+  antes, porque hoy sería un salto de red por renovación para resolver una
+  carrera que no puede ocurrir.
+- ⬜ **La ventana de gracia debilita la detección de reuso, a propósito**
+  (2026-08-28, ADR-073). Un refresh robado y reusado dentro de esos 30 s,
+  contra el mismo proceso, recibe el par ya emitido en vez de disparar la
+  revocación de la cadena. Se aceptó porque la alternativa medida es que la
+  caja pierda la sesión en cada renovación —se reprodujo—, pero el punto
+  correcto de esa coordinación es el servidor de auth, que podría devolver el
+  último par emitido para un token recién rotado en vez de un 401.
+
 - ✅ 2026-08-12 **El sistema visual, cerrado (ADR-037).** Lo que se salda y lo
   que queda:
   - **Tokens que faltaban** (F2.3): elevación (`--sombra-1..3`), estados

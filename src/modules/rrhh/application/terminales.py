@@ -4,7 +4,7 @@ El admin crea el registro desde el back-office (nace inactivo, con un
 código de 6 dígitos vigente 30 minutos) y la tablet lo teclea una vez en el
 pad para quedar enrolada. De ahí en más, cada marcación manda el secreto
 del terminal; el router la rechaza sin uno válido de esa sucursal
-(RN-RRHH-023, ADR-073).
+(RN-RRHH-023, ADR-079).
 
 El secreto es aleatorio, no una contraseña humana, así que se hashea con
 SHA-256 y no Argon2id — mismo criterio que `TokenAgente`

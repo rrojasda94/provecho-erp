@@ -1,7 +1,7 @@
 """DTOs (pydantic) del módulo sales."""
 
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Literal
 
@@ -35,6 +35,10 @@ class VentaItemIn(BaseModel):
     # Deciden qué líneas condicionadas de la receta se descuentan
     # (RN-COM-037). Solo admite valores que el producto o su padre ofrecen.
     valores_variante_ids: list[uuid.UUID] = []
+    # Lo que el mesero le dice a cocina sobre ESTE plato ("bien cocida", "sin
+    # sal"). Texto libre: lo estructurado ya son las restas y los atributos,
+    # y aun así queda un pedido del comensal que ninguno de los dos expresa.
+    nota: str | None = Field(default=None, max_length=140)
 
 
 class VentaCreate(UbicacionMixin):
@@ -54,6 +58,10 @@ class VentaCreate(UbicacionMixin):
     direccion_entrega: str | None = Field(default=None, max_length=255)
     mesa_id: uuid.UUID | None = None
     comensales: int | None = Field(default=None, ge=1)
+    # Cómo se sirve el pedido entero: "servir todo junto", "bebidas al final".
+    # Del pedido y no de una línea: no dice qué lleva un plato, dice en qué
+    # orden sale todo.
+    nota_cocina: str | None = Field(default=None, max_length=200)
     # Identificador generado por el cliente. El PDV puede crear la venta sin
     # conexión y conservar su id al llegar al servidor (ADR-009); si no lo
     # manda, lo genera el servidor como siempre.
@@ -128,7 +136,13 @@ class VentaOut(BaseModel):
     distancia_entrega_km: Decimal | None = None
     costo_entrega: Decimal | None = None
     mesa_id: uuid.UUID | None = None
+    # El número que ve el personal ("Mesa 7"), derivado de la mesa. Va acá
+    # porque el PDV reabre una cuenta desde la pestaña de cuentas abiertas,
+    # sin pasar por el mapa de salón: con solo el id, la pestaña quedaba
+    # rotulada "Mesa ?".
+    mesa_numero: int | None = None
     comensales: int | None = None
+    nota_cocina: str | None = None
     descuento_modo: str | None = None
     descuento_valor: Decimal | None = None
     descuento_motivo: str | None = None
@@ -169,9 +183,29 @@ class AnularLineasCreate(BaseModel):
 class AgregarLineasCreate(BaseModel):
     """Sumar líneas a una orden ya enviada a cocina (RN-COM-029). Mismo
     shape que los `items` del alta: una mesa que pide de a poco no debería
-    obligar a abrir una orden nueva que después se cobra por separado."""
+    obligar a abrir una orden nueva que después se cobra por separado.
+
+    Todo lo de una misma llamada entra al KDS como una tanda propia
+    (ADR-075): una comanda nueva en la cola, no líneas sueltas dentro de la
+    pastilla del pedido original."""
 
     items: list[VentaItemIn] = Field(min_length=1)
+    # Opcional por compatibilidad: los clientes que ya estaban mandando
+    # aumentos sin ella siguen funcionando. Cuando viene, un reintento del
+    # mismo envío devuelve la orden sin volver a mandar la comanda a cocina
+    # (RN-COM-002).
+    idempotency_key: str | None = Field(default=None, max_length=100)
+
+
+class NotaCocinaIn(BaseModel):
+    """Cómo se sirve el pedido. `null` la quita.
+
+    Se puede cambiar con la orden ya en cocina porque así se pide de verdad:
+    "las bebidas al final" se dice a mitad del servicio, no al tomar la
+    comanda.
+    """
+
+    nota: str | None = Field(default=None, max_length=200)
 
 
 class MoverLineasCreate(BaseModel):
@@ -297,7 +331,11 @@ class TicketComprobanteOut(BaseModel):
 
 class PagoCreate(BaseModel):
     medio_pago_id: uuid.UUID
-    monto: Decimal = Field(gt=0)
+    # Lo que el cliente entrega, a centavos. `decimal_places` no es cosmético:
+    # el PDV mandaba el resultado de una resta en float —"23.299999999999997"
+    # por una cuenta de 23.30— y ese sobrante invisible hacía que el pago
+    # nunca cubriera el total y la venta quedara sin comprobante.
+    monto: Decimal = Field(gt=0, decimal_places=2)
     idempotency_key: str = Field(min_length=8, max_length=100)
     referencia_externa: str | None = None
     grupo_cobro: int = Field(default=1, ge=1)
@@ -313,9 +351,26 @@ class PagoOut(BaseModel):
     id: uuid.UUID
     venta_id: uuid.UUID
     medio_pago_id: uuid.UUID
+    # Lo aplicado a la cuenta y lo devuelto: con un solo número el ticket no
+    # puede decir con cuánto pagó el cliente (ADR-077).
     monto: Decimal
+    vuelto: Decimal
     grupo_cobro: int
     estado: str
+
+
+class SaldoCuentaOut(BaseModel):
+    """Cuánto queda por cobrar en una cuenta de la venta (RN-COM-018).
+
+    Es la cifra que el diálogo de cobro tiene que mostrar: la calcula el
+    mismo `total_a_cobrar` que después valida el pago, así que descuento,
+    cupón, promoción y flete no pueden discrepar entre pantalla y servidor.
+    """
+
+    grupo_cobro: int
+    total: Decimal
+    pagado: Decimal
+    saldo: Decimal
 
 
 class PuntoVentaCreate(BaseModel):
@@ -938,7 +993,15 @@ class VentaItemOut(BaseModel):
     nombre: str
     cantidad: Decimal
     precio_unitario: Decimal
+    # Lo descontado en ESTA línea. Sin exponerlo, el PDV rearmaba el total de
+    # una orden reabierta a precio de lista y ofrecía cobrar más de lo que se
+    # debía — y el servidor lo rechazaba por exceder el saldo, con el "monto
+    # exacto" en pantalla.
+    descuento: Decimal = Decimal(0)
     grupo_cobro: int
+    # Sin esto, reabrir la cuenta perdía la nota: la línea volvía del
+    # servidor sin ella y el siguiente guardado la borraba.
+    nota: str | None = None
     extras: list[VentaItemExtraOut] = []
 
 
@@ -1285,3 +1348,110 @@ class CuponCanjeadoOut(BaseModel):
     codigo: str
     monto_descuento: Decimal
     venta: VentaOut
+
+
+# --- Borrador del PDV (ADR-074) ----------------------------------------------
+class BorradorIn(BaseModel):
+    """Lo que el PDV guarda de un ticket a medio armar.
+
+    `contenido` es opaco para el servidor a propósito: es la forma que el PDV
+    ya tenía en memoria (tipo de orden, mesa, comensales, cliente y líneas con
+    sus extras, restas y atributos) y un borrador todavía no es un hecho de
+    negocio que valga la pena tipar. Lo que sale a cocina sí se valida entero,
+    en `POST /sales/ventas`.
+    """
+
+    punto_venta_id: uuid.UUID
+    contenido: dict
+
+
+class BorradorOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sucursal_id: uuid.UUID
+    punto_venta_id: uuid.UUID
+    # Quién lo tocó al final. No restringe: el borrador es de la caja, y el
+    # relevo de turno tiene que poder seguirlo (ADR-074).
+    usuario_id: uuid.UUID
+    contenido: dict
+    actualizado_en: datetime = Field(validation_alias="updated_at")
+
+
+# --- Promociones condicionales (ADR-076) --------------------------------------
+class PromocionBase(BaseModel):
+    """Lo común a los cuatro tipos: vigencia, ámbito y resolución de solapes.
+
+    `condicion` y `beneficio` van como objetos libres y se validan **por
+    tipo** en `_validar_forma`: un modelo discriminado por tipo sería más
+    bonito y obligaría a versionar el contrato cada vez que un tipo gane un
+    parámetro, que es lo que este diseño evita a propósito (ADR-076).
+    """
+
+    nombre: str = Field(min_length=1, max_length=120)
+    tipo: Literal["nxm", "cantidad", "combo", "monto_minimo"]
+    condicion: dict = Field(default_factory=dict)
+    beneficio: dict = Field(default_factory=dict)
+    # Vigencia. Todo ausente = corre hasta que alguien la apague.
+    desde: date | None = None
+    hasta: date | None = None
+    # `0` = lunes, como `date.weekday()`. Vacío = todos los días.
+    dias_semana: list[int] | None = None
+    hora_desde: time | None = None
+    hora_hasta: time | None = None
+    # Ámbito. Ausente = toda la empresa.
+    marca_id: uuid.UUID | None = None
+    sucursal_id: uuid.UUID | None = None
+    canales: list[str] | None = None
+    modalidades: list[str] | None = None
+    # Quién toma las unidades primero cuando dos alcanzan el mismo plato.
+    prioridad: int = 0
+    # `True` se suma a lo que otra ya aplicó sobre las mismas unidades. El
+    # default es `False` porque acumular es lo que hace que el local regale
+    # más de lo que aprobó.
+    acumulable: bool = False
+
+
+class PromocionCreate(PromocionBase):
+    pass
+
+
+class PromocionUpdate(BaseModel):
+    """Parcial: el campo ausente no se toca. `activa: false` la termina
+    (RN-PRM-005) sin borrar nada — las ventas que la aplicaron la siguen
+    nombrando."""
+
+    nombre: str | None = Field(default=None, min_length=1, max_length=120)
+    condicion: dict | None = None
+    beneficio: dict | None = None
+    desde: date | None = None
+    hasta: date | None = None
+    dias_semana: list[int] | None = None
+    hora_desde: time | None = None
+    hora_hasta: time | None = None
+    marca_id: uuid.UUID | None = None
+    sucursal_id: uuid.UUID | None = None
+    canales: list[str] | None = None
+    modalidades: list[str] | None = None
+    prioridad: int | None = None
+    acumulable: bool | None = None
+    activa: bool | None = None
+
+
+class PromocionOut(PromocionBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    activa: bool
+
+
+class VentaPromocionOut(BaseModel):
+    """Una promoción que este pedido activó, con lo que descontó.
+
+    El nombre viaja congelado: la promoción se renombra o se apaga, y el
+    ticket de ayer tiene que seguir diciendo lo que el cliente leyó.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+    promocion_id: uuid.UUID
+    nombre: str
+    monto: Decimal

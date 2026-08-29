@@ -81,7 +81,7 @@ ASISTENCIA_MARCAR = "rrhh.asistencia_marcar"
 # back-office: el pad no marca por nadie, solo presenta la firma del
 # trabajador (ADR-065).
 ASISTENCIA_TERMINAL = "rrhh.asistencia_terminal"
-# Autorizar o revocar el dispositivo que puede marcar por un local (ADR-073)
+# Autorizar o revocar el dispositivo que puede marcar por un local (ADR-079)
 # es alta de infraestructura del local, igual que `kds.configurar`: nunca
 # lo tiene la cuenta de servicio del pad, que solo abre la pantalla.
 TERMINAL_GESTIONAR = "rrhh.terminal_gestionar"
@@ -955,7 +955,7 @@ def editar_turno(
 
 
 # --- Terminal de marcaje -----------------------------------------------------------
-# Autorizar y revocar el dispositivo del pad (ADR-073): alta de
+# Autorizar y revocar el dispositivo del pad (ADR-079): alta de
 # infraestructura del local, nunca de la cuenta de servicio que abre la
 # pantalla — mismo criterio que `kds.configurar` frente a `kds.operar`.
 @router.post(
@@ -1025,7 +1025,7 @@ def enrolar_terminal(
 ):
     """La tablet teclea el código que un admin generó desde el back-office y
     se queda con un secreto propio: de acá en más, cada marcación lo manda
-    (RN-RRHH-023, ADR-073). Rate limit por IP y no por terminal — todavía no
+    (RN-RRHH-023, ADR-079). Rate limit por IP y no por terminal — todavía no
     hay uno enrolado con quien contar el límite."""
     tenant.exigir_sucursal(sucursal_id)
     consumir("terminal_enrolar", ip_de(request), 10, 300)

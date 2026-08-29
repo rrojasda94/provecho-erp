@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Pantalla de activación del pad (ADR-073): sin el secreto del terminal, la
+ * Pantalla de activación del pad (ADR-079): sin el secreto del terminal, la
  * tablet no muestra tarjetas ni marca nada — la sesión de la cuenta de
  * servicio ya no alcanza sola. Un admin genera el código de 6 dígitos desde
  * Organización → Terminales; la tablet lo teclea acá, una sola vez.

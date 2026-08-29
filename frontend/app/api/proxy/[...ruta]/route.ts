@@ -62,7 +62,7 @@ function cabecerasSalientes(
   // propio deja al servidor buscando una marca que el cuerpo no tiene. El
   // error que devuelve no menciona la palabra "boundary" por ningún lado.
   const tipo = req.headers.get("content-type");
-  // El secreto del terminal enrolado (ADR-073): si la tablet no tiene
+  // El secreto del terminal enrolado (ADR-079): si la tablet no tiene
   // cookie, el pad ni siquiera intenta marcar (ver `asistencia/page.tsx`),
   // así que reenviarlo vacío acá no rompe nada.
   const terminal = store.get(COOKIE_TERMINAL)?.value;
@@ -124,6 +124,12 @@ async function reenviar(req: Request, ruta: string[]): Promise<Response> {
   return new Response(respuesta.body, { status: respuesta.status, headers: cabeceras });
 }
 
+/**
+ * Un handler por verbo, y **todos los que la API usa**: Next devuelve 405 al
+ * verbo que este archivo no exporta, sin decir que el que falta es el del
+ * proxy y no el del endpoint. El `PUT` del borrador del PDV (ADR-074) se fue
+ * a producción así.
+ */
 type Contexto = { params: Promise<{ ruta: string[] }> };
 
 export async function GET(req: Request, { params }: Contexto) {
@@ -131,6 +137,10 @@ export async function GET(req: Request, { params }: Contexto) {
 }
 
 export async function POST(req: Request, { params }: Contexto) {
+  return reenviar(req, (await params).ruta);
+}
+
+export async function PUT(req: Request, { params }: Contexto) {
   return reenviar(req, (await params).ruta);
 }
 

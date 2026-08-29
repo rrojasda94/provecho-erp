@@ -19,7 +19,13 @@
 import { redirect } from "next/navigation";
 
 import { ApiError, apiFetch } from "@/lib/api";
-import type { Categoria, Pantalla, Semaforo, SucursalKds } from "@/lib/kds";
+import {
+  SEMAFORO_DE_FABRICA,
+  type Categoria,
+  type Pantalla,
+  type Semaforo,
+  type SucursalKds,
+} from "@/lib/kds";
 import { tieneAccesoModulo, tienePermiso } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -49,17 +55,6 @@ async function sucursalesDelUsuario(token: string, propias: string[]): Promise<S
     .then((todas) => todas.filter((s) => propias.includes(s.id)))
     .catch(() => []);
 }
-
-/** Los mismos valores que la semilla del backend. Si la configuración no
- * carga, la cocina abre con colores de fábrica en vez de sin pantalla — es
- * un semáforo, no un dato del pedido. */
-const SEMAFORO_DE_FABRICA: Semaforo = {
-  minutos_ambar: 8,
-  minutos_rojo: 15,
-  color_normal: "#22c55e",
-  color_ambar: "#fbbf24",
-  color_rojo: "#f87171",
-};
 
 /** Cada bloqueo dice a quién pedirle qué: en cocina nadie va a leer un 500. */
 function Bloqueo({ titulo, detalle }: { titulo: string; detalle: string }) {

@@ -1,7 +1,7 @@
 """Reglas de negocio de venta y cobro. Puras, sin infraestructura."""
 
 from datetime import UTC, date, datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 CANALES = {"pdv", "agente_ia", "delivery"}
 MODALIDADES = {"mesa", "takeout", "delivery"}
@@ -65,10 +65,37 @@ def elegir_lista_precio(candidatas: list) -> object | None:
     )
 
 
+#: La unidad mínima de plata. Todo total que alguien vaya a cobrar, mostrar o
+#: comparar pasa por acá.
+CENTAVO = Decimal("0.01")
+
+
+def a_centavos(monto: Decimal) -> Decimal:
+    """Redondea a dos decimales, que es lo único que existe en una caja.
+
+    `cantidad` y `precio_unitario` guardan dos decimales cada uno, así que su
+    producto puede traer cuatro. Con el total sin redondear, el saldo real de
+    la cuenta era `18.525` mientras la pantalla —que lee `venta.total`, ya
+    truncado por `Numeric(10,2)`— decía `18.53`: pagar el monto exacto que el
+    cajero tenía delante se rechazaba por exceder el saldo, y pagar un
+    centavo menos dejaba la cuenta con medio centavo imposible de cancelar,
+    la venta atascada en `orden` y sin comprobante.
+
+    `ROUND_HALF_UP` y no el bancario que `quantize` trae por defecto: es como
+    redondea `numeric` en Postgres, que es quien guarda `venta.total`. Con el
+    bancario, 18.525 daría 18.52 acá y 18.53 en la columna — la misma
+    discrepancia entre lo que se cobra y lo que se muestra que esta función
+    viene a cerrar. Y es lo que espera cualquiera que mire una caja: el medio
+    centavo sube.
+    """
+    return monto.quantize(CENTAVO, rounding=ROUND_HALF_UP)
+
+
 def total_venta(items: list[tuple[Decimal, Decimal, Decimal]]) -> Decimal:
-    """items = [(cantidad, precio_unitario, descuento)]."""
-    return sum(
-        (cant * precio - desc for cant, precio, desc in items), Decimal(0)
+    """items = [(cantidad, precio_unitario, descuento)]. A centavos: un total
+    con cuatro decimales no es cobrable."""
+    return a_centavos(
+        sum((cant * precio - desc for cant, precio, desc in items), Decimal(0))
     )
 
 
@@ -101,10 +128,33 @@ def _sin_zona(valor: datetime) -> datetime:
     return valor.replace(tzinfo=None) if valor.tzinfo else valor
 
 
+#: Medios que pueden recibir más de lo que se debe, porque pueden devolver
+#: la diferencia. Un billete de 50 por una cuenta de 33.30 es el caso normal
+#: de una caja; una tarjeta cobrada de más no tiene vuelto posible y solo
+#: descuadraría el arqueo (ADR-077).
+MEDIOS_CON_VUELTO = {"efectivo"}
+
+
+def admite_vuelto(tipo_medio_pago: str) -> bool:
+    return tipo_medio_pago in MEDIOS_CON_VUELTO
+
+
+def vuelto_de(monto_recibido: Decimal, saldo: Decimal) -> Decimal:
+    """Lo que hay que devolverle al cliente. Nunca negativo."""
+    return max(a_centavos(monto_recibido) - a_centavos(saldo), Decimal(0))
+
+
 def pagos_cubren_total(pagos_confirmados: list[Decimal], total: Decimal) -> bool:
-    """La venta pasa a `pagada` cuando los pagos confirmados igualan el
-    total (RN-COM-016). No se admite sobrepago."""
-    return sum(pagos_confirmados, Decimal(0)) == total
+    """La cuenta queda cancelada cuando los pagos confirmados llegan al
+    total (RN-COM-016, enmendada por ADR-077).
+
+    Es `>=` y no `==` desde que el efectivo admite sobrepago: lo que se
+    aplica a la cuenta nunca excede el saldo —la diferencia se va como
+    vuelto—, pero comparar por igualdad exacta sobre Decimales que venían sin
+    cuantizar dejaba cuentas pagadas al centavo sin cerrarse ni emitir
+    comprobante. A centavos en los dos lados, por lo mismo.
+    """
+    return a_centavos(sum(pagos_confirmados, Decimal(0))) >= a_centavos(total)
 
 
 # --- Descuento manual de la orden (RN-COM-017) -------------------------------

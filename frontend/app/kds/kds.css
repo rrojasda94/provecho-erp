@@ -260,6 +260,20 @@
     text-decoration: underline;
 }
 
+/* La salida del KDS. Sin subrayado y con marco: los otros enlaces cruzan
+   entre pantallas de cocina, este se va de la pantalla completa — y quien lo
+   busca (un trabajador que entró a mirar la cola y quiere volver al PDV) lo
+   busca como un botón, no como un enlace más de la fila. */
+.kds-salir {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--kds-texto);
+    text-decoration: none;
+    border: 1px solid var(--kds-borde-fuerte);
+    border-radius: 8px;
+    padding: 0.4rem 0.75rem;
+}
+
 /* --- Tarjetas --- */
 .kds-grid {
     flex: 1;
@@ -268,6 +282,10 @@
     grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
     gap: 0.75rem;
     align-content: start;
+    /* Cada tarjeta mide lo suyo. Sin esto las filas del grid se igualan a la
+       más alta, así que una comanda larga estiraba a sus vecinas y empujaba
+       los botones de todas ellas fuera de la vista. */
+    align-items: start;
 }
 
 .kds-nada {
@@ -286,6 +304,15 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    /* Techo a la tarjeta: lo que pasa de acá scrollea DENTRO de la lista de
+       ítems, no arrastrando la página.
+
+       Sin el techo, una comanda larga —o con notas de cocina, que desde la
+       0.8.0 son un bloque por línea— crecía varias pantallas y dejaba "Todo
+       listo" tan abajo que en cocina no se llegaba: el cocinero tenía que
+       scrollear toda la página con las manos ocupadas para tachar un pedido
+       que ya había preparado. */
+    max-height: calc(100vh - 7rem);
 }
 
 /* El color del borde superior es el estado del PEDIDO completo (el ítem más
@@ -403,6 +430,13 @@
     gap: 0.375rem;
     margin: 0;
     padding: 0;
+    /* Lo único que scrollea de la tarjeta. El pie —acciones y nota del
+       pedido— queda fuera, así que el botón está siempre a la vista.
+       `min-height: 0` es obligatorio: dentro de un flex en columna, un hijo
+       no baja de su tamaño de contenido y `overflow` no llegaría a
+       activarse nunca. */
+    overflow-y: auto;
+    min-height: 0;
 }
 
 /* Ítem + deshacer en la misma fila. El deshacer es angosto a propósito: se
@@ -581,6 +615,17 @@
     font-variant-numeric: tabular-nums;
 }
 
+/* Cuánto del pedido ya está hecho mientras el resto se prepara. En verde
+   como las líneas tachadas y por lo mismo: es lo que el mozo busca de reojo
+   cuando pasa por la barra. */
+.kds-avance-parcial {
+    margin: 0 0 0.25rem;
+    color: var(--kds-verde);
+    font-size: 0.875rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
 .kds-acciones {
     display: flex;
     gap: 0.5rem;
@@ -626,4 +671,41 @@
     font-size: 0.875rem;
     font-weight: 600;
     z-index: 9;
+}
+
+/* Lo que el mesero le dijo a cocina sobre un plato. En ámbar como las
+   restas y por lo mismo: en una pantalla que se lee de reojo, lo que pasa
+   desapercibido sale como plato rehecho. */
+.kds-nombre .kds-nota {
+    display: block;
+    color: var(--kds-ambar);
+    font-style: normal;
+    font-weight: 700;
+}
+
+/* Cómo se sirve el pedido entero. Al pie de la tarjeta, en una franja
+   propia: no es de ningún plato, y ponerla dentro de uno la escondería. */
+.kds-nota-pedido {
+    margin: 0.5rem 0 0;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.5rem;
+    background: var(--kds-surface-alta);
+    color: var(--kds-ambar);
+    font-weight: 700;
+    font-size: 0.9375rem;
+}
+
+/* Qué envío del pedido es esta tarjeta (ADR-075). Discreto: el número de
+   orden sigue siendo lo que la cocina busca. */
+.kds-tanda {
+    font-size: 0.75em;
+    font-weight: 600;
+    color: var(--kds-muted);
+}
+
+/* Mismo motivo que en `pdv.css`: el pie fijo del layout raíz se monta sobre
+   la última fila de tarjetas, y una pantalla de cocina no se scrollea para
+   destapar nada. */
+body:has(.kds) > footer {
+    display: none;
 }

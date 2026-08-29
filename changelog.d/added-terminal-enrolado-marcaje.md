@@ -1,4 +1,4 @@
-- **El pad de asistencia solo marca desde un terminal autorizado** (ADR-073,
+- **El pad de asistencia solo marca desde un terminal autorizado** (ADR-079,
   RN-RRHH-023). La sesión de la cuenta de servicio del pad era exportable a
   cualquier navegador: con el mismo token, `/asistencia` marcaba igual desde
   el celular de un supervisor que nunca llegó al local. Ahora cada sucursal

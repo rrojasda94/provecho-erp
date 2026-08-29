@@ -145,7 +145,7 @@ export async function guardarSucursalAction(
       // Cerrar un local es `estado="inactiva"`: no hay baja de sucursal, sigue
       // siendo el ancla de sus ventas, cajas y trabajadores.
       estado: String(formData.get("estado") ?? "activa"),
-      // Vacío = no evalúa distancia en el marcaje (RN-RRHH-024, ADR-073).
+      // Vacío = no evalúa distancia en el marcaje (RN-RRHH-024, ADR-079).
       radio_marcaje_m: radioTexto ? Number(radioTexto) : null,
       ...ubicacionDe(formData),
     },

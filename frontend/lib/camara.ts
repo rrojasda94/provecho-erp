@@ -1,5 +1,5 @@
 /**
- * Una foto chica de la cámara frontal, en base64 (RN-RRHH-024, ADR-073).
+ * Una foto chica de la cámara frontal, en base64 (RN-RRHH-024, ADR-079).
  *
  * Es evidencia, no biometría: nadie la compara contra nada, solo queda
  * disponible para RRHH si algo no cuadra. Por eso el fallo es silencioso —

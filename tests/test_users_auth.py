@@ -228,3 +228,55 @@ def test_verificar_pin_cuenta_contra_el_mismo_lockout_que_el_login(client):
         ).status_code in (401, 423)
     # Un contador propio habría dejado probar PINes sin agotar los del login.
     assert _login(client).status_code == 423
+
+
+# --- El claim `sucursales` es una lista estable ------------------------------
+def test_las_sucursales_del_token_van_ordenadas_y_sin_las_borradas(client):
+    """Esa lista **es** el claim del token, y hay pantallas que toman la
+    primera: el PDV abría "su" sucursal por el índice 0.
+
+    Sin `ORDER BY` el orden lo decidía Postgres y podía cambiar entre dos
+    emisiones del mismo usuario — la caja de una sucursal terminaba creando
+    los pedidos en la otra. Y sin filtrar `deleted_at`, una sucursal borrada
+    seguía viajando en el token: `Tenant.exigir_sucursal` la dejaba pasar y
+    el listado de ventas devolvía vacío en vez de negar el acceso.
+    """
+    from datetime import UTC, datetime
+
+    from sqlalchemy import select
+
+    from src.modules.users.infrastructure.models import (
+        Empresa,
+        Marca,
+        Sucursal,
+        Usuario,
+        UsuarioSucursal,
+    )
+    from src.modules.users.infrastructure.repositories import UsuarioRepo
+
+    session = next(client.app.dependency_overrides[get_db]())
+    empresa = session.scalar(select(Empresa))
+    marca = session.scalar(select(Marca))
+    admin = session.scalar(select(Usuario).where(Usuario.username == "admin"))
+    creadas = []
+    # A propósito fuera de orden alfabético al insertar: si el repositorio no
+    # ordena, el test pasa por casualidad con el orden de inserción.
+    for nombre in ("Zorritos", "Amazonas", "Borrada"):
+        s = Sucursal(
+            marca_id=marca.id, empresa_id=empresa.id, nombre=nombre,
+            direccion="Jr. X 1", tenencia="alquilada",
+        )
+        session.add(s)
+        session.flush()
+        session.add(UsuarioSucursal(usuario_id=admin.id, sucursal_id=s.id))
+        creadas.append(s)
+    creadas[-1].deleted_at = datetime.now(UTC)
+    session.commit()
+
+    nombres = [
+        session.get(Sucursal, sid).nombre
+        for sid in UsuarioRepo(session).sucursal_ids(admin.id)
+    ]
+    assert "Borrada" not in nombres
+    assert {"Amazonas", "Zorritos"} <= set(nombres)
+    assert nombres == sorted(nombres)

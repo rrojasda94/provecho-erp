@@ -222,3 +222,26 @@ def test_la_imagen_lleva_lo_que_se_corre_dentro_del_contenedor() -> None:
         "documentado falla con `No module named 'scripts'`"
     )
 
+
+
+def test_los_motivos_de_descuento_del_pdv_son_los_que_la_api_acepta():
+    """El PDV los ofrece como chips y la API los valida contra un conjunto
+    cerrado: si las dos listas se separan, el cajero elige un motivo que el
+    servidor rechaza con un 409 en el momento de firmar.
+
+    `cupon` queda fuera del PDV a propósito: ese motivo lo pone el canje del
+    cupón, no una persona eligiendo de una lista.
+    """
+    from src.modules.sales.domain.rules import MOTIVO_CUPON, MOTIVOS_DESCUENTO
+
+    fuente = (RAIZ / "frontend/app/pdv/tipos.ts").read_text(encoding="utf-8")
+    bloque = re.search(
+        r"export const MOTIVOS_DESCUENTO = \[(.*?)\] as const;", fuente, re.S
+    )
+    assert bloque, "No encontré MOTIVOS_DESCUENTO en frontend/app/pdv/tipos.ts"
+    del_pdv = set(re.findall(r'\["([a-z_]+)",', bloque.group(1)))
+
+    assert del_pdv == MOTIVOS_DESCUENTO - {MOTIVO_CUPON}, (
+        "los motivos de descuento del PDV y los de la API no coinciden: "
+        f"PDV={sorted(del_pdv)} API={sorted(MOTIVOS_DESCUENTO - {MOTIVO_CUPON})}"
+    )

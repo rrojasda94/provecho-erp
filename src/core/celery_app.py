@@ -114,6 +114,14 @@ celery_app.conf.beat_schedule = {
         "task": "marketing.barrer_encuestas_vencidas",
         "schedule": 3600.0,
     },
+    # Borradores del PDV de turnos ya cerrados. De madrugada y no cada hora:
+    # el corte es la medianoche del negocio, y borrar a media tarde el
+    # borrador de "ayer" mientras alguien todavía lo tiene abierto sería
+    # quitarle el pedido de la pantalla en pleno servicio.
+    "purgar-borradores-viejos": {
+        "task": "sales.purgar_borradores_viejos",
+        "schedule": crontab(hour=5, minute=30),
+    },
 }
 
 

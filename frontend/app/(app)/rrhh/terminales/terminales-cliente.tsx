@@ -2,7 +2,7 @@
 
 /**
  * Alta y revocación del dispositivo autorizado a marcar por un local
- * (ADR-073, RN-RRHH-023). No es `DialogoFormulario`: el alta devuelve un
+ * (ADR-079, RN-RRHH-023). No es `DialogoFormulario`: el alta devuelve un
  * código de activación que solo se ve una vez, y ese diálogo cierra solo
  * al terminar — se perdería antes de que alguien lo copie.
  */
@@ -154,7 +154,7 @@ export function TerminalesCliente({
         </h1>
       </div>
       <p className="text-sm text-gray">
-        El dispositivo autorizado a marcar asistencia por un local (ADR-073).
+        El dispositivo autorizado a marcar asistencia por un local (ADR-079).
         Sin uno enrolado, el pad no marca aunque el PIN sea correcto — es lo
         que evita que alguien marque desde fuera del local. Revocar uno
         (tablet perdida o dada de baja) lo desactiva en el acto.

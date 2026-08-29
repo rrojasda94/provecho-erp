@@ -39,8 +39,12 @@ function pedido(extra: Partial<Borrador> = {}): Borrador {
     ventaId: null,
     numeroOrden: null,
     hora: "12:00",
+    notaCocina: "",
     consumoMotivo: null,
     consumoAutorizacion: null,
+    descuento: null,
+    cupon: null,
+    promociones: [],
     ...extra,
   } as Borrador;
 }
@@ -51,6 +55,17 @@ test("el reparto suma al total del pedido", () => {
 
 test("sin cotizar todavía, el total es solo lo consumido", () => {
   assert.equal(totalBorrador(pedido()), 80);
+});
+
+test("la promoción baja el total y el descuento se toma sobre lo que queda", () => {
+  // Mismo orden que el servidor (ADR-076): 80 de lista − 40 de promoción =
+  // 40, y el 10 % firmado se toma sobre 40. Al revés, el supervisor estaría
+  // regalando el doble de lo que aprobó.
+  const conPromo = pedido({
+    promociones: [{ nombre: "2x1", monto: 40 }],
+    descuento: { modo: "porcentaje", valor: 10, motivo: "cortesia" },
+  });
+  assert.equal(totalBorrador(conPromo), 36);
 });
 
 test("un consumo de personal vale cero, reparto incluido", () => {

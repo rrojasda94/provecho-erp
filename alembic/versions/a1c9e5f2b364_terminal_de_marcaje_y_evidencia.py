@@ -1,6 +1,6 @@
 """terminal de marcaje y evidencia de marcacion
 
-Ancla el marcaje de asistencia al dispositivo, no a la red (ADR-073):
+Ancla el marcaje de asistencia al dispositivo, no a la red (ADR-079):
 
 - `terminal_marcaje`: el dispositivo autorizado a marcar por una sucursal.
   Nace inactivo con un codigo de activacion; enrolar lo activa y guarda
@@ -12,7 +12,7 @@ Ancla el marcaje de asistencia al dispositivo, no a la red (ADR-073):
   bloquear) la distancia del marcaje. NULL = esa sucursal no lo evalua.
 
 Revision ID: a1c9e5f2b364
-Revises: bf0ea834a972
+Revises: d4b7e91c2f80
 Create Date: 2026-08-28
 
 """
@@ -22,7 +22,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = 'a1c9e5f2b364'
-down_revision: str | None = 'bf0ea834a972'
+down_revision: str | None = 'd4b7e91c2f80'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

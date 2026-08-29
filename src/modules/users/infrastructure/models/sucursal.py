@@ -42,7 +42,7 @@ class Sucursal(
     # atención). El horario laboral de cada trabajador NO vive aquí.
     horario_atencion: Mapped[dict | None] = mapped_column(JsonB, nullable=True)
     # Radio en metros para observar (nunca bloquear) el marcaje de asistencia
-    # (RN-RRHH-024, ADR-073). NULL = esta sucursal no evalúa distancia — el
+    # (RN-RRHH-024, ADR-079). NULL = esta sucursal no evalúa distancia — el
     # GPS de una tablet bajo techo se equivoca por decenas de metros, así que
     # el valor nace vacío y cada local lo activa cuando le sirve.
     radio_marcaje_m: Mapped[int | None] = mapped_column(Integer, nullable=True)

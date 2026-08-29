@@ -1,4 +1,4 @@
-"""Registro de la evidencia de cada marcación (RN-RRHH-024, ADR-073).
+"""Registro de la evidencia de cada marcación (RN-RRHH-024, ADR-079).
 
 `asistencia` es la fila-resumen del día; esto es la fila por toque, con lo
 que RRHH mira cuando algo no cuadra: quién firmó, desde qué terminal (NULL

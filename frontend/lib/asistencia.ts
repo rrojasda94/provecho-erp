@@ -26,7 +26,7 @@ export type Marcacion = {
   };
 };
 
-/** Evidencia opcional del marcaje (RN-RRHH-024, ADR-073): ninguno de los
+/** Evidencia opcional del marcaje (RN-RRHH-024, ADR-079): ninguno de los
  * tres es obligatorio, y su ausencia nunca impide marcar. `foto` va en
  * base64 sin el encabezado `data:image/jpeg;base64,`. */
 export type EvidenciaMarcaje = {

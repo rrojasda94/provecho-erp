@@ -1,4 +1,4 @@
-# ADR-073 — El marcaje se ancla al dispositivo, no a la red
+# ADR-079 — El marcaje se ancla al dispositivo, no a la red
 
 - Estado: aceptado
 - Fecha: 2026-08-28

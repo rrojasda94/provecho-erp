@@ -16,7 +16,7 @@ slice de ventas (solo el modelo, sin casos de uso); ese slice le agregó
 **2026-08-01** — slice de contratación: `convocatoria` + el tablero que va de
 la postulación recibida al fin del periodo de prueba.
 
-**2026-08-28** — terminal enrolado y evidencia de marcaje (ADR-073,
+**2026-08-28** — terminal enrolado y evidencia de marcaje (ADR-079,
 RN-RRHH-023/024): el pad ya no marca solo con el PIN, exige un dispositivo
 autorizado y guarda foto/ubicación/IP de cada toque como observación, nunca
 como condición.
@@ -151,7 +151,7 @@ versión genérica.
   contra el **mismo lockout del login**. Cada marcación escribe además su
   `marcacion` vía `application/marcaciones.py` (terminal, IP, ubicación,
   foto — ninguno bloquea, ver RN-RRHH-024).
-- **`application/terminales.py`** (2026-08-28, ADR-073): el dispositivo
+- **`application/terminales.py`** (2026-08-28, ADR-079): el dispositivo
   autorizado a marcar por una sucursal. `crear` genera un código de
   activación de 6 dígitos vigente 30 minutos; `enrolar` lo cambia por un
   secreto propio (SHA-256, igual criterio que `TokenAgente`) que la tablet

@@ -82,7 +82,7 @@ erDiagram
   `propia` paga predial/arbitrios, RN-IMP-004), horario_atencion
   (disponibilidad al público — el horario laboral de cada trabajador vive
   en `asistencia`/`contrato_laboral`, no aquí), radio_marcaje_m (nullable,
-  2026-08-28, ADR-073 — metros para **observar**, nunca bloquear, la
+  2026-08-28, ADR-079 — metros para **observar**, nunca bloquear, la
   distancia de un marcaje de asistencia; NULL = esa sucursal no lo evalúa).
   Se abastece del almacén central de su empresa (excepción: gas/bebidas
   embotelladas directo de proveedor, gestión fuera de la sucursal).
@@ -904,9 +904,16 @@ Solicitud.
   **no** una FK a `kds_pantalla` a propósito: la línea guarda DÓNDE VA, no
   QUIÉN la atiende, así que desactivar el horno a media noche no deja
   pedidos apuntando a una pantalla que ya no opera — caen solos a la
-  siguiente estación que los acepte.
+  siguiente estación que los acepte, y si ninguna declara su categoría, a la
+  primera de la cadena (ADR-078): antes se quedaban invisibles en todo el
+  KDS. También lleva **idempotency_key** (nullable, único — marca la
+  PRIMERA línea de cada envío a cocina, RN-COM-002/ADR-075: sin ella, el
+  reintento de un aumento cuya respuesta se perdió mandaba dos comandas
+  idénticas).
 - **kds_pantalla**: sucursal_id, nombre, tipo (`preparacion` | `despacho`),
-  categoria_ids (JSONB de `categoria.id`; NULL/[] = todas), **orden**
+  categoria_ids (JSONB de `categoria.id`; NULL/[] = todas — y una categoría
+  que ninguna pantalla declara la atiende la primera de la cadena, ADR-078),
+  **orden**
   (entero, default 0 — eslabón de la estación en la cadena de preparación),
   activo. `UNIQUE (sucursal_id, nombre)`.
 
@@ -952,8 +959,12 @@ Solicitud.
   precios, RN-MDP-001).
 - **pago**: venta_id, medio_pago_id, monto (obligatorio — una venta puede
   cobrarse con varios `pago`, confirmado 2026-07-20 como caso real del
-  negocio, no solo capacidad técnica; suma de `pago.monto` debe igualar
-  `venta.total` antes de `estado=pagada`, RN-COM-016), **grupo_cobro**
+  negocio, no solo capacidad técnica; suma de `pago.monto` debe **cubrir**
+  `venta.total` antes de `estado=pagada`, RN-COM-016), **vuelto**
+  (`Numeric(10,2)`, default 0 — lo devuelto al cliente, ADR-077; `monto` es
+  lo que entra a la cuenta y nunca pasa del saldo, así que contabilidad no
+  asienta plata que salió del cajón. Solo los medios con vuelto —hoy
+  `efectivo`— pueden traerlo distinto de cero), **grupo_cobro**
   (entero, default 1 — los pagos de un grupo suman contra el total de ESE
   grupo, no de la venta entera; la venta pasa a `pagada` recién cuando
   ningún grupo queda con saldo, RN-COM-018/ADR-018), pasarela (izipay),
@@ -1409,7 +1420,7 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
   (ADR-064), distinto del turno de caja y del horario de atención. Único por
   `(sucursal_id, nombre)`. `hora_fin`/`hora_limite_salida` menores que
   `hora_inicio` significan que el turno cruza la medianoche.
-- **terminal_marcaje** (2026-08-28, ADR-073): sucursal_id, nombre, codigo
+- **terminal_marcaje** (2026-08-28, ADR-079): sucursal_id, nombre, codigo
   (activación, 6 dígitos, se borra al enrolar), codigo_expira_en (30 min),
   secreto_hash (SHA-256 — no Argon2id: el secreto es aleatorio de 128 bits,
   no una contraseña humana), activo, ultima_marcacion_en. El dispositivo
@@ -1417,7 +1428,7 @@ un trabajador puede o no tener usuario, y no todo usuario es trabajador
   sucursal, el pad no marca aunque el PIN sea correcto. Único por
   `(sucursal_id, nombre)` entre los vivos y por `secreto_hash` entre los no
   nulos (mismo patrón parcial que `kds_pantalla`).
-- **marcacion** (2026-08-28, ADR-073, RN-RRHH-024): asistencia_id, tipo
+- **marcacion** (2026-08-28, ADR-079, RN-RRHH-024): asistencia_id, tipo
   (`entrada`|`salida`), momento, usuario_id (quién firmó), terminal_id
   (nullable — NULL = corrección de back-office), ip, ubicacion_lat/lng,
   distancia_m (calculada, haversine, contra `sucursal.ubicacion_lat/lng`),

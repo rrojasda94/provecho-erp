@@ -130,7 +130,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ⬜ **Los trabajadores que ya existían quedaron sin sucursal**: la migración
   `b6d29f10c47e` es aditiva y nullable, sin backfill — no hay dato del que
   deducir el local. Hay que asignárselos a mano desde RRHH → Trabajadores.
-- ✅ 2026-08-28 (ADR-073) **Terminal enrolado y evidencia de marcaje**: el pad
+- ✅ 2026-08-28 (ADR-079) **Terminal enrolado y evidencia de marcaje**: el pad
   ya no marca solo con el PIN — exige un `terminal_marcaje` activo de la
   sucursal (RN-RRHH-023) y guarda foto/ubicación/IP de cada toque como
   observación, nunca como condición (RN-RRHH-024). Ver ROADMAP → Módulo

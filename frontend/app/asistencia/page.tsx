@@ -9,7 +9,7 @@
  *
  * Eso solo prueba QUIÉN abre el pad, no DÓNDE está la tablet: el token de
  * esa cuenta es exportable, y sin más candado funcionaría igual desde el
- * celular de cualquiera. `provecho_terminal` es ese candado (ADR-073): sin
+ * celular de cualquiera. `provecho_terminal` es ese candado (ADR-079): sin
  * la cookie del terminal enrolado, la pantalla ni siquiera pide tarjetas —
  * pide el código de activación.
  */

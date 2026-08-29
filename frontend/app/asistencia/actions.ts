@@ -16,7 +16,7 @@ const ES_PRODUCCION = process.env.COOKIE_SECURE
 const DIAS_TERMINAL = 365;
 
 /** Guarda el secreto que devolvió `POST /asistencia/terminal/enrolar` en la
- * cookie httpOnly del terminal (ADR-073). Aparte de `loginAction` porque
+ * cookie httpOnly del terminal (ADR-079). Aparte de `loginAction` porque
  * activa un dispositivo, no una persona: la sesión de la cuenta de
  * servicio y el secreto del terminal viven en cookies distintas y con
  * vigencias distintas. */

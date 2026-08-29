@@ -29,6 +29,7 @@ from src.modules.sales.application import catalogo as catalogo_uc
 from src.modules.sales.application import clientes as clientes_uc
 from src.modules.sales.application import comprobantes as comprobantes_uc
 from src.modules.sales.application import mesas as mesas_uc
+from src.modules.sales.application import promociones as promociones_uc
 from src.modules.sales.application import ventas as ventas_uc
 from src.modules.sales.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.sales.domain import rules
@@ -37,7 +38,11 @@ from src.modules.sales.infrastructure.models import (
     ProductoComercial,
     PuntoVenta,
 )
-from src.modules.sales.infrastructure.repositories import ComprobanteRepo, VentaRepo
+from src.modules.sales.infrastructure.repositories import (
+    ComprobanteRepo,
+    PagoRepo,
+    VentaRepo,
+)
 from src.modules.users.infrastructure.models import (
     Empresa,
     Grupo,
@@ -167,7 +172,13 @@ def base(session):
     medio = MedioPago(
         empresa_id=empresa.id, nombre="Efectivo", direccion="cobro", tipo="efectivo"
     )
-    session.add_all([usuario, medio])
+    # Un medio sin cajón: es contra este que se prueba que el sobrepago
+    # sigue rechazándose donde no hay vuelto posible (ADR-077).
+    tarjeta = MedioPago(
+        empresa_id=empresa.id, nombre="Visa", direccion="cobro",
+        tipo="tarjeta_credito",
+    )
+    session.add_all([usuario, medio, tarjeta])
     session.flush()
     # Cobrar exige turno de caja abierto (RN-MDP-002). Este archivo prueba el
     # PDV, no la caja: el turno se inserta directo.
@@ -183,6 +194,7 @@ def base(session):
         "punto_venta": punto_venta,
         "usuario": usuario,
         "medio": medio,
+        "tarjeta": tarjeta,
     }
 
 
@@ -344,7 +356,12 @@ def test_cobrar_una_cuenta_no_cierra_la_venta_y_emite_su_comprobante(session, ba
     assert len(ComprobanteRepo(session).todos_de_venta(venta.id)) == 2
 
 
-def test_el_pago_no_puede_exceder_el_saldo_de_su_cuenta(session, base):
+def test_el_pago_no_puede_exceder_el_saldo_en_un_medio_sin_vuelto(session, base):
+    """Sin cajón que devuelva, un monto de más es un error de tecleo.
+
+    Aceptarlo dejaría la tarjeta cobrada por encima de lo consumido y el
+    arqueo sin forma de cuadrar (ADR-077).
+    """
     venta = _crear(
         session,
         base,
@@ -358,11 +375,41 @@ def test_el_pago_no_puede_exceder_el_saldo_de_su_cuenta(session, base):
         ventas_uc.registrar_pago(
             session,
             venta_id=venta.id,
-            medio_pago_id=base["medio"].id,
+            medio_pago_id=base["tarjeta"].id,
             monto=Decimal("50.00"),
             idempotency_key="pago-excede",
             grupo_cobro=1,
         )
+
+
+def test_en_efectivo_el_exceso_es_vuelto_y_cierra_la_cuenta(session, base):
+    """Un billete de 50 por una cuenta de 40 es el caso normal de una caja.
+
+    Rechazarlo obligaba al cajero a teclear el saldo exacto de memoria, que
+    es de donde salía "pongo el monto exacto y me dice que supera el monto a
+    pagar". Lo que entra a la cuenta sigue siendo el saldo: el vuelto salió
+    del cajón y contabilidad no debe asentarlo (ADR-077).
+    """
+    venta = _crear(
+        session,
+        base,
+        [
+            _item(base["productos"][0], precio="40.00", grupo_cobro=1),
+            _item(base["productos"][1], precio="30.00", grupo_cobro=2),
+        ],
+    )
+    pago, venta, comprobante = ventas_uc.registrar_pago(
+        session,
+        venta_id=venta.id,
+        medio_pago_id=base["medio"].id,
+        monto=Decimal("50.00"),
+        idempotency_key="pago-con-vuelto",
+        grupo_cobro=1,
+    )
+    assert pago.monto == Decimal("40.00")
+    assert pago.vuelto == Decimal("10.00")
+    assert comprobante is not None, "la cuenta quedó cubierta"
+    assert venta.estado == "orden", "la cuenta 2 sigue pendiente"
 
 
 def test_pagar_una_cuenta_inexistente_falla(session, base):
@@ -1690,3 +1737,339 @@ def test_mover_conserva_el_avance_de_preparacion_del_kds(session, base):
         "la bebida de destino sigue pendiente: el pedido no es entregable "
         "solo porque llegó un plato ya listo"
     )
+
+
+# --- La cuenta recuerda su mesa ----------------------------------------------
+def test_la_venta_expone_el_numero_de_su_mesa(session, base):
+    """El PDV reabre una cuenta desde la pestaña de cuentas abiertas, sin
+    pasar por el mapa de salón: con solo `mesa_id` la pestaña quedaba
+    rotulada "Mesa ?" y el mesero no sabía a qué mesa estaba cobrando."""
+    mesa = mesas_uc.crear_mesa(session, sucursal_id=base["sucursal"].id)
+    venta = _crear(session, base, [_item(base["productos"][0])], mesa_id=mesa.id)
+    session.expire_all()
+
+    assert venta.mesa_numero == mesa.numero
+
+
+def test_una_venta_sin_mesa_no_inventa_numero(session, base):
+    venta = _crear(session, base, [_item(base["productos"][0])], modalidad="takeout")
+    session.expire_all()
+
+    assert venta.mesa_numero is None
+
+
+# --- La tanda del KDS (ADR-075) ----------------------------------------------
+def test_las_lineas_del_alta_son_la_tanda_uno(session, base):
+    venta = _crear(session, base, [_item(base["productos"][0])])
+
+    assert [i.tanda for i in VentaRepo(session).items(venta.id)] == [1]
+
+
+def test_cada_agregado_abre_su_propia_tanda(session, base):
+    """Todo lo que el trabajador confirmó de un envío sale junto en la misma
+    comanda; el envío siguiente es otra."""
+    venta = _crear(session, base, [_item(base["productos"][0])])
+    ventas_uc.agregar_lineas(
+        session,
+        venta_id=venta.id,
+        items=[
+            {"producto_comercial_id": base["productos"][1].id, "cantidad": Decimal(1),
+             "precio_unitario": Decimal("30.00")},
+            {"producto_comercial_id": base["productos"][0].id, "cantidad": Decimal(1),
+             "precio_unitario": Decimal("40.00")},
+        ],
+        usuario_id=base["usuario"].id,
+    )
+    ventas_uc.agregar_lineas(
+        session,
+        venta_id=venta.id,
+        items=[{"producto_comercial_id": base["productos"][1].id,
+                "cantidad": Decimal(1), "precio_unitario": Decimal("30.00")}],
+        usuario_id=base["usuario"].id,
+    )
+
+    tandas = sorted(i.tanda for i in VentaRepo(session).items(venta.id))
+    assert tandas == [1, 2, 2, 3]
+
+
+# --- Promociones condicionales (ADR-076) --------------------------------------
+def _promocion(session, base, **campos):
+    campos.setdefault("nombre", "Promo")
+    campos.setdefault("tipo", "nxm")
+    campos.setdefault("condicion", {"lleva": 2})
+    campos.setdefault("beneficio", {"libera": 1})
+    return promociones_uc.crear_promocion(
+        session, empresa_id=base["empresa"].id, **campos
+    )
+
+
+def test_la_promocion_baja_el_total_sin_tocar_el_descuento_manual(session, base):
+    """La frontera de ADR-076: `venta.descuento_*` es el acto humano firmado.
+    Si el motor escribiera ahí, el reporte de descuentos no podría distinguir
+    lo que regaló un supervisor de lo que aplicó una regla."""
+    _promocion(session, base)
+    venta = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+    session.flush()
+
+    assert venta.total == Decimal("40.00")  # 80 de lista, una liberada
+    assert venta.descuento_modo is None
+    assert venta.descuento_valor is None
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal("40.00")
+
+
+def test_la_promocion_queda_nombrada_en_la_venta(session, base):
+    """El nombre viaja congelado: la promoción se renombra o se apaga, y el
+    ticket de ayer tiene que decir lo que el cliente leyó."""
+    _promocion(session, base, nombre="2x1 de martes")
+    venta = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+
+    aplicadas = promociones_uc.aplicadas_a(session, venta.id)
+    assert [(a.nombre, a.monto) for a in aplicadas] == [("2x1 de martes", Decimal("40.00"))]
+
+
+def test_el_aumento_puede_activar_la_promocion(session, base):
+    """La segunda pizza es la que acaba de entrar: si el motor no se
+    reevaluara al agregar líneas, el 2x1 no se activaría nunca en una mesa
+    que pide de a poco (RN-COM-029)."""
+    _promocion(session, base)
+    venta = _crear(session, base, [_item(base["productos"][0])])
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal(0)
+
+    ventas_uc.agregar_lineas(
+        session,
+        venta_id=venta.id,
+        items=[{
+            "producto_comercial_id": base["productos"][0].id,
+            "cantidad": Decimal(1),
+            "precio_unitario": Decimal("40.00"),
+        }],
+        usuario_id=base["usuario"].id,
+    )
+
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal("40.00")
+
+
+def test_quitar_la_linea_desactiva_la_promocion_que_activaba(session, base):
+    """No queda cobrada sobre algo que ya no está."""
+    _promocion(session, base)
+    venta = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+    linea = VentaRepo(session).items(venta.id)[0]
+
+    ventas_uc.anular_lineas(
+        session,
+        venta_id=venta.id,
+        venta_item_ids=[linea.id],
+        motivo="error de tecleo",
+        autorizado_por=base["usuario"].id,
+    )
+
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal(0)
+
+
+def test_un_consumo_de_personal_no_promociona(session, base):
+    """Ya vale cero (RN-COM-025): descontarle algo no significa nada."""
+    _promocion(session, base)
+    venta = _crear(
+        session,
+        base,
+        [_item(base["productos"][0], cantidad=2)],
+        tipo="consumo_personal",
+        consumo_motivo="capacitacion",
+        consumo_autorizado_por=base["usuario"].id,
+    )
+
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal(0)
+    assert venta.total == Decimal(0)
+
+
+def test_una_promocion_apagada_deja_de_aplicarse_pero_no_borra_lo_aplicado(
+    session, base
+):
+    """RN-PRM-005: terminarla no puede reescribir una venta que ya se cobró
+    con ella."""
+    promo = _promocion(session, base)
+    vieja = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+    promociones_uc.terminar_promocion(session, promo.id)
+    session.flush()
+    nueva = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+
+    assert promociones_uc.total_aplicado(session, vieja.id) == Decimal("40.00")
+    assert promociones_uc.total_aplicado(session, nueva.id) == Decimal(0)
+
+
+def test_la_promocion_de_otra_sucursal_no_alcanza_a_esta_venta(session, base):
+    otra = Sucursal(
+        marca_id=base["sucursal"].marca_id,
+        empresa_id=base["empresa"].id,
+        nombre="Charlie's - Norte",
+        direccion="Jr. Otro 456",
+        tenencia="alquilada",
+    )
+    session.add(otra)
+    session.flush()
+    _promocion(session, base, sucursal_id=otra.id)
+    venta = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal(0)
+
+
+def test_la_promocion_de_otra_modalidad_no_alcanza_a_esta_venta(session, base):
+    _promocion(session, base, modalidades=["delivery"])
+    venta = _crear(
+        session, base, [_item(base["productos"][0], cantidad=2)], modalidad="mesa"
+    )
+
+    assert promociones_uc.total_aplicado(session, venta.id) == Decimal(0)
+
+
+def test_el_descuento_manual_se_calcula_sobre_lo_ya_promocionado(session, base):
+    """El supervisor firma un porcentaje sobre lo que el cliente va a pagar.
+    Al revés, un 20 % sobre un pedido con 2x1 regalaría casi la mitad del
+    ticket sin que nadie lo haya aprobado así."""
+    _promocion(session, base)
+    venta = _crear(session, base, [_item(base["productos"][0], cantidad=2)])
+    ventas_uc.aplicar_descuento(
+        session,
+        venta_id=venta.id,
+        modo="porcentaje",
+        valor=Decimal(10),
+        motivo="cortesia",
+        autorizado_por=base["usuario"].id,
+    )
+
+    # 80 de lista - 40 de promoción = 40; el 10% se toma sobre 40, no sobre 80.
+    assert venta.total == Decimal("36.00")
+
+
+def test_una_promocion_nxm_que_libera_todo_lo_que_exige_se_rechaza(session, base):
+    with pytest.raises(ReglaNegocio):
+        _promocion(session, base, condicion={"lleva": 2}, beneficio={"libera": 2})
+
+
+def test_una_vigencia_al_reves_se_rechaza(session, base):
+    with pytest.raises(ReglaNegocio):
+        _promocion(
+            session, base, desde=date(2026, 9, 1), hasta=date(2026, 8, 1)
+        )
+
+
+def test_el_aumento_confirma_lo_que_sube_la_cuenta_no_el_precio_de_lista(
+    session, base
+):
+    """El evento lleva "lo confirmado en esta operación" (ADR-043 §3), y con
+    una promoción de por medio eso deja de ser el precio de lista.
+
+    La segunda pizza de un 2x1 entra por S/ 40 y no le suma un sol al total.
+    Publicar los 40 dejaría a contabilidad asentando plata que la caja nunca
+    cobró, y los libros dejarían de cuadrar con el turno.
+    """
+    _promocion(session, base)
+    venta = _crear(session, base, [_item(base["productos"][0])])
+    confirmadas: list[dict] = []
+    event_bus.subscribe("sales.venta_confirmada", confirmadas.append)
+    ventas_uc.agregar_lineas(
+        session,
+        venta_id=venta.id,
+        items=[{
+            "producto_comercial_id": base["productos"][0].id,
+            "cantidad": Decimal(1),
+            "precio_unitario": Decimal("40.00"),
+        }],
+        usuario_id=base["usuario"].id,
+    )
+    # Los eventos salen al commitear (ADR-016), no al publicarlos.
+    session.commit()
+
+    # Dos pizzas de S/ 40 con 2x1: la cuenta sigue en 40 y el aumento no
+    # confirmó un sol, aunque de lista entraron 40.
+    assert venta.total == Decimal("40.00")
+    assert Decimal(confirmadas[-1]["total"]) == Decimal(0)
+
+
+# --- Parche 0.8.1: el cobro rechazaba el monto exacto -------------------------
+def test_el_total_se_cuantiza_a_centavos(session, base):
+    """Un total con cuatro decimales no es cobrable.
+
+    `cantidad` y `precio_unitario` guardan dos decimales cada uno, así que su
+    producto puede traer cuatro: 1.5 × 12.35 = 18.525. El saldo real era
+    18.525 mientras la pantalla —que lee `venta.total`, ya truncado por
+    `Numeric(10,2)`— decía 18.53. Pagar el monto exacto que el cajero tenía
+    delante se rechazaba por exceder el saldo, y pagar un centavo menos
+    dejaba medio centavo imposible de cancelar: la venta atascada en `orden`
+    y sin comprobante.
+    """
+    venta = _crear(
+        session, base, [_item(base["productos"][0], cantidad="1.5", precio="12.35")]
+    )
+    total = ventas_uc.total_a_cobrar(session, venta)
+    assert total == Decimal("18.53")
+    assert venta.total == total
+
+    _pago, venta, comprobante = ventas_uc.registrar_pago(
+        session,
+        venta_id=venta.id,
+        medio_pago_id=base["tarjeta"].id,
+        monto=Decimal("18.53"),
+        idempotency_key="pago-exacto-centavos",
+    )
+    assert comprobante is not None, "el monto exacto de la pantalla tiene que cerrar"
+    assert venta.estado == "pagada"
+
+
+def test_el_saldo_lo_dice_el_servidor_por_cuenta(session, base):
+    """El número que valida el pago es el mismo que lo propone.
+
+    El PDV sumaba el borrador en el navegador y no podía saber el flete de
+    una orden reabierta ni el prorrateo del descuento entre cuentas.
+    """
+    venta = _crear(
+        session,
+        base,
+        [
+            _item(base["productos"][0], precio="40.00", grupo_cobro=1),
+            _item(base["productos"][1], precio="30.00", grupo_cobro=2),
+        ],
+    )
+    ventas_uc.registrar_pago(
+        session,
+        venta_id=venta.id,
+        medio_pago_id=base["medio"].id,
+        monto=Decimal("15.00"),
+        idempotency_key="saldo-parcial",
+        grupo_cobro=1,
+    )
+    assert ventas_uc.total_a_cobrar(session, venta, 1) == Decimal("40.00")
+    pagado = sum(PagoRepo(session).confirmados(venta.id, 1), Decimal(0))
+    assert pagado == Decimal("15.00")
+    assert ventas_uc.total_a_cobrar(session, venta, 2) == Decimal("30.00")
+
+
+def test_cada_cuenta_deja_su_propio_comprobante(session, base):
+    """Pagos separados, comprobantes separados (RN-COM-018).
+
+    Ya se emitía uno por cuenta; lo que faltaba era poder listarlos: el PDV
+    solo pedía el singular, que devuelve el primero, y el segundo cliente se
+    quedaba sin su papel.
+    """
+    venta = _crear(
+        session,
+        base,
+        [
+            _item(base["productos"][0], precio="40.00", grupo_cobro=1),
+            _item(base["productos"][1], precio="30.00", grupo_cobro=2),
+        ],
+    )
+    for grupo, monto in ((1, "40.00"), (2, "30.00")):
+        ventas_uc.registrar_pago(
+            session,
+            venta_id=venta.id,
+            medio_pago_id=base["medio"].id,
+            monto=Decimal(monto),
+            idempotency_key=f"cuenta-{grupo}",
+            grupo_cobro=grupo,
+        )
+    repo = ComprobanteRepo(session)
+    todos = repo.todos_de_venta(venta.id)
+    assert len(todos) == 2
+    assert {c.grupo_cobro for c in todos} == {1, 2}
+    assert len({c.correlativo for c in todos}) == 2, "cada uno con su correlativo"

@@ -96,7 +96,7 @@ class Settings(BaseSettings):
     # (RN-PER-004: no hay plazo legal fijo en Perú, lo declara el aviso de
     # privacidad). Se aplica al crear la ficha y lo barre la purga.
     rrhh_plazo_conservacion_postulante_meses: int = 12
-    # Días que se conserva la foto de una marcación (RN-RRHH-024, ADR-073).
+    # Días que se conserva la foto de una marcación (RN-RRHH-024, ADR-079).
     # Pasado el plazo la purga borra solo `marcacion.foto`; la fila y el
     # resto de la evidencia (terminal, IP, distancia) se quedan.
     rrhh_marcaje_foto_retencion_dias: int = 90

@@ -17,11 +17,20 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import (
+    Enum,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    select,
+)
+from sqlalchemy.orm import Mapped, column_property, declared_attr, mapped_column
 
 from src.core.database import Base
 from src.core.model_base import TimestampMixin, UbicacionMixin, UuidPkMixin
+from src.modules.sales.infrastructure.models.mesa import Mesa
 
 
 class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
@@ -127,9 +136,41 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     mesa_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("mesa.id"), nullable=True
     )
+
+    # Derivado, no columna: el número que ve el personal ("Mesa 7").
+    #
+    # Existe porque el PDV reabre una cuenta desde la pestaña de cuentas
+    # abiertas, y por ese camino nunca pasó por el mapa de salón: se quedaba
+    # con el `mesa_id` y la pestaña decía "Mesa ?". El número es de la mesa,
+    # no de la venta, así que duplicarlo en una columna sería una segunda
+    # fuente de verdad para un dato que además es inmutable (RN-MDC-004).
+    #
+    # Subconsulta y no `relationship`: `GET /sales/ventas` está paginado y un
+    # eager load por fila —o peor, un lazy load por fila— es exactamente lo
+    # que no puede pagar la pantalla que se refresca en cada cobro.
+    @declared_attr
+    def mesa_numero(cls) -> Mapped[int | None]:
+        return column_property(
+            select(Mesa.numero)
+            .where(Mesa.id == cls.mesa_id)
+            .correlate_except(Mesa)
+            .scalar_subquery()
+        )
+
     # Cuántos comen en la mesa. Opcional: el cajero no siempre lo pregunta.
     # Base del ticket promedio por comensal.
     comensales: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Cómo se sirve el pedido entero: "servir todo junto", "bebidas al
+    # final", "primero el pan al ajo", "en platos separados".
+    #
+    # Es del pedido y no de una línea a propósito: no dice qué lleva un
+    # plato —eso es `venta_item.nota`—, dice en qué orden y de qué forma sale
+    # todo. Colgarla de la primera línea la escondería dentro de un plato, y
+    # repetirla en todas sería pedirle al cocinero que las compare.
+    #
+    # El KDS la pinta al pie de la pastilla, donde se lee después de saber
+    # qué hay que preparar.
+    nota_cocina: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # --- Descuento manual de la orden (RN-COM-017) ---------------------------
     # Distinto de `venta_item.descuento` (monto por línea que sale de listas
     # promocionales) y de las promociones condicionales por marca/sucursal,

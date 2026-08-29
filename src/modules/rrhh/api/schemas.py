@@ -546,7 +546,7 @@ class PadMarcarIn(BaseModel):
     trabajador_id: uuid.UUID
     # Ni fecha ni hora ni tipo: los pone el servidor (ADR-065).
     pin: str = Field(min_length=4, max_length=12)
-    # Evidencia opcional (RN-RRHH-024, ADR-073): su ausencia nunca impide
+    # Evidencia opcional (RN-RRHH-024, ADR-079): su ausencia nunca impide
     # marcar. `foto` viaja en base64 — JPEG en claro, sin el encabezado
     # `data:image/jpeg;base64,`; ~127 KB decodificados es el tope de un
     # JPEG de 320px al 60%, con margen. El servidor revalida el tamaño real
