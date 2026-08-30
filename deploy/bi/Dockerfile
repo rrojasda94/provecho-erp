@@ -24,5 +24,9 @@ USER root
 # distinto: la primera "funciona" pero instala en el lugar que nadie usa; la
 # segunda ni siquiera encuentra el binario. `uv` sí viene en la imagen y
 # apunta al intérprete que se le diga.
-RUN uv pip install --python /app/.venv/bin/python psycopg2-binary authlib
+# `httpx` es para `scripts/superset_init.py` (Fase C, provisiona la
+# conexión analítica + los 10 datasets + RLS por la API REST) — no lo usa
+# Superset en sí, pero corre *dentro* de este contenedor (no hay Python en
+# el droplet aparte del venv de la imagen), así que tiene que estar acá.
+RUN uv pip install --python /app/.venv/bin/python psycopg2-binary authlib httpx
 USER superset
