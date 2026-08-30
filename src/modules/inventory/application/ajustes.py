@@ -5,12 +5,14 @@ usuario. Al aprobarse se genera el movimiento y se refleja en el stock.
 """
 
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
+from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application import margenes
 from src.modules.inventory.application import stock as stock_uc
 from src.modules.inventory.application.errors import NoEncontrado, ReglaNegocio
@@ -77,6 +79,7 @@ def detalle_ajuste(session: Session, ajuste_id: uuid.UUID) -> dict:
         "solicitado_por": ajuste.solicitado_por,
         "aprobado_por": ajuste.aprobado_por,
         "dentro_margen": ajuste.dentro_margen,
+        "lote_id": ajuste.lote_id,
         "articulo": articulo.nombre if articulo else "(borrado)",
         "sku_codigo": sku.codigo if sku else "(borrado)",
         "almacen": almacen.nombre if almacen else "(borrado)",
@@ -97,12 +100,24 @@ def solicitar_ajuste(
     cantidad: Decimal,
     motivo: str,
     solicitado_por: uuid.UUID,
+    lote_codigo: str | None = None,
+    fecha_vencimiento: date | None = None,
+    fecha_elaboracion: date | None = None,
+    condicion_almacenamiento: str | None = None,
 ) -> Ajuste:
     if motivo not in rules.MOTIVOS_AJUSTE:
         raise ReglaNegocio(f"motivo de ajuste inválido: {motivo}")
     if not rules.signo_ajuste_valido(motivo, cantidad):
         raise ReglaNegocio(
             f"signo de cantidad ({cantidad}) inválido para motivo '{motivo}'"
+        )
+    datos_de_lote = any(
+        (lote_codigo, fecha_vencimiento, fecha_elaboracion, condicion_almacenamiento)
+    )
+    if datos_de_lote and cantidad <= 0:
+        raise ReglaNegocio(
+            "los datos de lote solo aplican a una entrada (cantidad positiva); "
+            "una salida de un artículo con control de lote reparte por FEFO"
         )
     almacen = session.get(Almacen, almacen_id)
     if almacen is None:
@@ -117,6 +132,20 @@ def solicitar_ajuste(
         valor_diferencia=cantidad * costo,
         piso=piso,
     )
+    lote_id = None
+    if cantidad > 0 and datos_de_lote:
+        articulo = lotes_uc.articulo_de_sku(session, sku_id)
+        if articulo.controla_lote:
+            lote_id = lotes_uc.crear_lote(
+                session,
+                articulo_id=articulo.id,
+                codigo=lote_codigo,
+                fecha_vencimiento=fecha_vencimiento,
+                fecha_elaboracion=fecha_elaboracion,
+                origen="carga_inicial",
+                referencia=str(almacen_id),
+                condicion_almacenamiento=condicion_almacenamiento,
+            ).id
     return AjusteRepo(session).add(
         Ajuste(
             almacen_id=almacen_id,
@@ -126,6 +155,7 @@ def solicitar_ajuste(
             solicitado_por=solicitado_por,
             dentro_margen=dentro_margen,
             estado="pendiente",
+            lote_id=lote_id,
         )
     )
 
@@ -148,6 +178,11 @@ def aprobar_ajuste(
         "usuario_id": aprobado_por,
         "referencia": str(ajuste.id),
         "motivo_ajuste": ajuste.motivo,
+        # Solo lo pobló `solicitar_ajuste` en la rama de entrada (cantidad
+        # positiva); `registrar_movimiento` ignora `lote_id=None` y crea el
+        # lote automático de siempre. `registrar_salida` (rama negativa) no
+        # lo lee — reparte por FEFO.
+        "lote_id": ajuste.lote_id,
     }
     if ajuste.cantidad < 0:
         # Un ajuste negativo de un artículo con lote puede repartirse entre

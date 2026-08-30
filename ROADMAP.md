@@ -202,6 +202,7 @@ sesión y de dónde sale la cuenta contable de lo que se compra y se vende.
 | 4 y 5 | Ciclo de la OC en pantalla y factura de proveedor completa (ADR-085) | ✅ 2026-08-30 |
 | 7 | La cuenta contable se configura en la categoría y se hereda (ADR-086) | ✅ 2026-08-30 |
 | + | Recargar el PDV vuelve al pedido que se estaba armando, no a la primera pestaña (lo encontró la suite `uso`, que estaba roja en `main` por esto) | ✅ 2026-08-30 |
+| + | Entrada de stock manual: `/inventario/ajustes` solo aprobaba/rechazaba, sin forma de solicitar una — el formulario llama al mismo `POST /ajustes` que ya existía, y un artículo con lote puede declarar código y vencimiento al entrar | ✅ 2026-08-30 |
 
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)
 

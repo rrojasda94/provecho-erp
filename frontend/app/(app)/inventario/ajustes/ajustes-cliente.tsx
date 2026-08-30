@@ -4,10 +4,14 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
+import { Combobox } from "@/components/ui/combobox";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { pedir } from "@/lib/cliente-api";
 import { primeroElDe } from "@/lib/destinos";
 import { tienePermiso } from "@/lib/permisos";
+
+import { registrarEntradaStockAction } from "./actions";
 
 export type Ajuste = {
   id: string;
@@ -20,7 +24,24 @@ export type Ajuste = {
   solicitado_por: string;
   aprobado_por: string | null;
   dentro_margen: boolean;
+  lote_id: string | null;
 };
+
+export type OpcionAlmacen = { id: string; nombre: string };
+export type OpcionSku = { id: string; etiqueta: string; controlaLote: boolean };
+
+/** Los únicos dos motivos con delta positivo (`rules.signo_ajuste_valido`
+ * del servidor): `faltante`/`merma` solo aplican a una salida. */
+const MOTIVOS_ENTRADA = [
+  ["sobrante", "Sobrante"],
+  ["error_registro", "Corrección de error de registro"],
+] as const;
+
+const CONDICIONES = [
+  ["ambiente", "Ambiente"],
+  ["refrigerado", "Refrigerado"],
+  ["congelado", "Congelado"],
+] as const;
 
 const CLASE_ESTADO: Record<string, string> = {
   pendiente: "bg-amber-100 text-amber-900",
@@ -41,17 +62,22 @@ export function AjustesCliente({
   resaltado,
   estado,
   permisos,
+  almacenes,
+  skus,
 }: {
   ajustes: Ajuste[];
   resaltado: string | null;
   estado: string;
   permisos: string[];
+  almacenes: OpcionAlmacen[];
+  skus: OpcionSku[];
 }) {
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState("");
   const puedeAprobar = tienePermiso(permisos, "inventory.aprobar_ajuste");
+  const puedeSolicitar = tienePermiso(permisos, "inventory.solicitar_ajuste");
 
   async function decidir(id: string, accion: "aprobar" | "rechazar") {
     setEnviando(id);
@@ -155,15 +181,18 @@ export function AjustesCliente({
         <h1 className="font-heading text-xl italic uppercase text-dark">
           Ajustes de inventario
         </h1>
-        <label className="flex items-center gap-2 text-sm font-semibold">
-          Estado
-          <select value={estado} onChange={(e) => cambiarEstado(e.target.value)}>
-            <option value="pendiente">Pendientes</option>
-            <option value="aprobado">Aprobados</option>
-            <option value="rechazado">Rechazados</option>
-            <option value="">Todos</option>
-          </select>
-        </label>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            Estado
+            <select value={estado} onChange={(e) => cambiarEstado(e.target.value)}>
+              <option value="pendiente">Pendientes</option>
+              <option value="aprobado">Aprobados</option>
+              <option value="rechazado">Rechazados</option>
+              <option value="">Todos</option>
+            </select>
+          </label>
+          {puedeSolicitar && <FormularioEntradaStock almacenes={almacenes} skus={skus} />}
+        </div>
       </div>
       {resaltado && !ajustes.some((a) => a.id === resaltado) && (
         <p className="text-sm text-secondary">
@@ -181,5 +210,101 @@ export function AjustesCliente({
         placeholderBusqueda="Buscar por motivo..."
       />
     </div>
+  );
+}
+
+function FormularioEntradaStock({
+  almacenes,
+  skus,
+}: {
+  almacenes: OpcionAlmacen[];
+  skus: OpcionSku[];
+}) {
+  const [skuId, setSkuId] = useState<string | null>(null);
+  const controlaLote = useMemo(
+    () => skus.find((s) => s.id === skuId)?.controlaLote ?? false,
+    [skus, skuId],
+  );
+
+  return (
+    <DialogoFormulario
+      titulo="Registrar entrada de stock"
+      disparador="+ Registrar entrada de stock"
+      accion={registrarEntradaStockAction}
+      etiquetaEnvio="Registrar"
+      ayuda="Queda pendiente hasta que otro usuario la apruebe: quien la pide no puede aprobarla (RN-INV-006)."
+      envioDeshabilitado={almacenes.length === 0 || skus.length === 0}
+      alCerrar={() => setSkuId(null)}
+    >
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Almacén
+        <Combobox
+          name="almacen_id"
+          etiqueta="Almacén"
+          requerido
+          marcador="Elegir…"
+          opciones={almacenes.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Qué entra
+        <Combobox
+          name="sku_id"
+          etiqueta="Qué entra"
+          requerido
+          marcador="Elegir…"
+          opciones={skus.map((s) => ({ valor: s.id, etiqueta: s.etiqueta }))}
+          alCambiar={setSkuId}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Cantidad
+        <input name="cantidad" inputMode="decimal" defaultValue="1" />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Motivo
+        <select name="motivo" defaultValue="sobrante">
+          {MOTIVOS_ENTRADA.map(([valor, etiqueta]) => (
+            <option key={valor} value={valor}>
+              {etiqueta}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {/* Solo el artículo con control de lote pide vencimiento: los demás no
+          se mueven por `stock_lote`, y pedirlo igual sería un campo que nadie
+          sabe para qué sirve. */}
+      {controlaLote && (
+        <>
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Código de lote
+            <input name="lote_codigo" maxLength={50} placeholder="Opcional: se genera del vencimiento" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Fecha de vencimiento
+            <input name="fecha_vencimiento" type="date" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Fecha de elaboración
+            <input name="fecha_elaboracion" type="date" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Condición de almacenamiento
+            <select name="condicion_almacenamiento" defaultValue="">
+              <option value="">Sin especificar</option>
+              {CONDICIONES.map(([valor, etiqueta]) => (
+                <option key={valor} value={valor}>
+                  {etiqueta}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
+    </DialogoFormulario>
   );
 }

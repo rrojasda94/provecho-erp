@@ -579,13 +579,24 @@ Endpoints `/api/v1/inventory`:
 | POST | `/skus` | `gestionar_catalogo` |
 | GET | `/stock` | `leer` |
 | POST | `/movimientos` | `registrar_movimiento` |
-| POST | `/ajustes` | `solicitar_ajuste` |
+| POST | `/ajustes` | `solicitar_ajuste` — es también la "entrada de stock" manual: un ajuste positivo con motivo `sobrante`/`error_registro` (2026-08-30) |
 | POST | `/ajustes/{id}/aprobar` \| `/rechazar` | `aprobar_ajuste` |
 
 Reglas ya aplicadas: stock solo cambia vía `movimiento_inventario`; salida no
 deja stock negativo; ajuste `solicitar` ≠ `aprobar` y aprobador ≠ solicitante;
 alerta `bajo_minimo` derivada en la consulta; evento
 `inventory.ajuste_fuera_margen` al aprobar fuera de margen.
+
+**Entrada de stock manual con lote (2026-08-30).** No es un tipo de
+movimiento aparte: es `POST /ajustes` con `cantidad > 0`. Un ajuste positivo
+de un artículo con `controla_lote` puede declarar `lote_codigo`,
+`fecha_vencimiento`, `fecha_elaboracion` y `condicion_almacenamiento` al
+solicitarlo — antes solo existía el lote automático sin vencimiento que crea
+`registrar_movimiento` cuando nadie pasa `lote_id`, perdiendo la trazabilidad
+que RN-LOT-002 exige. `Ajuste.lote_id` guarda el lote elegido y viaja al
+`movimiento_inventario` al aprobar. Combinar datos de lote con una `cantidad`
+negativa es 409: una salida de un artículo con lote reparte por FEFO
+(`registrar_salida`), no toma un lote explícito.
 
 `application/stock.py::contar_bajo_minimo(session, empresa_id)` (nuevo
 2026-07-26, ADR-012): cuenta filas bajo mínimo escopadas por empresa (vía

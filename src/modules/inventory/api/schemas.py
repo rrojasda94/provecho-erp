@@ -199,6 +199,9 @@ class SkuListadoOut(SkuOut):
     código obliga a adivinar qué es cada cosa."""
 
     articulo_nombre: str
+    # El formulario de entrada de stock lo necesita para decidir si pide
+    # lote/vencimiento sin un viaje más al elegir el SKU.
+    controla_lote: bool
 
 
 class SkuDetalleOut(SkuOut):
@@ -484,6 +487,12 @@ class AjusteCreate(BaseModel):
     # `dentro_margen` no se recibe: lo calcula el servidor contra el margen
     # aprobado para la empresa. Que lo declarara el cliente permitía silenciar
     # `inventory.ajuste_fuera_margen` desde el mismo request que lo provoca.
+    # Solo tienen sentido en una entrada (cantidad > 0) de un artículo con
+    # control de lote — el servidor rechaza combinarlos con una salida.
+    lote_codigo: str | None = Field(default=None, max_length=50)
+    fecha_vencimiento: date | None = None
+    fecha_elaboracion: date | None = None
+    condicion_almacenamiento: str | None = None
 
 
 class AjusteOut(BaseModel):
@@ -498,6 +507,7 @@ class AjusteOut(BaseModel):
     solicitado_por: uuid.UUID
     aprobado_por: uuid.UUID | None
     dentro_margen: bool
+    lote_id: uuid.UUID | None
 
 
 class AjusteDetalleOut(AjusteOut):
