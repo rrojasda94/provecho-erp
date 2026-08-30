@@ -80,7 +80,7 @@ borrador no existía fuera de la memoria del navegador.
 | 1 | Apertura/cierre de caja sin texto montado; el PDV cabe en la ventana | ✅ 2026-08-28 |
 | 1 | Bloqueo manual de la pantalla (RN-POS-014) | ✅ 2026-08-28 |
 | 1 | Alta de cliente con solo DNI, y reuso si esa persona ya es cliente | ✅ 2026-08-28 |
-| 2 | Pantalla de despacho como overlay dentro del PDV | ✅ 2026-08-28 |
+| 2 | Pantalla de despacho como overlay dentro del PDV | ✅ 2026-08-28 (salida rotulada «Volver al PDV» el 2026-08-30: la × sin etiqueta no se leía como la vuelta) |
 | 2 | Cupón y descuento manual en caja (backend ya existía, faltaba el PDV) | ✅ 2026-08-28 |
 | 2 | Notas de cocina: por línea **y** una general del pedido, al pie de la pastilla del KDS | ✅ 2026-08-28 |
 | 3 | Motor de promociones automáticas + su pantalla en el back office (ADR-076) | ✅ 2026-08-28 |

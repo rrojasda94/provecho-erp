@@ -84,14 +84,6 @@ export default function DespachoEnPdv({
       aria-label="Despacho"
       onClose={onCerrar}
     >
-      <button
-        type="button"
-        className="pdv-despacho-cerrar"
-        onClick={onCerrar}
-        aria-label="Cerrar despacho"
-      >
-        ×
-      </button>
       {pantalla ? (
         <DespachoCliente
           pantalla={{ id: pantalla.id, nombre: pantalla.nombre }}
@@ -100,14 +92,22 @@ export default function DespachoEnPdv({
           // el pedido. El permiso real lo valida la API en cada request.
           puedeEntregar
           semaforo={semaforo}
-          // Sin los enlaces a Historial y Estaciones: son navegaciones fuera
-          // del PDV, y desde un overlay eso es una trampa.
-          sinNavegacion
+          // La única salida, y con nombre. Reemplaza a Historial, Estaciones
+          // y Salir —navegaciones fuera del PDV, que desde un overlay son una
+          // trampa— y también a la × que flotaba sobre este encabezado sin
+          // decir a dónde volvía.
+          alVolver={{ etiqueta: "Volver al PDV", onClick: onCerrar }}
         />
       ) : (
         <main className="kds-vacio">
           <h1>Despacho</h1>
           <p>{falla ?? "Cargando la cola…"}</p>
+          {/* Sin cola no hay encabezado del KDS donde poner la salida, y sin
+              salida esta pantalla es un callejón: el diálogo nativo se cierra
+              con Escape, que en una tablet no existe. */}
+          <button type="button" className="kds-salir" onClick={onCerrar}>
+            ← Volver al PDV
+          </button>
         </main>
       )}
     </dialog>
