@@ -16,6 +16,17 @@ from superset.security import SupersetSecurityManager
 # --- Identidad del proceso ---------------------------------------------
 SECRET_KEY = os.environ["SUPERSET_SECRET_KEY"]
 
+# Caddy le habla a este proceso por HTTP dentro de la red de Docker (TLS
+# termina en Caddy, ver Caddyfile) — sin esto, Superset no tiene forma de
+# saber que la conexión de verdad llegó por HTTPS y arma sus propias URLs
+# (el `redirect_uri` que le manda a Provecho al armar el login OAuth,
+# `oauth_authorize_url` de Authlib) con esquema `http://`. La comparación de
+# `redirect_uri` en `src/core/oauth/servicio.py` es exacta, no por prefijo,
+# así que ese esquema equivocado alcanza para que el login falle con
+# "server_error" — comprobado a mano contra el droplet BI real. Un solo
+# proxy por delante (Caddy): confiar un salto de `X-Forwarded-*` alcanza.
+ENABLE_PROXY_FIX = True
+
 # --- Metadata de Superset: esquema aparte de la Postgres de staging -----
 # Rol `superset_meta`, creado por `scripts/superset_provision_db.sql` —
 # CRUD solo sobre su propio esquema, cero acceso a las tablas de Provecho ni
