@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ApiError, apiFetch } from "@/lib/api";
+import { fechaHora } from "@/lib/fechas";
 import { obtenerSesion } from "@/lib/sesion";
 
 /**
@@ -92,7 +93,7 @@ export default async function DevolucionPage({
           etiqueta="Anulada"
           valor={
             devolucion.anulada_at
-              ? `${new Date(devolucion.anulada_at).toLocaleString("es-PE")}`
+              ? fechaHora(devolucion.anulada_at)
               : "—"
           }
         />

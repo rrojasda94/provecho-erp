@@ -156,3 +156,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     desde Organización → Sucursales. No hay un valor por defecto razonable
     para todos los locales — depende de qué tan preciso es el GPS de cada
     tablet en ese punto exacto.
+- ✅ 2026-08-30 **La remuneración dejó de salir por el listado** (auditoría
+  backend↔frontend del 2026-08-30, hallazgo #6). El legajo escondía boletas
+  y liquidaciones salvo `rrhh.nomina_gestionar` —con la justificación
+  escrita en el código— y `GET /rrhh/trabajadores` devolvía
+  `remuneracion_base` a cualquiera con `rrhh.leer`, que es lo que tiene el
+  rol `supervisor`: leía el sueldo de toda la plantilla eludiendo el gate.
+  Ahora el campo viaja en `null` sin ese permiso, en el listado, en la ficha
+  y en el `trabajador` embebido del legajo. Se censura a `null` y no se
+  agregó un `remuneracion_visible`: el legajo ya trae `nomina_visible`, que
+  es el único sitio donde hacía falta distinguir "no te lo muestro" de "no
+  tiene sueldo cargado".
+  - ⬜ **El `PATCH` sigue pidiendo solo `rrhh.trabajador_gestionar`**: quien
+    no puede ver la remuneración igual podría fijarla. Hoy no es explotable
+    —ningún rol del seeder tiene uno de los dos permisos sin el otro— pero
+    son permisos distintos y un rol a medida sí puede separarlos.

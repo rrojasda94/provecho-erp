@@ -1248,6 +1248,10 @@ def solicitar_ajuste(
         cantidad=body.cantidad,
         motivo=body.motivo,
         solicitado_por=actor.id,
+        lote_codigo=body.lote_codigo,
+        fecha_vencimiento=body.fecha_vencimiento,
+        fecha_elaboracion=body.fecha_elaboracion,
+        condicion_almacenamiento=body.condicion_almacenamiento,
     )
     session.commit()
     return aj

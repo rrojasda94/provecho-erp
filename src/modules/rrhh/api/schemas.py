@@ -74,7 +74,10 @@ class TrabajadorOut(BaseModel):
     fecha_ingreso: date
     fecha_cese: date | None
     # Viaja para que el formulario de corrección pueda precargarla: sin esto
-    # editar el cargo obligaba a reteclear la remuneración de memoria.
+    # editar el cargo obligaba a reteclear la remuneración de memoria. Pero
+    # solo para quien tiene `rrhh.nomina_gestionar`: al resto le llega en
+    # `null`, mismo criterio que la nómina del legajo. `rrhh.leer` lo tiene
+    # el supervisor, que ve a su gente y no cuánto gana.
     remuneracion_base: Decimal | None
     registra_asistencia: bool
     estado: str
