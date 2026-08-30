@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 export type EstadoRol = { error: string; ok: boolean };
 
@@ -14,10 +15,6 @@ async function token(): Promise<string> {
   const valor = store.get(COOKIE_TOKEN)?.value;
   if (!valor) redirect("/login");
   return valor;
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 export async function crearRolAction(
@@ -35,7 +32,7 @@ export async function crearRolAction(
       cuerpo: { nombre, descripcion: descripcion || undefined },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear el rol."), ok: false };
+    return estadoDeError(e, "No se pudo crear el rol.");
   }
   revalidatePath("/usuarios/roles");
   return { error: "", ok: true };
@@ -56,7 +53,7 @@ export async function asignarPermisoAction(
       cuerpo: { permiso_id: permisoId },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo asignar el permiso."), ok: false };
+    return estadoDeError(e, "No se pudo asignar el permiso.");
   }
   revalidatePath("/usuarios/roles");
   return { error: "", ok: true };
@@ -72,7 +69,7 @@ export async function quitarPermisoAction(
       metodo: "DELETE",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo quitar el permiso."), ok: false };
+    return estadoDeError(e, "No se pudo quitar el permiso.");
   }
   revalidatePath("/usuarios/roles");
   return { error: "", ok: true };

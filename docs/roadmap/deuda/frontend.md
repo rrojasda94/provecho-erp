@@ -567,6 +567,22 @@ errores de consola.
   back-office no está verificado** — de esas solo se comprueba la ruta. Se
   cierra moviendo sus llamadas a módulos importables como los cuatro que ya
   lo son, no escribiendo otro tipo de test.
+- ✅ 2026-08-30 **El 422 se lee** (ADR-017, addendum). Era el otro extremo
+  de la decisión de arriba: si el cliente no replica `pattern`, `minimum` ni
+  los enums, el 422 del servidor **es** el mensaje de error, y venía en
+  inglés y sin nombrar el campo ("Field required; Field required"). El
+  servidor ahora manda `detail` en español nombrando cada campo y un
+  `errores[]` aparte (`src/core/validacion.py`); `DialogoFormulario` marca
+  con `aria-invalid` y enfoca el primer input rechazado, buscándolo por su
+  `name` —que es el mismo nombre que usa la API—. De paso, el parseo del
+  error dejó de estar duplicado en los dos clientes HTTP y el
+  `mensajeDe(e, porDefecto)` copiado en quince `actions.ts` es uno solo en
+  `lib/errores.ts`.
+  Deuda que deja: **no hay mensaje inline bajo el input**. Ponerlo obliga a
+  pasar `nombre` en cada `CampoFormulario` de las diecisiete pantallas, y el
+  texto del pie ya nombra el campo; va si aparece un formulario donde el pie
+  no alcance. Un campo anidado (`valor.monto`) no tiene input con ese `name`
+  y por eso tampoco se marca — solo se lee en el pie.
 - ⬜ **Los enums de la base no tienen una sola fuente en el frontend**: la
   pantalla de caja repite los valores de `custodia`, `descuadre_atribucion`
   y los estados en constantes propias. Mientras el `pattern` del schema los
