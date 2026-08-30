@@ -55,7 +55,8 @@ export async function lineasDeVentaAction(
     );
     return { lineas, error: "" };
   } catch (e) {
-    return { lineas: [], error: mensajeDe(e, "No se pudieron traer las líneas.") };
+    // Solo el texto: el llamador no es un formulario, no tiene campos que marcar.
+    return { lineas: [], error: estadoDeError(e, "No se pudieron traer las líneas.").error };
   }
 }
 
