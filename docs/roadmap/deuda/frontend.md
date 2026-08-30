@@ -3,6 +3,44 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-30 **Una pantalla que revienta ya no queda en blanco**
+  (`frontend/app/error.tsx`, hallazgo #8 de la auditoría del 2026-08-30). No
+  había **ningún** error boundary: cero `error.tsx`, cero `componentDidCatch`.
+  Un throw al renderizar —el de `(app)/layout.tsx`, que pide la sesión, es el
+  gordo: tumbaba el ERP entero— caía en la pantalla por defecto de Next, que
+  en producción es blanca y sin salida, y en una tablet detrás de una barra
+  eso se resuelve apagando el equipo. Por eso el reintento del dashboard
+  (2026-08-07, abajo) existía en parte para tapar este agujero. El boundary
+  vive en `app/` y no en `app/(app)/` para cubrir también PDV, KDS,
+  asistencia, login y las rutas públicas, que cuelgan directo del layout
+  raíz. Reintenta con `reset()` y muestra `error.digest`, que en producción
+  es lo único que ata la pantalla al log.
+- ⬜ **El boundary global es uno solo y se dibuja en claro** (2026-08-30):
+  reemplaza la pantalla entera en vez de conservar la `TopBar` (haría falta
+  un `error.tsx` por módulo) y no tiene versión con la paleta oscura del PDV.
+  Es una mejora de cómo se cae, no la diferencia entre caer y no caer, así
+  que se hace junto con el `ErrorState` unificado de F2.4.
+- ✅ 2026-08-30 **La fecha renderizada en el servidor salía +5**
+  (`frontend/lib/fechas.ts`, hallazgo #9 de la misma auditoría). Dos fichas
+  —kardex de un SKU y devolución anulada— formateaban con
+  `new Date(iso).toLocaleString("es-PE")`, y `"es-PE"` fija el **idioma**, no
+  la zona: la ponía el proceso, que en Docker es UTC, así que un movimiento
+  de las 20:00 se leía como la 01:00 del día siguiente. Es la misma trampa
+  que documenta `src/shared/fechas.py` y que ADR-067 ya pagó con la fecha de
+  emisión ante SUNAT. Ahora la zona viaja explícita (`timeZone`), que además
+  vale en `npm run dev` y en una tablet mal configurada; `frontend/Dockerfile`
+  fija `TZ` con `tzdata` como defensa en profundidad (alpine no trae la base
+  de zonas y sin ella `TZ` se ignora en silencio). De paso, la fecha de
+  cierre de un periodo contable dejó de mostrarse con `slice(0, 10)` sobre el
+  ISO crudo, que era el día UTC. `lib/fechas.test.ts` congela la regla.
+- ⬜ **Una decena de pantallas cliente formatean con la zona del navegador**
+  (2026-08-30): `toLocaleString("es-PE")` sin `timeZone` en comprobantes,
+  reportes, terminales, ticket impreso, KDS y PDV. Hoy aciertan porque los
+  equipos están en Perú; se migran a `lib/fechas.ts` cuando se toque cada
+  una. Aparte, `rrhh/contratacion/tablero-cliente.tsx` deriva "hoy" con
+  `new Date().toISOString()`, que es el día **UTC** del navegador: pasadas
+  las 19:00 propone el día equivocado.
+
 - ⬜ **La renovación de sesión asume una sola instancia de Next** (2026-08-28,
   ADR-073). `refrescarSesion` coordina las rotaciones con un `Map` de módulo
   —single-flight más una ventana de gracia de 30 s—, y ese estado vive en **un

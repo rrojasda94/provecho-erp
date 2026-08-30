@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
 from src.core.model_base import TimestampMixin, UuidPkMixin
+from src.shared import fechas
 
 
 class ImplementacionMaterialSucursal(Base, UuidPkMixin, TimestampMixin):
@@ -17,7 +18,7 @@ class ImplementacionMaterialSucursal(Base, UuidPkMixin, TimestampMixin):
 
     campana_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campana.id"))
     sucursal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sucursal.id"))
-    fecha: Mapped[date] = mapped_column(Date, default=date.today)
+    fecha: Mapped[date] = mapped_column(Date, default=fechas.hoy)
     verificado_por: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuario.id"))
     # Completa = producto nuevo y clásico, no solo el lanzamiento.
     completa: Mapped[bool] = mapped_column(Boolean, default=False)

@@ -232,7 +232,8 @@ sube de prioridad.
 ## F2.10 Manejo de errores
 
 🔶 **Parcial**. `ApiError` ya distingue status HTTP; `obtenerSesion` maneja
-el 401 (redirect a login).
+el 401 (redirect a login), y `app/error.tsx` atrapa lo que revienta al
+renderizar.
 
 ✅ **Error ≠ vacío (2026-08-07)**. La regla, y es innegociable en pantallas
 nuevas: **un fetch que falló nunca se dibuja como lista vacía**. El estado
@@ -268,11 +269,29 @@ había hecho daño:
   reintento (`router.refresh()` en `useTransition` — la pantalla se arma en
   el servidor).
 
-⬜ **Falta**: página de error global de Next.js (`error.tsx`/`not-found.tsx`
-no existen todavía) y unificar `.pdv-fallo` con `AvisoFallo` en un
-`ErrorState` reutilizable (F2.4) — hoy son dos porque el PDV corre sobre su
-paleta oscura propia y el shell sobre Tailwind. Quedan cargas del PDV con el
-patrón viejo (carta, medios de pago, POS, caja): ver ROADMAP → Frontend.
+✅ **La pantalla que revienta ya no queda en blanco (2026-08-30)**.
+`app/error.tsx` es el error boundary de toda la aplicación. Vive en `app/` y
+no en `app/(app)/` a propósito: así cubre también PDV, KDS, asistencia, login
+y las rutas públicas —que cuelgan directo del layout raíz— y alcanza a los
+throws del propio `(app)/layout.tsx`, que pide la sesión y era el caso que
+dejaba el ERP entero sin dibujar. Reintenta con `reset()` (la primitiva del
+boundary, que vuelve a montar el segmento) y no con `router.refresh()`, que
+es lo que usa `AvisoFallo` porque ese sí es un bloque dentro de una página
+que renderizó. Muestra `error.digest`: en producción Next reemplaza el
+mensaje del servidor por uno genérico y el digest es lo único que ata la
+pantalla a la línea del log.
+
+No hay `global-error.tsx`: solo serviría para un throw del layout raíz, y su
+único fetch (`obtenerPreferencias`) ya cae en valores por defecto.
+`not-found.tsx` existe desde antes.
+
+⬜ **Falta**: unificar `.pdv-fallo` con `AvisoFallo` en un `ErrorState`
+reutilizable (F2.4) — hoy son dos porque el PDV corre sobre su paleta oscura
+propia y el shell sobre Tailwind, y por lo mismo el boundary global se dibuja
+en claro también sobre el PDV. Boundaries por módulo (que conservarían la
+`TopBar` en vez de reemplazar la pantalla entera) tampoco existen. Quedan
+cargas del PDV con el patrón viejo (carta, medios de pago, POS, caja): ver
+ROADMAP → Frontend.
 
 ## F2.11 Tablas
 
