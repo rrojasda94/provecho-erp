@@ -24,13 +24,26 @@ exactamente el riesgo que separar en dos máquinas evita.
 | Nombre del droplet | `provecho-bi` |
 | Tamaño | 1 vCPU / 1 GB RAM (~$8/mes, tier Premium Intel/AMD) |
 | Red | En la **misma VPC privada** que `provecho-staging` — sin eso no llega a Postgres sin exponerlo a internet |
-| IP pública | _(completar)_ |
-| IP privada (VPC) | _(completar — es la que usa `SUPERSET_METADATA_DATABASE_URI` y la que se abre en el firewall de Postgres)_ |
+| IP pública | `167.99.125.141` |
+| IP privada (VPC) | `10.17.0.6` según `ip addr` **en el propio droplet BI** — pero no es la IP que hay que abrir en `pg_hba.conf`/firewall de staging, ver nota abajo |
 | SO | Ubuntu 24.04 LTS, igual que staging |
 | Dominio | `bi.majambo.com.pe` |
 | Usuario de la app | `app` (sudo, sin login root, sin login por contraseña) — mismo criterio que staging |
 | Llave SSH | Reusar `renota-provecho`/`provecho_droplet` o generar una nueva — decisión de quien lo crea |
 | Swap | 2 GB (`fallocate`) — con 1 GB de RAM al límite, una consulta puntual pesada no debe matar el proceso |
+
+> **La IP privada que ve el droplet BI de sí mismo no es la que ve Postgres
+> del otro lado.** `ip addr` en el droplet BI reporta `10.17.0.6`, pero
+> DigitalOcean enruta el tráfico de la VPC a través de un gateway que hace
+> NAT: staging ve la conexión llegar desde `10.108.0.2` (confirmado con
+> `SELECT inet_client_addr();` corrido en esa sesión). La IP que va en
+> `pg_hba.conf` y en el firewall del droplet de staging es **esta segunda**,
+> no la que muestra `ip addr` en el droplet BI — confundirlas hace perder
+> tiempo pensando que hay un problema de región/subred cuando no lo hay.
+> Al escribirla en `pg_hba.conf`, siempre con el sufijo `/32`: sin él,
+> Postgres interpreta el siguiente token de la línea (el método de auth,
+> p. ej. `scram-sha-256`) como la máscara y falla el arranque completo con
+> `invalid IP mask` — tumba TODO staging, no solo la conexión nueva.
 
 ## Decisiones tomadas
 
@@ -147,14 +160,56 @@ infirieron de la documentación de Superset:
   (los diez datasets, ni uno más — es exactamente lo único que la conexión
   `bi_lector` puede ver).
 
+## Bugs encontrados contra el droplet real (no los detectó el CI de PR #130)
+
+Los cinco aparecieron recién al ensayar contra Postgres/Superset reales — el
+Docker local de la sección anterior no los reprodujo porque no hay proxy TLS
+ni build de imagen final de por medio en ese ensayo:
+
+- **`superset_init.py` (el script que registra la conexión `bi_lector` y
+  arma la RLS) necesita `httpx`**, no solo `psycopg2-binary`. Faltaba en
+  `deploy/bi/Dockerfile` — `ModuleNotFoundError` al correrlo.
+- **`AUTH_TYPE = AUTH_OAUTH` necesita `authlib`**, tampoco instalado en la
+  imagen — mismo síntoma. Los dos se resolvieron agregando ambos paquetes
+  al `uv pip install` de `deploy/bi/Dockerfile`.
+- **Indentación de YAML rompía `create-admin`.** El `command: >` (folded
+  scalar) de `docker-compose.bi.yml` tenía las líneas de
+  `--username`/`--firstname`/`--email`/`--password` con 2 espacios más que
+  sus hermanas — en un folded scalar, una línea con *más* indentación que
+  el resto no se pliega con un espacio, se preserva como bloque aparte, y
+  `sh -c` la interpretó como un comando nuevo (`--username: not found`).
+  Corregido igualando la indentación de todas las líneas del bloque.
+- **Sin `ENABLE_PROXY_FIX = True`, Superset arma su `redirect_uri` en
+  `http://`** aunque el dominio público sea `https://`: Caddy le habla por
+  HTTP dentro de la red de Docker (TLS termina en Caddy), y sin el
+  middleware `ProxyFix` de Werkzeug, Superset no tiene forma de saber que
+  la conexión real llegó por HTTPS. La comparación de `redirect_uri` en
+  `src/core/oauth/servicio.py` es exacta, no por prefijo — el esquema
+  equivocado alcanza para que el login falle con `server_error` genérico.
+- **Authlib manda `client_id`/`client_secret` por HTTP Basic por
+  default** (RFC 6749 §2.3.1), pero `POST /oauth/token`
+  (`src/core/oauth/router.py`) los espera como campos del form. FastAPI
+  responde 422 antes de llegar a la lógica de negocio, sin ningún log de
+  OAuth que lo explique — del lado de Superset solo aparece
+  `Error returning OAuth user info: 'access_token'`, porque el token nunca
+  llegó. Se agregó `"token_endpoint_auth_method": "client_secret_post"` a
+  `client_kwargs` en `deploy/bi/superset_config.py`.
+
 ## Pendiente
 
-- [ ] Todo lo de la sección "Crear el droplet BI" — nada de esto corrió
-      contra infraestructura real todavía, solo contra Postgres/Superset
-      locales en Docker
+- [x] Todo lo de la sección "Crear el droplet BI" — corrió contra el
+      droplet real (`167.99.125.141`), login SSO confirmado de punta a
+      punta con el usuario `admin`
 - [ ] Fase D: permiso `bi.acceder` ya seedeado (Fase B); falta la entrada
       de navegación en `frontend/lib/modulos.ts` y los tableros embebidos
       en `/dashboard`
+- [ ] **Verificación de fondo pendiente**: la prueba de RLS solo corrió con
+      `admin` (superusuario, esperable que vea todo). Falta loguearse con un
+      usuario `supervisor`/`contador` de una sola sucursal y confirmar que
+      un dataset `vw_bi_*` de verdad se filtra a esa sucursal — y que
+      "SQL Lab" no aparece en su menú (ver comentario en
+      `deploy/bi/superset_config.py`: "SQL Lab es la puerta que ningún
+      permiso de fila cierra"). Sin esto, Fase C no está probada, solo el
+      login lo está.
 - [ ] `docs/security/authorization.md` y ADR-083: marcar Fase C como hecha
-      una vez que el droplet real esté arriba y la verificación end-to-end
-      (usuario real, una sola sucursal) haya pasado
+      una vez que la verificación de RLS de arriba haya pasado
