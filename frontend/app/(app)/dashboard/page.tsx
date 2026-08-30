@@ -1,7 +1,12 @@
+import { BarChart3 } from "lucide-react";
+import Link from "next/link";
+
 import { Tablero } from "@/components/reportes/tablero";
 import { AvisoFallo } from "@/components/shell/aviso-fallo";
+import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { esSinPermiso, fallaDe, type Falla } from "@/lib/carga";
+import { tienePermiso } from "@/lib/permisos";
 import type {
   Catalogo,
   Marca,
@@ -78,6 +83,34 @@ function Kpi({
   );
 }
 
+/**
+ * El pase al análisis avanzado.
+ *
+ * Quien mira el tablero del día es justo quien después quiere cruzar los
+ * datos a mano, y hasta ahora eso obligaba a volver al home y entrar por la
+ * otra ficha — un rodeo que nadie hacía, así que el BI quedaba sin usar.
+ *
+ * Va acá y no en el sidebar del módulo porque `ModuloShell` no filtra los
+ * ítems de `SUBMENUS` por permiso: ahí se le ofrecería también a quien no
+ * tiene `bi.acceder`, para mandarlo a una pantalla de "sin permiso".
+ */
+function PaseAlBi({ permisos }: { permisos: string[] }) {
+  if (!tienePermiso(permisos, "bi.acceder")) return null;
+  return (
+    <header className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm text-gray">
+        ¿Necesitas cruzar estos datos a mano? El análisis avanzado abre con la
+        misma sesión.
+      </p>
+      <Button variant="outline" render={<Link href="/bi" />}>
+        <BarChart3 className="size-4" aria-hidden />
+        Ir al BI
+      </Button>
+    </header>
+  );
+}
+
+
 export default async function DashboardPage() {
   // `empresa_id` sale de `/users/me` (verificado por la API), ya no del JWT
   // decodificado sin firma en el cliente.
@@ -131,6 +164,8 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <AvisoFallo fallas={fallas} />
+
+      <PaseAlBi permisos={usuario.permisos} />
 
       {resumen.datos && (
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
