@@ -4,6 +4,7 @@ import { AlertCircle, HelpCircle, X } from "lucide-react";
 import { startTransition, useActionState, useEffect, useRef } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ESTADO_INICIAL, type EstadoFormulario } from "@/lib/errores";
 
 /**
  * Diálogo con formulario: el molde de toda alta y toda corrección del ERP.
@@ -24,10 +25,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
  * campos empujaba los botones fuera de la pantalla.
  */
 
-/** Lo que devuelve toda Server Action de formulario del ERP. */
-export type EstadoFormulario = { error: string; ok: boolean };
-
-export const ESTADO_INICIAL: EstadoFormulario = { error: "", ok: false };
+// El tipo del estado vive en `lib/errores.ts` —donde se arma— y se
+// reexporta acá porque diecisiete pantallas ya lo importan de este módulo.
+export { ESTADO_INICIAL, type EstadoFormulario };
 
 const CLASE_PRIMARIO =
   "inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/85 disabled:pointer-events-none disabled:opacity-50";
@@ -68,6 +68,29 @@ export function DialogoFormulario({
   useEffect(() => {
     if (estado.ok) dialogRef.current?.close();
   }, [estado.ok]);
+
+  // El servidor dice qué campos rechazó (`errores[]` del 422) y el `campo`
+  // que manda es el mismo `name` del input: se marca y se enfoca el primero,
+  // que es lo que evita releer un formulario de doce campos para encontrar
+  // cuál era.
+  // ponytail: se marca por DOM y no con un slot de error en
+  // `CampoFormulario` porque eso obligaría a pasar `nombre` en cada campo de
+  // las diecisiete pantallas. Techo conocido: un campo anidado
+  // (`valor.monto`) no tiene input con ese `name` y solo aparece en el texto
+  // del pie. Si hace falta el mensaje bajo el input, ahí sí se agrega.
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    form.querySelectorAll("[aria-invalid]").forEach((el) => el.removeAttribute("aria-invalid"));
+    let primero: HTMLElement | null = null;
+    for (const { campo } of estado.campos ?? []) {
+      const control = form.querySelector<HTMLElement>(`[name="${CSS.escape(campo)}"]`);
+      if (!control) continue;
+      control.setAttribute("aria-invalid", "true");
+      primero ??= control;
+    }
+    primero?.focus();
+  }, [estado.campos]);
 
   return (
     <>

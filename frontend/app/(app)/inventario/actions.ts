@@ -5,8 +5,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type { EstadoFormulario } from "@/components/formulario/dialogo-formulario";
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 import { CLAVES_ROL } from "@/lib/roles-contables";
 
 export type EstadoCatalogo = EstadoFormulario;
@@ -23,10 +24,6 @@ async function token(): Promise<string> {
 
 function texto(formData: FormData, campo: string): string {
   return String(formData.get(campo) ?? "").trim();
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 // --- Categorías de artículo -------------------------------------------------
@@ -63,7 +60,7 @@ export async function crearCategoriaAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear la categoría."), ok: false };
+    return estadoDeError(e, "No se pudo crear la categoría.");
   }
   revalidatePath(RUTA_CATEGORIAS);
   return { error: "", ok: true };
@@ -102,7 +99,7 @@ export async function editarCategoriaAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo guardar la categoría."), ok: false };
+    return estadoDeError(e, "No se pudo guardar la categoría.");
   }
   revalidatePath(RUTA_CATEGORIAS);
   return { error: "", ok: true };
@@ -124,7 +121,7 @@ export async function crearCategoriaUdmAction(
       cuerpo: { nombre },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear la magnitud."), ok: false };
+    return estadoDeError(e, "No se pudo crear la magnitud.");
   }
   revalidatePath(RUTA_UNIDADES);
   return { error: "", ok: true };
@@ -151,7 +148,7 @@ export async function crearUnidadMedidaAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear la unidad."), ok: false };
+    return estadoDeError(e, "No se pudo crear la unidad.");
   }
   revalidatePath(RUTA_UNIDADES);
   return { error: "", ok: true };
@@ -180,7 +177,7 @@ export async function editarUnidadMedidaAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo guardar la unidad."), ok: false };
+    return estadoDeError(e, "No se pudo guardar la unidad.");
   }
   revalidatePath(RUTA_UNIDADES);
   return { error: "", ok: true };

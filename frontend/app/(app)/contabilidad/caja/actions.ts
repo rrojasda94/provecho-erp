@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 export type EstadoCaja = { error: string; ok: boolean };
 
@@ -14,10 +15,6 @@ async function token(): Promise<string> {
   const valor = store.get(COOKIE_TOKEN)?.value;
   if (!valor) redirect("/login");
   return valor;
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 /**
@@ -43,7 +40,7 @@ async function elevar(
       cuerpo: { username, pin, permiso },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "PIN incorrecto o sin permiso para autorizar.") };
+    return { error: estadoDeError(e, "PIN incorrecto o sin permiso para autorizar.").error };
   }
 }
 
@@ -73,7 +70,7 @@ export async function entregarCustodiaAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo registrar la entrega."), ok: false };
+    return estadoDeError(e, "No se pudo registrar la entrega.");
   }
   revalidatePath("/contabilidad/caja");
   return { error: "", ok: true };
@@ -102,7 +99,7 @@ export async function reabrirCierreAction(
       cuerpo: { motivo, autorizacion: elevacion.autorizacion },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo reabrir el cierre."), ok: false };
+    return estadoDeError(e, "No se pudo reabrir el cierre.");
   }
   revalidatePath("/contabilidad/caja");
   return { error: "", ok: true };
@@ -135,7 +132,7 @@ export async function registrarPosAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo registrar el terminal."), ok: false };
+    return estadoDeError(e, "No se pudo registrar el terminal.");
   }
   revalidatePath("/contabilidad/caja");
   return { error: "", ok: true };
@@ -152,7 +149,7 @@ export async function cambiarEstadoPosAction(
       cuerpo: { estado },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo cambiar el estado del terminal."), ok: false };
+    return estadoDeError(e, "No se pudo cambiar el estado del terminal.");
   }
   revalidatePath("/contabilidad/caja");
   return { error: "", ok: true };

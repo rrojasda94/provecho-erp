@@ -5,8 +5,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type { EstadoFormulario } from "@/components/formulario/dialogo-formulario";
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 import { ubicacionDe } from "@/lib/ubicacion-form";
 
 export type EstadoOrganizacion = EstadoFormulario;
@@ -20,10 +21,6 @@ async function token(): Promise<string> {
 
 function texto(formData: FormData, campo: string): string {
   return String(formData.get(campo) ?? "").trim();
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 /**
@@ -47,7 +44,7 @@ async function guardar(
       cuerpo,
     });
   } catch (e) {
-    return { error: mensajeDe(e, `No se pudo guardar ${queEs}.`), ok: false };
+    return estadoDeError(e, `No se pudo guardar ${queEs}.`);
   }
   revalidatePath(ruta);
   return { error: "", ok: true };
@@ -187,10 +184,7 @@ async function guardarAbastecimiento(
       },
     });
   } catch (e) {
-    return {
-      error: mensajeDe(e, "La sucursal se guardó, pero no su abastecimiento."),
-      ok: false,
-    };
+    return estadoDeError(e, "La sucursal se guardó, pero no su abastecimiento.");
   }
   revalidatePath("/organizacion/sucursales");
   return guardada;
@@ -259,7 +253,7 @@ async function llamarAlmacen(
   try {
     await apiFetch(ruta, { token: await token(), metodo });
   } catch (e) {
-    return { error: mensajeDe(e, porDefecto), ok: false };
+    return estadoDeError(e, porDefecto);
   }
   revalidatePath("/organizacion/almacenes");
   return { error: "", ok: true };

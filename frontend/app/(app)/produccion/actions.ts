@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 export type EstadoOrden = { error: string; ok: boolean };
 
@@ -14,10 +15,6 @@ async function token(): Promise<string> {
   const valor = store.get(COOKIE_TOKEN)?.value;
   if (!valor) redirect("/login");
   return valor;
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 export async function crearOrdenAction(
@@ -44,7 +41,7 @@ export async function crearOrdenAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear la orden."), ok: false };
+    return estadoDeError(e, "No se pudo crear la orden.");
   }
   revalidatePath("/produccion");
   return { error: "", ok: true };
@@ -81,7 +78,7 @@ export async function registrarConsumoAction(
       cuerpo: { items },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo registrar el consumo."), ok: false };
+    return estadoDeError(e, "No se pudo registrar el consumo.");
   }
   revalidatePath("/produccion");
   return { error: "", ok: true };
@@ -115,7 +112,7 @@ export async function completarOrdenAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo completar la orden."), ok: false };
+    return estadoDeError(e, "No se pudo completar la orden.");
   }
   revalidatePath("/produccion");
   return { error: "", ok: true };

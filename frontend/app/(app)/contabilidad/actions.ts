@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 export type EstadoAsiento = { error: string; ok: boolean };
 
@@ -14,10 +15,6 @@ async function token(): Promise<string> {
   const valor = store.get(COOKIE_TOKEN)?.value;
   if (!valor) redirect("/login");
   return valor;
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 type Linea = { cuenta_contable_id: string; tipo: string; monto: number };
@@ -70,7 +67,7 @@ export async function crearAsientoAction(
       cuerpo: { fecha, glosa, lineas },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo registrar el asiento."), ok: false };
+    return estadoDeError(e, "No se pudo registrar el asiento.");
   }
 
   revalidatePath("/contabilidad");
@@ -84,7 +81,7 @@ export async function anularAsientoAction(asientoId: string): Promise<EstadoAsie
       metodo: "POST",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo anular el asiento."), ok: false };
+    return estadoDeError(e, "No se pudo anular el asiento.");
   }
   revalidatePath("/contabilidad");
   return { error: "", ok: true };
@@ -112,7 +109,7 @@ export async function crearCuentaAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear la cuenta."), ok: false };
+    return estadoDeError(e, "No se pudo crear la cuenta.");
   }
   revalidatePath("/contabilidad/plan-cuentas");
   return { error: "", ok: true };
@@ -140,7 +137,7 @@ export async function editarCuentaAction(
       cuerpo: { nombre, activa: formData.get("activa") === "on" },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo guardar la cuenta."), ok: false };
+    return estadoDeError(e, "No se pudo guardar la cuenta.");
   }
   revalidatePath("/contabilidad/plan-cuentas");
   return { error: "", ok: true };
@@ -161,7 +158,7 @@ export async function abrirPeriodoAction(
       cuerpo: { anio, mes },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo abrir el periodo."), ok: false };
+    return estadoDeError(e, "No se pudo abrir el periodo.");
   }
   revalidatePath("/contabilidad/periodos");
   return { error: "", ok: true };
@@ -174,7 +171,7 @@ export async function cerrarPeriodoAction(periodoId: string): Promise<EstadoAsie
       metodo: "POST",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo cerrar el periodo."), ok: false };
+    return estadoDeError(e, "No se pudo cerrar el periodo.");
   }
   revalidatePath("/contabilidad/periodos");
   return { error: "", ok: true };
@@ -196,7 +193,7 @@ export async function ejecutarPagoAction(
       cuerpo: { medio_pago: medioPago, constancia: constancia || undefined },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo ejecutar el pago."), ok: false };
+    return estadoDeError(e, "No se pudo ejecutar el pago.");
   }
   revalidatePath("/contabilidad/pagos");
   return { error: "", ok: true };
@@ -209,7 +206,7 @@ export async function rechazarPagoAction(movimientoId: string): Promise<EstadoAs
       metodo: "POST",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo rechazar el pago."), ok: false };
+    return estadoDeError(e, "No se pudo rechazar el pago.");
   }
   revalidatePath("/contabilidad/pagos");
   return { error: "", ok: true };
@@ -224,7 +221,7 @@ export async function importarPcgeAction(): Promise<EstadoAsiento> {
       metodo: "POST",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo importar el plan contable."), ok: false };
+    return estadoDeError(e, "No se pudo importar el plan contable.");
   }
   revalidatePath("/contabilidad/plan-cuentas");
   return { error: "", ok: true };
