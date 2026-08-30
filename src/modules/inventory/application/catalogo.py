@@ -308,6 +308,7 @@ def listar_skus(session: Session, empresa_id: uuid.UUID | None = None) -> list[d
             "codigo_barras": sku.codigo_barras,
             "activo": sku.activo,
             "articulo_nombre": articulo.nombre,
+            "controla_lote": articulo.controla_lote,
         }
         for sku, articulo in SkuRepo(session).list(empresa_id)
     ]

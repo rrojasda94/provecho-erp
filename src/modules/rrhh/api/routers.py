@@ -103,11 +103,26 @@ _rate_limit_postulacion = rate_limit("postulacion", 20, 3600)
 _rate_limit_convocatoria_publica = rate_limit("convocatoria_publica", 60, 3600)
 
 
+def _sin_sueldo_si_no_corresponde(trabajador, visible: bool):
+    """El sueldo solo viaja con `rrhh.nomina_gestionar`.
+
+    Mismo criterio que el legajo: `rrhh.leer` lo tiene el supervisor, que
+    necesita ver a su gente pero no cuánto gana. Esconder la nómina del
+    legajo y dejar `remuneracion_base` en el listado era esconderla de la
+    puerta principal y dejar la ventana abierta.
+    """
+    if visible:
+        return trabajador
+    return schemas.TrabajadorOut.model_validate(trabajador).model_copy(
+        update={"remuneracion_base": None}
+    )
+
+
 # --- Trabajador ----------------------------------------------------------------
 @router.post("/trabajadores", response_model=schemas.TrabajadorOut, status_code=201)
 def crear_trabajador(
     body: schemas.TrabajadorCreate,
-    _: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
+    actor: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
@@ -115,39 +130,51 @@ def crear_trabajador(
     campos["empresa_id"] = tenant.empresa(campos["empresa_id"])
     trabajador = trabajadores.crear_trabajador(session, **campos)
     session.commit()
-    return trabajador
+    return _sin_sueldo_si_no_corresponde(
+        trabajador, tiene_permiso(session, actor.id, NOMINA_GESTIONAR)
+    )
 
 
 @router.get("/trabajadores", response_model=Pagina[schemas.TrabajadorOut])
 def listar_trabajadores(
     empresa_id: uuid.UUID | None = None,
-    _: Usuario = Depends(require_permission(LEER)),
+    actor: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
-    return paginar(
+    """La remuneración viaja en `null` sin `rrhh.nomina_gestionar`."""
+    pagina = paginar(
         session,
         trabajadores.q_trabajadores(session, tenant.filtro_empresa(empresa_id)),
         p,
     )
+    visible = tiene_permiso(session, actor.id, NOMINA_GESTIONAR)
+    pagina["items"] = [
+        _sin_sueldo_si_no_corresponde(t, visible) for t in pagina["items"]
+    ]
+    return pagina
 
 
 @router.get("/trabajadores/{trabajador_id}", response_model=schemas.TrabajadorOut)
 def ver_trabajador(
     trabajador_id: uuid.UUID,
-    _: Usuario = Depends(require_permission(LEER)),
+    actor: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return exigir_trabajador(session, trabajador_id, tenant)
+    """La remuneración viaja en `null` sin `rrhh.nomina_gestionar`."""
+    return _sin_sueldo_si_no_corresponde(
+        exigir_trabajador(session, trabajador_id, tenant),
+        tiene_permiso(session, actor.id, NOMINA_GESTIONAR),
+    )
 
 
 @router.patch("/trabajadores/{trabajador_id}", response_model=schemas.TrabajadorOut)
 def actualizar_trabajador(
     trabajador_id: uuid.UUID,
     body: schemas.TrabajadorUpdate,
-    _: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
+    actor: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
@@ -158,14 +185,16 @@ def actualizar_trabajador(
         session, trabajador_id, **body.model_dump(exclude_unset=True)
     )
     session.commit()
-    return trabajador
+    return _sin_sueldo_si_no_corresponde(
+        trabajador, tiene_permiso(session, actor.id, NOMINA_GESTIONAR)
+    )
 
 
 @router.post("/trabajadores/{trabajador_id}/cesar", response_model=schemas.TrabajadorOut)
 def cesar_trabajador(
     trabajador_id: uuid.UUID,
     body: schemas.TrabajadorCese,
-    _: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
+    actor: Usuario = Depends(require_permission(TRABAJADOR_GESTIONAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
@@ -174,7 +203,9 @@ def cesar_trabajador(
         session, trabajador_id, fecha_cese=body.fecha_cese
     )
     session.commit()
-    return trabajador
+    return _sin_sueldo_si_no_corresponde(
+        trabajador, tiene_permiso(session, actor.id, NOMINA_GESTIONAR)
+    )
 
 
 # --- Legajo del trabajador (file personal) -----------------------------------
@@ -188,8 +219,9 @@ def ver_legajo(
     """El expediente completo en una sola lectura: contratos, amonestaciones,
     memorándums, certificados, permisos y pactos.
 
-    **La nómina va solo con `rrhh.nomina_gestionar`.** Boletas y
-    liquidaciones llevan remuneración, y `rrhh.leer` lo tiene el supervisor,
+    **La nómina va solo con `rrhh.nomina_gestionar`**: boletas,
+    liquidaciones y la `remuneracion_base` de la ficha del trabajador. Las
+    tres llevan remuneración, y `rrhh.leer` lo tiene el supervisor,
     que necesita ver las amonestaciones de su gente pero no cuánto gana. Que
     una boleta ya fuera legible pidiéndola por su id no es razón para
     volverla navegable. Cuando no viaja, `nomina_visible` lo dice: un legajo
@@ -199,11 +231,14 @@ def ver_legajo(
     se pide por `GET /rrhh/asistencia` acotada por rango.
     """
     exigir_trabajador(session, trabajador_id, tenant)
-    return legajo_uc.legajo(
-        session,
-        trabajador_id,
-        incluir_nomina=tiene_permiso(session, actor.id, NOMINA_GESTIONAR),
+    visible = tiene_permiso(session, actor.id, NOMINA_GESTIONAR)
+    expediente = legajo_uc.legajo(session, trabajador_id, incluir_nomina=visible)
+    # La ficha del trabajador también lleva sueldo: esconder las boletas y
+    # dejarlo ahí sería censurar el documento y no el dato.
+    expediente["trabajador"] = _sin_sueldo_si_no_corresponde(
+        expediente["trabajador"], visible
     )
+    return expediente
 
 
 @router.get(

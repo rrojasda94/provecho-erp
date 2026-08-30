@@ -266,8 +266,10 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   Texto de 48 columnas + membrete, igual que la comanda (ADR-067).
 - **Autorización de supervisor** (RN-AUD-005): `POST /auth/autorizar`
   (módulo `users`) verifica PIN + permiso y devuelve una elevación de 3
-  minutos acotada a esa acción. Descuento y anulación de líneas la exigen;
-  `autorizado_por` sale de ahí, nunca del cuerpo del request.
+  minutos acotada a esa acción y **de un solo uso**. Descuento y anulación
+  de líneas la exigen; `autorizado_por` sale de ahí, nunca del cuerpo del
+  request. Una elevación cubre una operación: la del descuento de una venta
+  no sirve para la siguiente.
 
 **Variantes y grupos de opciones (2026-08-03, migración `b6d1e83f47ac`,
 ADR-023):**
