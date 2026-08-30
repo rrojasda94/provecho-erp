@@ -107,6 +107,7 @@ CAJERO_PIN = "111111"
 PRODUCTO_NOMBRE = "Pizza E2E"
 # La estación de cocina que los recorridos de uso abren para ver la cola.
 NOMBRE_ESTACION = "Cocina E2E"
+NOMBRE_DESPACHO = "Despacho E2E"
 PRODUCTO_PRECIO = Decimal("25.00")
 
 # --- Carta armada (variantes + grupo obligatorio + extras) -------------------
@@ -236,24 +237,28 @@ def sembrar_e2e(session: Session) -> dict:
             )
     punto_venta = puntos_venta[0]
 
-    # Una estación de cocina por sucursal. Sin ella, `/kds` abre en el
-    # tablero de estaciones y cualquier recorrido que quiera ver la cola
-    # tiene que crearla a mano antes — quince clics de preparación que no son
-    # lo que la prueba viene a mirar. Sin `categoria_ids`: la estación ve
-    # todo, que es lo que un local de una sola cocina configura.
+    # Una estación de cocina y una de despacho por sucursal. Sin ellas,
+    # `/kds` abre en el tablero de estaciones y cualquier recorrido que
+    # quiera ver la cola tiene que crearlas a mano antes — quince clics de
+    # preparación que no son lo que la prueba viene a mirar. Sin
+    # `categoria_ids`: la estación ve todo, que es lo que un local de una
+    # sola cocina configura.
+    #
+    # La de despacho faltaba desde que el PDV la embebe (ADR-078): el overlay
+    # busca una `tipo="despacho"` activa y sin ninguna sembrada solo se podía
+    # probar su estado vacío.
     for suc in session.scalars(select(Sucursal)).all():
-        ya = session.scalar(
-            select(KdsPantalla).where(
-                KdsPantalla.sucursal_id == suc.id,
-                KdsPantalla.nombre == NOMBRE_ESTACION,
-            )
-        )
-        if ya is None:
-            session.add(
-                KdsPantalla(
-                    sucursal_id=suc.id, nombre=NOMBRE_ESTACION, tipo="preparacion"
+        for nombre, tipo in ((NOMBRE_ESTACION, "preparacion"), (NOMBRE_DESPACHO, "despacho")):
+            ya = session.scalar(
+                select(KdsPantalla).where(
+                    KdsPantalla.sucursal_id == suc.id,
+                    KdsPantalla.nombre == nombre,
                 )
             )
+            if ya is None:
+                session.add(
+                    KdsPantalla(sucursal_id=suc.id, nombre=nombre, tipo=tipo)
+                )
     session.flush()
 
     # `supervisor` es quien recibe el efectivo del cajón al terminar el

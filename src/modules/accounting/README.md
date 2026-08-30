@@ -143,6 +143,39 @@ monto; no hay asiento de cierre anual, así que el resultado del balance es
 acumulado desde el inicio del libro; y el corte corriente/no corriente se
 toma por rubro porque no hay fecha de vencimiento por cuota.
 
+## La cuenta la elige la categoría (ADR-086, 2026-08-30)
+
+Las plantillas del PCGE eran iguales para todo: **toda venta acreditaba
+`7011` y toda compra debitaba `6011` y `201`**, sea una pizza o la factura de
+la luz. Y como los estados financieros son pura agregación sobre
+`asiento_linea`, eso era literalmente lo que mostraba el balance.
+
+Ahora cada `LineaPlantilla` puede llevar un **rol** (`compra`, `existencia`,
+`variacion_existencia`, `servicio`, `ingreso`, `merma`, `consumo_personal`), y
+la categoría del artículo o del producto dice qué cuenta usa cada rol. Las
+líneas sin rol —`1212`, `4212`, `40111`, `1041`— son contraparte: la cuenta
+por cobrar es del cliente y el IGV del fisco, así que no dependen de qué se
+vendió y no se reparten.
+
+`crear_asiento_desde_plantilla` recibe un `desglose`
+(`[{categoria_id, monto, es_servicio}]`) y prorratea cada línea con rol al
+céntimo, dando el residuo entero a la parte mayor (`reparto_proporcional`).
+**El desglose es peso, nunca importe**: el asiento siempre suma el monto del
+evento, aunque venga incompleto. Sin desglose útil, el asiento es el de
+siempre byte por byte — y una `regla_asiento` de la empresa lo ignora, porque
+quien configuró dos líneas pidió dos líneas.
+
+La configuración **no vive acá**: vive en `categoria.asiento_contable_config`
+(`inventory`), porque la categoría es el único agrupador que comparten
+artículos y productos comerciales. Este módulo aporta el vocabulario
+(`queries_publicas.roles_contables`) y la validación de que la cuenta exista,
+esté activa y sea de último nivel (`problemas_de_config_contable`), que son
+las mismas tres reglas que `_construir_lineas` impone al asentar.
+
+Un artículo con `tipo="servicio"` manda su parte a la 63x y **no escribe el
+bloque de destino**: cuadra igual porque `201`/`611` son un par del mismo
+importe.
+
 ## Casos de uso
 
 - Mantener plan de cuentas (e importar el PCGE oficial).

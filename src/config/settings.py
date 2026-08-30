@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 15
     refresh_token_days: int = 7
+    # Cuánto puede estar quieta una sesión antes de darse por cerrada
+    # (ADR-084). El plazo del refresh es el techo absoluto; esto es el de
+    # inactividad, y es el que corta la sesión de una PC que se apagó.
+    #
+    # Ocho horas y no dos: entre almuerzo y cena una caja puede quedarse sin
+    # tocar media tarde, y hacerla volver a entrar ahí es exactamente el
+    # problema que ADR-073 vino a arreglar. Un turno completo cabe; una noche,
+    # no.
+    refresh_inactividad_horas: int = 8
     # Endurecimiento HTTP. Listas en .env separadas por coma.
     #
     # `NoDecode` es lo que hace que esa promesa se cumpla: sin él,

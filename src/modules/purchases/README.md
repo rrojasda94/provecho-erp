@@ -123,6 +123,38 @@ incurrido, no un compromiso a aprobar) ni por `caja_chica_movimiento`
 (ese modelo sigue sin existir — el pago sale por cuentas por pagar
 normal). Detalle de la decisión en ADR-082.
 
+## El ciclo completo en pantalla (2026-08-30, ADR-085)
+
+Todos los casos de uso del módulo tenían endpoint y test verde desde el
+primer slice, y **ninguno tenía pantalla** salvo crear y editar: el listado
+ofrecía «Editar» y solo en `borrador`, así que una OC emitida no tenía
+acciones en ninguna parte. Ahora:
+
+- `/compras/ordenes-compra/[id]` — la ficha, con emitir, recibir, anular y
+  registrar factura según `domain/rules.py` y permiso. El formulario de
+  recepción precarga lo pendiente y pide lote y vencimiento solo si el
+  artículo `controla_lote` (RN-VNC-002).
+- `/compras/directas` — la compra y su factura en un paso. Ruta propia y no
+  un diálogo del listado: la paleta de comandos lee `SUBMENUS` y un diálogo
+  no se puede buscar por nombre.
+- `/compras/facturas` — el registro de compras, sobre
+  `GET /purchases/comprobantes` (nuevo). Acepta `purchases.leer` **o**
+  `accounting.leer`: el contador necesita el documento fuente del asiento sin
+  el módulo de compras entero.
+
+Dos lecturas nuevas alimentan la ficha:
+`GET /ordenes-compra/{id}/recepciones` (con el `articulo_id` resuelto desde
+el ítem de la OC, que es donde vive) y `GET /ordenes-compra/{id}/comprobantes`.
+
+### Los datos de la factura del proveedor
+
+`comprobante` guardaba tipo, serie, correlativo y sustento, y nada más.
+Suma `emisor_num_doc`, `fecha_emision` y `total` (ADR-085), y su unicidad se
+parte por dirección: el emitido es único por empresa, el recibido por emisor.
+`emisor_num_doc` sale de `proveedor.ruc` y no se teclea salvo que el papel
+diga otra cosa. `tipo` y `sustento` pasan a `Literal` — eran `str` libres
+contra columnas `Enum` con CHECK, o sea un 500 en vez de un 422.
+
 ## Dirección del proveedor anclada al mapa (2026-08-22, ADR-053)
 
 `proveedor` lleva el `UbicacionMixin` de `core/model_base`. Convive con

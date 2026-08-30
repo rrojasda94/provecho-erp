@@ -37,6 +37,7 @@ const RUTAS = [
   "/",
   "/dashboard",
   "/inventario",
+  "/inventario/stock",
   "/inventario/articulos",
   "/inventario/lotes",
   "/inventario/ajustes",
@@ -49,6 +50,8 @@ const RUTAS = [
   "/catalogo/recetas",
   "/compras",
   "/compras/ordenes-compra",
+  "/compras/directas",
+  "/compras/facturas",
   "/compras/proveedores",
   "/contabilidad",
   "/contabilidad/caja",
@@ -92,9 +95,24 @@ type Falla = { donde: string; clase: string; detalle: string };
  * `aria-busy`) de las pantallas del shell `(app)`. Un `waitForTimeout` fijo
  * corre la misma carrera que el propio ERP resuelve con `loading.tsx`: en
  * frío, `next dev` compila la ruta la primera vez que se pide y puede tardar
- * más que cualquier número fijo razonable. */
+ * más que cualquier número fijo razonable.
+ *
+ * El selector pide `aria-busy="true"` y no la sola presencia del atributo.
+ * `DialogoFormulario` monta su `<form aria-busy={pendiente}>` dentro de un
+ * `<dialog>` cerrado que **siempre** está en el DOM, y React escribe los
+ * `aria-*` booleanos como texto: en reposo eso es un `aria-busy="false"`
+ * que `[aria-busy]` casa igual y que no se va nunca. Con eso, toda pantalla
+ * con un diálogo de alta —catálogo, organización, proveedores, plan de
+ * cuentas: catorce de las cuarenta y tres— se comía los 60 s enteros de
+ * espera. Tres medidas por catorce rutas son cuarenta y dos minutos de
+ * reloj tirados, y son los que hacían que este caso no llegara nunca al
+ * final de su recorrido. */
 async function esperarCarga(page: Page) {
-  await page.locator("[aria-busy]").first().waitFor({ state: "detached", timeout: 60_000 }).catch(() => {});
+  await page
+    .locator('[aria-busy="true"]')
+    .first()
+    .waitFor({ state: "detached", timeout: 60_000 })
+    .catch(() => {});
   await page.waitForTimeout(300);
 }
 
@@ -144,6 +162,12 @@ async function prepararEscenario(page: Page): Promise<string[]> {
     await dialogo(page).getByRole("button", { name: "Abrir caja" }).click();
   }
   await expect(page.getByTestId("estado-caja")).toContainText("Caja abierta");
+
+  // Pestaña nueva antes de marcar: los borradores son del punto de venta y
+  // sobreviven a la corrida anterior (ADR-074), así que el PDV abre con la
+  // cuenta que dejó otro recorrido. Sobre una orden ya enviada el botón dice
+  // "Enviar aumento", no "Enviar", y la espera se iba entera al timeout.
+  await page.getByRole("button", { name: "Nuevo pedido" }).click();
 
   await page.getByRole("button", { name: new RegExp(PRODUCTO, "i") }).first().click();
   await dialogo(page).getByRole("button", { name: /Guardar/i }).click();

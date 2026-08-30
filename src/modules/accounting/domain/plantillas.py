@@ -37,13 +37,40 @@ from decimal import ROUND_HALF_UP, Decimal
 CENTIMO = Decimal("0.01")
 
 
+#: Los roles contables que una categoría puede mapear (ADR-086).
+#:
+#: Solo los que hoy alimentan una línea de plantilla. Nada especulativo: un
+#: rol sin línea que lo use sería configuración que no hace nada, y nadie
+#: podría darse cuenta salvo cerrando el mes.
+#:
+#: `costo_venta` no está por eso mismo: ningún evento asienta todavía contra
+#: la 69, así que no hay línea que reemplazar (ver deuda de `accounting`).
+ROLES = (
+    "compra",
+    "existencia",
+    "variacion_existencia",
+    "servicio",
+    "ingreso",
+    "merma",
+    "consumo_personal",
+)
+
+
 @dataclass(frozen=True)
 class LineaPlantilla:
-    """Una línea del asiento: qué cuenta, de qué lado y con cuál importe."""
+    """Una línea del asiento: qué cuenta, de qué lado y con cuál importe.
+
+    `rol` dice qué papel juega la cuenta, y es lo que permite que una
+    categoría la reemplace por la suya (ADR-086). `None` = **contraparte**:
+    la cuenta por cobrar es del cliente, la cuenta por pagar del proveedor y
+    el IGV del fisco — ninguna depende de qué se compró o se vendió, así que
+    ninguna se reparte.
+    """
 
     codigo: str
     tipo: str  # "debe" | "haber"
     importe: str  # "base" | "igv" | "total"
+    rol: str | None = None
 
 
 @dataclass(frozen=True)
@@ -62,13 +89,21 @@ class Plantilla:
     lineas: tuple[LineaPlantilla, ...]
 
 
-def _d(codigo: str, importe: str = "total") -> LineaPlantilla:
-    return LineaPlantilla(codigo, "debe", importe)
+def _d(codigo: str, importe: str = "total", rol: str | None = None) -> LineaPlantilla:
+    return LineaPlantilla(codigo, "debe", importe, rol)
 
 
-def _h(codigo: str, importe: str = "total") -> LineaPlantilla:
-    return LineaPlantilla(codigo, "haber", importe)
+def _h(codigo: str, importe: str = "total", rol: str | None = None) -> LineaPlantilla:
+    return LineaPlantilla(codigo, "haber", importe, rol)
 
+
+#: Cuenta de fábrica del rol `servicio`. No es una línea de ninguna
+#: plantilla: **sustituye** a la de `compra` cuando lo comprado es un
+#: servicio, y en ese caso el bloque de destino (201/611) no se escribe —
+#: un flete no entra a ningún almacén. `6399` («Otros», bajo «Otros
+#: servicios prestados por terceros») es lo genérico correcto; la categoría
+#: «Energía eléctrica» apunta a `6361` y «Mantenimiento» a `6343`.
+CODIGO_SERVICIO_DE_FABRICA = "6399"
 
 PLANTILLAS: dict[str, Plantilla] = {
     # Venta: nace la cuenta por cobrar del cliente. El cobro la cancela
@@ -81,7 +116,7 @@ PLANTILLAS: dict[str, Plantilla] = {
         monto_es="total",
         lineas=(
             _d("1212", "total"),
-            _h("7011", "total"),
+            _h("7011", "total", rol="ingreso"),
         ),
     ),
     # Comprobante emitido: el débito fiscal. Reclasifica del ingreso al
@@ -105,10 +140,10 @@ PLANTILLAS: dict[str, Plantilla] = {
     "purchases.compra_recibida": Plantilla(
         monto_es="base",
         lineas=(
-            _d("6011", "base"),
+            _d("6011", "base", rol="compra"),
             _h("4212", "base"),
-            _d("201", "base"),
-            _h("611", "base"),
+            _d("201", "base", rol="existencia"),
+            _h("611", "base", rol="variacion_existencia"),
         ),
     ),
     # Comprobante de compra conforme: el crédito fiscal. Sube la deuda con
@@ -124,17 +159,17 @@ PLANTILLAS: dict[str, Plantilla] = {
     # atención al personal, no a costo de ventas.
     "inventory.consumo_personal_valorizado": Plantilla(
         monto_es="neto",
-        lineas=(_d("625"), _h("201")),
+        lineas=(_d("625", rol="consumo_personal"), _h("201", rol="existencia")),
     ),
     # Merma desechada y faltante de traslado: existencias que salieron y no
     # se convirtieron en venta.
     "inventory.merma_registrada": Plantilla(
         monto_es="neto",
-        lineas=(_d("6599"), _h("201")),
+        lineas=(_d("6599", rol="merma"), _h("201", rol="existencia")),
     ),
     "inventory.transferencia_recibida": Plantilla(
         monto_es="neto",
-        lineas=(_d("6599"), _h("201")),
+        lineas=(_d("6599", rol="merma"), _h("201", rol="existencia")),
     ),
     # Pago a proveedor: cancela la deuda contra la cuenta corriente. La
     # detracción no abre línea propia — el dinero sale igual de la misma
@@ -167,3 +202,32 @@ def desagregar(monto: Decimal, tasa_igv: Decimal, monto_es: str) -> dict[str, De
         return {"base": base, "igv": monto - base, "total": monto}
     total = (monto * factor).quantize(CENTIMO, rounding=ROUND_HALF_UP)
     return {"base": monto, "igv": total - monto, "total": total}
+
+
+def reparto_proporcional(total: Decimal, pesos: list[Decimal]) -> list[Decimal]:
+    """Reparte `total` en proporción a `pesos`, al céntimo, sin perder ni
+    inventar un centavo.
+
+    El residuo del redondeo va **entero a la parte mayor**. Redondear cada
+    parte por su cuenta aparta la suma del total y deja el asiento
+    descuadrado por un céntimo — es el mismo problema que `desagregar`
+    resuelve calculando el IGV por diferencia. Acá lo sagrado es el total: el
+    reparto es lo que absorbe el redondeo, porque el total es el que tiene
+    que cuadrar contra la línea de contraparte, que no se reparte.
+
+    Pesos que suman cero (o lista vacía) devuelve la lista vacía: quien llama
+    vuelve a la línea sin repartir, que es el comportamiento de siempre.
+    """
+    suma = sum(pesos, Decimal(0))
+    if not pesos or suma <= 0:
+        return []
+    partes = [
+        (total * peso / suma).quantize(CENTIMO, rounding=ROUND_HALF_UP)
+        for peso in pesos
+    ]
+    residuo = total - sum(partes, Decimal(0))
+    if residuo:
+        mayor = max(range(len(partes)), key=lambda i: pesos[i])
+        partes[mayor] += residuo
+    return partes
+

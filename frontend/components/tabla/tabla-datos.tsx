@@ -90,7 +90,14 @@ export function TablaDatos<T>({
         placeholder={placeholderBusqueda}
       />
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-[var(--sombra-1)]">
+      {/* `relative` junto a `overflow-x-auto` y no por estética: un
+          descendiente `position:absolute` sin ancestro posicionado toma
+          como bloque contenedor el del documento, y entonces **este**
+          contenedor no lo recorta. Es lo que pasa con el input oculto de
+          validación que Base UI dibuja por cada `Combobox`: dentro de una
+          celda quedaba a 667 px en un teléfono de 390 y estiraba la página
+          entera, con la barra de scroll horizontal que eso implica. */}
+      <div className="relative overflow-x-auto rounded-lg border border-border bg-card shadow-[var(--sombra-1)]">
         <table className="w-full text-sm">
           <TablaEncabezado tabla={tabla} />
           {!sinFilas && (

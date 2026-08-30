@@ -6,8 +6,6 @@ import { redirect } from "next/navigation";
 import { ApiError, apiFetch } from "@/lib/api";
 import { COOKIE_REFRESH, COOKIE_TOKEN } from "@/lib/auth";
 import {
-  MAX_AGE_ACCESS,
-  MAX_AGE_REFRESH,
   opcionesCookie,
 } from "@/lib/sesion-refresh";
 
@@ -136,12 +134,10 @@ export async function loginAction(
   // Las mismas opciones que usa la renovación del middleware (ADR-073):
   // dos juegos distintos dejarían dos cookies del mismo nombre y la sesión
   // volvería a caducar a los quince minutos aunque se esté renovando.
-  store.set(COOKIE_TOKEN, tokens.access_token, opcionesCookie(MAX_AGE_ACCESS));
-  store.set(
-    COOKIE_REFRESH,
-    tokens.refresh_token,
-    opcionesCookie(MAX_AGE_REFRESH),
-  );
+  // Sin plazo: son cookies de sesión y mueren al cerrar el navegador
+  // (ADR-084).
+  store.set(COOKIE_TOKEN, tokens.access_token, opcionesCookie());
+  store.set(COOKIE_REFRESH, tokens.refresh_token, opcionesCookie());
 
   const siguiente = String(formData.get("next") ?? "");
   if (SIGUIENTE_PERMITIDO.test(siguiente)) redirect(siguiente);

@@ -2077,6 +2077,98 @@
         "title": "ArticuloUpdate",
         "type": "object"
       },
+      "AsientoContableConfig": {
+        "additionalProperties": false,
+        "description": "Qué cuenta del PCGE usa cada rol contable de esta categoría (ADR-086).\n\nSe guarda el **código** y no el id de la cuenta. El código es el del PCGE:\nel mismo en toda empresa del grupo, legible en un backup y el que el\ncontador reconoce; el id es de una fila concreta, y el hub replica este\ncampo entre empresas (`application/sincronizacion.py`), donde un id ajeno\nsería basura. Además, el fallback de la plantilla ya es un código: con id\nhabría dos caminos de resolución para lo mismo.\n\n`extra=\"forbid\"`: un rol mal escrito no puede quedar guardado diciendo\nnada. El asiento lo ignoraría en silencio y el error aparecería recién al\ncerrar el mes.",
+        "properties": {
+          "compra": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compra"
+          },
+          "consumo_personal": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumo Personal"
+          },
+          "existencia": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Existencia"
+          },
+          "ingreso": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingreso"
+          },
+          "merma": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merma"
+          },
+          "servicio": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servicio"
+          },
+          "variacion_existencia": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variacion Existencia"
+          }
+        },
+        "title": "AsientoContableConfig",
+        "type": "object"
+      },
       "AsientoLineaIn": {
         "properties": {
           "cuenta_contable_id": {
@@ -3745,14 +3837,12 @@
           "asiento_contable_config": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AsientoContableConfig"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Asiento Contable Config"
+            ]
           },
           "empresa_id": {
             "anyOf": [
@@ -3782,6 +3872,18 @@
             "minLength": 1,
             "title": "Nombre",
             "type": "string"
+          },
+          "padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Padre Id"
           }
         },
         "required": [
@@ -3792,6 +3894,18 @@
       },
       "CategoriaOut": {
         "properties": {
+          "asiento_contable_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asiento Contable Config"
+          },
           "empresa_id": {
             "format": "uuid",
             "title": "Empresa Id",
@@ -3816,6 +3930,18 @@
           "nombre": {
             "title": "Nombre",
             "type": "string"
+          },
+          "padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Padre Id"
           }
         },
         "required": [
@@ -3879,14 +4005,12 @@
           "asiento_contable_config": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AsientoContableConfig"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Asiento Contable Config"
+            ]
           },
           "frecuencia_conteo": {
             "anyOf": [
@@ -3912,9 +4036,26 @@
             ],
             "title": "Nombre"
           },
+          "padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Padre Id"
+          },
           "quitar_frecuencia": {
             "default": false,
             "title": "Quitar Frecuencia",
+            "type": "boolean"
+          },
+          "quitar_padre": {
+            "default": false,
+            "title": "Quitar Padre",
             "type": "boolean"
           }
         },
@@ -5326,6 +5467,41 @@
             "title": "Correlativo",
             "type": "integer"
           },
+          "emisor_num_doc": {
+            "anyOf": [
+              {
+                "pattern": "^(\\d{8}|\\d{11})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emisor Num Doc"
+          },
+          "fecha_emision": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Emision"
+          },
+          "gravado_igv": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gravado Igv"
+          },
           "idempotency_key": {
             "maxLength": 100,
             "minLength": 8,
@@ -5339,12 +5515,40 @@
             "type": "string"
           },
           "sustento": {
+            "enum": [
+              "efectivo",
+              "voucher_medio_pago",
+              "movimiento_bancario",
+              "contrato_credito"
+            ],
             "title": "Sustento",
             "type": "string"
           },
           "tipo": {
+            "enum": [
+              "factura",
+              "boleta",
+              "rhe",
+              "ticket_compra"
+            ],
             "title": "Tipo",
             "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
           }
         },
         "required": [
@@ -5516,12 +5720,181 @@
         "title": "ComprobanteEmitidoOut",
         "type": "object"
       },
+      "ComprobanteRecibidoOut": {
+        "description": "Una fila del registro de compras.\n\n`total` es lo que declara el papel y `total_orden` lo que la OC dice que\nse recibió (base, sin IGV). Viajan los dos y no uno \"el\" total: son\nnúmeros distintos por definición, y elegir cuál mostrar escondería la\ndiferencia, que es justo lo que hay que conciliar.",
+        "properties": {
+          "compra_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compra Id"
+          },
+          "correlativo": {
+            "title": "Correlativo",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "emisor_num_doc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emisor Num Doc"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "fecha_emision": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Emision"
+          },
+          "gravado_igv": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gravado Igv"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "proveedor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proveedor"
+          },
+          "proveedor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proveedor Id"
+          },
+          "serie": {
+            "title": "Serie",
+            "type": "string"
+          },
+          "sustento": {
+            "title": "Sustento",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "total_orden": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Orden"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "compra_id",
+          "emisor_num_doc",
+          "tipo",
+          "serie",
+          "correlativo",
+          "fecha_emision",
+          "total",
+          "sustento",
+          "gravado_igv",
+          "created_at"
+        ],
+        "title": "ComprobanteRecibidoOut",
+        "type": "object"
+      },
       "ConformidadComprobanteCreate": {
         "properties": {
           "correlativo": {
             "exclusiveMinimum": 0.0,
             "title": "Correlativo",
             "type": "integer"
+          },
+          "emisor_num_doc": {
+            "anyOf": [
+              {
+                "pattern": "^(\\d{8}|\\d{11})$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emisor Num Doc"
+          },
+          "fecha_emision": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Emision"
           },
           "gravado_igv": {
             "anyOf": [
@@ -5547,12 +5920,40 @@
             "type": "string"
           },
           "sustento": {
+            "enum": [
+              "efectivo",
+              "voucher_medio_pago",
+              "movimiento_bancario",
+              "contrato_credito"
+            ],
             "title": "Sustento",
             "type": "string"
           },
           "tipo": {
+            "enum": [
+              "factura",
+              "boleta",
+              "rhe",
+              "ticket_compra"
+            ],
             "title": "Tipo",
             "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
           }
         },
         "required": [
@@ -14030,6 +14431,161 @@
         "title": "MovimientoDineroOut",
         "type": "object"
       },
+      "MovimientoKardexOut": {
+        "description": "Una línea del kardex. `MovimientoOut` es lo que devuelve el alta;\nesto es lo que se lee, y por eso trae rótulos y no solo ids.",
+        "properties": {
+          "almacen": {
+            "title": "Almacen",
+            "type": "string"
+          },
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "articulo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo"
+          },
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "decimales": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decimales"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
+          "motivo_ajuste": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Ajuste"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          },
+          "sku_codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sku Codigo"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "unidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad"
+          },
+          "usuario_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Id"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "almacen",
+          "sku_id",
+          "cantidad",
+          "tipo",
+          "motivo_ajuste",
+          "lote_id",
+          "referencia",
+          "usuario_id",
+          "ts"
+        ],
+        "title": "MovimientoKardexOut",
+        "type": "object"
+      },
       "MovimientoMayorOut": {
         "properties": {
           "asiento_id": {
@@ -15386,6 +15942,37 @@
         "title": "Pagina[ComprobanteEmitidoOut]",
         "type": "object"
       },
+      "Pagina_ComprobanteRecibidoOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ComprobanteRecibidoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[ComprobanteRecibidoOut]",
+        "type": "object"
+      },
       "Pagina_ConteoOut_": {
         "properties": {
           "items": {
@@ -15570,6 +16157,37 @@
           "page_size"
         ],
         "title": "Pagina[MovimientoDineroOut]",
+        "type": "object"
+      },
+      "Pagina_MovimientoKardexOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MovimientoKardexOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[MovimientoKardexOut]",
         "type": "object"
       },
       "Pagina_NotificacionOut_": {
@@ -21581,6 +22199,59 @@
         "title": "RecepcionCreate",
         "type": "object"
       },
+      "RecepcionDetalleOut": {
+        "properties": {
+          "comprobante_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comprobante Id"
+          },
+          "fecha": {
+            "format": "date-time",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RecepcionItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "orden_compra_id": {
+            "format": "uuid",
+            "title": "Orden Compra Id",
+            "type": "string"
+          },
+          "recibido_por": {
+            "format": "uuid",
+            "title": "Recibido Por",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "orden_compra_id",
+          "recibido_por",
+          "fecha",
+          "comprobante_id"
+        ],
+        "title": "RecepcionDetalleOut",
+        "type": "object"
+      },
       "RecepcionItemIn": {
         "properties": {
           "cantidad_recibida": {
@@ -21647,6 +22318,69 @@
           "cantidad_recibida"
         ],
         "title": "RecepcionItemIn",
+        "type": "object"
+      },
+      "RecepcionItemOut": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad_recibida": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad Recibida",
+            "type": "string"
+          },
+          "costo_unitario": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Unitario",
+            "type": "string"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lote_codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Codigo"
+          },
+          "orden_compra_item_id": {
+            "format": "uuid",
+            "title": "Orden Compra Item Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "orden_compra_item_id",
+          "articulo_id",
+          "cantidad_recibida",
+          "costo_unitario",
+          "lote_codigo",
+          "fecha_vencimiento"
+        ],
+        "title": "RecepcionItemOut",
         "type": "object"
       },
       "RecepcionOut": {
@@ -24957,11 +25691,39 @@
         "type": "object"
       },
       "StockOut": {
+        "description": "Una fila del stock, ya rotulada.\n\nLos nombres viajan con la fila y no se resuelven en el cliente: la\npantalla pediría el catálogo entero de SKUs y de almacenes para dibujar\n50 filas, y con el catálogo creciendo esa es la petición que se rompe\nprimero. Mismo criterio que `StockDeSkuOut`, que ya traía `almacen`.",
         "properties": {
+          "almacen": {
+            "title": "Almacen",
+            "type": "string"
+          },
           "almacen_id": {
             "format": "uuid",
             "title": "Almacen Id",
             "type": "string"
+          },
+          "articulo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo"
+          },
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
           },
           "bajo_minimo": {
             "title": "Bajo Minimo",
@@ -24972,6 +25734,17 @@
             "title": "Cantidad",
             "type": "string"
           },
+          "decimales": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decimales"
+          },
           "disponible": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Disponible",
@@ -24981,6 +25754,17 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Reservado",
             "type": "string"
+          },
+          "sku_codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sku Codigo"
           },
           "sku_id": {
             "format": "uuid",
@@ -24998,10 +25782,22 @@
               }
             ],
             "title": "Stock Minimo"
+          },
+          "unidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad"
           }
         },
         "required": [
           "almacen_id",
+          "almacen",
           "sku_id",
           "cantidad",
           "reservado",
@@ -29039,10 +29835,33 @@
             "title": "Direccion",
             "type": "string"
           },
+          "emisor_num_doc": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Emisor Num Doc"
+          },
           "empresa_id": {
             "format": "uuid",
             "title": "Empresa Id",
             "type": "string"
+          },
+          "fecha_emision": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Emision"
           },
           "id": {
             "format": "uuid",
@@ -29060,6 +29879,18 @@
           "tipo": {
             "title": "Tipo",
             "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
           }
         },
         "required": [
@@ -29366,7 +30197,7 @@
   "info": {
     "description": "ERP modular para grupo de restaurantes multi-marca. Convenciones de la API: docs/engineering/api-guidelines.md.",
     "title": "Provecho ERP",
-    "version": "0.9.0"
+    "version": "0.9.1"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -34244,7 +35075,7 @@
         ]
       },
       "patch": {
-        "description": "Acá se configura cada cuánto se cuenta la categoría (RN-INV-007).",
+        "description": "Acá se configura cada cuánto se cuenta la categoría (RN-INV-007) y a\nqué cuentas del PCGE se imputa lo que agrupa (ADR-086).",
         "operationId": "editar_categoria_api_v1_inventory_categorias__categoria_id__patch",
         "parameters": [
           {
@@ -35616,6 +36447,104 @@
       }
     },
     "/api/v1/inventory/movimientos": {
+      "get": {
+        "description": "El kardex. `movimiento_inventario` se escribe desde el primer slice y\nhasta ahora no había forma de leerlo: la pantalla decía cuánto queda y\nnunca por qué cambió.",
+        "operationId": "consultar_movimientos_api_v1_inventory_movimientos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sku_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sku Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_MovimientoKardexOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Consultar Movimientos",
+        "tags": [
+          "inventory"
+        ]
+      },
       "post": {
         "description": "Devuelve una lista porque una salida FEFO puede repartirse entre\nvarios lotes, y cada lote es un movimiento propio (ADR-015).",
         "operationId": "registrar_movimiento_api_v1_inventory_movimientos_post",
@@ -37465,6 +38394,7 @@
     },
     "/api/v1/inventory/stock": {
       "get": {
+        "description": "Qué hay y dónde. Los filtros son los de la pantalla de stock: por\nalmacén, por sucursal (todos sus almacenes), por categoría, solo lo que\nestá bajo su punto de reorden, o por texto sobre el artículo y el SKU.",
         "operationId": "consultar_stock_api_v1_inventory_stock_get",
         "parameters": [
           {
@@ -37482,6 +38412,67 @@
                 }
               ],
               "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "categoria_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Categoria Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bajo_minimo",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Bajo Minimo",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
             }
           },
           {
@@ -42279,6 +43270,162 @@
         ]
       }
     },
+    "/api/v1/purchases/comprobantes": {
+      "get": {
+        "description": "El registro de compras: los comprobantes que la empresa recibió.\n\nAcepta `purchases.leer` **o** `accounting.leer`. El contador tiene que\npoder ver el documento fuente del asiento sin que haya que darle el módulo\nde compras entero, que además lo dejaría emitir órdenes.",
+        "operationId": "listar_comprobantes_recibidos_api_v1_purchases_comprobantes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "query",
+            "name": "proveedor_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Proveedor Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "factura",
+                    "boleta",
+                    "rhe",
+                    "ticket_compra"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tipo"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_ComprobanteRecibidoOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Comprobantes Recibidos",
+        "tags": [
+          "purchases"
+        ]
+      }
+    },
     "/api/v1/purchases/ordenes-compra": {
       "get": {
         "operationId": "listar_ordenes_compra_api_v1_purchases_ordenes_compra_get",
@@ -42557,6 +43704,59 @@
         ]
       }
     },
+    "/api/v1/purchases/ordenes-compra/{orden_compra_id}/comprobantes": {
+      "get": {
+        "description": "Qué factura sustenta esta OC. Sin esto la ficha no puede decir si ya\nse dio conformidad, y ofrecería registrarla dos veces.",
+        "operationId": "listar_comprobantes_de_orden_api_v1_purchases_ordenes_compra__orden_compra_id__comprobantes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orden_compra_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Orden Compra Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/src__modules__purchases__api__schemas__ComprobanteOut"
+                  },
+                  "title": "Response Listar Comprobantes De Orden Api V1 Purchases Ordenes Compra  Orden Compra Id  Comprobantes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Comprobantes De Orden",
+        "tags": [
+          "purchases"
+        ]
+      }
+    },
     "/api/v1/purchases/ordenes-compra/{orden_compra_id}/conformidad-comprobante": {
       "post": {
         "operationId": "dar_conformidad_comprobante_api_v1_purchases_ordenes_compra__orden_compra_id__conformidad_comprobante_post",
@@ -42664,6 +43864,57 @@
       }
     },
     "/api/v1/purchases/ordenes-compra/{orden_compra_id}/recepciones": {
+      "get": {
+        "description": "Qué se recibió de esta OC y cuándo. La ficha lo necesita para poder\nofrecer una recepción parcial sabiendo qué falta.",
+        "operationId": "listar_recepciones_api_v1_purchases_ordenes_compra__orden_compra_id__recepciones_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orden_compra_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Orden Compra Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RecepcionDetalleOut"
+                  },
+                  "title": "Response Listar Recepciones Api V1 Purchases Ordenes Compra  Orden Compra Id  Recepciones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Recepciones",
+        "tags": [
+          "purchases"
+        ]
+      },
       "post": {
         "operationId": "recibir_orden_compra_api_v1_purchases_ordenes_compra__orden_compra_id__recepciones_post",
         "parameters": [

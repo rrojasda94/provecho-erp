@@ -36,6 +36,11 @@ const TIPOS_ARTICULO = [
   "empaque",
   "repuesto",
   "suministro",
+  // Lo que se compra y no entra a ningún almacén: la luz, un flete, un
+  // mantenimiento (ADR-086). Es un artículo para poder ponerlo en una línea
+  // de orden de compra, pero no lleva SKU ni mueve stock, y su asiento va a
+  // la 63x en vez de a existencias.
+  "servicio",
 ] as const;
 
 function SelectorTipo({ valor }: { valor?: string }) {
@@ -49,6 +54,10 @@ function SelectorTipo({ valor }: { valor?: string }) {
           </option>
         ))}
       </select>
+      <span className="text-xs font-normal text-gray">
+        Un <strong>servicio</strong> no lleva stock ni SKU: se compra, se
+        factura y va directo a gasto.
+      </span>
     </label>
   );
 }

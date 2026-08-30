@@ -1,7 +1,12 @@
+import { BarChart3 } from "lucide-react";
+import Link from "next/link";
+
 import { Tablero } from "@/components/reportes/tablero";
 import { AvisoFallo } from "@/components/shell/aviso-fallo";
+import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { esSinPermiso, fallaDe, type Falla } from "@/lib/carga";
+import { tienePermiso } from "@/lib/permisos";
 import type {
   Catalogo,
   Marca,
@@ -61,22 +66,63 @@ function Kpi({
   valor,
   detalle,
   alerta,
+  href,
 }: {
   titulo: string;
   valor: string | number;
   detalle?: string;
   alerta?: boolean;
+  /** A dónde lleva la cifra. Un indicador que dice "hay 12" y no ofrece
+   * verlos obliga a buscar esos doce a mano en otra pantalla. */
+  href?: string;
 }) {
-  return (
-    <article className="rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-sm">
+  const cuerpo = (
+    <>
       <h2 className="rotulo">{titulo}</h2>
       <p className={`cifra mt-2 text-3xl font-semibold ${alerta ? "text-secondary" : ""}`}>
         {valor}
       </p>
       {detalle && <p className="cifra mt-0.5 text-sm text-gray">{detalle}</p>}
-    </article>
+    </>
+  );
+  const clase =
+    "rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-sm";
+  return href ? (
+    <Link href={href} className={`${clase} block`}>
+      {cuerpo}
+    </Link>
+  ) : (
+    <article className={clase}>{cuerpo}</article>
   );
 }
+
+/**
+ * El pase al análisis avanzado.
+ *
+ * Quien mira el tablero del día es justo quien después quiere cruzar los
+ * datos a mano, y hasta ahora eso obligaba a volver al home y entrar por la
+ * otra ficha — un rodeo que nadie hacía, así que el BI quedaba sin usar.
+ *
+ * Va acá y no en el sidebar del módulo porque `ModuloShell` no filtra los
+ * ítems de `SUBMENUS` por permiso: ahí se le ofrecería también a quien no
+ * tiene `bi.acceder`, para mandarlo a una pantalla de "sin permiso".
+ */
+function PaseAlBi({ permisos }: { permisos: string[] }) {
+  if (!tienePermiso(permisos, "bi.acceder")) return null;
+  return (
+    <header className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm text-gray">
+        ¿Necesitas cruzar estos datos a mano? El análisis avanzado abre con la
+        misma sesión.
+      </p>
+      <Button variant="outline" render={<Link href="/bi" />}>
+        <BarChart3 className="size-4" aria-hidden />
+        Ir al BI
+      </Button>
+    </header>
+  );
+}
+
 
 export default async function DashboardPage() {
   // `empresa_id` sale de `/users/me` (verificado por la API), ya no del JWT
@@ -132,6 +178,8 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-6">
       <AvisoFallo fallas={fallas} />
 
+      <PaseAlBi permisos={usuario.permisos} />
+
       {resumen.datos && (
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Kpi
@@ -143,6 +191,8 @@ export default async function DashboardPage() {
             titulo="Stock bajo mínimo"
             valor={resumen.datos.stock_bajo_minimo}
             alerta={resumen.datos.stock_bajo_minimo > 0}
+            detalle="Ver cuáles"
+            href="/inventario/stock?bajo=1"
           />
           <Kpi
             titulo="Incidencias de inventario (7d)"

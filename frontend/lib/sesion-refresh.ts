@@ -19,12 +19,6 @@ import { API_INTERNAL_URL } from "@/lib/api";
 export const COOKIE_TOKEN = "provecho_token";
 export const COOKIE_REFRESH = "provecho_refresh";
 
-/** Los mismos números que la API (`ACCESS_TOKEN_MINUTES`,
- * `REFRESH_TOKEN_DAYS`). Duplicados a mano acá porque el `maxAge` de la
- * cookie lo pone Next y no la API — si allá se cambian, esto se cambia. */
-export const MINUTOS_ACCESS = 15;
-export const DIAS_REFRESH = 7;
-
 export type ParDeTokens = { access_token: string; refresh_token: string };
 
 /**
@@ -134,19 +128,32 @@ const ES_PRODUCCION = process.env.COOKIE_SECURE
  * `(nombre, dominio, path)`, así que si la renovación usara otro `path` el
  * resultado serían dos `provecho_token` distintos y ganaría el que no toca —
  * una sesión que se "renueva" y sigue caducando.
+ *
+ * **Sin `maxAge` a propósito (ADR-084).** Una cookie con `Max-Age` es
+ * persistente: el navegador la escribe en disco y sobrevive a cerrar todas
+ * las ventanas y a apagar el equipo, así que el refresh de siete días era una
+ * ventana deslizante que ningún gesto del usuario cerraba. Sin plazo, el
+ * navegador la borra al cerrarse, que es lo que la gente entiende por "cerrar
+ * el sistema".
+ *
+ * Esto **no** rompe la renovación silenciosa de ADR-073. El disparador barato
+ * era que el navegador borrara la cookie de acceso al vencer su `Max-Age`;
+ * ahora ya no pasa, pero `convieneRenovar` lee el `exp` del JWT y dispara
+ * igual — ese segundo camino existía justamente para el desfase entre los dos
+ * relojes, y acá pasa a ser el único.
+ *
+ * Y no alcanza sola: "restaurar pestañas" devuelve las cookies de sesión tal
+ * cual después de un apagón. El corte que no depende del navegador es el de
+ * inactividad, y vive en la API (`REFRESH_INACTIVIDAD_HORAS`).
  */
-export function opcionesCookie(maxAge: number) {
+export function opcionesCookie() {
   return {
     httpOnly: true,
     secure: ES_PRODUCCION,
     sameSite: "lax" as const,
     path: "/",
-    maxAge,
   };
 }
-
-export const MAX_AGE_ACCESS = 60 * MINUTOS_ACCESS;
-export const MAX_AGE_REFRESH = 60 * 60 * 24 * DIAS_REFRESH;
 
 /** Margen contra el vencimiento. Un token que le quedan diez segundos ya no
  * sirve: alcanza para que el request salga y no para que la API lo valide
@@ -161,13 +168,15 @@ const MARGEN_SEGUNDOS = 60;
  * es "conviene renovar antes de mandarlo". Un token manipulado no gana nada
  * con esto: la API lo rechaza igual.
  *
- * Mirar el `exp` y no solo la ausencia de la cookie no es redundante. La
- * cookie se planta con `maxAge` igual al plazo del token, pero son dos
- * relojes distintos —el del navegador y el del servidor de la API—, y basta
- * un desfase de segundos para que el token venza mientras la cookie sigue
- * ahí. Esa ventana es exactamente el 401 que deja a la caja en `/login` a
- * mitad de un pedido. Y si algún día `ACCESS_TOKEN_MINUTES` cambia del lado
- * de la API sin que `MINUTOS_ACCESS` la siga, esto lo cubre solo.
+ * Desde ADR-084 este es el **único** disparador. Antes había dos: la cookie
+ * se plantaba con `maxAge` igual al plazo del token, así que el navegador la
+ * borraba al vencer y su ausencia bastaba. Ahora la cookie es de sesión y no
+ * caduca sola, de modo que el `exp` es lo que decide.
+ *
+ * Nunca fue redundante, además: son dos relojes distintos —el del navegador y
+ * el del servidor de la API— y bastaba un desfase de segundos para que el
+ * token venciera con la cookie todavía puesta. Esa ventana es exactamente el
+ * 401 que dejaba a la caja en `/login` a mitad de un pedido.
  *
  * Un token ilegible cuenta como vencido: si no se puede leer, tampoco se
  * puede confiar en que sirva, y renovar es barato.

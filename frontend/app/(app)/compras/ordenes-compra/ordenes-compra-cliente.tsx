@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import Link from "next/link";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { TablaDatos } from "@/components/tabla/tabla-datos";
@@ -21,6 +22,8 @@ export type OrdenCompra = {
   id: string;
   proveedor_id: string;
   tipo: string;
+  // `oc` | `directa` (ADR-082). Se listan juntas y se distinguen acá.
+  origen: string;
   almacen_destino_id: string;
   estado: string;
   total: string;
@@ -28,7 +31,13 @@ export type OrdenCompra = {
 };
 export type Proveedor = { id: string; razon_social: string | null; ruc: string | null };
 export type Almacen = { id: string; nombre: string; tipo: string };
-export type Articulo = { id: string; id_interno: string; nombre: string };
+export type Articulo = {
+  id: string;
+  id_interno: string;
+  nombre: string;
+  // Decide si la recepción pide lote y vencimiento (RN-VNC-002).
+  controla_lote: boolean;
+};
 
 const ESTADO_INICIAL: EstadoOrdenCompra = { error: "", ok: false };
 
@@ -75,8 +84,8 @@ function FilaItem({
       <input
         name="cantidad[]"
         type="number"
-        min="0.01"
-        step="0.01"
+        min="0.0001"
+        step="0.0001"
         placeholder="Cant."
         value={fila.cantidad}
         onChange={(e) => onCambiar("cantidad", e.target.value)}
@@ -86,7 +95,7 @@ function FilaItem({
         name="costo_unitario[]"
         type="number"
         min="0"
-        step="0.01"
+        step="0.0001"
         placeholder="Costo"
         value={fila.costoUnitario}
         onChange={(e) => onCambiar("costoUnitario", e.target.value)}
@@ -386,6 +395,9 @@ export function OrdenesCompraCliente({
     () => new Map(almacenes.map((a) => [a.id, a.nombre])),
     [almacenes],
   );
+  // Se filtra en el cliente y no por URL: el listado ya viene entero y son
+  // dos valores, no un catálogo. Mismo patrón que Contabilidad → Pagos.
+  const [origen, setOrigen] = useState("");
 
   const columnas: ColumnDef<OrdenCompra>[] = useMemo(
     () => [
@@ -393,6 +405,21 @@ export function OrdenesCompraCliente({
         id: "proveedor",
         header: "Proveedor",
         accessorFn: (o) => nombreProveedor.get(o.proveedor_id) ?? "—",
+        // La fila abre la ficha, que es donde la OC se emite, se recibe y se
+        // factura. Antes el listado era el final del camino.
+        cell: ({ row }) => (
+          <Link
+            href={`/compras/ordenes-compra/${row.original.id}`}
+            className="font-semibold text-primary hover:underline"
+          >
+            {nombreProveedor.get(row.original.proveedor_id) ?? "—"}
+          </Link>
+        ),
+      },
+      {
+        id: "origen",
+        header: "Origen",
+        accessorFn: (o) => (o.origen === "directa" ? "Compra directa" : "OC"),
       },
       {
         id: "almacen",
@@ -427,11 +454,24 @@ export function OrdenesCompraCliente({
     [nombreProveedor, nombreAlmacen, articulos],
   );
 
+  const visibles = useMemo(
+    () => (origen ? ordenes.filter((o) => o.origen === origen) : ordenes),
+    [ordenes, origen],
+  );
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-heading text-xl text-dark">Órdenes de compra</h1>
-        <DialogoNuevaOC proveedores={proveedores} almacenes={almacenes} articulos={articulos} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/compras/directas"
+            className="rounded border border-primary px-4 py-2 text-sm font-bold text-primary hover:bg-primary/10"
+          >
+            Compra directa
+          </Link>
+          <DialogoNuevaOC proveedores={proveedores} almacenes={almacenes} articulos={articulos} />
+        </div>
       </div>
       {articulos.length === 0 && (
         <p className="text-sm text-secondary">
@@ -439,7 +479,15 @@ export function OrdenesCompraCliente({
             "No hay artículos en el catálogo — crea uno en Inventario antes de emitir una OC."}
         </p>
       )}
-      <TablaDatos columnas={columnas} datos={ordenes} placeholderBusqueda="Buscar orden..." />
+      <label className="flex w-52 flex-col gap-1 text-xs font-semibold">
+        Origen
+        <select value={origen} onChange={(e) => setOrigen(e.target.value)}>
+          <option value="">Todas</option>
+          <option value="oc">Órdenes de compra</option>
+          <option value="directa">Compras directas</option>
+        </select>
+      </label>
+      <TablaDatos columnas={columnas} datos={visibles} placeholderBusqueda="Buscar orden..." />
     </div>
   );
 }

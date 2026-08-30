@@ -2,11 +2,12 @@
 reuso), logout y construcción de claims del JWT."""
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.config.settings import settings
 from src.core.events import event_bus
 from src.core.logging_config import logger_seguridad
 from src.modules.users.application.errors import (
@@ -171,6 +172,30 @@ def login(session: Session, username: str, pin: str, ip: str | None = None) -> d
     return tokens
 
 
+def _quieta_demasiado(rec: RefreshToken) -> bool:
+    """¿La sesión estuvo quieta más de lo permitido? (ADR-084)
+
+    El plazo se mide contra el `created_at` de la fila vigente, y no hace
+    falta una columna nueva: **la rotación inserta una fila por renovación**,
+    así que el `created_at` del token que llega ES la hora de la última
+    actividad. El frontend renueva con un minuto de margen sobre los quince
+    del access token, o sea que ese dato nunca se atrasa más de eso.
+
+    Es el corte que no depende del navegador. Las cookies ya son de sesión y
+    mueren al cerrarlo, pero "restaurar pestañas" las devuelve intactas
+    después de un apagón — y ahí lo único que puede cerrar la sesión es el
+    servidor.
+
+    `0` desactiva el corte: un despliegue que necesite sesiones que no
+    caduquen por quietud (un tablero colgado en la pared) lo apaga por
+    configuración en vez de tocar código.
+    """
+    if settings.refresh_inactividad_horas <= 0:
+        return False
+    quieta = datetime.now(UTC) - _aware(rec.created_at)
+    return quieta > timedelta(hours=settings.refresh_inactividad_horas)
+
+
 def refresh(session: Session, raw_token: str) -> dict:
     repo = RefreshTokenRepo(session)
     rec = repo.get_by_hash(hash_refresh_token(raw_token))
@@ -190,6 +215,19 @@ def refresh(session: Session, raw_token: str) -> dict:
     if _aware(rec.expira_en) <= datetime.now(UTC):
         rec.revocado = True
         raise TokenInvalido("Refresh token expirado")
+
+    if _quieta_demasiado(rec):
+        # Se revoca la cadena entera, no solo esta fila: si la sesión se dio
+        # por cerrada, ningún token suyo puede seguir sirviendo.
+        repo.revocar_sesion(rec.sesion_id)
+        # `info` y no `error`: vencer por inactividad es lo esperado, no una
+        # señal de robo. Mezclarlo con la detección de reuso enterraría la
+        # alerta que sí importa bajo el ruido de cada mañana.
+        log_seguridad.info(
+            "Sesión cerrada por inactividad",
+            extra={"usuario_id": str(rec.usuario_id), "sesion_id": str(rec.sesion_id)},
+        )
+        raise TokenInvalido("Sesión cerrada por inactividad")
 
     usuario = UsuarioRepo(session).get(rec.usuario_id)
     if usuario is None or not usuario.activo:

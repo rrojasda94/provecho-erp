@@ -3,6 +3,15 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-30 **Pantalla de stock y kardex**: `GET /inventory/stock` existía
+  desde el primer slice y no lo consumía nadie; `MovimientoRepo.q_list`
+  existía sin un solo llamador y no había `GET /inventory/movimientos`. Ahora
+  `StockOut` viaja rotulado (almacén, artículo, SKU, unidad y sus decimales),
+  la consulta filtra por sucursal, categoría, texto y bajo mínimo, y la ficha
+  del SKU muestra su kardex. Deuda que queda: la pantalla pide `page_size=200`
+  y pagina en el navegador — cablear los controles al servidor sigue anotado
+  en `contrato-de-api.md`, y ahora hay una pantalla más que lo espera.
+
 - ✅ 2026-08-12 **Abastecedor de respaldo** (ADR-040, RN-INV-022,
   migración `a7c04e3b91d5`): dar de baja el central dejaba a la sucursal sin
   poder pedir nada.

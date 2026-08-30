@@ -32,10 +32,16 @@ type Props = {
   sucursalId: string;
   puedeEntregar: boolean;
   semaforo: Semaforo;
-  /** Sin los enlaces a Historial y Estaciones. Lo usa el despacho embebido
-   * en el PDV: desde un overlay, un enlace que navega fuera es una trampa —
-   * el cajero pierde de vista la caja y el pedido a medio armar. */
-  sinNavegacion?: boolean;
+  /**
+   * Cómo se sale cuando el despacho está embebido (el overlay del PDV).
+   *
+   * Su presencia también apaga Historial y Estaciones: desde un overlay, un
+   * enlace que navega fuera es una trampa —el cajero pierde de vista la caja
+   * y el pedido a medio armar—. Lo que reemplaza a esos tres es **una** salida
+   * rotulada, y no la × sin etiqueta que había antes flotando encima de este
+   * encabezado: nadie la leía como "volver al PDV".
+   */
+  alVolver?: { etiqueta: string; onClick: () => void };
 };
 
 /** Estaciones por las que el pedido todavía espera, sin repetir. */
@@ -196,7 +202,7 @@ export default function DespachoCliente({
   sucursalId,
   puedeEntregar,
   semaforo,
-  sinNavegacion = false,
+  alVolver,
 }: Props) {
   const { pedidos, aviso, setAviso, avisarDe, cargado, refrescar } = useCola(pantalla.id);
 
@@ -222,10 +228,14 @@ export default function DespachoCliente({
         <span className="kds-meta">
           {pedidos.length} {pedidos.length === 1 ? "pedido" : "pedidos"}
         </span>
-        {/* Lo que ya salió, con la vuelta atrás para el toque sobre la
-            tarjeta equivocada. */}
-        {!sinNavegacion && (
+        {alVolver ? (
+          <button type="button" className="kds-salir" onClick={alVolver.onClick}>
+            ← {alVolver.etiqueta}
+          </button>
+        ) : (
           <>
+            {/* Lo que ya salió, con la vuelta atrás para el toque sobre la
+                tarjeta equivocada. */}
             <a
               className="kds-cambiar"
               href={`/kds?pantalla=${pantalla.id}&sucursal=${sucursalId}&vista=historial`}
@@ -235,10 +245,6 @@ export default function DespachoCliente({
             <a className="kds-cambiar" href={`/kds?sucursal=${sucursalId}`}>
               Estaciones
             </a>
-            {/* La salida de la pantalla completa. Va dentro de
-                `sinNavegacion` como los otros: desde el overlay del PDV el
-                despacho se cierra con su ×, que devuelve al pedido a medio
-                armar en vez de navegar fuera y descartarlo. */}
             <Link className="kds-salir" href="/">
               Salir
             </Link>

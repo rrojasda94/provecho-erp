@@ -24,6 +24,11 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
   ],
   compras: [
     { label: "Órdenes de compra", href: "/compras/ordenes-compra" },
+    // El gasto ya incurrido, que llega con la factura en la mano (ADR-082).
+    // Ruta propia y no un diálogo del listado: es lo que hace que se pueda
+    // buscar por nombre en la paleta de comandos.
+    { label: "Compra directa", href: "/compras/directas" },
+    { label: "Facturas de proveedor", href: "/compras/facturas" },
     { label: "Proveedores", href: "/compras/proveedores" },
   ],
   contabilidad: [
@@ -43,7 +48,11 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Divisas", href: "/gerencia/divisas" },
   ],
   inventario: [
-    // Primero lo que se hace todos los días: pedir y contar.
+    // Primera de todas: la pregunta con la que se abre el módulo es qué hay.
+    // Hasta ahora el único saldo visible era el de la ficha de un SKU, a la
+    // que solo se llegaba sabiendo de antemano cuál mirar.
+    { label: "Stock", href: "/inventario/stock" },
+    // Después lo que se hace todos los días: pedir y contar.
     { label: "Requerimientos", href: "/inventario/solicitudes" },
     { label: "Conteos", href: "/inventario/conteos" },
     { label: "Artículos", href: "/inventario/articulos" },

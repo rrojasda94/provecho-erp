@@ -96,6 +96,18 @@ function nuevoBorrador(mesa?: MesaEnMapa): Borrador {
   };
 }
 
+/** Un pedido con algo a medio armar: o no salió nunca a cocina, o tiene
+ * líneas marcadas que todavía no se enviaron.
+ *
+ * Es con lo que se decide qué pestaña queda al frente al recuperar los
+ * borradores del servidor. La primera de la lista no sirve: los borradores
+ * llegan en el orden en que se abrieron (ADR-074), así que la primera suele
+ * ser una cuenta ya enviada que espera el cobro, y quien recarga la página
+ * aparecía mirando esa en vez del pedido que estaba tecleando. */
+function tienePendiente(b: Borrador): boolean {
+  return !b.ventaId || b.lineas.some((l) => !l.enviada);
+}
+
 /** Un pedido que todavía no es nada: sin líneas, sin mesa, sin cliente y sin
  * haber salido a cocina. Se puede cerrar sin preguntar y no vale la pena
  * abrir otro igual al lado. */
@@ -368,7 +380,7 @@ export default function PdvCliente({
   const restaurarBorradores = useCallback((guardados: Borrador[]) => {
     const completos = guardados.map((b) => ({ ...nuevoBorrador(), ...b }));
     setBorradores(completos);
-    setActivoId(completos[0].id);
+    setActivoId((completos.find(tienePendiente) ?? completos[0]).id);
   }, []);
 
   /** Los borradores viven en el servidor (ADR-074): recargar la página o

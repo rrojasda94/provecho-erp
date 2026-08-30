@@ -263,7 +263,10 @@
 /* La salida del KDS. Sin subrayado y con marco: los otros enlaces cruzan
    entre pantallas de cocina, este se va de la pantalla completa — y quien lo
    busca (un trabajador que entró a mirar la cola y quiere volver al PDV) lo
-   busca como un botón, no como un enlace más de la fila. */
+   busca como un botón, no como un enlace más de la fila.
+   Sirve a un `<a>` y a un `<button>`: en el overlay del PDV volver no es
+   navegar, es cerrar el diálogo, y las tres declaraciones de abajo son las
+   que el navegador le pone de más a un botón. */
 .kds-salir {
     font-size: 0.8125rem;
     font-weight: 700;
@@ -272,6 +275,16 @@
     border: 1px solid var(--kds-borde-fuerte);
     border-radius: 8px;
     padding: 0.4rem 0.75rem;
+    background: transparent;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+/* En el vacío la salida es la única cosa tocable, y el grid de `.kds-vacio`
+   la estiraría de lado a lado. */
+.kds-vacio .kds-salir {
+    justify-self: start;
+    margin-top: 0.5rem;
 }
 
 /* --- Tarjetas --- */

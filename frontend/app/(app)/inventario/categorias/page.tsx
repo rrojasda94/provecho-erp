@@ -4,6 +4,7 @@ import { obtenerSesion } from "@/lib/sesion";
 import {
   CategoriasCliente,
   type Categoria,
+  type Cuenta,
   type ProgramaConteo,
 } from "./categorias-cliente";
 
@@ -36,11 +37,30 @@ export default async function CategoriasPage({
     { token },
   ).catch(() => []);
 
+  // El plan de cuentas es de otro módulo y exige `accounting.leer`, que quien
+  // administra el catálogo no necesariamente tiene. Si niega, los campos caen
+  // a texto con el código y el servidor los valida igual: un selector que no
+  // carga no puede dejar la pantalla inservible.
+  let cuentas: Cuenta[] = [];
+  let avisoCuentas: string | null = null;
+  try {
+    cuentas = await apiFetch<Cuenta[]>("/api/v1/accounting/cuentas-contables", {
+      token,
+    });
+  } catch (e) {
+    avisoCuentas =
+      e instanceof ApiError && e.status === 403
+        ? "No puedes ver el plan de cuentas (accounting.leer): escribe el código a mano."
+        : "No se pudo cargar el plan de cuentas.";
+  }
+
   return (
     <CategoriasCliente
       categorias={categorias}
       programa={programa}
       resaltado={categoria ?? null}
+      cuentas={cuentas}
+      avisoCuentas={avisoCuentas}
     />
   );
 }

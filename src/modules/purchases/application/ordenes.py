@@ -163,6 +163,41 @@ def q_ordenes_compra(session: Session, empresa_id: uuid.UUID | None = None):
     return OrdenCompraRepo(session).q_list(empresa_id)
 
 
+def recepciones_de_orden(session: Session, orden_compra_id: uuid.UUID) -> list[dict]:
+    """Las recepciones de la OC con sus líneas, ya resueltas a `articulo_id`.
+
+    Devuelve dicts y no ORM porque el artículo no está en `recepcion_item`
+    sino en el ítem de la OC del que cuelga: armarlo en el router obligaría a
+    que la API conociera ese join. Dos consultas, nunca una por recepción.
+    """
+    repo = RecepcionCompraRepo(session)
+    recepciones = repo.de_orden(orden_compra_id)
+    por_recepcion: dict[uuid.UUID, list[dict]] = {r.id: [] for r in recepciones}
+    for item, articulo_id in repo.items_de([r.id for r in recepciones]):
+        por_recepcion[item.recepcion_compra_id].append(
+            {
+                "id": item.id,
+                "orden_compra_item_id": item.orden_compra_item_id,
+                "articulo_id": articulo_id,
+                "cantidad_recibida": item.cantidad_recibida,
+                "costo_unitario": item.costo_unitario,
+                "lote_codigo": item.lote_codigo,
+                "fecha_vencimiento": item.fecha_vencimiento,
+            }
+        )
+    return [
+        {
+            "id": r.id,
+            "orden_compra_id": r.orden_compra_id,
+            "recibido_por": r.recibido_por,
+            "fecha": r.fecha,
+            "comprobante_id": r.comprobante_id,
+            "items": por_recepcion[r.id],
+        }
+        for r in recepciones
+    ]
+
+
 def emitir_orden_compra(
     session: Session,
     orden_compra_id: uuid.UUID,

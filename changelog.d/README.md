@@ -38,26 +38,21 @@ dentro de seis meses.
 
 ## Pendiente de corte
 
-**0.9.0 está cortado pero no desplegado.** `CHANGELOG.md`, `pyproject.toml` y
-`frontend/package.json` ya llevan `0.9.0` (PCGE, compra directa, alerta de
-stock bajo en el PDV — ver `chore(release): 0.9.0`, PR #131), pero staging
-sigue en 0.8.2: el `Desplegar` que corrió después del corte llevó `0.8.2`
-como input (quedó el valor anterior sin cambiar), no `0.9.0` ni `latest`.
+Nada. **0.9.1 se cortó el 2026-08-30** y se lleva los 17 fragmentos que
+quedaban: el BI autoservicio con Superset (fases A–E, ADR-083), las listas
+desplegables con búsqueda de PR #132 y los siete arreglos del tercer turno de
+prueba en staging (PR #140).
 
-**PR #132 (listas desplegables con búsqueda) se mergea sobre ese mismo commit
-sin corte propio** — así lo dice su descripción: el corte queda para el
-momento de mergear. Trae dos fragmentos propios
-(`added-busqueda-en-las-listas-desplegables.md`,
-`fixed-promociones-pedian-ids-a-mano.md`) que van a caer en este directorio
-recién cuando se mergee.
+Se cortó 0.9.1 y no se dejó viajar todo como cambios sin versión justamente
+por lo que decía la nota anterior: **0.9.0 se cortó pero nunca llegó a
+staging** —el `Desplegar` posterior al corte se disparó con `0.8.2` como
+input, el valor que había quedado del despliegue anterior—, así que staging
+venía de 0.8.2 y se saltea 0.9.0 entero. Todo lo de 0.9.0 viaja igual: el
+despliegue trae la imagen de `main`, no un diff entre versiones.
 
-Para no dejar 0.9.0 sin sus propios fixes en staging por un despliegue de
-más: **no correr `Desplegar` de nuevo hasta mergear PR #132**, y entonces
-desplegar los dos juntos en un solo paso — `./scripts/desplegar.sh latest`
-(o el workflow con input `latest`) trae lo que haya en `main`, 0.9.0 incluido.
-Si se prefiere que los fragmentos de PR #132 queden con su propio número en
-el CHANGELOG en vez de viajar como cambios sin versión, cortar 0.9.1 antes
-de ese despliegue.
+La lección de ese despliegue perdido sigue valiendo: **el input `version` de
+`Desplegar` conserva el valor de la corrida anterior**, así que hay que
+mirarlo antes de darle a Run.
 
 ## Cortar la versión
 

@@ -638,3 +638,25 @@ def atributo_de_valores(
         .where(ProductoAtributoValor.id.in_(ids))
     )
     return {str(valor_id): str(atributo_id) for valor_id, atributo_id in filas}
+
+
+def categoria_de_productos(
+    session: Session, producto_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, uuid.UUID | None]:
+    """`producto_comercial_id` → `categoria_id`.
+
+    La categoría es la **misma tabla** que la de los artículos
+    (`inventory.categoria`): es el único punto donde lo que se compra y lo que
+    se vende se agrupan igual, y por eso configurar ahí alcanza para repartir
+    un asiento sin una segunda configuración del lado de ventas (ADR-086).
+    """
+    ids = {i for i in producto_ids if i is not None}
+    if not ids:
+        return {}
+    filas = session.execute(
+        select(ProductoComercial.id, ProductoComercial.categoria_id).where(
+            ProductoComercial.id.in_(ids)
+        )
+    ).all()
+    return dict(filas)
+

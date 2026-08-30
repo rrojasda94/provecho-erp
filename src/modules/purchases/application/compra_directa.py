@@ -28,7 +28,10 @@ def registrar_compra_directa(
     creado_por: uuid.UUID,
     idempotency_key: str,
     items: list[dict],  # [{articulo_id, cantidad, costo_unitario}]
-    comprobante: dict,  # {idempotency_key, tipo, serie, correlativo, sustento}
+    # Lo que trae el papel: `idempotency_key`, `tipo`, `serie`, `correlativo`,
+    # `sustento` y, opcionales, `emisor_num_doc`, `fecha_emision`, `total` y
+    # `gravado_igv`. Se pasa entero a `dar_conformidad_comprobante`.
+    comprobante: dict,
 ) -> Comprobante:
     repo = OrdenCompraRepo(session)
     existente = repo.get_by_idempotency(idempotency_key)
@@ -87,12 +90,9 @@ def registrar_compra_directa(
         items=recepcion_items,
     )
 
+    # Se reenvía el dict completo menos su `idempotency_key`, que va aparte:
+    # enumerar campo por campo hacía que cada dato nuevo de la factura llegara
+    # a la compra directa un release tarde, y así pasó con `gravado_igv`.
     return comprobantes_uc.dar_conformidad_comprobante(
-        session,
-        orden.id,
-        idempotency_key=comprobante["idempotency_key"],
-        tipo=comprobante["tipo"],
-        serie=comprobante["serie"],
-        correlativo=comprobante["correlativo"],
-        sustento=comprobante["sustento"],
+        session, orden.id, **comprobante
     )

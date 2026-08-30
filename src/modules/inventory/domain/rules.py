@@ -41,6 +41,19 @@ ESTADOS_SOLICITUD_CANCELABLES = {"borrador", "pendiente", "aprobada"}
 # programa no depende de qué día tenga febrero.
 # ponytail: si el negocio pide anclar al día del mes, esto pasa a
 # `dateutil.relativedelta` — el resto del cálculo no cambia.
+#: El tipo de artículo que **no** tiene stock (ADR-086).
+#:
+#: `articulo.tipo` es un enum extensible por diseño (`String(30)`, sin CHECK):
+#: los tipos se agregan sin migración. Un servicio comprado —la luz, un flete,
+#: un mantenimiento— es un artículo para poder ponerlo en una línea de orden
+#: de compra, pero no entra a ningún almacén: no tiene SKU porque no tiene
+#: existencias, no porque falte configurarlo.
+#:
+#: Es el discriminador y no el rol contable de su categoría, a propósito: es
+#: el mismo hecho que decide si la cosa mueve stock, e `inventory` tiene que
+#: poder saberlo sin preguntarle nada a `accounting`.
+TIPO_SERVICIO = "servicio"
+
 FRECUENCIAS_CONTEO: dict[str, int] = {
     "diario": 1,
     "semanal": 7,

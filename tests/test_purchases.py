@@ -4,6 +4,7 @@ que test_inventory.py.
 """
 
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -35,6 +36,7 @@ from src.modules.users.infrastructure.models import (
     UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
+from src.shared import fechas
 
 
 @pytest.fixture()
@@ -647,3 +649,249 @@ def test_rol_comprador_puede_leer_articulos_para_armar_una_oc():
     from src.seeders.seed import ROLES
 
     assert "inventory.leer" in ROLES["comprador"]
+
+
+# --- La factura del proveedor: datos propios y unicidad por emisor -----------
+def _hasta_recibida(client, h, ids, proveedor_id, *, clave="fact"):
+    """Deja una OC en `recibida`, que es el estado desde el que se factura."""
+    oc = _crear_oc(client, h, ids, proveedor_id, idempotency_key=f"oc-factura-{clave}")
+    oc_id = oc.json()["id"]
+    client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
+    item_id = client.get(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}", headers=h
+    ).json()["items"][0]["id"]
+    client.post(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones", headers=h,
+        json={
+            "idempotency_key": f"recepcion-{clave}",
+            "items": [{"orden_compra_item_id": item_id, "cantidad_recibida": "100"}],
+        },
+    )
+    return oc_id
+
+
+def _facturar(client, h, oc_id, **overrides):
+    cuerpo = {
+        "idempotency_key": f"conf-{oc_id[:8]}",
+        "tipo": "factura",
+        "serie": "F001",
+        "correlativo": 1,
+        "sustento": "contrato_credito",
+    }
+    cuerpo.update(overrides)
+    return client.post(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/conformidad-comprobante",
+        headers=h, json=cuerpo,
+    )
+
+
+def test_la_factura_guarda_fecha_total_y_emisor(env):
+    """Los tres datos que la factura del proveedor no podía representar: la
+    fecha era `created_at` (cuándo se tecleó), el importe se tomaba de la OC
+    —que es la base de lo recibido— y el emisor no viajaba."""
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc_id = _hasta_recibida(client, h, ids, proveedor_id)
+
+    r = _facturar(client, h, oc_id, fecha_emision="2026-08-25", total="1180.00")
+    assert r.status_code == 201
+    assert r.json()["fecha_emision"] == "2026-08-25"
+    assert Decimal(r.json()["total"]) == Decimal("1180.00")
+    # No se teclea: el emisor es el proveedor de la OC.
+    assert r.json()["emisor_num_doc"] == "20111111111"
+
+
+def test_la_factura_no_puede_emitirse_manana(env):
+    """409 y no 422: es una regla de negocio, no un formato mal escrito, y el
+    proyecto mapea `ReglaNegocio` a 409 (igual que recibir más de lo
+    ordenado). La fecha se compara contra el día del negocio, no el del
+    servidor."""
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc_id = _hasta_recibida(client, h, ids, proveedor_id)
+
+    manana = (fechas.hoy() + timedelta(days=1)).isoformat()
+    r = _facturar(client, h, oc_id, fecha_emision=manana)
+    assert r.status_code == 409
+    assert "mañana" in r.json()["detail"]
+
+
+def test_un_tipo_de_comprobante_invalido_es_422_y_no_500(env):
+    """`tipo` y `sustento` eran `str` libres contra columnas `Enum` con
+    CHECK: el valor malo moría en el flush con un 500 que no decía qué campo
+    estaba mal."""
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc_id = _hasta_recibida(client, h, ids, proveedor_id)
+
+    assert _facturar(client, h, oc_id, tipo="guia").status_code == 422
+    assert _facturar(client, h, oc_id, sustento="trueque").status_code == 422
+    # `nc` está en el enum de la columna y **no** en el de la API: una nota de
+    # crédito recibida no tiene todavía flujo que la aplique.
+    assert _facturar(client, h, oc_id, tipo="nc").status_code == 422
+
+
+def test_dos_proveedores_pueden_emitir_la_misma_serie_y_correlativo(env):
+    """El F001-1 de la molinera y el de la ferretería son documentos
+    distintos. La constraint global los hacía chocar."""
+    client, ids, _ = env
+    h = _token(client)
+    uno = _crear_proveedor(client, h, ids).json()["id"]
+    otro = _crear_proveedor(
+        client, h, ids, razon_social="Ferretería EIRL", ruc="20222222222",
+    ).json()["id"]
+
+    oc_uno = _hasta_recibida(client, h, ids, uno, clave="a")
+    oc_otro = _hasta_recibida(client, h, ids, otro, clave="b")
+
+    assert _facturar(client, h, oc_uno).status_code == 201
+    assert _facturar(client, h, oc_otro).status_code == 201
+
+
+def test_el_mismo_proveedor_no_repite_serie_y_correlativo(env):
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc_uno = _hasta_recibida(client, h, ids, proveedor_id, clave="a")
+    oc_dos = _hasta_recibida(client, h, ids, proveedor_id, clave="b")
+
+    assert _facturar(client, h, oc_uno).status_code == 201
+    r = _facturar(client, h, oc_dos)
+    assert r.status_code == 409
+    # El mensaje nombra el documento: un 409 pelado no dice cuál repetiste.
+    assert "F001-1" in r.json()["detail"]
+
+
+def test_una_factura_recibida_no_bloquea_la_serie_propia(env):
+    """La constraint global hacía que registrar una compra F001-500 impidiera
+    emitir nuestro propio F001-500 — y que el siguiente correlativo propio
+    saltara a 501, un salto de numeración ante SUNAT provocado por el papel
+    de un tercero."""
+    client, ids, TestSession = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc_id = _hasta_recibida(client, h, ids, proveedor_id)
+    assert _facturar(client, h, oc_id, correlativo=500).status_code == 201
+
+    from src.modules.sales.infrastructure.repositories import ComprobanteRepo
+    with TestSession() as s:
+        empresa_id = s.scalar(select(Empresa.id))
+        assert ComprobanteRepo(s).siguiente_correlativo(empresa_id, "F001") == 1
+
+
+def test_los_literales_de_la_api_no_se_separan_del_dominio(env):
+    """`schemas.TipoRecibido` se escribe a mano porque `Literal[*tupla]` no le
+    sirve al type checker ni a OpenAPI. Esto es lo que impide que las dos
+    listas se separen."""
+    from typing import get_args
+
+    from src.modules.purchases.api import schemas
+    from src.modules.purchases.domain import rules
+
+    assert get_args(schemas.TipoRecibido) == rules.TIPOS_COMPROBANTE_RECIBIDO
+    assert get_args(schemas.Sustento) == rules.SUSTENTOS_COMPROBANTE
+
+
+def test_la_ficha_de_la_oc_lee_sus_recepciones_y_su_factura(env):
+    """Sin estas dos lecturas la ficha no puede mostrar qué se recibió ni si
+    ya se facturó, y ofrecería registrar la factura dos veces."""
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc_id = _hasta_recibida(client, h, ids, proveedor_id)
+
+    recepciones = client.get(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones", headers=h
+    ).json()
+    assert len(recepciones) == 1
+    assert Decimal(recepciones[0]["items"][0]["cantidad_recibida"]) == Decimal("100")
+    # El artículo sale del ítem de la OC: `recepcion_item` no lo guarda.
+    assert recepciones[0]["items"][0]["articulo_id"] == ids["articulo_id"]
+
+    assert client.get(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/comprobantes", headers=h
+    ).json() == []
+    _facturar(client, h, oc_id)
+    comprobantes = client.get(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/comprobantes", headers=h
+    ).json()
+    assert len(comprobantes) == 1
+    assert comprobantes[0]["serie"] == "F001"
+
+
+def test_el_registro_de_compras_filtra_y_trae_el_proveedor(env):
+    client, ids, _ = env
+    h = _token(client)
+    uno = _crear_proveedor(client, h, ids).json()["id"]
+    otro = _crear_proveedor(
+        client, h, ids, razon_social="Ferretería EIRL", ruc="20222222222",
+    ).json()["id"]
+    _facturar(client, h, _hasta_recibida(client, h, ids, uno, clave="a"))
+    _facturar(client, h, _hasta_recibida(client, h, ids, otro, clave="b"))
+
+    todos = client.get("/api/v1/purchases/comprobantes", headers=h).json()
+    assert todos["total"] == 2
+    # El proveedor y el total de la OC se componen después de paginar.
+    assert {c["proveedor"] for c in todos["items"]} == {
+        "Molinera SAC", "Ferretería EIRL",
+    }
+    assert all(Decimal(c["total_orden"]) == Decimal("1000.00") for c in todos["items"])
+
+    solo_uno = client.get(
+        f"/api/v1/purchases/comprobantes?proveedor_id={uno}", headers=h
+    ).json()
+    assert solo_uno["total"] == 1
+    assert solo_uno["items"][0]["proveedor"] == "Molinera SAC"
+
+
+def test_el_registro_de_compras_lo_ve_el_contador(env):
+    """El contador necesita el documento fuente del asiento sin que haya que
+    darle el módulo de compras entero, que además lo dejaría emitir OC."""
+    client, ids, TestSession = env
+    h_admin = _token(client)
+    proveedor_id = _crear_proveedor(client, h_admin, ids).json()["id"]
+    _facturar(client, h_admin, _hasta_recibida(client, h_admin, ids, proveedor_id))
+
+    with TestSession() as s:
+        rol = s.scalar(select(Rol).where(Rol.nombre == "contador"))
+        sucursal_id = s.scalar(select(Sucursal.id))
+        contador = Usuario(
+            username="contador_pruebas", pin_hash=hash_pin("999999"), tipo="humano",
+        )
+        s.add(contador)
+        s.flush()
+        s.add_all([
+            UsuarioRol(usuario_id=contador.id, rol_id=rol.id),
+            UsuarioSucursal(usuario_id=contador.id, sucursal_id=sucursal_id),
+        ])
+        s.commit()
+
+    h = _token(client, username="contador_pruebas", pin="999999")
+    assert client.get("/api/v1/purchases/comprobantes", headers=h).status_code == 200
+    # Y sigue sin poder emitir una OC.
+    assert client.post(
+        "/api/v1/purchases/ordenes-compra", headers=h,
+        json={
+            "proveedor_id": proveedor_id, "almacen_destino_id": ids["almacen_id"],
+            "idempotency_key": "no-deberia-crear",
+            "items": [{"articulo_id": ids["articulo_id"], "cantidad": "1", "costo_unitario": "1"}],
+        },
+    ).status_code == 403
+
+
+def test_la_compra_directa_guarda_los_datos_de_la_factura(env):
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+
+    cuerpo = _compra_directa_body(ids, proveedor_id)
+    cuerpo["comprobante"].update(fecha_emision="2026-08-20", total="59.00")
+    r = client.post("/api/v1/purchases/compras-directas", headers=h, json=cuerpo)
+
+    assert r.status_code == 201
+    assert r.json()["fecha_emision"] == "2026-08-20"
+    assert Decimal(r.json()["total"]) == Decimal("59.00")
+    assert r.json()["emisor_num_doc"] == "20111111111"
