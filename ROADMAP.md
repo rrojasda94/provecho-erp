@@ -199,7 +199,7 @@ sesión y de dónde sale la cuenta contable de lo que se compra y se vende.
 | 6 | El despacho embebido en el PDV vuelve con un botón rotulado, no con una × muda | ✅ 2026-08-30 |
 | 1 | Pantalla de stock (`GET /inventory/stock` no lo consumía nadie) y kardex (`GET /inventory/movimientos`, nuevo) | ✅ 2026-08-30 |
 | 3 | La sesión muere con el navegador y a las 8 h quietas (ADR-084) | ✅ 2026-08-30 |
-| 4 y 5 | Ciclo de la OC en pantalla y factura de proveedor completa (ADR-085) | ⬜ |
+| 4 y 5 | Ciclo de la OC en pantalla y factura de proveedor completa (ADR-085) | ✅ 2026-08-30 |
 | 7 | La cuenta contable se configura en la categoría y se hereda (ADR-086) | ⬜ |
 
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)

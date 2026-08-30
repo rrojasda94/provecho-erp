@@ -1,13 +1,21 @@
 """DTOs (pydantic) del módulo purchases."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.shared.ubicacion import UbicacionMixin
+
+# Se escriben literales y no se derivan de `rules`: `Literal[*tupla]` no le
+# sirve al type checker ni al esquema de OpenAPI, que es el punto de tenerlos.
+# Que no se separen del dominio lo fija un caso en `tests/test_purchases.py`.
+TipoRecibido = Literal["factura", "boleta", "rhe", "ticket_compra"]
+Sustento = Literal[
+    "efectivo", "voucher_medio_pago", "movimiento_bancario", "contrato_credito"
+]
 
 
 class ProveedorCreate(UbicacionMixin):
@@ -126,12 +134,42 @@ class OrdenCompraOut(BaseModel):
     items: list[OrdenCompraItemOut] = []
 
 
-class CompraDirectaComprobante(BaseModel):
+class ComprobanteProveedorBase(BaseModel):
+    """Los datos del papel que entregó el proveedor.
+
+    `Literal` y no `str`: `comprobante.tipo` y `comprobante.sustento` son
+    columnas `Enum` con CHECK, así que hasta 2026-08-30 un valor fuera de
+    rango no se rechazaba acá — moría en el `flush` con un **500** que no
+    decía qué campo estaba mal. Es el mismo defecto que `ProveedorUpdate` ya
+    había corregido con `Literal`.
+    """
+
     idempotency_key: str = Field(min_length=8, max_length=100)
-    tipo: str
+    tipo: TipoRecibido
     serie: str = Field(min_length=1, max_length=10)
     correlativo: int = Field(gt=0)
-    sustento: str
+    sustento: Sustento
+    # RUC (11) o DNI (8 — un RHE de persona natural). Ausente = se toma el
+    # del proveedor de la OC: el emisor es él, y tecleado dos veces son dos
+    # verdades. Se manda solo cuando el papel lo desmiente (una factura de
+    # otra razón social del mismo grupo, por ejemplo).
+    emisor_num_doc: str | None = Field(default=None, pattern=r"^(\d{8}|\d{11})$")
+    # La fecha del papel, que es la que manda en el Registro de Compras. Sin
+    # ella lo único que quedaba era cuándo se tecleó.
+    fecha_emision: date | None = None
+    # El importe del papel, IGV incluido. Puede diferir del total de la OC
+    # —que es la base de lo recibido— y por eso es un dato propio y no algo
+    # que se derive.
+    total: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
+    # ¿La factura del proveedor trae IGV? Lo marca quien la tiene delante:
+    # una empresa de Amazonía vende exonerada y aun así compra con IGV a un
+    # proveedor de fuera de la región, y ese crédito fiscal se registra
+    # recién acá. `None` = manda el default de la empresa.
+    gravado_igv: bool | None = None
+
+
+class CompraDirectaComprobante(ComprobanteProveedorBase):
+    pass
 
 
 class CompraDirectaCreate(BaseModel):
@@ -164,17 +202,55 @@ class RecepcionOut(BaseModel):
     recibido_por: uuid.UUID
 
 
-class ConformidadComprobanteCreate(BaseModel):
-    idempotency_key: str = Field(min_length=8, max_length=100)
+class ConformidadComprobanteCreate(ComprobanteProveedorBase):
+    pass
+
+
+class RecepcionItemOut(BaseModel):
+    id: uuid.UUID
+    orden_compra_item_id: uuid.UUID
+    # Resuelto desde el ítem de la OC: `recepcion_item` no lo guarda, y sin
+    # él la ficha mostraría el UUID de una línea.
+    articulo_id: uuid.UUID
+    cantidad_recibida: Decimal
+    costo_unitario: Decimal
+    lote_codigo: str | None
+    fecha_vencimiento: date | None
+
+
+class RecepcionDetalleOut(BaseModel):
+    id: uuid.UUID
+    orden_compra_id: uuid.UUID
+    recibido_por: uuid.UUID
+    fecha: datetime
+    comprobante_id: uuid.UUID | None
+    items: list[RecepcionItemOut] = []
+
+
+class ComprobanteRecibidoOut(BaseModel):
+    """Una fila del registro de compras.
+
+    `total` es lo que declara el papel y `total_orden` lo que la OC dice que
+    se recibió (base, sin IGV). Viajan los dos y no uno "el" total: son
+    números distintos por definición, y elegir cuál mostrar escondería la
+    diferencia, que es justo lo que hay que conciliar.
+    """
+
+    id: uuid.UUID
+    empresa_id: uuid.UUID
+    compra_id: uuid.UUID | None
+    proveedor_id: uuid.UUID | None = None
+    proveedor: str | None = None
+    emisor_num_doc: str | None
     tipo: str
-    serie: str = Field(min_length=1, max_length=10)
-    correlativo: int = Field(gt=0)
+    serie: str
+    correlativo: int
+    fecha_emision: date | None
+    total: Decimal | None
+    total_orden: Decimal | None = None
     sustento: str
-    # ¿La factura del proveedor trae IGV? Lo marca quien la tiene delante:
-    # una empresa de Amazonía vende exonerada y aun así compra con IGV a un
-    # proveedor de fuera de la región, y ese crédito fiscal se registra
-    # recién acá. `None` = manda el default de la empresa.
-    gravado_igv: bool | None = None
+    gravado_igv: bool | None
+    created_at: datetime
 
 
 class ComprobanteOut(BaseModel):
@@ -187,3 +263,6 @@ class ComprobanteOut(BaseModel):
     serie: str
     correlativo: int
     sustento: str
+    emisor_num_doc: str | None = None
+    fecha_emision: date | None = None
+    total: Decimal | None = None

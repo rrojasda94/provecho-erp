@@ -678,12 +678,23 @@ class ComprobanteRepo:
         )
 
     def siguiente_correlativo(self, empresa_id: uuid.UUID, serie: str) -> int:
-        """El UNIQUE (empresa, serie, correlativo) corta la carrera: dos
-        cajas que choquen fallan y el PDV reintenta con la misma
-        idempotency_key. Serie SUNAT por punto de venta si el volumen lo pide."""
+        """El índice único de los emitidos corta la carrera: dos cajas que
+        choquen fallan y el PDV reintenta con la misma idempotency_key. Serie
+        SUNAT por punto de venta si el volumen lo pide.
+
+        **Solo mira lo emitido.** La serie del proveedor no numera la nuestra:
+        desde que la unicidad se partió por dirección (2026-08-30), dos
+        documentos distintos pueden llamarse F001-1 y solo uno de los dos lo
+        emitimos nosotros. Sin este filtro, registrar una factura de compra
+        F001-1200 haría que el siguiente comprobante propio de esa serie
+        saliera con el correlativo 1201 — un salto de numeración ante SUNAT
+        provocado por el papel de un tercero.
+        """
         actual = self.s.scalar(
             select(func.max(Comprobante.correlativo)).where(
-                Comprobante.empresa_id == empresa_id, Comprobante.serie == serie
+                Comprobante.empresa_id == empresa_id,
+                Comprobante.serie == serie,
+                Comprobante.direccion == "emitido",
             )
         )
         return (actual or 0) + 1

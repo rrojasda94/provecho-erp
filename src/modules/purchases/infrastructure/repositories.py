@@ -1,6 +1,7 @@
 """Repositorios SQLAlchemy del módulo purchases. La sesión es la Unit of Work."""
 
 import uuid
+from collections.abc import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -101,6 +102,40 @@ class RecepcionCompraRepo:
                     RecepcionItem.recepcion_compra_id == recepcion_compra_id
                 )
             )
+        )
+
+    def de_orden(self, orden_compra_id: uuid.UUID) -> list[RecepcionCompra]:
+        """Las recepciones de la OC, de la primera a la última: la ficha las
+        lee como historial y ese es el orden en que ocurrieron."""
+        return list(
+            self.s.scalars(
+                select(RecepcionCompra)
+                .where(RecepcionCompra.orden_compra_id == orden_compra_id)
+                .order_by(RecepcionCompra.fecha, RecepcionCompra.id)
+            )
+        )
+
+    def items_de(
+        self, recepcion_ids: Sequence[uuid.UUID]
+    ) -> list[tuple[RecepcionItem, uuid.UUID]]:
+        """Las líneas de varias recepciones con el `articulo_id` ya resuelto.
+
+        El artículo no vive en `recepcion_item` sino en el ítem de la OC del
+        que cuelga, así que sin este join la ficha mostraría UUID de líneas.
+        Una consulta para todas las recepciones y no una por recepción.
+        """
+        if not recepcion_ids:
+            return []
+        return list(
+            self.s.execute(
+                select(RecepcionItem, OrdenCompraItem.articulo_id)
+                .join(
+                    OrdenCompraItem,
+                    OrdenCompraItem.id == RecepcionItem.orden_compra_item_id,
+                )
+                .where(RecepcionItem.recepcion_compra_id.in_(recepcion_ids))
+                .order_by(RecepcionItem.id)
+            ).all()
         )
 
     def ultima_de_orden(self, orden_compra_id: uuid.UUID) -> RecepcionCompra | None:

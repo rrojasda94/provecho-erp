@@ -1068,14 +1068,29 @@ Solicitud.
   direccion (`emitido` | `recibido`), tipo (`boleta` | `factura` | `nc` si
   emitido; `factura` | `rhe` | `boleta` | `ticket_compra` si recibido,
   RN-CPP-001/002 — el conjunto válido según dirección se valida en el
-  dominio, no en el esquema), serie (snapshot de
+  dominio, no en el esquema; el de recibidos es `TIPOS_COMPROBANTE_RECIBIDO`
+  en `purchases/domain/rules.py`), serie (snapshot de
   `punto_venta.serie_boleta`/`serie_factura` al momento de emitir —
-  inmutable aunque el punto de venta cambie de serie después), correlativo
-  (único por empresa+serie — nunca se repite, RN-CPP-007), sustento
+  inmutable aunque el punto de venta cambie de serie después), correlativo,
+  emisor_num_doc (solo si `recibido` — RUC o DNI de quien emitió el papel;
+  en un emitido el emisor somos nosotros y eso ya lo dice `empresa_id`),
+  fecha_emision (Date, solo si `recibido` — la fecha del papel, que es la
+  que manda en el Registro de Compras; en un emitido se deriva de
+  `created_at` en hora del negocio), total (solo si `recibido` — el importe
+  con IGV que declara el papel, que puede diferir del total de la OC porque
+  ese es la base valorizada de lo recibido), sustento
   (`efectivo` | `voucher_medio_pago` | `movimiento_bancario` |
   `contrato_credito`, RN-CPP-003), idempotency_key (anti-duplicado/
   reemisión, RN-CPP-008), estado de emisión, hash e intentos del
   proveedor, respuesta (JSONB). Ver ADR-005 (Factiliza).
+  **La unicidad depende de la dirección (ADR-085)**: un emitido es único por
+  `(empresa, serie, correlativo)` —RN-CPP-007, es nuestra numeración ante
+  SUNAT—; un recibido, por `(empresa, emisor_num_doc, serie, correlativo)`,
+  porque el número del papel identifica al documento dentro de **su** emisor:
+  dos proveedores emiten su F001-1 el mismo día y los dos son válidos. Son
+  dos índices únicos parciales, no una constraint: la constraint global que
+  había hacía que la primera factura de compra bloqueara ese número en toda
+  la empresa, incluida la serie propia.
   **grupo_cobro** (entero, default 1) y **receptor_num_doc** /
   **receptor_nombre** (ADR-018): `venta_id` dejó de identificar un único
   comprobante — una venta dividida emite uno por grupo. El código que

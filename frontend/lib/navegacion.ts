@@ -24,6 +24,11 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
   ],
   compras: [
     { label: "Órdenes de compra", href: "/compras/ordenes-compra" },
+    // El gasto ya incurrido, que llega con la factura en la mano (ADR-082).
+    // Ruta propia y no un diálogo del listado: es lo que hace que se pueda
+    // buscar por nombre en la paleta de comandos.
+    { label: "Compra directa", href: "/compras/directas" },
+    { label: "Facturas de proveedor", href: "/compras/facturas" },
     { label: "Proveedores", href: "/compras/proveedores" },
   ],
   contabilidad: [

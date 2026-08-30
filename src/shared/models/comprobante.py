@@ -12,16 +12,20 @@ dominio, no en el esquema.
 """
 
 import uuid
+from datetime import date
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
+    Date,
     Enum,
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
-    UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -32,10 +36,49 @@ from src.core.model_base import JsonB, TimestampMixin, UuidPkMixin
 class Comprobante(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "comprobante"
     __table_args__ = (
-        UniqueConstraint("empresa_id", "serie", "correlativo"),
+        # La unicidad de un comprobante no es una sola: depende de quién lo
+        # emitió, y hasta 2026-08-30 acá había una constraint global
+        # `(empresa, serie, correlativo)` que las mezclaba.
+        #
+        # El nuestro no se repite dentro de la empresa. El del proveedor no se
+        # repite dentro de **ese proveedor**: dos proveedores distintos emiten
+        # F001-1 el mismo día y los dos son válidos. Con una sola constraint,
+        # la primera factura recibida bloqueaba ese número en toda la empresa
+        # —incluida nuestra propia serie, que es la que se declara a SUNAT—.
+        Index(
+            "uq_comprobante_emitido",
+            "empresa_id",
+            "serie",
+            "correlativo",
+            unique=True,
+            sqlite_where=text("direccion = 'emitido'"),
+            postgresql_where=text("direccion = 'emitido'"),
+        ),
+        # `emisor_num_doc IS NOT NULL` explícito y no confiado al
+        # comportamiento de NULL: un `ticket_compra` informal puede no
+        # identificar al emisor, y ahí no hay unicidad que imponer. Escribirlo
+        # deja dicho que es a propósito. (`NULLS NOT DISTINCT` sería lo
+        # equivalente en Postgres 15+, pero los tests corren sobre SQLite.)
+        Index(
+            "uq_comprobante_recibido",
+            "empresa_id",
+            "emisor_num_doc",
+            "serie",
+            "correlativo",
+            unique=True,
+            sqlite_where=text(
+                "direccion = 'recibido' AND emisor_num_doc IS NOT NULL"
+            ),
+            postgresql_where=text(
+                "direccion = 'recibido' AND emisor_num_doc IS NOT NULL"
+            ),
+        ),
         # Una venta dividida tiene varios comprobantes: se busca por
         # (venta, grupo) al cobrar cada cuenta.
         Index("ix_comprobante_venta_grupo", "venta_id", "grupo_cobro"),
+        # La ficha de una OC pide sus comprobantes por acá, y `compra_id` no
+        # tiene FK (es de otro módulo) así que tampoco tenía índice.
+        Index("ix_comprobante_compra_id", "compra_id"),
     )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
@@ -89,6 +132,28 @@ class Comprobante(Base, UuidPkMixin, TimestampMixin):
             native_enum=False,
         )
     )
+    # --- Documento recibido (direccion="recibido") ---------------------------
+    # RUC (11) o DNI (8, un RHE de persona natural) de QUIEN EMITIÓ el papel.
+    # En un comprobante emitido queda NULL: el emisor somos nosotros y eso ya
+    # lo dice `empresa_id`. Es la columna que hace posible partir la unicidad
+    # por dirección — sin ella, dos proveedores no pueden tener el mismo
+    # F001-1.
+    emisor_num_doc: Mapped[str | None] = mapped_column(String(11), nullable=True)
+    # La fecha que trae el papel del proveedor, que es la que manda en el
+    # Registro de Compras — no la del día en que alguien lo tecleó, que es lo
+    # único que había (`created_at`). `Date` y no `DateTime`: una factura
+    # declara un día, no una hora.
+    #
+    # Solo se llena en `direccion="recibido"`. Para un comprobante emitido la
+    # fecha del documento se deriva de `created_at` en hora del negocio
+    # (`sales.application.comprobantes.fecha_emision`), y tener dos verdades
+    # sobre lo mismo es peor que no tener ninguna.
+    fecha_emision: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Importe total del documento, IGV incluido. Hasta ahora el importe de una
+    # compra se tomaba implícitamente de `orden_compra.total`, que es la base
+    # de lo recibido: una factura que difiera —por IGV, redondeo o un flete
+    # que la OC no tenía— no se podía representar.
+    total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(100), unique=True)
     # ¿La operación lleva IGV? NULL = lo decide el default de la empresa
     # (`shared.tributos`). Se marca donde alguien tiene el documento delante:

@@ -1,6 +1,7 @@
 """Routers FastAPI del módulo purchases: proveedores y ciclo de OC."""
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -14,7 +15,13 @@ from src.modules.purchases.application.scope import (
     exigir_orden_compra,
     exigir_proveedor,
 )
-from src.modules.users.api.deps import get_db, get_tenant, require_permission
+from src.modules.users.api.deps import (
+    check_permission,
+    get_current_user,
+    get_db,
+    get_tenant,
+    require_permission,
+)
 from src.modules.users.application.queries_publicas import tiene_permiso
 from src.modules.users.infrastructure.models import Usuario
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
@@ -129,6 +136,38 @@ def ver_orden_compra(
 ):
     orden = exigir_orden_compra(session, orden_compra_id, tenant)
     return _con_items(session, orden)
+
+
+@router.get(
+    "/ordenes-compra/{orden_compra_id}/recepciones",
+    response_model=list[schemas.RecepcionDetalleOut],
+)
+def listar_recepciones(
+    orden_compra_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Qué se recibió de esta OC y cuándo. La ficha lo necesita para poder
+    ofrecer una recepción parcial sabiendo qué falta."""
+    exigir_orden_compra(session, orden_compra_id, tenant)
+    return ordenes.recepciones_de_orden(session, orden_compra_id)
+
+
+@router.get(
+    "/ordenes-compra/{orden_compra_id}/comprobantes",
+    response_model=list[schemas.ComprobanteOut],
+)
+def listar_comprobantes_de_orden(
+    orden_compra_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Qué factura sustenta esta OC. Sin esto la ficha no puede decir si ya
+    se dio conformidad, y ofrecería registrarla dos veces."""
+    exigir_orden_compra(session, orden_compra_id, tenant)
+    return comprobantes.comprobantes_de_orden(session, orden_compra_id)
 
 
 @router.patch("/ordenes-compra/{orden_compra_id}", response_model=schemas.OrdenCompraOut)
@@ -247,3 +286,57 @@ def dar_conformidad_comprobante(
     )
     session.commit()
     return comprobante
+
+
+@router.get("/comprobantes", response_model=Pagina[schemas.ComprobanteRecibidoOut])
+def listar_comprobantes_recibidos(
+    empresa_id: uuid.UUID | None = None,
+    desde: date | None = None,
+    hasta: date | None = None,
+    proveedor_id: uuid.UUID | None = None,
+    tipo: schemas.TipoRecibido | None = None,
+    usuario: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """El registro de compras: los comprobantes que la empresa recibió.
+
+    Acepta `purchases.leer` **o** `accounting.leer`. El contador tiene que
+    poder ver el documento fuente del asiento sin que haya que darle el módulo
+    de compras entero, que además lo dejaría emitir órdenes.
+    """
+    # Una sola consulta y basta con uno de los dos, igual que
+    # `GET /sales/comprobantes` del otro lado del mostrador.
+    check_permission(session, usuario, LEER, "accounting.leer")
+
+    pagina = paginar(
+        session,
+        comprobantes.q_comprobantes_recibidos(
+            tenant.filtro_empresa(empresa_id),
+            desde=desde,
+            hasta=hasta,
+            proveedor_id=proveedor_id,
+            tipo=tipo,
+        ),
+        p,
+    )
+    # El proveedor y el total de la OC se componen **después** de paginar: un
+    # join a la consulta cambiaría el conteo y el orden.
+    datos = comprobantes.datos_de_ordenes(
+        session, [c.compra_id for c in pagina["items"]]
+    )
+    pagina["items"] = [
+        schemas.ComprobanteRecibidoOut.model_validate(
+            {
+                **{
+                    campo: getattr(c, campo)
+                    for campo in schemas.ComprobanteRecibidoOut.model_fields
+                    if hasattr(c, campo)
+                },
+                **datos.get(c.compra_id, {}),
+            }
+        )
+        for c in pagina["items"]
+    ]
+    return pagina

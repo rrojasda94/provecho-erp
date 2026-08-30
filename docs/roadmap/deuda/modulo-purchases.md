@@ -3,6 +3,24 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-30 **El ciclo de la OC en pantalla** (ADR-085, migración
+  `0a056863874b`): ficha con emitir / recibir / anular / facturar, pantalla de
+  compra directa, registro de compras (`GET /purchases/comprobantes`, nuevo),
+  y las dos lecturas que faltaban (recepciones y comprobantes de una OC). El
+  módulo tenía **todos** sus casos de uso con endpoint y test verde desde
+  siempre: el hueco estaba entero del lado del frontend, y no estaba anotado
+  en ninguna parte — a diferencia de la deuda de pantallas de `inventory`, que
+  sí se documentó. Esa omisión es lo que lo dejó vivo cuatro meses.
+- ⬜ **`total_documento` viaja en `purchases.comprobante_conforme` y no lo lee
+  nadie** (2026-08-30). Es el importe que declara la factura, aditivo, para la
+  reconciliación estilo Odoo que sigue diferida más abajo. El `monto` del
+  evento sigue siendo la base de lo recibido, que es lo que la plantilla del
+  PCGE espera.
+- ⬜ **La compra directa no tiene su propia comprobación de recepción**
+  (2026-08-30): recibe el 100% de lo comprado en el mismo paso, que es lo
+  correcto para un gasto ya incurrido, pero si el papel dice una cantidad y
+  llegó otra no hay dónde corregirlo salvo anulando y rehaciendo.
+
 - ✅ 2026-07-25 **Migración Alembic** `4ff85f833b29` (proveedor,
   orden_compra, orden_compra_item, recepcion_compra, recepcion_item)
   aplicada a la BD dev (Supabase).
