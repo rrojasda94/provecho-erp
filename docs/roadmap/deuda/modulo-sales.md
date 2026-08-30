@@ -172,17 +172,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   reversa; reversarlo por una línea borraría el gasto de las que sí se
   comieron, y reasentar la diferencia exige valorizar solo lo quitado. Es la
   misma limitación que la nota de crédito parcial.
-- ⬜ **Reporte de consumo de personal** (ADR-034): el gasto se registra y se
-  asienta, pero no hay reporte propio en el catálogo cerrado (ADR-024). Hoy
-  se lee con `GET /sales/ventas?tipo=consumo_personal` y con los movimientos
-  `consumo_interno` de inventario — sirve para revisar, no para que gerencia
-  compare sucursales por mes. Falta también el consumo por **motivo**, que
-  es la razón por la que el motivo es un enum cerrado.
-  `inventory.consumo_personal_valorizado` tampoco tiene **emisión** en el
-  catálogo de `reports` (ADR-033): nadie se entera del gasto salvo que lo
-  vaya a buscar. Es una entrada en `reports/domain/catalogo.py` más su fila
-  en `events.md`, pero primero hay que decidir a qué área se dirige —
-  gerencia, contabilidad, o el encargado del local.
+- 🔶 **Reporte de consumo de personal** (ADR-034). Resuelto a medias el
+  2026-08-30: `sales.consumo_personal_registrado` **ya es una emisión** del
+  catálogo de `reports` (ADR-033), dirigida a Gerencia y Contabilidad, con
+  número de orden, motivo y autorizador — nadie tiene que ir a buscar el
+  gasto. Lo que **sigue abierto** es el **acumulado**: no hay reporte que
+  compare sucursales por mes ni que sume por **motivo**, que es la razón por
+  la que el motivo es un enum cerrado. Hoy eso se arma a mano con
+  `GET /sales/ventas?tipo=consumo_personal` y los movimientos
+  `consumo_interno`. `inventory.consumo_personal_valorizado` —el monto
+  valorizado— tampoco tiene emisión propia; se dejó fuera a propósito para no
+  avisar dos veces del mismo plato: el aviso útil es el del hecho, no el de
+  su costeo.
 - ✅ 2026-08-15 **Los íconos del home ya no llevan a 404** — y hacía rato que no
   lo hacían: los siete destinos que la deuda enumeraba (`/produccion`, `/rrhh`,
   `/marketing`, `/gerencia`, `/usuarios`, `/contabilidad` y el resto de

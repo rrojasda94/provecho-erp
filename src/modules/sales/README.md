@@ -1113,13 +1113,29 @@ con 100% de descuento**:
   `capacitacion` | `otro`) y la **firma de un encargado** con su PIN
   (`sales.registrar_consumo_personal`, elevación de `POST /auth/autorizar`).
   Queda en `audit_log`.
+- **La firma es por cada cambio, no solo por el alta** (2026-08-30):
+  `POST /ventas/{id}/items` exige la elevación de
+  `sales.registrar_consumo_personal` cuando la orden es un consumo, y
+  `POST /ventas/{id}/anular-lineas` exige la de `sales.anular` **aunque la
+  línea esté dentro de la ventana de corrección** — esa ventana es para el
+  tecleo del cajero, no para deshacer lo que un encargado firmó. En una venta
+  normal nada de esto aplica. El borrador del PDV queda fuera: mientras no
+  salió a cocina no hay inventario movido ni nada firmado todavía.
 - Publica `sales.consumo_personal_registrado` — **no** `venta_confirmada`,
   que `accounting` asienta como ingreso y `marketing` atribuye como venta.
+  Lo consume `inventory` y también `reports`: es una emisión del catálogo
+  (Gerencia y Contabilidad) con número de orden, motivo y autorizador.
 - **No se cobra ni se factura**: `registrar_pago` y `aplicar_descuento`
   responden 409 antes de llegar al comprobante.
 - Se prepara y despacha como cualquier pedido (KDS con distintivo, comanda
   con `** CONSUMO PERSONAL **`), y **la entrega lo cierra**: pasa a
-  `estado="cerrada"`, su único cierre posible porque nunca pasa por caja.
+  `estado="cerrada"`, su único cierre posible porque nunca pasa por caja. El
+  PDV la registra con **"Cerrar cuenta"**, el botón que ocupa el lugar de
+  "Cobrar" — es el mismo `POST /ventas/{id}/entrega` del despacho, con la
+  misma exigencia de tener todos los ítems en `listo`.
+- La orden cerrada aparece en la pestaña **"Cerradas"** del PDV junto a lo
+  cobrado, marcada como consumo y sin monto: no suma plata al turno, pero sin
+  ella nadie puede reconstruir qué se preparó sin cobrar.
 - El costo sale de `inventory` como `consumo_interno` y llega a
   `accounting` como gasto de alimentación de personal (RN-COM-027).
   Anularlo repone el insumo y reversa el asiento.
