@@ -17,6 +17,8 @@ RUN npm ci
 # El `web` de `docker-compose.yml` apunta acá. Monta el código encima, así
 # que este COPY solo existe para que la imagen también corra suelta.
 FROM deps AS dev
+RUN apk add --no-cache tzdata
+ENV TZ=America/Lima
 COPY . .
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
@@ -41,7 +43,17 @@ WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME=0.0.0.0
+    HOSTNAME=0.0.0.0 \
+    TZ=America/Lima
+
+# `tzdata` + `TZ`: las imágenes alpine no traen la base de zonas, y sin
+# ella `TZ` se ignora en silencio y el proceso se queda en UTC. Importa
+# porque hay pantallas que formatean la fecha en el servidor: sin zona, un
+# movimiento de las 20:00 hora Perú se dibuja como la 01:00 del día
+# siguiente. Es defensa en profundidad — el arreglo de verdad es el
+# `timeZone` explícito de `lib/fechas.ts`, que además vale en `npm run dev`
+# y en el navegador.
+RUN apk add --no-cache tzdata
 
 # Sin privilegios, igual que la imagen del backend: una vulnerabilidad en la
 # aplicación no debe traer consigo root dentro del contenedor.

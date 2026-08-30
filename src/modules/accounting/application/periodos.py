@@ -3,7 +3,7 @@ devuelve el existente); cerrar es definitivo salvo asiento inverso
 (RN-CTB-002)."""
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
@@ -26,9 +26,7 @@ def abrir_periodo(
     return repo.add(PeriodoContable(empresa_id=empresa_id, anio=anio, mes=mes, estado="abierto"))
 
 
-def listar_periodos(
-    session: Session, empresa_id: uuid.UUID | None = None
-) -> list[PeriodoContable]:
+def listar_periodos(session: Session, empresa_id: uuid.UUID | None = None) -> list[PeriodoContable]:
     return PeriodoContableRepo(session).list(empresa_id)
 
 
@@ -42,7 +40,7 @@ def cerrar_periodo(
         raise Conflicto(f"el periodo ya está {periodo.estado}")
     periodo.estado = "cerrado"
     periodo.cerrado_por = cerrado_por
-    periodo.fecha_cierre = datetime.now()
+    periodo.fecha_cierre = datetime.now(UTC)
     event_bus.publish(
         "accounting.periodo_cerrado",
         {"periodo_id": str(periodo.id), "fecha_cierre": periodo.fecha_cierre.isoformat()},
