@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 export type EstadoRrhh = { error: string; ok: boolean };
 
@@ -14,10 +15,6 @@ async function token(): Promise<string> {
   const valor = store.get(COOKIE_TOKEN)?.value;
   if (!valor) redirect("/login");
   return valor;
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 function texto(datos: FormData, campo: string): string {
@@ -54,7 +51,7 @@ export async function crearConvocatoriaAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear la convocatoria."), ok: false };
+    return estadoDeError(e, "No se pudo crear la convocatoria.");
   }
   revalidatePath("/rrhh/contratacion");
   return { error: "", ok: true };
@@ -81,7 +78,7 @@ export async function publicarConvocatoriaAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo publicar la convocatoria."), ok: false };
+    return estadoDeError(e, "No se pudo publicar la convocatoria.");
   }
   revalidatePath("/rrhh/contratacion");
   return { error: "", ok: true };
@@ -96,7 +93,7 @@ export async function cerrarConvocatoriaAction(
       metodo: "POST",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo cerrar la convocatoria."), ok: false };
+    return estadoDeError(e, "No se pudo cerrar la convocatoria.");
   }
   revalidatePath("/rrhh/contratacion");
   return { error: "", ok: true };
@@ -116,7 +113,7 @@ export async function avanzarPostulanteAction(
       cuerpo: { estado },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo avanzar al postulante."), ok: false };
+    return estadoDeError(e, "No se pudo avanzar al postulante.");
   }
   revalidatePath("/rrhh/contratacion");
   return { error: "", ok: true };
@@ -142,7 +139,7 @@ export async function descartarPostulanteAction(
       cuerpo: { motivo },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo descartar al postulante."), ok: false };
+    return estadoDeError(e, "No se pudo descartar al postulante.");
   }
   revalidatePath("/rrhh/contratacion");
   return { error: "", ok: true };
@@ -188,7 +185,7 @@ export async function contratarPostulanteAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo contratar al postulante."), ok: false };
+    return estadoDeError(e, "No se pudo contratar al postulante.");
   }
   revalidatePath("/rrhh/contratacion");
   return { error: "", ok: true };

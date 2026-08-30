@@ -3,6 +3,7 @@
 import { useActionState, useTransition } from "react";
 
 import { Insignia } from "@/components/estado/insignia";
+import { fecha } from "@/lib/fechas";
 
 import { abrirPeriodoAction, cerrarPeriodoAction, type EstadoAsiento } from "../actions";
 
@@ -23,7 +24,9 @@ const MESES = [
 function BotonCerrar({ periodo }: { periodo: Periodo }) {
   const [pendiente, startTransition] = useTransition();
   if (periodo.estado !== "abierto") {
-    return <span className="text-xs text-gray">{periodo.fecha_cierre?.slice(0, 10) ?? "—"}</span>;
+    return <span className="text-xs text-gray">
+        {periodo.fecha_cierre ? fecha(periodo.fecha_cierre) : "—"}
+      </span>;
   }
   return (
     <button

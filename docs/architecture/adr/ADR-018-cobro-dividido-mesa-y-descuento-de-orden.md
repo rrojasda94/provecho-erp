@@ -159,6 +159,19 @@ Tres decisiones dentro de la decisión:
   sirviera, el cajero se autorizaría con su propia sesión.
 - **La elevación está acotada a un permiso**: una obtenida para descontar no
   vale para anular.
+- **La elevación es de un solo uso** (2026-08-30): el `jti` se consume al
+  verificarlo. Se emitía desde el principio y nadie lo miraba, así que
+  durante sus tres minutos el mismo token autorizaba una operación tras
+  otra: el cajero conseguía la firma para un descuento y se la aplicaba a
+  las ventas siguientes, con el rastro nombrando al supervisor en todas.
+  La marca vive en Redis con el TTL de la elevación —`SET NX EX`, el mismo
+  cliente y el mismo corta-circuito del rate limit—, y lleva la clave de
+  idempotencia de la operación cuando la hay, para que el reintento del
+  mismo request no se confunda con un reuso. **Límite conocido**: es
+  fail-open como el rate limit, así que con Redis caído no hay anti-replay
+  —el token sigue acotado a 3 minutos y un permiso—. Cerrar eso pediría
+  llevar la marca a Postgres, y no vale la pena hasta que un Redis caído sea
+  algo más que un incidente raro.
 - **Va detrás del mismo rate limit que el login**: es un endpoint que recibe
   PINes; sin freno sería el camino cómodo para probarlos. El error es el
   mismo tenga o no el permiso, para no revelar qué PIN es válido ni quién es

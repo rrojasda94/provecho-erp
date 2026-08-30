@@ -113,6 +113,22 @@ def _venta(s, ids, *, minutos_atras: int, estados: list[str], estado_venta="paga
 
 
 # --- Cuándo SÍ alerta -------------------------------------------------------
+def test_alerta_el_pedido_todavia_sin_cobrar(env):
+    """El caso normal de una mesa: la comanda salió a cocina y la cuenta sigue
+    abierta, así que la venta está en `orden`.
+
+    `ESTADOS_VIVOS` decía `("confirmada", "pagada", "facturada")` y
+    `confirmada` no es ninguno de los cinco valores de `estado_venta`: faltaba
+    justo `orden`, y la alerta de demora no disparaba nunca donde más falta
+    hace. El resto de los tests no lo veía porque `_venta` deja `pagada` por
+    defecto (auditoría del 2026-08-20).
+    """
+    s, ids = env
+    venta = _venta(s, ids, minutos_atras=20, estados=["pendiente"], estado_venta="orden")
+
+    assert alertas.revisar_pedido(s, venta.id, ahora=AHORA) is not None
+
+
 def test_alerta_si_sigue_en_cocina_pasado_el_umbral(env):
     s, ids = env
     venta = _venta(s, ids, minutos_atras=20, estados=["pendiente", "listo"])

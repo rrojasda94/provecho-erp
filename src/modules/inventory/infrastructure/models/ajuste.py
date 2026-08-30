@@ -50,3 +50,9 @@ class Ajuste(Base, UuidPkMixin, TimestampMixin):
     movimiento_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("movimiento_inventario.id"), nullable=True
     )
+    # Solo una entrada (cantidad > 0) de un artículo con control de lote lo
+    # lleva: declarado al solicitar, para no perder la fecha de vencimiento
+    # que `registrar_movimiento` no pide al crear el lote automático.
+    lote_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lote.id"), nullable=True
+    )

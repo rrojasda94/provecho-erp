@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 export type EstadoVenta = { error: string; ok: boolean };
 
@@ -16,10 +17,6 @@ async function token(): Promise<string> {
   return valor;
 }
 
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
-}
-
 export async function anularVentaAction(ventaId: string): Promise<EstadoVenta> {
   try {
     await apiFetch(`/api/v1/sales/ventas/${ventaId}/anular`, {
@@ -27,7 +24,7 @@ export async function anularVentaAction(ventaId: string): Promise<EstadoVenta> {
       metodo: "POST",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo anular la venta."), ok: false };
+    return estadoDeError(e, "No se pudo anular la venta.");
   }
   revalidatePath("/ventas");
   return { error: "", ok: true };
@@ -43,14 +40,23 @@ export type LineaVenta = {
 
 /** Las líneas se piden al abrir el diálogo, no al pintar la jornada: solo
  * hacen falta para acreditar y traerlas por cada venta del día sería un
- * viaje por fila para algo que casi nunca se usa. */
-export async function lineasDeVentaAction(ventaId: string): Promise<LineaVenta[]> {
+ * viaje por fila para algo que casi nunca se usa.
+ *
+ * Devuelve el fallo en vez de una lista vacía: acreditar es lo último que
+ * puede hacerse a ciegas, y "la API no respondió" no puede verse igual que
+ * "esta venta no tiene líneas". */
+export async function lineasDeVentaAction(
+  ventaId: string,
+): Promise<{ lineas: LineaVenta[]; error: string }> {
   try {
-    return await apiFetch<LineaVenta[]>(`/api/v1/sales/ventas/${ventaId}/items`, {
-      token: await token(),
-    });
-  } catch {
-    return [];
+    const lineas = await apiFetch<LineaVenta[]>(
+      `/api/v1/sales/ventas/${ventaId}/items`,
+      { token: await token() },
+    );
+    return { lineas, error: "" };
+  } catch (e) {
+    // Solo el texto: el llamador no es un formulario, no tiene campos que marcar.
+    return { lineas: [], error: estadoDeError(e, "No se pudieron traer las líneas.").error };
   }
 }
 
@@ -85,7 +91,7 @@ export async function emitirNotaCreditoAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo emitir la nota de crédito."), ok: false };
+    return estadoDeError(e, "No se pudo emitir la nota de crédito.");
   }
   revalidatePath("/ventas");
   return { error: "", ok: true };
@@ -103,7 +109,7 @@ export async function reintentarComprobanteAction(
     // 502 = SUNAT/Factiliza rechazó de nuevo. El intento ya quedó contado en
     // el comprobante, así que la pantalla se recarga igual para mostrarlo.
     revalidatePath("/ventas");
-    return { error: mensajeDe(e, "El comprobante volvió a fallar."), ok: false };
+    return estadoDeError(e, "El comprobante volvió a fallar.");
   }
   revalidatePath("/ventas");
   return { error: "", ok: true };
@@ -134,7 +140,7 @@ export async function crearMesaAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear la mesa."), ok: false };
+    return estadoDeError(e, "No se pudo crear la mesa.");
   }
   revalidatePath("/ventas/mesas");
   return { error: "", ok: true };
@@ -157,7 +163,7 @@ export async function guardarMesaAction(
       cuerpo: { zona: zona || null, capacidad: capacidad ? Number(capacidad) : null },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo guardar la mesa."), ok: false };
+    return estadoDeError(e, "No se pudo guardar la mesa.");
   }
   revalidatePath("/ventas/mesas");
   return { error: "", ok: true };
@@ -177,7 +183,7 @@ export async function moverMesaAction(
       cuerpo: { pos_x: posX, pos_y: posY },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo mover la mesa."), ok: false };
+    return estadoDeError(e, "No se pudo mover la mesa.");
   }
   revalidatePath("/ventas/mesas");
   return { error: "", ok: true };
@@ -192,7 +198,7 @@ export async function eliminarMesaAction(mesaId: string): Promise<EstadoVenta> {
       metodo: "DELETE",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo quitar la mesa."), ok: false };
+    return estadoDeError(e, "No se pudo quitar la mesa.");
   }
   revalidatePath("/ventas/mesas");
   return { error: "", ok: true };
@@ -274,7 +280,7 @@ export async function crearPromocionAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear la promoción."), ok: false };
+    return estadoDeError(e, "No se pudo crear la promoción.");
   }
   revalidatePath("/ventas/promociones");
   return { error: "", ok: true };
@@ -289,7 +295,7 @@ export async function terminarPromocionAction(
       metodo: "POST",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo terminar la promoción."), ok: false };
+    return estadoDeError(e, "No se pudo terminar la promoción.");
   }
   revalidatePath("/ventas/promociones");
   return { error: "", ok: true };

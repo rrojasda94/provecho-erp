@@ -138,6 +138,35 @@ def test_la_nomina_solo_viaja_con_permiso_de_nomina(env):  # noqa: F811
     # sin esta bandera, un legajo censurado se lee igual que uno sin boletas.
     assert como_lector["nomina_visible"] is False
     assert como_lector["boletas"] == []
+    # Y tampoco por la ventana: la ficha del trabajador lleva el sueldo base.
+    assert como_lector["trabajador"]["remuneracion_base"] is None
+
+
+def test_la_remuneracion_no_viaja_en_el_listado_de_trabajadores(env):  # noqa: F811
+    """El legajo escondía la nómina y el listado la devolvía igual: quien
+    solo tiene `rrhh.leer` leía el sueldo de toda la plantilla."""
+    client, ids, TestSession = env
+    h = _token(client)
+    trabajador_id = _crear_trabajador(
+        client, h, ids, remuneracion_base="2500.00"
+    ).json()["id"]
+
+    como_admin = client.get("/api/v1/rrhh/trabajadores", headers=h).json()
+    assert como_admin["items"][0]["remuneracion_base"] == "2500.00"
+
+    _rol_solo_lectura(TestSession, "lector2", "222222")
+    h_lector = _token(client, "lector2", "222222")
+
+    listado = client.get("/api/v1/rrhh/trabajadores", headers=h_lector)
+    assert listado.status_code == 200, listado.text
+    assert listado.json()["items"][0]["remuneracion_base"] is None
+
+    ficha = client.get(f"/api/v1/rrhh/trabajadores/{trabajador_id}", headers=h_lector)
+    assert ficha.status_code == 200, ficha.text
+    # El resto de la ficha sigue viajando: se censura el sueldo, no al
+    # trabajador.
+    assert ficha.json()["cargo"] == "Mozo"
+    assert ficha.json()["remuneracion_base"] is None
 
 
 def test_legajo_de_trabajador_inexistente_404(env):  # noqa: F811

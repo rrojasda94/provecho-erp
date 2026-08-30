@@ -146,7 +146,11 @@ def crear_venta(
                 "el consumo de personal requiere autorización de un encargado",
             )
         try:
-            autorizado_por = autorizacion.verificar(body.autorizacion, CONSUMO_PERSONAL)
+            # `uso`: la elevación se gasta al usarla, pero el reintento de
+            # esta misma venta no cuenta como reuso.
+            autorizado_por = autorizacion.verificar(
+                body.autorizacion, CONSUMO_PERSONAL, uso=body.idempotency_key
+            )
         except TokenInvalido as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
     venta = ventas.crear_venta(
@@ -261,7 +265,7 @@ def listar_ventas(
     sucursal_id: uuid.UUID | None = None,
     desde: date | None = None,
     hasta: date | None = None,
-    estado: str | None = None,
+    estado: rules.EstadoVenta | None = None,
     punto_venta_id: uuid.UUID | None = None,
     tipo: str | None = None,
     _: Usuario = Depends(require_permission(LEER)),

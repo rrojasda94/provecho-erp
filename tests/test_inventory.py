@@ -264,6 +264,63 @@ def test_ajuste_flujo_segregado_ok(env):
     assert Decimal(stock[0]["cantidad"]) == Decimal("7")
 
 
+def test_ajuste_entrada_crea_lote_con_vencimiento(env):
+    """Entrada de stock manual (RN-LOT-002): declarar lote y vencimiento al
+    solicitar el ajuste, no perderlo como pasaba con el lote automático de
+    `registrar_movimiento`."""
+    client, ids, TestSession = env
+    h = _token(client)
+    art = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "Q002", "nombre": "Queso Lote",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo", "controla_lote": True,
+    }).json()
+    sku = client.post("/api/v1/inventory/skus", headers=h, json={
+        "articulo_id": art["id"], "codigo": "SKU-QUESO-LOTE",
+    }).json()
+    h_alm = _token(client, "almacenero1", "654321")
+    aj = client.post("/api/v1/inventory/ajustes", headers=h_alm, json={
+        "almacen_id": ids["almacen_id"], "sku_id": sku["id"],
+        "cantidad": "10", "motivo": "sobrante",
+        "lote_codigo": "L-2026-09", "fecha_vencimiento": "2026-09-30",
+    }).json()
+    assert aj["lote_id"] is not None
+
+    r = client.post(f"/api/v1/inventory/ajustes/{aj['id']}/aprobar", headers=h)
+    assert r.status_code == 200
+
+    from src.modules.inventory.infrastructure.models import Lote, MovimientoInventario
+    with TestSession() as s:
+        lote = s.get(Lote, uuid.UUID(aj["lote_id"]))
+        assert lote is not None
+        assert str(lote.fecha_vencimiento) == "2026-09-30"
+        mov = s.scalar(
+            select(MovimientoInventario).where(
+                MovimientoInventario.referencia == aj["id"]
+            )
+        )
+        assert mov.lote_id == lote.id
+
+
+def test_ajuste_lote_solo_aplica_a_entrada_positiva_409(env):
+    client, ids, _ = env
+    h_alm = _token(client, "almacenero1", "654321")
+    r = client.post("/api/v1/inventory/ajustes", headers=h_alm, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "-5", "motivo": "faltante", "lote_codigo": "L-2026-09",
+    })
+    assert r.status_code == 409
+
+
+def test_listar_skus_incluye_controla_lote(env):
+    client, ids, _ = env
+    h = _token(client)
+    fila = next(
+        s for s in client.get("/api/v1/inventory/skus", headers=h).json()
+        if s["id"] == ids["sku_id"]
+    )
+    assert fila["controla_lote"] is False
+
+
 def test_stock_bajo_minimo_flag(env):
     client, ids, TestSession = env
     h = _token(client)

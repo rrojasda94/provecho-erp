@@ -48,9 +48,7 @@ def test_un_timestamp_sin_zona_se_lee_como_utc(zona_lima):
     assert fechas.a_fecha_local(guardado) == datetime.date(2026, 8, 3)
 
     # Antes del corte de las 19:00 hora Perú, el día coincide.
-    assert fechas.a_fecha_local(datetime.datetime(2026, 8, 4, 15, 0)) == datetime.date(
-        2026, 8, 4
-    )
+    assert fechas.a_fecha_local(datetime.datetime(2026, 8, 4, 15, 0)) == datetime.date(2026, 8, 4)
 
 
 def test_un_timestamp_con_zona_se_convierte_no_se_ignora(zona_lima):
@@ -61,10 +59,25 @@ def test_un_timestamp_con_zona_se_convierte_no_se_ignora(zona_lima):
     assert fechas.a_fecha_local(None) is None
 
 
-def test_ningun_modulo_usa_la_fecha_local_del_proceso():
+# Las tres formas de leer el reloj del proceso en vez del del negocio. La
+# primera es la que causó el desfase original; las otras dos se colaron
+# después porque el barrido solo buscaba la primera.
+PROHIBIDO = {
+    "date.today": "la fecha local del proceso, en vez de `fechas.hoy()`",
+    "datetime.now()": "la hora local del proceso, sin zona: `datetime.now(UTC)` "
+    "para un instante, `fechas.ahora()` para una franja horaria",
+    "datetime.utcnow": "un naive que miente sobre ser UTC (y está deprecado)",
+}
+
+
+def test_ningun_modulo_lee_el_reloj_del_proceso():
     """`date.today()` devuelve la zona del sistema: en Docker, UTC. Un módulo
     que la use vuelve a desfasar el calendario cinco horas, así que la regla
-    se congela acá y no en una convención que nadie relee."""
+    se congela acá y no en una convención que nadie relee.
+
+    Se busca `date.today` **sin** los paréntesis a propósito: como `default`
+    de una columna la función viaja sin llamar (`default=date.today`), que es
+    la misma bomba con otra sintaxis y pasaba el barrido anterior."""
     raiz = os.path.join(os.path.dirname(os.path.dirname(__file__)), "src")
     culpables = []
     for carpeta, _, archivos in os.walk(raiz):
@@ -74,12 +87,12 @@ def test_ningun_modulo_usa_la_fecha_local_del_proceso():
             if not archivo.endswith(".py"):
                 continue
             ruta = os.path.join(carpeta, archivo)
+            # `fechas.py` las nombra en su docstring para explicar por qué no
+            # se usan.
+            if ruta.endswith("fechas.py"):
+                continue
             texto = open(ruta, encoding="utf-8").read()
-            # `fechas.py` la nombra en su docstring para explicar por qué no
-            # se usa.
-            if "date.today()" in texto and not ruta.endswith("fechas.py"):
-                culpables.append(os.path.relpath(ruta, raiz))
-    assert not culpables, (
-        "usan la fecha local del proceso en vez de `fechas.hoy()`: "
-        + ", ".join(culpables)
-    )
+            for patron, motivo in PROHIBIDO.items():
+                if patron in texto:
+                    culpables.append(f"{os.path.relpath(ruta, raiz)}: `{patron}` es {motivo}")
+    assert not culpables, "leen el reloj del proceso:\n" + "\n".join(culpables)

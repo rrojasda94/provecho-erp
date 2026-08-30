@@ -2,9 +2,19 @@
 
 from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Literal, get_args
 
 CANALES = {"pdv", "agente_ia", "delivery"}
 MODALIDADES = {"mesa", "takeout", "delivery"}
+
+# --- Estado de la venta -------------------------------------------------------
+# Fuente única: de acá salen el Enum de la columna, el filtro del listado y el
+# desplegable de la jornada. Estaban escritos tres veces y derivaron — el
+# frontend ofrecía `entregada`, que es estado de ítem y no de venta, y escondía
+# `facturada`, donde termina la mayoría de lo cobrado. La máquina de
+# transiciones está en `docs/domain/state-machines.md`.
+EstadoVenta = Literal["orden", "pagada", "facturada", "anulada", "cerrada"]
+ESTADOS_VENTA: tuple[str, ...] = get_args(EstadoVenta)
 
 # --- Mesas del salón (RN-MDC-004) --------------------------------------------
 # El plano es una grilla de celdas, no coordenadas libres: una mesa nueva

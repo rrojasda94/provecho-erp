@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 export type EstadoMarketing = { error: string; ok: boolean };
 
@@ -14,10 +15,6 @@ async function token(): Promise<string> {
   const valor = store.get(COOKIE_TOKEN)?.value;
   if (!valor) redirect("/login");
   return valor;
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 function leerBrief(formData: FormData) {
@@ -53,7 +50,7 @@ export async function crearCampanaAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear la campaña."), ok: false };
+    return estadoDeError(e, "No se pudo crear la campaña.");
   }
   revalidatePath("/marketing");
   return { error: "", ok: true };
@@ -73,7 +70,7 @@ export async function completarBriefAction(
       cuerpo: leerBrief(formData),
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo guardar el brief."), ok: false };
+    return estadoDeError(e, "No se pudo guardar el brief.");
   }
   revalidatePath("/marketing");
   return { error: "", ok: true };
@@ -92,7 +89,7 @@ export async function avanzarCampanaAction(
       metodo: "POST",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo avanzar la campaña."), ok: false };
+    return estadoDeError(e, "No se pudo avanzar la campaña.");
   }
   revalidatePath("/marketing");
   return { error: "", ok: true };
@@ -131,7 +128,7 @@ export async function crearPiezaAction(
       cuerpo: pieza,
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo planificar la pieza."), ok: false };
+    return estadoDeError(e, "No se pudo planificar la pieza.");
   }
   revalidatePath("/marketing/contenido");
   return { error: "", ok: true };
@@ -149,7 +146,7 @@ export async function validarPiezaAction(
       cuerpo: { [campo]: valor },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo validar la pieza."), ok: false };
+    return estadoDeError(e, "No se pudo validar la pieza.");
   }
   revalidatePath("/marketing/contenido");
   return { error: "", ok: true };
@@ -163,7 +160,7 @@ export async function publicarPiezaAction(piezaId: string): Promise<EstadoMarket
       cuerpo: {},
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo publicar la pieza."), ok: false };
+    return estadoDeError(e, "No se pudo publicar la pieza.");
   }
   revalidatePath("/marketing/contenido");
   return { error: "", ok: true };
@@ -176,7 +173,7 @@ export async function descartarPiezaAction(piezaId: string): Promise<EstadoMarke
       metodo: "POST",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo descartar la pieza."), ok: false };
+    return estadoDeError(e, "No se pudo descartar la pieza.");
   }
   revalidatePath("/marketing/contenido");
   return { error: "", ok: true };
