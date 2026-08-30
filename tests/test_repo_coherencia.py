@@ -245,3 +245,27 @@ def test_los_motivos_de_descuento_del_pdv_son_los_que_la_api_acepta():
         "los motivos de descuento del PDV y los de la API no coinciden: "
         f"PDV={sorted(del_pdv)} API={sorted(MOTIVOS_DESCUENTO - {MOTIVO_CUPON})}"
     )
+
+
+def test_los_estados_del_filtro_de_la_jornada_son_los_del_enum_de_venta():
+    """La pantalla `/ventas` filtra por `estado` y el backend lo valida contra
+    `estado_venta`: si las dos listas se separan, el filtro no falla — devuelve
+    cero filas, o esconde un estado entero.
+
+    Pasó de verdad (auditoría del 2026-08-20, hallazgo 1): el desplegable
+    ofrecía `entregada` —que es estado de ítem del KDS, no de venta— y no
+    ofrecía `facturada`, que es donde termina casi todo lo cobrado.
+    """
+    from src.modules.sales.domain.rules import ESTADOS_VENTA
+
+    fuente = (RAIZ / "frontend/app/(app)/ventas/jornada-cliente.tsx").read_text(
+        encoding="utf-8"
+    )
+    bloque = re.search(r"const ESTADOS = \[(.*?)\];", fuente, re.S)
+    assert bloque, "No encontré ESTADOS en frontend/app/(app)/ventas/jornada-cliente.tsx"
+    de_la_pantalla = set(re.findall(r'"([a-z_]+)"', bloque.group(1)))
+
+    assert de_la_pantalla == set(ESTADOS_VENTA), (
+        "los estados del filtro de la jornada y los de la API no coinciden: "
+        f"pantalla={sorted(de_la_pantalla)} API={sorted(ESTADOS_VENTA)}"
+    )

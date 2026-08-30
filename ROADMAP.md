@@ -185,6 +185,39 @@ la reconciliación completa estilo Odoo 18 entre compras/inventario/
 contabilidad (más allá de los eventos puntuales que ya existen) y la caja
 chica que la compra directa todavía no usa para pagar.
 
+## Auditoría del 2026-08-20 — Ola 1, lo que toca ventas (2026-08-30)
+
+La auditoría de las cinco fases dejó 18 hallazgos priorizados. Esta tanda toma
+los tres que caen sobre `/ventas` —la pantalla que verifica lo que se
+facturó— y los cierra. El patrón común no es un error visible sino silencio:
+un filtro que devuelve cero filas, un botón que termina en 403, una venta que
+parece no tener líneas.
+
+| # audit | Qué | Estado |
+|---|---|---|
+| 1 | El filtro de estados de la jornada ofrecía `entregada` (no existe) y escondía `facturada`; `estado` viajaba como `str` sin validar | ✅ 2026-08-30 |
+| 3 | «Reintentar emisión», «Nota de crédito» y «Anular» gateados por permiso | 🔶 parcial — faltan los otros 6 botones-403 (pagos, asientos, trabajadores, artículos, devoluciones, OC) |
+| 11 | El fallo al traer las líneas para la NC se distingue de una venta sin líneas | 🔶 parcial — faltan `rechazarPagoAction` y la carta del PDV |
+| + | La alerta de pedido demorado nunca disparaba para un pedido sin cobrar: `ESTADOS_VIVOS` decía `confirmada`, que no es un valor de `estado_venta`, y omitía `orden` | ✅ 2026-08-30 |
+
+La causa raíz de los tres primeros era la misma: los cinco valores de
+`estado_venta` estaban escritos en cuatro lugares que no se importan entre sí.
+Ahora hay **una** fuente, `sales.domain.rules.ESTADOS_VENTA`, de la que salen
+el `Enum` de la columna, el `Literal` del query param y —con un test de
+coherencia, extendiendo el patrón que la propia auditoría señalaba como
+existente-pero-no-extendido (hallazgo 15)— el desplegable de la pantalla.
+
+**Sigue abierto de la misma familia**, encontrado al hacer esto y sin tocar:
+el PDV filtra su pestaña de cobrados por `estado="pagada"` a secas
+(`use-datos-pdv.ts`), así que la venta se le cae de la lista en cuanto SUNAT
+acepta y la mueve a `facturada` — mismo bug que ya se parcheó en el KDS
+(0.8.1); `estado_emision="error"` es un valor de enum que `sales` nunca
+escribe (sí `inventory`), y el botón «Reintentar emisión» se ofrece
+justamente para `rechazado`/`error` —donde reintentar no sirve— y no para
+`pendiente` con intentos acumulados, que es donde sí; y la reemisión del
+comprobante corregido tras una NC de motivo 02/03 está documentada en tres
+lugares y no existe.
+
 ## Parche 0.9.1 — tercer turno de prueba en staging (2026-08-30)
 
 Siete reportes. **Cinco no eran código faltante en el backend**: eran

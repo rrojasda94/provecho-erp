@@ -43,14 +43,22 @@ export type LineaVenta = {
 
 /** Las líneas se piden al abrir el diálogo, no al pintar la jornada: solo
  * hacen falta para acreditar y traerlas por cada venta del día sería un
- * viaje por fila para algo que casi nunca se usa. */
-export async function lineasDeVentaAction(ventaId: string): Promise<LineaVenta[]> {
+ * viaje por fila para algo que casi nunca se usa.
+ *
+ * Devuelve el fallo en vez de una lista vacía: acreditar es lo último que
+ * puede hacerse a ciegas, y "la API no respondió" no puede verse igual que
+ * "esta venta no tiene líneas". */
+export async function lineasDeVentaAction(
+  ventaId: string,
+): Promise<{ lineas: LineaVenta[]; error: string }> {
   try {
-    return await apiFetch<LineaVenta[]>(`/api/v1/sales/ventas/${ventaId}/items`, {
-      token: await token(),
-    });
-  } catch {
-    return [];
+    const lineas = await apiFetch<LineaVenta[]>(
+      `/api/v1/sales/ventas/${ventaId}/items`,
+      { token: await token() },
+    );
+    return { lineas, error: "" };
+  } catch (e) {
+    return { lineas: [], error: mensajeDe(e, "No se pudieron traer las líneas.") };
   }
 }
 

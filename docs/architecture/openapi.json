@@ -52820,6 +52820,13 @@
             "schema": {
               "anyOf": [
                 {
+                  "enum": [
+                    "orden",
+                    "pagada",
+                    "facturada",
+                    "anulada",
+                    "cerrada"
+                  ],
                   "type": "string"
                 },
                 {

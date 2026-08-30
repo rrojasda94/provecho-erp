@@ -18,8 +18,14 @@ Venta — `cliente`, `punto_venta`, `producto_comercial`, `venta`,
 `venta_item` (`src/modules/sales/infrastructure/models/`). `venta_item`
 guarda su propio `precio_unitario` (snapshot), por eso no depende de
 `lista_precio`/`precio` para existir. `venta.estado` implementado con el
-enum vigente (`orden`|`pagada`|`facturada`|`anulada`, RN-COM-005) — no
-el enum viejo de 8 estados. `venta.numero_orden` (RN-COM-014) es el
+enum vigente (RN-COM-005) — no el enum viejo de 8 estados. Sus cinco
+valores viven en **un solo lugar**, `rules.ESTADOS_VENTA`
+(`orden`|`pagada`|`facturada`|`anulada`|`cerrada`): de ahí salen el `Enum`
+de la columna, el `Literal` que valida `GET /ventas?estado=` y —vía el test
+de coherencia de `tests/test_repo_coherencia.py`— el desplegable de la
+pantalla de jornada. Estaban escritos por separado y derivaron: el frontend
+ofrecía un `entregada` que no existe y escondía `facturada`.
+`venta.numero_orden` (RN-COM-014) es el
 correlativo por sucursal+día que ve el personal; `cliente.usuario_id`
 (RN-COM-015) es la cuenta web opcional, nunca requerida en sucursal/
 Central de Pedidos.
@@ -390,7 +396,7 @@ cobrar; se administran en Catálogo → Medios de pago). Capas
 | Método | Ruta | Permiso |
 |--------|------|---------|
 | POST | `/ventas` | `sales.crear` |
-| GET | `/ventas?sucursal_id=&desde=&hasta=&estado=&punto_venta_id=` | `sales.leer` |
+| GET | `/ventas?sucursal_id=&desde=&hasta=&estado=&punto_venta_id=` (`estado` validado contra `ESTADOS_VENTA`: uno inexistente da 422, no una lista vacía) | `sales.leer` |
 | GET | `/ventas/{id}` | `sales.leer` |
 | POST | `/ventas/{id}/pagos` | `sales.cobrar` |
 | POST | `/ventas/{id}/anular` | `sales.anular` |
