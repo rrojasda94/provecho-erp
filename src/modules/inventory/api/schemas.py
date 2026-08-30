@@ -7,27 +7,71 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # --- Categorías ---
 # `empresa_id` sale del JWT (ADR-004). Solo un superusuario sin empresa
 # asignada puede indicarla; a cualquier otro usuario, una empresa distinta
 # a la suya le responde 403.
+#: Un código del PCGE tal como se teclea: solo dígitos, del rubro de dos a la
+#: divisionaria más larga.
+_CODIGO_CUENTA = r"^\d{2,20}$"
+
+
+class AsientoContableConfig(BaseModel):
+    """Qué cuenta del PCGE usa cada rol contable de esta categoría (ADR-086).
+
+    Se guarda el **código** y no el id de la cuenta. El código es el del PCGE:
+    el mismo en toda empresa del grupo, legible en un backup y el que el
+    contador reconoce; el id es de una fila concreta, y el hub replica este
+    campo entre empresas (`application/sincronizacion.py`), donde un id ajeno
+    sería basura. Además, el fallback de la plantilla ya es un código: con id
+    habría dos caminos de resolución para lo mismo.
+
+    `extra="forbid"`: un rol mal escrito no puede quedar guardado diciendo
+    nada. El asiento lo ignoraría en silencio y el error aparecería recién al
+    cerrar el mes.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    # Elemento 6: qué se compró.
+    compra: str | None = Field(default=None, pattern=_CODIGO_CUENTA)
+    # Elemento 2 y su variación: a dónde entra lo comprado.
+    existencia: str | None = Field(default=None, pattern=_CODIGO_CUENTA)
+    variacion_existencia: str | None = Field(default=None, pattern=_CODIGO_CUENTA)
+    # Sustituye a `compra` cuando el artículo es un servicio, y en ese caso el
+    # bloque de destino no se escribe: un flete no entra a ningún almacén.
+    servicio: str | None = Field(default=None, pattern=_CODIGO_CUENTA)
+    # Elemento 7: contra qué cuenta de venta se acredita.
+    ingreso: str | None = Field(default=None, pattern=_CODIGO_CUENTA)
+    merma: str | None = Field(default=None, pattern=_CODIGO_CUENTA)
+    consumo_personal: str | None = Field(default=None, pattern=_CODIGO_CUENTA)
+
+
 class CategoriaCreate(BaseModel):
     empresa_id: uuid.UUID | None = None
     nombre: str = Field(min_length=1, max_length=100)
-    asiento_contable_config: dict | None = None
+    asiento_contable_config: AsientoContableConfig | None = None
     # Cada cuánto se cuenta esta categoría (RN-INV-007). NULL = fuera del
     # conteo cíclico.
     frecuencia_conteo: str | None = None
+    # Categoría madre. El caso de uso ya la aceptaba y el router no se la
+    # pasaba, así que la jerarquía solo se podía armar por la base.
+    padre_id: uuid.UUID | None = None
 
 
 class CategoriaUpdate(BaseModel):
     nombre: str | None = Field(default=None, min_length=1, max_length=100)
-    asiento_contable_config: dict | None = None
+    # Se manda **entero**: los roles que no vengan quedan sin configurar y
+    # vuelven a heredar de la madre; `{}` limpia el mapa. No hace falta el
+    # centinela que sí necesita la frecuencia, porque un diccionario tiene una
+    # representación propia de "vacío" que un escalar no tiene.
+    asiento_contable_config: AsientoContableConfig | None = None
     frecuencia_conteo: str | None = None
     # Único modo de volver a NULL: sin esto, `frecuencia_conteo=None` es
     # indistinguible de "no la mandaron".
     quitar_frecuencia: bool = False
+    padre_id: uuid.UUID | None = None
+    quitar_padre: bool = False
 
 
 class CategoriaOut(BaseModel):
@@ -36,6 +80,11 @@ class CategoriaOut(BaseModel):
     empresa_id: uuid.UUID
     nombre: str
     frecuencia_conteo: str | None
+    # Los dos viajaban solo hacia adentro: `asiento_contable_config` se podía
+    # escribir y no leer —un campo de solo escritura, que ninguna pantalla
+    # podía mostrar— y `padre_id` no salía, así que el árbol no se veía.
+    padre_id: uuid.UUID | None = None
+    asiento_contable_config: dict | None = None
 
 
 # --- Unidades de medida ---

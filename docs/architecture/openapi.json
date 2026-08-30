@@ -2077,6 +2077,98 @@
         "title": "ArticuloUpdate",
         "type": "object"
       },
+      "AsientoContableConfig": {
+        "additionalProperties": false,
+        "description": "Qué cuenta del PCGE usa cada rol contable de esta categoría (ADR-086).\n\nSe guarda el **código** y no el id de la cuenta. El código es el del PCGE:\nel mismo en toda empresa del grupo, legible en un backup y el que el\ncontador reconoce; el id es de una fila concreta, y el hub replica este\ncampo entre empresas (`application/sincronizacion.py`), donde un id ajeno\nsería basura. Además, el fallback de la plantilla ya es un código: con id\nhabría dos caminos de resolución para lo mismo.\n\n`extra=\"forbid\"`: un rol mal escrito no puede quedar guardado diciendo\nnada. El asiento lo ignoraría en silencio y el error aparecería recién al\ncerrar el mes.",
+        "properties": {
+          "compra": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compra"
+          },
+          "consumo_personal": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumo Personal"
+          },
+          "existencia": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Existencia"
+          },
+          "ingreso": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ingreso"
+          },
+          "merma": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merma"
+          },
+          "servicio": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Servicio"
+          },
+          "variacion_existencia": {
+            "anyOf": [
+              {
+                "pattern": "^\\d{2,20}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variacion Existencia"
+          }
+        },
+        "title": "AsientoContableConfig",
+        "type": "object"
+      },
       "AsientoLineaIn": {
         "properties": {
           "cuenta_contable_id": {
@@ -3745,14 +3837,12 @@
           "asiento_contable_config": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AsientoContableConfig"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Asiento Contable Config"
+            ]
           },
           "empresa_id": {
             "anyOf": [
@@ -3782,6 +3872,18 @@
             "minLength": 1,
             "title": "Nombre",
             "type": "string"
+          },
+          "padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Padre Id"
           }
         },
         "required": [
@@ -3792,6 +3894,18 @@
       },
       "CategoriaOut": {
         "properties": {
+          "asiento_contable_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asiento Contable Config"
+          },
           "empresa_id": {
             "format": "uuid",
             "title": "Empresa Id",
@@ -3816,6 +3930,18 @@
           "nombre": {
             "title": "Nombre",
             "type": "string"
+          },
+          "padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Padre Id"
           }
         },
         "required": [
@@ -3879,14 +4005,12 @@
           "asiento_contable_config": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/AsientoContableConfig"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Asiento Contable Config"
+            ]
           },
           "frecuencia_conteo": {
             "anyOf": [
@@ -3912,9 +4036,26 @@
             ],
             "title": "Nombre"
           },
+          "padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Padre Id"
+          },
           "quitar_frecuencia": {
             "default": false,
             "title": "Quitar Frecuencia",
+            "type": "boolean"
+          },
+          "quitar_padre": {
+            "default": false,
+            "title": "Quitar Padre",
             "type": "boolean"
           }
         },
@@ -34934,7 +35075,7 @@
         ]
       },
       "patch": {
-        "description": "Acá se configura cada cuánto se cuenta la categoría (RN-INV-007).",
+        "description": "Acá se configura cada cuánto se cuenta la categoría (RN-INV-007) y a\nqué cuentas del PCGE se imputa lo que agrupa (ADR-086).",
         "operationId": "editar_categoria_api_v1_inventory_categorias__categoria_id__patch",
         "parameters": [
           {

@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import type { EstadoFormulario } from "@/components/formulario/dialogo-formulario";
 import { ApiError, apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { CLAVES_ROL } from "@/lib/roles-contables";
 
 export type EstadoCatalogo = EstadoFormulario;
 
@@ -30,6 +31,19 @@ function mensajeDe(e: unknown, porDefecto: string): string {
 
 // --- Categorías de artículo -------------------------------------------------
 
+/** El mapa de cuentas que arma el formulario (ADR-086).
+ *
+ * Un rol en blanco **se omite**, no viaja como `""`: ausente significa
+ * "hereda de la madre", y una cadena vacía sería un código inválido. El mapa
+ * se manda entero —también vacío— porque es así como se limpia. */
+function configContable(formData: FormData): Record<string, string> {
+  return Object.fromEntries(
+    CLAVES_ROL.map((rol) => [rol, texto(formData, `cuenta_${rol}`)]).filter(
+      ([, codigo]) => codigo,
+    ),
+  );
+}
+
 export async function crearCategoriaAction(
   _previo: EstadoCatalogo,
   formData: FormData,
@@ -44,6 +58,8 @@ export async function crearCategoriaAction(
       cuerpo: {
         nombre,
         frecuencia_conteo: texto(formData, "frecuencia_conteo") || undefined,
+        padre_id: texto(formData, "padre_id") || undefined,
+        asiento_contable_config: configContable(formData),
       },
     });
   } catch (e) {
@@ -68,6 +84,8 @@ export async function editarCategoriaAction(
 
   const frecuencia = texto(formData, "frecuencia_conteo");
 
+  const madre = texto(formData, "padre_id");
+
   try {
     await apiFetch(`/api/v1/inventory/categorias/${id}`, {
       token: await token(),
@@ -76,6 +94,11 @@ export async function editarCategoriaAction(
         nombre,
         frecuencia_conteo: frecuencia || undefined,
         quitar_frecuencia: frecuencia === "",
+        padre_id: madre || undefined,
+        quitar_padre: madre === "",
+        // Entero: los roles que el formulario dejó en blanco no viajan, así
+        // que quedan sin configurar y vuelven a heredar de la madre.
+        asiento_contable_config: configContable(formData),
       },
     });
   } catch (e) {

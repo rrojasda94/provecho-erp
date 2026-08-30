@@ -17,6 +17,7 @@ from src.modules.inventory.application import recetas as recetas_uc
 from src.modules.inventory.domain import rules
 from src.modules.inventory.infrastructure.models import (
     Articulo,
+    Categoria,
     IncidenciaInventario,
     MovimientoInventario,
     Receta,
@@ -492,3 +493,105 @@ def salidas_sin_lote(
         }
         for fila in session.execute(stmt)
     ]
+
+
+#: Tope de la caminata hacia la raíz al resolver la herencia. Es el mismo de
+#: `catalogo.PROFUNDIDAD_MAXIMA_CATEGORIA`, duplicado a propósito: importarlo
+#: desde acá ataría el contrato público a un módulo de aplicación interno, y
+#: lo que este número protege es distinto — que un ciclo escrito a mano en la
+#: base no cuelgue un asiento.
+_PROFUNDIDAD_HERENCIA = 6
+
+
+def config_contable_de_categorias(
+    session: Session,
+    empresa_id: uuid.UUID,
+    categoria_ids: Sequence[uuid.UUID],
+) -> dict[uuid.UUID, dict[str, str]]:
+    """Config contable **efectiva** de cada categoría: la suya, completada rol
+    por rol con la de sus ancestros (ADR-086).
+
+    El árbol es de este módulo —`categoria.padre_id`, su guard de ciclos y su
+    profundidad máxima viven en `application/catalogo.py`—, así que la
+    herencia se resuelve acá y no en `accounting`. Que contabilidad caminara
+    ese árbol sería reimplementar la regla de otro módulo.
+
+    Una sola consulta: se traen todas las categorías de la empresa —son
+    decenas— y el recorrido se hace en memoria. Resolver de a una era un
+    SELECT por ancestro y por línea del evento, y una venta de diez líneas
+    paga eso diez veces.
+
+    El recorrido lleva tope de profundidad y conjunto de visitados: la capa de
+    aplicación impide crear un ciclo, pero una fila tocada a mano no puede
+    colgar el asiento de una venta.
+    """
+    pedidas = {i for i in categoria_ids if i is not None}
+    if not pedidas:
+        return {}
+    arbol = {
+        fila.id: (fila.padre_id, fila.asiento_contable_config or {})
+        for fila in session.scalars(
+            select(Categoria).where(
+                Categoria.empresa_id == empresa_id, Categoria.deleted_at.is_(None)
+            )
+        )
+    }
+    resuelto: dict[uuid.UUID, dict[str, str]] = {}
+    for categoria_id in pedidas:
+        efectiva: dict[str, str] = {}
+        visitados: set[uuid.UUID] = set()
+        actual = categoria_id
+        for _ in range(_PROFUNDIDAD_HERENCIA):
+            if actual is None or actual in visitados or actual not in arbol:
+                break
+            visitados.add(actual)
+            padre_id, config = arbol[actual]
+            # `setdefault`: gana el más cercano. Se recorre de la hija hacia
+            # la raíz, así que el primero que aparece es el que manda.
+            for rol, codigo in config.items():
+                if codigo:
+                    efectiva.setdefault(rol, codigo)
+            actual = padre_id
+        resuelto[categoria_id] = efectiva
+    return resuelto
+
+
+def clasificacion_de_articulos(
+    session: Session, articulo_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, dict]:
+    """`articulo_id` → `{empresa_id, categoria_id, tipo, es_servicio}`.
+
+    Los cuatro juntos y no en tres funciones: quien pregunta por la categoría
+    de un artículo para contabilizarlo necesita también saber si es un
+    servicio —no lleva existencias, así que su asiento no escribe el bloque de
+    destino—, y separarlo serían dos viajes para responder una sola pregunta.
+    """
+    ids = {i for i in articulo_ids if i is not None}
+    if not ids:
+        return {}
+    return {
+        art.id: {
+            "empresa_id": art.empresa_id,
+            "categoria_id": art.categoria_id,
+            "tipo": art.tipo,
+            "es_servicio": art.tipo == rules.TIPO_SERVICIO,
+        }
+        for art in session.scalars(select(Articulo).where(Articulo.id.in_(ids)))
+    }
+
+
+def categoria_de_skus(
+    session: Session, sku_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, uuid.UUID | None]:
+    """`sku_id` → `categoria_id` de su artículo. Para los eventos que viajan
+    por SKU (la merma) y no por artículo."""
+    ids = {i for i in sku_ids if i is not None}
+    if not ids:
+        return {}
+    filas = session.execute(
+        select(Sku.id, Articulo.categoria_id)
+        .join(Articulo, Articulo.id == Sku.articulo_id)
+        .where(Sku.id.in_(ids))
+    ).all()
+    return dict(filas)
+

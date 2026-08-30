@@ -3,6 +3,25 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-30 **La cuenta contable se configura en la categoría y se hereda**
+  (ADR-086, sin migración): las líneas de plantilla llevan rol, el asiento
+  reparte el monto del evento por categoría y `articulo.tipo="servicio"` manda
+  su parte a la 63x sin tocar existencias. `categoria.asiento_contable_config`
+  deja de ser un campo de solo escritura.
+  Lo que deja abierto:
+  - ⬜ **`consumo_personal_valorizado` y `transferencia_recibida` no se
+    reparten**: sus payloads llevan un `monto` agregado y ningún detalle, y
+    sumárselo es cambiar el publicador dentro de `_mover`.
+  - ⬜ **El rol `costo_venta` no existe todavía**: ningún evento asienta contra
+    la 69 (ver más abajo, hace falta un consumo valorizado por venta), así que
+    sería configuración muda. El día que ese evento exista, el rol se suma al
+    catálogo y al formulario sin tocar el reparto.
+  - ⬜ **La validación al guardar no comprueba «último nivel» al asentar**: si
+    una cuenta gana hijas después de configurarse, el asiento se imputa igual
+    en el rubro. `crear_asiento_automatico_multilinea` no hace esa comprobación
+    (solo la hace el asiento manual); el filtro de lectura solo descarta lo que
+    no existe o está inactivo.
+
 - ✅ 2026-07-25 **Pago a proveedor (PROC-CTB-003)**: migración `cbf904a9fc1b`
   (`movimiento_dinero`). `purchases.comprobante_conforme` encola
   (`registrar_pago`, idempotente por `comprobante_id` RN-CTB-008);

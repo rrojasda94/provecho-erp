@@ -9,10 +9,14 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.modules.accounting.domain import plantillas
+from src.modules.accounting.infrastructure.models import CuentaContable
 from src.modules.accounting.infrastructure.repositories import (
     AperturaCajaRepo,
+    CuentaContableRepo,
     MovimientoCajaRepo,
 )
 from src.modules.sales.application.queries_publicas import (
@@ -119,3 +123,87 @@ def estado_de_caja(
         )
     filas.sort(key=lambda f: f["horas_abierta"], reverse=True)
     return filas
+
+
+def roles_contables() -> tuple[str, ...]:
+    """Los roles que una categoría puede mapear a una cuenta (ADR-086).
+
+    Vive acá porque el vocabulario es de contabilidad —qué papel juega una
+    cuenta en un asiento— y lo consume `inventory`, que es donde la
+    configuración se escribe. Que las dos listas no se separen lo fija un
+    caso en `tests/test_contabilidad_por_categoria.py`.
+    """
+    return plantillas.ROLES
+
+
+def problemas_de_config_contable(
+    session: Session, empresa_id: uuid.UUID, config: dict[str, str] | None
+) -> list[str]:
+    """Qué está mal en el mapa de cuentas de una categoría, en castellano.
+
+    Devuelve **mensajes** y no levanta: quien llama es `inventory`, y una
+    excepción de `accounting` cruzando la frontera del módulo no la atrapa su
+    manejador de errores — saldría como 500 en vez del 409 que corresponde.
+
+    Comprueba las tres reglas que `_construir_lineas` ya impone al armar un
+    asiento, adelantadas al momento de configurar: la cuenta existe **en esta
+    empresa** (el PCGE se siembra por empresa), está activa, y es de último
+    nivel. Imputar en el rubro que agrupa deja el mayor sin decir de qué se
+    trata, y el rubro con movimiento propio además del de sus divisionarias.
+
+    Dos consultas para todo el mapa, no dos por rol.
+    """
+    if not config:
+        return []
+    codigos = sorted({codigo for codigo in config.values() if codigo})
+    if not codigos:
+        return []
+
+    repo = CuentaContableRepo(session)
+    cuentas = repo.get_by_codigos(empresa_id, codigos)
+    # Un solo viaje para saber cuáles agrupan a otras: `tiene_hijas` por
+    # código serían N consultas para un formulario de siete campos.
+    con_hijas = {
+        padre_id
+        for padre_id in session.scalars(
+            select(CuentaContable.cuenta_padre_id).where(
+                CuentaContable.empresa_id == empresa_id,
+                CuentaContable.cuenta_padre_id.is_not(None),
+                CuentaContable.deleted_at.is_(None),
+            )
+        ).all()
+    }
+
+    problemas = []
+    for rol, codigo in sorted(config.items()):
+        if not codigo:
+            continue
+        cuenta = cuentas.get(codigo)
+        if cuenta is None:
+            problemas.append(f"{rol}: la cuenta {codigo} no existe en el plan de la empresa")
+        elif not cuenta.activa:
+            problemas.append(f"{rol}: la cuenta {codigo} está inactiva")
+        elif cuenta.id in con_hijas:
+            problemas.append(
+                f"{rol}: la cuenta {codigo} agrupa a otras; el asiento se "
+                "imputa en una de último nivel"
+            )
+    return problemas
+
+
+def cuentas_por_codigo(
+    session: Session, empresa_id: uuid.UUID, codigos: list[str]
+) -> dict[str, uuid.UUID]:
+    """`codigo` → `cuenta_contable.id`, para los códigos que existan y estén
+    activos. Los que no, simplemente no aparecen: quien llama decide si eso
+    es un error o un motivo para caer al default."""
+    if not codigos:
+        return {}
+    return {
+        codigo: cuenta.id
+        for codigo, cuenta in CuentaContableRepo(session)
+        .get_by_codigos(empresa_id, codigos)
+        .items()
+        if cuenta.activa
+    }
+

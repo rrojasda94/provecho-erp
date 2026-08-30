@@ -130,9 +130,15 @@ erDiagram
   kilometraje, tenencia (`propio` | `alquilado`), responsable_id
   (trabajador, RN-VEH-002), gps_equipado (bool), camara_equipada (bool),
   licenciado_a_trabajador_id (nullable — beneficio laboral, RN-VEH-003).
-- **categoria**: empresa_id, nombre, asiento_contable_config (JSONB —
-  cuenta contable por tipo de movimiento: compra, consumo, merma, etc.;
-  opcional), frecuencia_conteo (`diario` | `semanal` | `quincenal` |
+- **categoria**: empresa_id, nombre, padre_id (jerarquía; NULL = raíz),
+  asiento_contable_config (JSONB — **rol contable → código del PCGE**, con los
+  siete roles de `accounting.domain.plantillas.ROLES`: `compra`,
+  `existencia`, `variacion_existencia`, `servicio`, `ingreso`, `merma`,
+  `consumo_personal`; ADR-086. Se guarda el **código** y no el id de la
+  cuenta: el código es el mismo en toda empresa del grupo —el hub replica
+  este campo— y el id es de una fila. Lo que no configura se hereda de la
+  categoría madre, rol por rol, y sin ancestro cae en el código de fábrica de
+  la plantilla), frecuencia_conteo (`diario` | `semanal` | `quincenal` |
   `mensual` | `semestral` | `anual`; nullable). Se asigna a `articulo` o
   `activo` (ambos con categoria_id opcional); libremente
   editable/eliminable, a diferencia del SKU.

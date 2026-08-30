@@ -3,6 +3,7 @@ RN-CTB-001 cuadre) y automático (generado por `application/listeners.py` desde
 un evento operativo mapeado en `regla_asiento`). Anular NUNCA borra/edita —
 crea el asiento inverso en el periodo abierto vigente (RN-CTB-002)."""
 
+import logging
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -20,8 +21,13 @@ from src.modules.accounting.infrastructure.repositories import (
     CuentaContableRepo,
     ReglaAsientoRepo,
 )
+from src.modules.inventory.application.queries_publicas import (
+    config_contable_de_categorias,
+)
 from src.modules.users.infrastructure.models import Empresa
 from src.shared import fechas, tributos
+
+log = logging.getLogger(__name__)
 
 
 def _construir_lineas(
@@ -282,6 +288,147 @@ def crear_asiento_automatico_multilinea(
     return asiento
 
 
+def _config_utilizable(
+    session: Session,
+    empresa_id: uuid.UUID,
+    config: dict[uuid.UUID, dict[str, str]],
+) -> dict[uuid.UUID, dict[str, str]]:
+    """Saca del mapa las cuentas que ya no sirven, y lo deja anotado.
+
+    La validación al guardar (`inventory.catalogo`) es la primera barrera;
+    esta es la segunda, para lo que cambió después: una cuenta desactivada o
+    borrada del plan. Cae al código de fábrica de la línea en vez de dejar a
+    la empresa sin poder comprar — que es el mismo criterio no bloqueante con
+    el que este módulo trata todo lo demás.
+
+    Una consulta para todos los códigos de todas las categorías del evento.
+    """
+    codigos = sorted({c for mapa in config.values() for c in mapa.values() if c})
+    if not codigos:
+        return config
+    validas = {
+        codigo
+        for codigo, cuenta in CuentaContableRepo(session)
+        .get_by_codigos(empresa_id, codigos)
+        .items()
+        if cuenta.activa
+    }
+    descartadas = set(codigos) - validas
+    if descartadas:
+        log.warning(
+            "cuentas configuradas en categorías que no existen o están "
+            "inactivas en la empresa %s: %s — se usa el código de fábrica",
+            empresa_id,
+            ", ".join(sorted(descartadas)),
+        )
+    return {
+        categoria_id: {rol: c for rol, c in mapa.items() if c in validas}
+        for categoria_id, mapa in config.items()
+    }
+
+
+def _grupos_del_desglose(desglose: list[dict] | None) -> list[dict]:
+    """Agrupa el desglose por `(categoria_id, es_servicio)` sumando montos.
+
+    Dos líneas de la misma categoría producen **una** parte, no dos: el
+    asiento habla de cuentas, no de líneas del documento.
+    """
+    if not desglose:
+        return []
+    sumado: dict[tuple, Decimal] = {}
+    for entrada in desglose:
+        monto = Decimal(str(entrada.get("monto") or 0))
+        if monto <= 0:
+            continue
+        clave = (entrada.get("categoria_id"), bool(entrada.get("es_servicio")))
+        sumado[clave] = sumado.get(clave, Decimal(0)) + monto
+    return [
+        {"categoria_id": categoria_id, "es_servicio": es_servicio, "monto": monto}
+        for (categoria_id, es_servicio), monto in sumado.items()
+    ]
+
+
+def _codigo_del_rol(
+    linea: plantillas_pcge.LineaPlantilla, grupo: dict, config: dict[str, str]
+) -> str | None:
+    """Qué cuenta usa esta línea para este grupo. `None` = la línea no se
+    escribe para él.
+
+    Un servicio no entra a ningún almacén: su parte omite el bloque de
+    destino (`existencia` y `variacion_existencia`) y manda su compra a la
+    63x. El asiento sigue cuadrando porque ese bloque es un débito y un
+    crédito **del mismo importe**: quitarlos juntos no mueve la balanza.
+    """
+    rol = linea.rol
+    if grupo["es_servicio"]:
+        if rol in ("existencia", "variacion_existencia"):
+            return None
+        if rol == "compra":
+            return config.get("servicio") or plantillas_pcge.CODIGO_SERVICIO_DE_FABRICA
+    return config.get(rol) or linea.codigo
+
+
+def _repartir_por_categoria(
+    session: Session,
+    empresa_id: uuid.UUID,
+    plantilla: plantillas_pcge.Plantilla,
+    importes: dict[str, Decimal],
+    desglose: list[dict] | None,
+) -> dict[tuple[str, str], Decimal]:
+    """`(codigo, debe|haber)` → importe, ya repartido por categoría.
+
+    Sin desglose útil —o si ninguna categoría configuró nada— devuelve
+    exactamente lo que la plantilla dice, que es el comportamiento anterior a
+    ADR-086. Esa ruta de escape es lo que hace el cambio retrocompatible.
+
+    Dos categorías que resuelven al mismo código producen **una** línea: el
+    mayor no gana nada con la misma cuenta escrita dos veces.
+    """
+    grupos = _grupos_del_desglose(desglose)
+    config = (
+        _config_utilizable(
+            session,
+            empresa_id,
+            config_contable_de_categorias(
+                session, empresa_id, [g["categoria_id"] for g in grupos]
+            ),
+        )
+        if grupos
+        else {}
+    )
+    hay_algo_que_repartir = any(linea.rol for linea in plantilla.lineas) and (
+        any(config.get(g["categoria_id"]) for g in grupos)
+        or any(g["es_servicio"] for g in grupos)
+    )
+
+    por_codigo: dict[tuple[str, str], Decimal] = {}
+
+    def sumar(codigo: str, tipo: str, importe: Decimal) -> None:
+        clave = (codigo, tipo)
+        por_codigo[clave] = por_codigo.get(clave, Decimal(0)) + importe
+
+    if not hay_algo_que_repartir:
+        for linea in plantilla.lineas:
+            sumar(linea.codigo, linea.tipo, importes[linea.importe])
+        return por_codigo
+
+    pesos = [g["monto"] for g in grupos]
+    for linea in plantilla.lineas:
+        importe = importes[linea.importe]
+        if linea.rol is None or importe <= 0:
+            sumar(linea.codigo, linea.tipo, importe)
+            continue
+        partes = plantillas_pcge.reparto_proporcional(importe, pesos)
+        # El bloque de destino de un grupo de servicio no se escribe, así que
+        # su parte se descarta junto con la del par: `existencia` y
+        # `variacion_existencia` son el mismo importe de los dos lados.
+        for grupo, parte in zip(grupos, partes, strict=True):
+            codigo = _codigo_del_rol(linea, grupo, config.get(grupo["categoria_id"], {}))
+            if codigo is not None:
+                sumar(codigo, linea.tipo, parte)
+    return por_codigo
+
+
 def crear_asiento_desde_plantilla(
     session: Session,
     *,
@@ -292,6 +439,7 @@ def crear_asiento_desde_plantilla(
     referencia_origen: str,
     monto: Decimal,
     gravado_igv: bool | None = None,
+    desglose: list[dict] | None = None,
 ) -> Asiento | None:
     """Asiento del PCGE para el evento, si hay plantilla y la empresa tiene
     las cuentas.
@@ -299,6 +447,12 @@ def crear_asiento_desde_plantilla(
     `gravado_igv` es la casilla del comprobante: `None` deja decidir al
     default de la empresa (`shared.tributos`). Solo llega en los eventos de
     comprobante — el resto no lo conoce, y por eso su asiento no lleva IGV.
+
+    `desglose` es `[{categoria_id, monto, es_servicio}]` — de qué se compone
+    el monto del evento (ADR-086). Se usa como **peso, nunca como importe**:
+    el asiento siempre suma `monto`, aunque el desglose venga incompleto, con
+    una categoría sin resolver o desactualizado. Sin desglose el asiento es
+    exactamente el de siempre, byte por byte.
 
     `None` —no error— cuando el evento no tiene plantilla o cuando falta
     alguna de sus cuentas: una empresa que todavía no importó el PCGE no
@@ -313,7 +467,12 @@ def crear_asiento_desde_plantilla(
     importes = plantillas_pcge.desagregar(
         monto, tributos.tasa_igv(empresa, gravado_igv), plantilla.monto_es
     )
-    codigos = [linea.codigo for linea in plantilla.lineas]
+    por_codigo = _repartir_por_categoria(
+        session, empresa_id, plantilla, importes, desglose
+    )
+    # Las claves son `(codigo, debe|haber)`: la misma cuenta puede caer de
+    # los dos lados, y al plan de cuentas se le pregunta por código.
+    codigos = sorted({codigo for codigo, _ in por_codigo})
     cuentas = CuentaContableRepo(session).get_by_codigos(empresa_id, codigos)
     if any(codigo not in cuentas for codigo in codigos):
         return None
@@ -321,9 +480,9 @@ def crear_asiento_desde_plantilla(
     # Una línea en cero no se escribe: con IGV exonerado, el asiento de venta
     # es de dos líneas y no de tres con una que dice 0.00.
     lineas = [
-        (cuentas[linea.codigo].id, linea.tipo, importes[linea.importe])
-        for linea in plantilla.lineas
-        if importes[linea.importe] > 0
+        (cuentas[codigo].id, tipo, importe)
+        for (codigo, tipo), importe in sorted(por_codigo.items())
+        if importe > 0
     ]
     if len(lineas) < 2:
         return None
@@ -348,6 +507,7 @@ def crear_asiento_automatico_si_hay_regla(
     referencia_origen: str,
     monto: Decimal,
     gravado_igv: bool | None = None,
+    desglose: list[dict] | None = None,
 ) -> Asiento | None:
     """Genera el asiento del evento. Dos fuentes, en este orden:
 
@@ -359,6 +519,10 @@ def crear_asiento_automatico_si_hay_regla(
 
     `None` si no hay ninguna de las dos (se omite y se audita en el log del
     llamador) — mismo criterio no bloqueante de siempre.
+
+    `desglose` (ADR-086) **solo lo usa la plantilla**. La empresa que
+    configuró una `regla_asiento` pidió un asiento de dos líneas: repartirlas
+    por categoría sería pisarle la decisión que tomó a propósito.
     """
     regla = ReglaAsientoRepo(session).get_vigente(empresa_id, evento)
     if regla is None:
@@ -371,6 +535,7 @@ def crear_asiento_automatico_si_hay_regla(
             referencia_origen=referencia_origen,
             monto=monto,
             gravado_igv=gravado_igv,
+            desglose=desglose,
         )
     return crear_asiento_automatico(
         session,

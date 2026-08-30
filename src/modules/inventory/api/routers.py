@@ -97,8 +97,15 @@ def crear_categoria(
         session,
         empresa_id=tenant.empresa(body.empresa_id),
         nombre=body.nombre,
-        asiento_contable_config=body.asiento_contable_config,
+        # `exclude_none`: los roles que no se configuraron no se guardan como
+        # `null`, se **ausentan**, que es lo que los hace heredar de la madre.
+        asiento_contable_config=(
+            body.asiento_contable_config.model_dump(exclude_none=True)
+            if body.asiento_contable_config is not None
+            else None
+        ),
         frecuencia_conteo=body.frecuencia_conteo,
+        padre_id=body.padre_id,
     )
     session.commit()
     return cat
@@ -112,9 +119,15 @@ def editar_categoria(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    """Acá se configura cada cuánto se cuenta la categoría (RN-INV-007)."""
+    """Acá se configura cada cuánto se cuenta la categoría (RN-INV-007) y a
+    qué cuentas del PCGE se imputa lo que agrupa (ADR-086)."""
     exigir_categoria(session, categoria_id, tenant)
-    cat = catalogo.editar_categoria(session, categoria_id, **body.model_dump())
+    campos = body.model_dump()
+    if body.asiento_contable_config is not None:
+        campos["asiento_contable_config"] = body.asiento_contable_config.model_dump(
+            exclude_none=True
+        )
+    cat = catalogo.editar_categoria(session, categoria_id, **campos)
     session.commit()
     return cat
 

@@ -93,6 +93,27 @@ def _empresa_de_almacen(session: Session, almacen_id: uuid.UUID) -> uuid.UUID | 
     return session.scalar(select(Almacen.empresa_id).where(Almacen.id == almacen_id))
 
 
+def _articulos_de_servicio(session: Session, ids) -> set[uuid.UUID]:
+    """Cuáles de esos artículos son servicios (`articulo.tipo`, ADR-086).
+
+    El discriminador es el tipo del artículo y no el rol contable de su
+    categoría: es el mismo hecho que decide si la cosa mueve stock, y mover
+    stock no puede depender de cómo esté configurada la contabilidad. Con el
+    rol como discriminador, alguien que limpiara un campo del formulario de
+    categorías empezaría a crear movimientos de un servicio.
+    """
+    uuids = {uuid.UUID(i) if isinstance(i, str) else i for i in ids if i}
+    if not uuids:
+        return set()
+    return set(
+        session.scalars(
+            select(Articulo.id).where(
+                Articulo.id.in_(uuids), Articulo.tipo == rules.TIPO_SERVICIO
+            )
+        )
+    )
+
+
 def _sku_de_articulo(session: Session, articulo_id: uuid.UUID) -> uuid.UUID | None:
     # ponytail: SKU activo de mayor prioridad; elección por lote llega con FEFO.
     return session.scalar(
@@ -445,8 +466,20 @@ def on_compra_recibida(payload: dict) -> None:
         with session_factory() as session:
             almacen_id = uuid.UUID(payload["almacen_destino_id"])
             empresa_id = _empresa_de_almacen(session, almacen_id)
+            # Los servicios se leen de una vez y no de a uno: una OC de
+            # servicios pagaría una consulta por línea para no hacer nada.
+            servicios = _articulos_de_servicio(
+                session, [it["articulo_id"] for it in payload["items"]]
+            )
             for it in payload["items"]:
                 articulo_id = uuid.UUID(it["articulo_id"])
+                # Un servicio comprado —la luz, un flete, un mantenimiento—
+                # no entra a ningún almacén: no tiene SKU porque no tiene
+                # existencias, no porque falte configurarlo. Sin esta línea,
+                # cada factura de luz dejaba una incidencia `sin_sku` que
+                # alguien tenía que revisar y descartar (ADR-086).
+                if articulo_id in servicios:
+                    continue
                 sku_id = _sku_de_articulo(session, articulo_id)
                 if sku_id is None:
                     _omitir(

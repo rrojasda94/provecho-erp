@@ -5,6 +5,9 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from src.modules.accounting.application.queries_publicas import (
+    problemas_de_config_contable,
+)
 from src.modules.inventory.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -43,6 +46,7 @@ def crear_categoria(
     padre_id: uuid.UUID | None = None,
 ) -> Categoria:
     _validar_frecuencia(frecuencia_conteo)
+    _validar_config_contable(session, empresa_id, asiento_contable_config)
     nombre = a_titulo(nombre)
     repo = CategoriaRepo(session)
     if repo.get_by_nombre(empresa_id, nombre):
@@ -92,6 +96,22 @@ def _validar_madre(
         )
 
 
+def _validar_config_contable(
+    session: Session, empresa_id: uuid.UUID, config: dict | None
+) -> None:
+    """Que cada cuenta configurada exista en el plan de ESTA empresa, esté
+    activa y sea de último nivel (ADR-086).
+
+    Las tres reglas son de `accounting` —son las mismas que `_construir_lineas`
+    impone al asentar—, así que las comprueba su contrato público y acá solo
+    se levanta. Adelantarlas al momento de configurar es la diferencia entre
+    un dedazo que se ve al guardar y uno que se descubre cerrando el mes.
+    """
+    problemas = problemas_de_config_contable(session, empresa_id, config)
+    if problemas:
+        raise ReglaNegocio("; ".join(problemas))
+
+
 def _validar_frecuencia(frecuencia: str | None) -> None:
     if frecuencia is not None and frecuencia not in rules.FRECUENCIAS_CONTEO:
         raise ReglaNegocio(f"frecuencia de conteo inválida: {frecuencia}")
@@ -105,18 +125,35 @@ def editar_categoria(
     asiento_contable_config: dict | None = None,
     frecuencia_conteo: str | None = None,
     quitar_frecuencia: bool = False,
+    padre_id: uuid.UUID | None = None,
+    quitar_padre: bool = False,
 ) -> Categoria:
     """`quitar_frecuencia` saca la categoría del conteo cíclico: sin ese
     flag explícito, `frecuencia_conteo=None` significa "no la toques" y no
-    habría forma de volver a NULL."""
+    habría forma de volver a NULL. `quitar_padre` es el mismo centinela para
+    la categoría madre.
+
+    `asiento_contable_config` **no lo necesita**: se manda entero, y un
+    diccionario sí tiene una representación propia de "vacío" (`{}`) que
+    `null` no tiene. Los roles que no vengan quedan sin configurar y vuelven
+    a heredar de la madre.
+    """
     _validar_frecuencia(frecuencia_conteo)
     categoria = CategoriaRepo(session).get(categoria_id)
     if categoria is None:
         raise NoEncontrado("categoría no encontrada")
+    _validar_config_contable(session, categoria.empresa_id, asiento_contable_config)
     if nombre is not None:
         categoria.nombre = a_titulo(nombre)
     if asiento_contable_config is not None:
         categoria.asiento_contable_config = asiento_contable_config
+    if quitar_padre:
+        categoria.padre_id = None
+    elif padre_id is not None:
+        if padre_id == categoria_id:
+            raise ReglaNegocio("una categoría no puede colgar de sí misma")
+        _validar_madre(session, categoria.empresa_id, padre_id)
+        categoria.padre_id = padre_id
     if quitar_frecuencia:
         categoria.frecuencia_conteo = None
     elif frecuencia_conteo is not None:
@@ -283,8 +320,15 @@ def crear_sku(
     codigo: str,
     codigo_barras: str | None = None,
 ) -> Sku:
-    if ArticuloRepo(session).get(articulo_id) is None:
+    articulo = ArticuloRepo(session).get(articulo_id)
+    if articulo is None:
         raise NoEncontrado("artículo no encontrado")
+    # Un servicio no tiene existencias, así que un SKU suyo sería una fila de
+    # stock que nada mueve — y el listener de compras lo saltea a propósito
+    # (ADR-086). Dejarlo crear serían dos verdades sobre si la cosa se
+    # inventaría.
+    if articulo.tipo == rules.TIPO_SERVICIO:
+        raise ReglaNegocio("un servicio no lleva SKU: no tiene existencias")
     repo = SkuRepo(session)
     if repo.get_by_codigo(codigo):
         raise Conflicto(f"código de SKU '{codigo}' ya existe")

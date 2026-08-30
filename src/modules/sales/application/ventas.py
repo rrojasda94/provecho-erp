@@ -129,6 +129,14 @@ def _armar_item(
         # Aditivo (ADR-056): un consumidor que lo ignore se comporta como
         # antes, igual que pasó con `sin_articulo_ids` en ADR-035.
         "valores_variante_ids": valores,
+        # Para el asiento por categoría (ADR-086). `accounting` resuelve la
+        # categoría del producto por contrato público, pero el importe de la
+        # línea **no lo puede recalcular**: sale de la lista de precios, de la
+        # promoción aplicada, del recargo de la variante y del descuento de la
+        # línea. Contabilizar un número distinto al que se cobró sería peor
+        # que no repartir.
+        "producto_comercial_id": str(prod.id),
+        "importe": str(cantidad * precio_unitario - fila.descuento),
     }
     return fila, detalle, prod
 

@@ -122,6 +122,39 @@ idempotente.
 duplicar la mitad-y-mitad daba 26 líneas sin condición, o sea una receta que
 descuenta todos los insumos de todas las mitades, siempre.
 
+## La categoría decide la cuenta contable (ADR-086, 2026-08-30)
+
+`categoria.asiento_contable_config` existía desde la primera migración y era
+**de solo escritura**: sin tipar, sin validar, `CategoriaOut` no lo devolvía y
+`accounting` nunca lo leyó. Ahora es un mapa **rol contable → código del
+PCGE** con los siete roles de `accounting.domain.plantillas.ROLES`, validado
+contra el plan de la empresa al guardar (la cuenta existe, está activa y es de
+último nivel — se pregunta por el contrato público de `accounting`).
+
+La configuración vive en la categoría y no en el artículo porque
+`articulo.categoria_id` y `producto_comercial.categoria_id` apuntan a la misma
+tabla: es el único agrupador que comparten lo que se compra y lo que se vende.
+Y se hereda por `padre_id`, rol por rol: «Gaseosas» debajo de «Bebidas» no
+configura nada. El resolutor es
+`queries_publicas.config_contable_de_categorias` — vive acá porque el árbol es
+de este módulo, y lo consume `accounting`.
+
+`padre_id` sale por fin en `CategoriaOut` y se puede editar por la pantalla:
+`crear_categoria` ya lo aceptaba y el router no se lo pasaba, así que la
+jerarquía solo existía si alguien tocaba la base.
+
+### `articulo.tipo = "servicio"`
+
+Lo que se compra y no entra a ningún almacén: la luz, un flete, un
+mantenimiento. Es un artículo para poder ponerlo en una línea de OC, pero **no
+lleva SKU** (`crear_sku` lo rechaza) y `on_compra_recibida` lo saltea sin
+escribir incidencia. Hasta hoy un artículo sin SKU dejaba una
+`incidencia_inventario` de tipo `sin_sku` por ítem y por compra, así que cada
+factura de luz generaba una falsa alarma que alguien tenía que descartar.
+
+Sin migración: `articulo.tipo` es `String(30)` con enum extensible a
+propósito.
+
 ## Casos de uso
 
 - CRUD de artículos y categorías.

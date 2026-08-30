@@ -29,6 +29,10 @@ from src.core.database import SessionLocal
 from src.core.events import event_bus
 from src.modules.accounting.application import asientos as asientos_uc
 from src.modules.accounting.application import pagos as pagos_uc
+from src.modules.inventory.application.queries_publicas import (
+    clasificacion_de_articulos,
+)
+from src.modules.sales.application.queries_publicas import categoria_de_productos
 from src.modules.users.infrastructure.models import Almacen, Sucursal
 from src.shared import fechas
 
@@ -49,7 +53,15 @@ def _empresa_de_sucursal(session, sucursal_id: str) -> uuid.UUID | None:
 
 
 def _generar(
-    session, *, empresa_id, evento, referencia_origen, monto, glosa, gravado_igv=None
+    session,
+    *,
+    empresa_id,
+    evento,
+    referencia_origen,
+    monto,
+    glosa,
+    gravado_igv=None,
+    desglose=None,
 ) -> None:
     asiento = asientos_uc.crear_asiento_automatico_si_hay_regla(
         session,
@@ -60,12 +72,69 @@ def _generar(
         referencia_origen=referencia_origen,
         monto=monto,
         gravado_igv=gravado_igv,
+        desglose=desglose,
     )
     if asiento is None:
         log.info(
             "evento %s: sin regla_asiento configurada para empresa %s, asiento omitido",
             evento, empresa_id,
         )
+
+
+def _desglose_de_compra(session, items: list[dict]) -> list[dict]:
+    """De qué se compone lo recibido, por categoría (ADR-086).
+
+    El payload de `purchases.compra_recibida` ya trae `articulo_id`,
+    `cantidad` y `costo_unitario` por ítem: no hizo falta cambiar el
+    publicador. Un ítem sin `articulo_id` —los hay en payloads viejos y en
+    algunos tests— viaja con categoría `None`, que resuelve al código de
+    fábrica; el asiento no se pierde por eso.
+    """
+    ids = [it["articulo_id"] for it in items if it.get("articulo_id")]
+    clasificacion = clasificacion_de_articulos(
+        session, [uuid.UUID(i) for i in ids]
+    )
+    desglose = []
+    for it in items:
+        articulo_id = it.get("articulo_id")
+        datos = clasificacion.get(uuid.UUID(articulo_id)) if articulo_id else None
+        desglose.append(
+            {
+                "categoria_id": (datos or {}).get("categoria_id"),
+                "es_servicio": bool((datos or {}).get("es_servicio")),
+                "monto": Decimal(it["cantidad"]) * Decimal(it["costo_unitario"]),
+            }
+        )
+    return desglose
+
+
+def _desglose_de_venta(session, items: list[dict]) -> list[dict]:
+    """De qué se compone la venta, por categoría del producto.
+
+    `producto_comercial_id` e `importe` viajan en el payload desde ADR-086:
+    el importe **no se puede recalcular acá** —sale de listas de precios,
+    promociones, recargos de variante y descuentos de línea— y contabilizar
+    un número distinto al que se cobró sería peor que no repartir.
+
+    Un payload sin esos campos (el replay de un hub viejo) devuelve lista
+    vacía y el asiento va entero a la cuenta de fábrica, como antes.
+    """
+    con_datos = [
+        it for it in items if it.get("producto_comercial_id") and it.get("importe")
+    ]
+    if not con_datos:
+        return []
+    categorias = categoria_de_productos(
+        session, [uuid.UUID(it["producto_comercial_id"]) for it in con_datos]
+    )
+    return [
+        {
+            "categoria_id": categorias.get(uuid.UUID(it["producto_comercial_id"])),
+            "es_servicio": False,
+            "monto": Decimal(str(it["importe"])),
+        }
+        for it in con_datos
+    ]
 
 
 def on_oc_emitida(payload: dict) -> None:
@@ -109,6 +178,7 @@ def on_compra_recibida(payload: dict) -> None:
                     referencia_origen=payload["orden_compra_id"],
                     monto=monto,
                     glosa=f"Recepción OC {payload['orden_compra_id']}",
+                    desglose=_desglose_de_compra(session, payload["items"]),
                 )
             session.commit()
     except Exception:
@@ -131,6 +201,7 @@ def on_venta_confirmada(payload: dict) -> None:
                     referencia_origen=payload["venta_id"],
                     monto=Decimal(payload["total"]),
                     glosa=f"Venta {payload['venta_id']}",
+                    desglose=_desglose_de_venta(session, payload.get("items") or []),
                 )
             session.commit()
     except Exception:
