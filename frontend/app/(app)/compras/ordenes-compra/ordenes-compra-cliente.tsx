@@ -84,8 +84,8 @@ function FilaItem({
       <input
         name="cantidad[]"
         type="number"
-        min="0.01"
-        step="0.01"
+        min="0.0001"
+        step="0.0001"
         placeholder="Cant."
         value={fila.cantidad}
         onChange={(e) => onCambiar("cantidad", e.target.value)}
@@ -95,7 +95,7 @@ function FilaItem({
         name="costo_unitario[]"
         type="number"
         min="0"
-        step="0.01"
+        step="0.0001"
         placeholder="Costo"
         value={fila.costoUnitario}
         onChange={(e) => onCambiar("costoUnitario", e.target.value)}

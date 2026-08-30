@@ -123,8 +123,8 @@ export function CompraDirectaCliente({
             <input
               name="cantidad[]"
               type="number"
-              min="0.01"
-              step="0.01"
+              min="0.0001"
+              step="0.0001"
               placeholder="Cant."
               value={fila.cantidad}
               onChange={(e) =>
@@ -138,7 +138,7 @@ export function CompraDirectaCliente({
               name="costo_unitario[]"
               type="number"
               min="0"
-              step="0.01"
+              step="0.0001"
               placeholder="Costo"
               value={fila.costoUnitario}
               onChange={(e) =>

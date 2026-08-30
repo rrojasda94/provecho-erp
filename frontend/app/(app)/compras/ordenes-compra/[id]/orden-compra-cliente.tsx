@@ -190,7 +190,7 @@ function DialogoRecepcion({
                         name="cantidad_recibida[]"
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="0.0001"
                         defaultValue={it.pendiente}
                       />
                     </label>
@@ -200,7 +200,7 @@ function DialogoRecepcion({
                         name="costo_recibido[]"
                         type="number"
                         min="0"
-                        step="0.01"
+                        step="0.0001"
                         defaultValue={it.costo_unitario}
                       />
                     </label>
