@@ -77,6 +77,20 @@ export function desdeGeocode(
   };
 }
 
+/** Recorta al ancla y nada más. Un objeto más gordo —un `ClienteBuscado`,
+ * que es `... & Ubicacion`— pasa como `Ubicacion` sin que el tipo se queje,
+ * y esparcirlo entero metía sus campos de más (`id`, `tipo`, `nombre`) en el
+ * cuerpo de la venta. */
+export function soloUbicacion(u: Ubicacion): Ubicacion {
+  return {
+    ubicacion_place_id: u.ubicacion_place_id,
+    ubicacion_lat: u.ubicacion_lat,
+    ubicacion_lng: u.ubicacion_lng,
+    ubicacion_plus_code: u.ubicacion_plus_code,
+    ubicacion_distrito: u.ubicacion_distrito,
+  };
+}
+
 export function estaAnclada(u: Ubicacion): boolean {
   return u.ubicacion_lat !== null && u.ubicacion_lat !== undefined;
 }
