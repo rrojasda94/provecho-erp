@@ -56,7 +56,19 @@ OAUTH_PROVIDERS = [
             "api_base_url": f"{PROVECHO_API_URL}/api/v1/oauth/",
             "access_token_url": f"{PROVECHO_API_URL}/api/v1/oauth/token",
             "authorize_url": f"{PROVECHO_WEB_URL}/oauth/authorize",
-            "client_kwargs": {"scope": "profile"},
+            # Sin esto, Authlib manda client_id/client_secret por HTTP Basic
+            # (su default, RFC 6749 §2.3.1) — pero POST /oauth/token
+            # (src/core/oauth/router.py) los espera como campos del form
+            # (Form(...), RFC 6749 §2.3.1 "or" la otra mitad), y FastAPI
+            # rechaza el request con 422 antes de llegar a la lógica de
+            # negocio: sin ningún log de OAuthError que lo explique, solo
+            # "Error returning OAuth user info: 'access_token'" del lado de
+            # Superset, porque el token nunca llegó. Comprobado a mano
+            # contra el droplet BI real.
+            "client_kwargs": {
+                "scope": "profile",
+                "token_endpoint_auth_method": "client_secret_post",
+            },
         },
     }
 ]
