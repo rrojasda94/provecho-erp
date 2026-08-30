@@ -1235,7 +1235,11 @@ producción se hace en cocinas de sucursal. Ver
   (`parametro_empresa`, aprobado por Gerencia — RN-GER-009); el sistema los
   calcula, nunca los declara quien solicita el ajuste.
 - **RN-INV-016** Un ajuste se origina por sobrante, faltante, merma/daño,
-  o error de registro.
+  o error de registro. Una entrada de stock manual —sobrante o corrección de
+  error de registro, siempre con `cantidad` positiva— de un artículo con
+  control de lote puede declarar código de lote y vencimiento al solicitar
+  el ajuste (RN-LOT-002); combinarlo con una `cantidad` negativa se rechaza,
+  porque esa salida reparte por FEFO y no toma un lote explícito.
 - **RN-INV-017** Toda merma se reporta en el módulo de producción o en el
   de inventario; debe estudiarse y rendir cuentas ante el almacén y el
   área contable. Mecanismo exacto de registro dentro de una auditoría

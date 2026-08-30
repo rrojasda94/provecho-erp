@@ -272,6 +272,53 @@
             ],
             "title": "Cantidad"
           },
+          "condicion_almacenamiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condicion Almacenamiento"
+          },
+          "fecha_elaboracion": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Elaboracion"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "lote_codigo": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Codigo"
+          },
           "motivo": {
             "title": "Motivo",
             "type": "string"
@@ -360,6 +407,18 @@
             "title": "Id",
             "type": "string"
           },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
           "motivo": {
             "title": "Motivo",
             "type": "string"
@@ -394,6 +453,7 @@
           "solicitado_por",
           "aprobado_por",
           "dentro_margen",
+          "lote_id",
           "articulo",
           "sku_codigo",
           "almacen",
@@ -452,6 +512,18 @@
             "title": "Id",
             "type": "string"
           },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
           "motivo": {
             "title": "Motivo",
             "type": "string"
@@ -477,7 +549,8 @@
           "conteo_id",
           "solicitado_por",
           "aprobado_por",
-          "dentro_margen"
+          "dentro_margen",
+          "lote_id"
         ],
         "title": "AjusteOut",
         "type": "object"
@@ -24725,6 +24798,10 @@
             ],
             "title": "Codigo Barras"
           },
+          "controla_lote": {
+            "title": "Controla Lote",
+            "type": "boolean"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -24737,7 +24814,8 @@
           "codigo",
           "codigo_barras",
           "activo",
-          "articulo_nombre"
+          "articulo_nombre",
+          "controla_lote"
         ],
         "title": "SkuListadoOut",
         "type": "object"
