@@ -324,3 +324,79 @@ def test_persona_id_null_explicito_desvincula(client) -> None:
     assert r.status_code == 200, r.text
     assert r.json()["persona_id"] is None
     assert r.json()["persona"] is None
+
+
+# --- Tipo de documento (fix/personas-tipo-documento) -------------------------
+def _persona(client, headers, **campos):
+    cuerpo = {
+        "nombres": "Ana",
+        "apellidos": "Torres",
+        "tipo_documento": "dni",
+        "numero_documento": "12345678",
+    }
+    cuerpo.update(campos)
+    return client.post("/api/v1/personas", headers=headers, json=cuerpo)
+
+
+def test_ruc_es_un_tipo_de_documento_valido_de_persona(client) -> None:
+    """El caso que motivó el arreglo: el formulario ofrecía «RUC» y guardar
+    devolvía 500 porque el `Enum` del modelo no lo conocía. Una persona
+    natural con negocio tiene RUC (empieza en 10)."""
+    headers = _admin_auth(client)
+    r = _persona(client, headers, tipo_documento="ruc", numero_documento="10123456789")
+    assert r.status_code == 201, r.text
+    assert r.json()["tipo_documento"] == "ruc"
+    # La lectura es lo que reventaba: el INSERT entraba igual y el
+    # `result_processor` del Enum levantaba `LookupError` en cada `GET`
+    # posterior, tumbando la lista entera para todos.
+    assert client.get("/api/v1/personas", headers=headers).status_code == 200
+
+
+def test_carne_extranjeria_se_guarda_como_ce(client) -> None:
+    """El tablero de contratación manda ese nombre desde que existe."""
+    r = _persona(
+        client,
+        _admin_auth(client),
+        tipo_documento="carne_extranjeria",
+        numero_documento="001234567",
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["tipo_documento"] == "ce"
+
+
+@pytest.mark.parametrize(
+    ("tipo", "numero"),
+    [
+        ("dni", "10123456789"),  # 11 dígitos no son un DNI
+        ("ruc", "12345678"),  # 8 tampoco son un RUC
+        ("dni", "1234567a"),  # un DNI son dígitos
+        ("marciano", "12345678"),  # tipo fuera del vocabulario
+        ("pasaporte", "abc"),  # demasiado corto
+    ],
+)
+def test_el_numero_se_valida_contra_su_tipo(client, tipo, numero) -> None:
+    r = _persona(client, _admin_auth(client), tipo_documento=tipo, numero_documento=numero)
+    assert r.status_code == 409, r.text
+    assert "500" not in str(r.status_code)
+
+
+def test_corregir_solo_el_tipo_revalida_contra_el_numero_guardado(client) -> None:
+    headers = _admin_auth(client)
+    persona = _persona(client, headers).json()
+    r = client.patch(
+        f"/api/v1/personas/{persona['id']}",
+        headers=headers,
+        json={"version": persona["version"], "tipo_documento": "ruc"},
+    )
+    assert r.status_code == 409, r.text
+
+
+def test_los_largos_del_dominio_de_ventas_no_se_desincronizan() -> None:
+    """`sales.domain.rules` no puede importar `shared` (el dominio depende
+    solo de la stdlib, `tests/test_arquitectura.py`), así que los largos
+    están escritos dos veces a propósito. Esto avisa si divergen."""
+    from src.modules.sales.domain import rules
+    from src.shared import documento
+
+    assert rules.LARGO_DNI == documento.LARGO_DNI
+    assert rules.LARGO_RUC == documento.LARGO_RUC

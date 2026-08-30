@@ -11,6 +11,7 @@ import type { Ubicacion } from "@/components/direccion/ubicacion";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { RUTA_EXPORTAR_CLIENTES } from "@/lib/clientes";
+import { ETIQUETA_DOCUMENTO, TIPOS_DOCUMENTO_NATURAL } from "@/lib/documento";
 
 import { completarDocumentoAction, editarClienteAction } from "./actions";
 import { ImportarClientes } from "./importar-clientes";
@@ -111,9 +112,11 @@ function DialogoCompletarDocumento({ cliente }: { cliente: Cliente }) {
         <label className="flex w-32 flex-col gap-1 text-sm font-semibold">
           Tipo
           <select name="tipo_documento" defaultValue="dni">
-            <option value="dni">DNI</option>
-            <option value="ce">CE</option>
-            <option value="pasaporte">Pasaporte</option>
+            {TIPOS_DOCUMENTO_NATURAL.map((t) => (
+              <option key={t} value={t}>
+                {ETIQUETA_DOCUMENTO[t]}
+              </option>
+            ))}
           </select>
         </label>
         <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">

@@ -14,6 +14,7 @@ import {
   type EstadoRrhh,
 } from "./actions";
 import { Combobox } from "@/components/ui/combobox";
+import { ETIQUETA_DOCUMENTO, TIPOS_DOCUMENTO } from "@/lib/documento";
 
 export type Convocatoria = {
   id: string;
@@ -299,9 +300,11 @@ function DialogoContratar({
         <label className="flex flex-col gap-1 text-sm font-semibold">
           Documento
           <select name="tipo_documento" defaultValue="dni">
-            <option value="dni">DNI</option>
-            <option value="carne_extranjeria">Carné de extranjería</option>
-            <option value="pasaporte">Pasaporte</option>
+            {TIPOS_DOCUMENTO.map((t) => (
+              <option key={t} value={t}>
+                {ETIQUETA_DOCUMENTO[t]}
+              </option>
+            ))}
           </select>
         </label>
         <Campo etiqueta="Número" nombre="numero_documento" maxLength={20} />

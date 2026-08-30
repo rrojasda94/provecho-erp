@@ -23,6 +23,7 @@ from src.core.model_base import (
     UuidPkMixin,
     VersionedMixin,
 )
+from src.shared.documento import TIPOS
 
 
 class Persona(
@@ -45,7 +46,11 @@ class Persona(
     # es compartida y no todos sus roles tienen la misma exigencia.
     # El UNIQUE se conserva: un índice único admite varios NULL.
     tipo_documento: Mapped[str | None] = mapped_column(
-        Enum("dni", "ce", "pasaporte", name="tipo_documento", native_enum=False),
+        # `create_constraint=True` a propósito: sin él SQLAlchemy no emite
+        # ningún CHECK (default desde 1.4), el valor fuera del vocabulario
+        # entra sin ruido y revienta 500 en **cada lectura** posterior de
+        # esa fila. Ver migración `c9f4a2e70b18`.
+        Enum(*TIPOS, name="tipo_documento", native_enum=False, create_constraint=True),
         nullable=True,
     )
     numero_documento: Mapped[str | None] = mapped_column(

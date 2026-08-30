@@ -201,7 +201,17 @@ erDiagram
 ```
 
 - **persona**: nombres, apellidos, tipo_documento (`dni` | `ce` |
-  `pasaporte`, **nullable** desde 2026-07-28), numero_documento (único,
+  `pasaporte` | `ruc`, **nullable** desde 2026-07-28; `ruc` desde 2026-08-30,
+  migración `c9f4a2e70b18` — una persona natural con negocio tiene RUC y
+  empieza en 10, distinto del `ruc` de `cliente`/`proveedor`/`empresa`, que
+  identifica a una persona jurídica y tiene columna propia. El vocabulario y
+  los largos por tipo viven en `src/shared/documento.py`, que es de donde los
+  leen `users`, `rrhh` y `sales`, y lo espeja `frontend/lib/documento.ts`;
+  `carne_extranjeria` se acepta y se normaliza a `ce`. La columna lleva
+  además el CHECK `ck_persona_tipo_documento`, que SQLAlchemy nunca había
+  emitido: sin él un valor fuera del vocabulario entraba sin ruido y hacía
+  fallar **cada lectura** posterior de esa fila con 500), numero_documento
+  (único,
   **nullable** desde 2026-07-28 — migración `e1c4a9d6b038`, ADR-018: para
   registrar a un cliente de mostrador basta el teléfono, RN-PTS-004; el
   UNIQUE se conserva porque un índice único admite varios NULL. **Trabajador

@@ -20,6 +20,7 @@ from src.modules.rrhh.domain import rules
 from src.modules.rrhh.infrastructure.models import Postulante
 from src.modules.rrhh.infrastructure.repositories import ConvocatoriaRepo, PostulanteRepo
 from src.modules.users.infrastructure.models import Empresa, Persona
+from src.shared import documento
 from src.shared.integrations.factiliza import nombres_desde_dni
 
 
@@ -226,6 +227,14 @@ def contratar_postulante(
     else:
         if not numero_documento:
             raise ReglaNegocio("el trabajador exige documento de identidad")
+        # El tablero manda `carne_extranjeria`; `persona` lo llama `ce`. La
+        # traducción y los largos por tipo viven en `shared.documento`.
+        try:
+            tipo_documento, numero_documento = documento.validar(
+                tipo_documento or documento.DNI, numero_documento
+            )
+        except ValueError as exc:
+            raise ReglaNegocio(str(exc)) from exc
         # El nombre de la planilla lo da RENIEC, no lo que el postulante
         # escribió de sí mismo en el formulario público (RN-PTS-004, mismo
         # criterio que el alta de cliente y de proveedor). Importa acá más
@@ -235,14 +244,14 @@ def contratar_postulante(
         # contratación sigue: nunca se bloquea por un tercero (ADR-005).
         nombres_finales = nombres or postulante.nombres
         apellidos_finales = apellidos or postulante.apellidos
-        if (tipo_documento or "dni") == "dni":
+        if tipo_documento == documento.DNI:
             nombres_finales, apellidos_finales = nombres_desde_dni(
                 numero_documento, nombres_finales, apellidos_finales
             )
         persona = Persona(
             nombres=nombres_finales,
             apellidos=apellidos_finales,
-            tipo_documento=tipo_documento or "dni",
+            tipo_documento=tipo_documento,
             numero_documento=numero_documento,
             telefono=postulante.telefono,
             email=postulante.email,

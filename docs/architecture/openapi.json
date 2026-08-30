@@ -17987,8 +17987,15 @@
             "type": "string"
           },
           "numero_documento": {
-            "title": "Numero Documento",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
           },
           "telefono": {
             "anyOf": [
@@ -18002,8 +18009,15 @@
             "title": "Telefono"
           },
           "tipo_documento": {
-            "title": "Tipo Documento",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Documento"
           },
           "ubicacion_distrito": {
             "anyOf": [
@@ -18147,6 +18161,7 @@
           "numero_documento": {
             "anyOf": [
               {
+                "maxLength": 20,
                 "type": "string"
               },
               {

@@ -278,3 +278,30 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   hizo ahora es que la doble validación es deliberada (ADR-041) y quitar la
   segunda llamada sin caché sería confiar en el cliente. Contraste: la tarifa
   de delivery sí cachea su geometría (`_distancia_cacheada`).
+
+- ⬜ **112 columnas `Enum(native_enum=False)` sin CHECK** (113 en total, una arreglada) (encontrado 2026-08-30
+  arreglando `persona.tipo_documento`). `create_constraint` vale `False` por
+  defecto desde SQLAlchemy 1.4 y `validate_strings` también: un valor fuera del
+  vocabulario **entra sin ruido** —el bind processor lo deja pasar y la columna
+  es un `VARCHAR` del largo del valor más largo— y después revienta en la
+  **lectura**, con `LookupError` → 500 en cada consulta que cargue esa fila. No
+  es un alta rechazada: es una fila ilegible para todos hasta que alguien la
+  corrija a mano en la base. `persona.tipo_documento` es la que mordió (se le
+  puso `create_constraint=True` y el CHECK en la migración `c9f4a2e70b18`); el
+  patrón está en todo el repo. Barrerlo es una migración con un CHECK por
+  columna y el saneo previo de cada una, así que va aparte. De paso: SQLite
+  **sí** hace cumplir los CHECK, así que ponerlos también cierra el hueco de
+  que la suite pase en verde sobre algo que Postgres rechaza.
+
+- ⬜ **El 8/11 del documento está escrito a mano en cuatro sitios más**
+  (2026-08-30). El vocabulario y los largos por tipo ya viven en
+  `src/shared/documento.py` y `frontend/lib/documento.ts`, pero siguen
+  reescritos como literales en `src/core/consulta_router.py:120,144`,
+  `frontend/app/(app)/ventas/clientes/actions.ts:78` y las tres regex
+  `/^\d{8}$/` de `frontend/app/(publico)/reconocerte/`. Y
+  `frontend/app/pdv/dialogos.tsx:1554` declara un `documentoValido` local que
+  **sombrea** el importado en `:9` y se saltea el chequeo de dígitos. No se
+  tocaron acá porque el PDV está en manos de otra rama y el conflicto costaría
+  más que la deuda. Ojo con `consulta_router`: ahí el 8/11 puede ser el
+  contrato del proveedor (RENIEC/SUNAT) y no la regla del ERP — mirarlo antes
+  de "arreglarlo".

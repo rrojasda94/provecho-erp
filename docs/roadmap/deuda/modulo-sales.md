@@ -682,3 +682,22 @@ que es una decisión de pantalla y no un bug de una línea.
   `venta_repo.items(venta.id)` para calcular el total. Barato hoy (un salón
   tiene decenas de mesas, no miles); se vuelve un problema si el mapa se
   refresca muy seguido desde muchas tablets a la vez.
+- ⬜ **El comprobante elige el código de documento por largo, no por tipo**
+  (2026-08-30). `comprobantes.py:236-241` hace `es_ruc = len(num) == LARGO_RUC`
+  y manda `DOC_SUNAT_RUC` o `DOC_SUNAT_DNI`: un receptor tecleado en caja con
+  carné de extranjería o pasaporte se **declara a SUNAT como DNI**.
+  `rules.doc_sunat_de_persona()` sí mapea los cuatro tipos, pero solo lo usa el
+  camino con `cliente_id`. Arreglarlo pide una columna
+  `comprobante.receptor_tipo_doc` y un campo más en el teclado del PDV — una
+  migración y un cambio de flujo de caja, no un parche. El arreglo del tipo de
+  documento de la persona (2026-08-30) **no** tocó esto.
+- ⬜ **El catálogo 06 de SUNAT está escrito dos veces**: `sales/domain/rules.py`
+  y `src/shared/integrations/factiliza/mapper.py`, con nombres distintos y sin
+  que ninguno importe al otro. Unificarlo obliga a decidir si los catálogos de
+  SUNAT son `shared` —y el dominio no puede importar `shared`
+  (`tests/test_arquitectura.py`)—, así que es una decisión de arquitectura, no
+  una limpieza.
+- ⬜ **El importador silencia un tipo de documento inválido**:
+  `importacion_clientes.py:437` convierte cualquier valor desconocido en `dni`
+  en vez de rechazar la fila con un motivo. La plantilla ya no promete `ruc`
+  (se corrigió el texto el 2026-08-30), pero el silencio sigue.

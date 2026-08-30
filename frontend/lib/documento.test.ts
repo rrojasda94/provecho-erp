@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { documentoValido, tipoPorLargo } from "./documento.ts";
+import {
+  documentoValido,
+  documentoValidoPorTipo,
+  ETIQUETA_DOCUMENTO,
+  TIPOS_DOCUMENTO,
+  tipoPorLargo,
+} from "./documento.ts";
 
 /**
  * El largo decide a quién se le pregunta (RN-CPP-003). Importa porque es lo
@@ -35,4 +41,23 @@ test("sin documento la venta sigue siendo válida", () => {
   assert.equal(documentoValido(""), true);
   assert.equal(documentoValido("44556677"), true);
   assert.equal(documentoValido("445566"), false);
+});
+
+test("el vocabulario de persona incluye ruc y todos tienen etiqueta", () => {
+  assert.ok(TIPOS_DOCUMENTO.includes("ruc"));
+  for (const t of TIPOS_DOCUMENTO) assert.ok(ETIQUETA_DOCUMENTO[t]);
+});
+
+test("el largo del número lo manda el tipo", () => {
+  assert.equal(documentoValidoPorTipo("dni", "44556677"), true);
+  assert.equal(documentoValidoPorTipo("dni", "20610077782"), false);
+  assert.equal(documentoValidoPorTipo("ruc", "10123456789"), true);
+  assert.equal(documentoValidoPorTipo("ruc", "44556677"), false);
+  // CE y pasaporte los emite otro país: alfanuméricos, sin largo fijo.
+  assert.equal(documentoValidoPorTipo("pasaporte", "AB123456"), true);
+  assert.equal(documentoValidoPorTipo("pasaporte", "AB1"), false);
+});
+
+test("sin documento sigue valiendo: es opcional (ADR-018)", () => {
+  assert.equal(documentoValidoPorTipo("dni", ""), true);
 });

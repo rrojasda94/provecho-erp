@@ -67,6 +67,12 @@ pantalla > lo declarado**, y si Factiliza no contesta o el documento no figura
 se usa lo revisado — la contratación nunca se bloquea por un tercero (ADR-005).
 Con carné de extranjería o pasaporte no se consulta: RENIEC no los tiene.
 
+El tablero manda `carne_extranjeria` y `persona` lo llama `ce`: la traducción
+y los largos por tipo viven en `src/shared/documento.py`, y `contratar` los
+aplica antes de crear la `persona`. Hasta el 2026-08-30 no los aplicaba nadie
+y contratar con carné de extranjería guardaba una fila que después hacía
+fallar toda lectura de esa persona con 500.
+
 ## Formulario público de postulación
 
 `POST /rrhh/postulaciones/{token}` — **sin JWT**. El token lo genera
