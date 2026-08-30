@@ -33,12 +33,15 @@ test("una OC en borrador se emite, se recibe y se factura", async ({ page }, tes
   // El seeder deja la OC en borrador a propósito: emitirla es un paso que
   // esta prueba tiene que dar por la pantalla, con su candado de umbral.
   await page.getByRole("link", { name: PROVEEDOR }).first().click();
-  await expect(page.getByText("borrador")).toBeVisible();
+  // Se espera la navegación antes de mirar el contenido: el listado tiene sus
+  // dos diálogos siempre en el DOM y «borrador» aparece en tres lugares ahí.
+  await expect(page).toHaveURL(/\/compras\/ordenes-compra\/[0-9a-f-]{36}/);
+  await expect(page.getByTestId("estado-oc")).toContainText("borrador");
   await capturar(page, testInfo, "ficha-en-borrador");
 
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Emitir" }).click();
-  await expect(page.getByText("emitida")).toBeVisible();
+  await expect(page.getByTestId("estado-oc")).toContainText("emitida");
 
   await page.getByRole("button", { name: "Registrar recepción" }).click();
   await expect(dialogo(page)).toBeVisible();
@@ -46,7 +49,7 @@ test("una OC en borrador se emite, se recibe y se factura", async ({ page }, tes
   // Las cantidades vienen precargadas con lo que falta: teclear de nuevo lo
   // que el sistema ya sabe es donde se equivoca quien está apurado.
   await dialogo(page).getByRole("button", { name: "Registrar" }).click();
-  await expect(page.getByText("recibida", { exact: false })).toBeVisible();
+  await expect(page.getByTestId("estado-oc")).toContainText("recibida");
 
   await page.getByRole("button", { name: "Registrar factura" }).click();
   await expect(dialogo(page)).toBeVisible();
@@ -93,7 +96,7 @@ test("una compra directa se registra con su factura en un paso", async ({
   // Termina en la ficha de la OC que creó: el resultado es una orden ya
   // recibida y conforme, y esa ficha es el único lugar donde vive.
   await expect(page).toHaveURL(/\/compras\/ordenes-compra\/[0-9a-f-]{36}/);
-  await expect(page.getByText("Compra directa")).toBeVisible();
+  await expect(page.getByTestId("origen-oc")).toContainText("Compra directa");
   await expect(page.getByText("B900-77")).toBeVisible();
   await capturar(page, testInfo, "compra-directa-registrada");
 });

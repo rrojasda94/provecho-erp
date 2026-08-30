@@ -571,14 +571,22 @@ export function OrdenCompraCliente({
             {nombreProveedor}
           </h1>
           <p className="flex flex-wrap items-center gap-2 text-sm text-gray">
-            <Insignia tono={TONO_ESTADO[orden.estado] ?? "neutro"}>
-              {orden.estado.replace("_", " ")}
-            </Insignia>
+            {/* Con `testid` propio, como `estado-caja` en el PDV: el estado se
+                nombra igual en el listado, en el botón «Crear (borrador)» y en
+                el título del diálogo de edición, así que buscarlo por texto es
+                ambiguo desde cualquier prueba. */}
+            <span data-testid="estado-oc">
+              <Insignia tono={TONO_ESTADO[orden.estado] ?? "neutro"}>
+                {orden.estado.replace("_", " ")}
+              </Insignia>
+            </span>
             {/* ADR-082 prometió distinguirlas donde importa: una compra
                 directa nace recibida y sustentada solo con su comprobante. */}
-            <Insignia tono="info">
-              {orden.origen === "directa" ? "Compra directa" : "Orden de compra"}
-            </Insignia>
+            <span data-testid="origen-oc">
+              <Insignia tono="info">
+                {orden.origen === "directa" ? "Compra directa" : "Orden de compra"}
+              </Insignia>
+            </span>
             <span>Destino: {almacen ?? "—"}</span>
             <span className="cifra font-semibold">S/ {Number(orden.total).toFixed(2)}</span>
           </p>

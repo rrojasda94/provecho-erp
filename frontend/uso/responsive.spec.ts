@@ -148,6 +148,12 @@ async function prepararEscenario(page: Page): Promise<string[]> {
   }
   await expect(page.getByTestId("estado-caja")).toContainText("Caja abierta");
 
+  // Pestaña nueva antes de marcar: los borradores son del punto de venta y
+  // sobreviven a la corrida anterior (ADR-074), así que el PDV abre con la
+  // cuenta que dejó otro recorrido. Sobre una orden ya enviada el botón dice
+  // "Enviar aumento", no "Enviar", y la espera se iba entera al timeout.
+  await page.getByRole("button", { name: "Nuevo pedido" }).click();
+
   await page.getByRole("button", { name: new RegExp(PRODUCTO, "i") }).first().click();
   await dialogo(page).getByRole("button", { name: /Guardar/i }).click();
   await page.getByRole("button", { name: /^Enviar$/i }).click();
