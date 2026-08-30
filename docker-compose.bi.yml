@@ -36,14 +36,21 @@ services:
     env_file: .env
     volumes:
       - ./deploy/bi/superset_config.py:/app/pythonpath/superset_config.py:ro
+    # Una sola línea a propósito: en un bloque `>` de YAML, una línea con
+    # MÁS indentación que sus vecinas queda fuera del plegado (se preserva
+    # literal, con su propio salto de línea) — exactamente lo que pasaba acá
+    # con los `--username`/`--firstname`/etc, dos espacios más adentro que
+    # el resto. El resultado no era el comando de una sola línea que parecía
+    # en el archivo: `superset fab create-admin` corría sin argumentos (pide
+    # interactivo) y cada `--flag valor` se ejecutaba como si fuera un
+    # comando propio (`sh: --username: not found`). Comprobado a mano contra
+    # el droplet BI real: el admin nunca se creaba, sin ningún error que lo
+    # dijera con claridad — `superset init` corría igual después y el
+    # contenedor salía en 0.
     command: >
       sh -c "
         superset db upgrade &&
-        superset fab create-admin
-          --username $${SUPERSET_ADMIN_USERNAME:-admin}
-          --firstname Provecho --lastname BI
-          --email $${SUPERSET_ADMIN_EMAIL:-admin@majambo.com.pe}
-          --password $${SUPERSET_ADMIN_PASSWORD} || true &&
+        superset fab create-admin --username $${SUPERSET_ADMIN_USERNAME:-admin} --firstname Provecho --lastname BI --email $${SUPERSET_ADMIN_EMAIL:-admin@majambo.com.pe} --password $${SUPERSET_ADMIN_PASSWORD} || true &&
         superset init
       "
     restart: "no"
