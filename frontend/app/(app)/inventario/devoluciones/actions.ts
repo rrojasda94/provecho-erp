@@ -5,8 +5,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type { EstadoFormulario } from "@/components/formulario/dialogo-formulario";
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 const RUTA = "/inventario/devoluciones";
 
@@ -19,10 +20,6 @@ async function token(): Promise<string> {
 
 function texto(formData: FormData, campo: string): string {
   return String(formData.get(campo) ?? "").trim();
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 /** Qué falta antes de mandar. El servidor valida igual; acá se evita el
@@ -78,7 +75,7 @@ export async function registrarDevolucionAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo registrar la devolución."), ok: false };
+    return estadoDeError(e, "No se pudo registrar la devolución.");
   }
   revalidatePath(RUTA);
   return { error: "", ok: true };
@@ -95,7 +92,7 @@ export async function anularDevolucionAction(
       metodo: "POST",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo anular la devolución."), ok: false };
+    return estadoDeError(e, "No se pudo anular la devolución.");
   }
   revalidatePath(RUTA);
   return { error: "", ok: true };

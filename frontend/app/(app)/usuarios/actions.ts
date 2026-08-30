@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 export type EstadoUsuario = { error: string; ok: boolean };
 
@@ -14,10 +15,6 @@ async function token(): Promise<string> {
   const valor = store.get(COOKIE_TOKEN)?.value;
   if (!valor) redirect("/login");
   return valor;
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 function leerCuenta(formData: FormData) {
@@ -56,7 +53,7 @@ export async function crearUsuarioAction(
       cuerpo: cuenta,
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear la cuenta."), ok: false };
+    return estadoDeError(e, "No se pudo crear la cuenta.");
   }
 
   revalidatePath("/usuarios");
@@ -74,7 +71,7 @@ export async function cambiarActivoAction(
       cuerpo: { activo },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo cambiar el estado."), ok: false };
+    return estadoDeError(e, "No se pudo cambiar el estado.");
   }
   revalidatePath("/usuarios");
   return { error: "", ok: true };
@@ -107,7 +104,7 @@ export async function editarUsuarioAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo guardar la cuenta."), ok: false };
+    return estadoDeError(e, "No se pudo guardar la cuenta.");
   }
   revalidatePath("/usuarios");
   return { error: "", ok: true };
@@ -128,7 +125,7 @@ export async function asignarRolAction(
       cuerpo: { rol_id: rolId },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo asignar el rol."), ok: false };
+    return estadoDeError(e, "No se pudo asignar el rol.");
   }
   revalidatePath("/usuarios");
   return { error: "", ok: true };
@@ -144,7 +141,7 @@ export async function quitarRolAction(
       metodo: "DELETE",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo quitar el rol."), ok: false };
+    return estadoDeError(e, "No se pudo quitar el rol.");
   }
   revalidatePath("/usuarios");
   return { error: "", ok: true };
@@ -171,7 +168,7 @@ export async function asignarSucursalAction(
       cuerpo: { sucursal_id: sucursalId },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo asignar la sucursal."), ok: false };
+    return estadoDeError(e, "No se pudo asignar la sucursal.");
   }
   revalidatePath("/usuarios");
   return { error: "", ok: true };
@@ -187,7 +184,7 @@ export async function quitarSucursalAction(
       metodo: "DELETE",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo quitar la sucursal."), ok: false };
+    return estadoDeError(e, "No se pudo quitar la sucursal.");
   }
   revalidatePath("/usuarios");
   return { error: "", ok: true };
@@ -209,7 +206,7 @@ export async function resetearPinAction(usuarioId: string): Promise<EstadoUsuari
       metodo: "POST",
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo resetear el PIN."), ok: false };
+    return estadoDeError(e, "No se pudo resetear el PIN.");
   }
   revalidatePath("/usuarios");
   return { error: "", ok: true };

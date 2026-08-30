@@ -45,9 +45,16 @@ al día falla el PR que lo causó (ADR-010).
     paginarlas sería un sobre que desenvolver para nada.
   La frontera es el origen del volumen, no su tamaño de hoy: si las filas
   las crea la operación, se pagina; si las escribe alguien configurando, no.
-- Error: `{detail}` (FastAPI) con código HTTP correcto:
-  `400` validación, `401` sin auth, `403` sin permiso, `404` no existe,
-  `409` conflicto/idempotencia, `422` reglas de negocio.
+- Error: `{detail}` —siempre un **texto legible en español**— con código
+  HTTP correcto: `400` error de aplicación sin especializar, `401` sin auth,
+  `403` sin permiso (incluye otro tenant), `404` no existe, `409` conflicto,
+  idempotencia y **regla de negocio**, `422` entrada inválida, `423` usuario
+  bloqueado, `429` rate limit.
+- El `422` agrega `errores: [{campo, etiqueta, mensaje}]` con los campos que
+  rechazó, para que el formulario pueda marcarlos (`ErrorValidacion`,
+  `src/core/validacion.py`). Va vacío cuando el 422 no viene de la validación
+  de entrada. Nunca se devuelve el formato crudo de FastAPI (`detail` como
+  lista, en inglés): ADR-017, addendum.
 - Fechas ISO 8601 UTC. Montos como decimal en string (nunca float).
 
 ## Nomenclatura

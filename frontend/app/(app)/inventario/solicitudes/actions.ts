@@ -5,8 +5,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type { EstadoFormulario } from "@/components/formulario/dialogo-formulario";
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 const RUTA = "/inventario/solicitudes";
 
@@ -19,10 +20,6 @@ async function token(): Promise<string> {
 
 function texto(formData: FormData, campo: string): string {
   return String(formData.get(campo) ?? "").trim();
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 /**
@@ -43,7 +40,7 @@ async function ejecutar(
   try {
     await llamar();
   } catch (e) {
-    return { error: mensajeDe(e, siFalla), ok: false };
+    return estadoDeError(e, siFalla);
   }
   revalidatePath(rutaRevalidada);
   return { error: "", ok: true };
@@ -72,10 +69,7 @@ export async function abrirBorradorAction(
     );
     id = borrador.id;
   } catch (e) {
-    return {
-      error: mensajeDe(e, "No se pudo abrir el requerimiento de la jornada."),
-      ok: false,
-    };
+    return estadoDeError(e, "No se pudo abrir el requerimiento de la jornada.");
   }
   revalidatePath(RUTA);
   redirect(`${RUTA}/${id}`);
