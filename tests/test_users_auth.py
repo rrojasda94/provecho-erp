@@ -4,21 +4,31 @@ Usa SQLite en memoria (StaticPool = una sola conexión compartida) y sobreescrib
 la dependencia get_db.
 """
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import src.core.models_registry  # noqa: F401  (puebla Base.metadata)
+from src.config.settings import settings
 from src.core.app import create_app
 from src.core.database import Base
 from src.modules.users.api.deps import get_db
 from src.modules.users.domain import rules
+from src.modules.users.infrastructure.models import RefreshToken
 
 
 @pytest.fixture()
-def client():
+def entorno():
+    """La app sembrada y su `sessionmaker`.
+
+    Se separa de `client` para que una prueba que necesita tocar la base por
+    fuera de la API —envejecer un refresh token, por ejemplo— pida las dos
+    cosas sin duplicar el armado.
+    """
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -40,7 +50,17 @@ def client():
             session.close()
 
     app.dependency_overrides[get_db] = _override_get_db
-    with TestClient(app) as c:
+    return app, TestSession
+
+
+@pytest.fixture()
+def sesiones(entorno):
+    return entorno[1]
+
+
+@pytest.fixture()
+def client(entorno):
+    with TestClient(entorno[0]) as c:
         yield c
 
 
@@ -108,6 +128,73 @@ def test_refresh_rota_y_reuso_revoca_cadena(client):
     # El nuevo también quedó revocado por la detección de reuso.
     r3 = client.post("/api/v1/auth/refresh", json={"refresh_token": nuevo})
     assert r3.status_code == 401
+
+
+def _envejecer_refresh(sesiones, horas: float) -> None:
+    """Mueve el `created_at` del refresh vigente hacia atrás.
+
+    El corte de ADR-084 mide contra ese campo y no contra uno nuevo: la
+    rotación inserta una fila por renovación, así que el `created_at` del
+    token que llega es la hora de la última actividad de esa sesión.
+    """
+    with sesiones() as s:
+        for rec in s.scalars(select(RefreshToken)).all():
+            rec.created_at = datetime.now(UTC) - timedelta(hours=horas)
+        s.commit()
+
+
+def test_una_sesion_quieta_ocho_horas_ya_no_renueva(client, sesiones):
+    """El reporte: apagar la PC y volver al día siguiente con la sesión
+    abierta. Las cookies de sesión del navegador cubren cerrar la ventana;
+    esto cubre el apagón con «restaurar pestañas», donde el navegador las
+    devuelve intactas y lo único que puede cortar es el servidor."""
+    tokens = _login(client).json()
+    _envejecer_refresh(sesiones, horas=9)
+
+    r = client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
+    )
+    assert r.status_code == 401
+    assert "inactividad" in r.json()["detail"].lower()
+
+
+def test_el_corte_por_inactividad_revoca_la_cadena_entera(client, sesiones):
+    """No basta con rechazar ese token: si la sesión se dio por cerrada,
+    ninguno de sus tokens puede seguir sirviendo."""
+    tokens = _login(client).json()
+    con_vida = client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
+    ).json()["refresh_token"]
+    _envejecer_refresh(sesiones, horas=9)
+
+    client.post("/api/v1/auth/refresh", json={"refresh_token": con_vida})
+    with sesiones() as s:
+        assert all(r.revocado for r in s.scalars(select(RefreshToken)).all())
+
+
+def test_una_sesion_quieta_menos_del_plazo_renueva_normal(client, sesiones):
+    """Siete horas es una caja entre almuerzo y cena, o un turno largo: hacerla
+    volver a entrar ahí es el problema que ADR-073 vino a arreglar."""
+    tokens = _login(client).json()
+    _envejecer_refresh(sesiones, horas=7)
+
+    r = client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
+    )
+    assert r.status_code == 200
+
+
+def test_el_plazo_de_inactividad_sale_de_settings(client, sesiones, monkeypatch):
+    """Un plazo clavado en el código sería el mismo para el local de mostrador
+    y para el tablero colgado en la pared. `0` lo apaga."""
+    tokens = _login(client).json()
+    _envejecer_refresh(sesiones, horas=100)
+    monkeypatch.setattr(settings, "refresh_inactividad_horas", 0)
+
+    r = client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]}
+    )
+    assert r.status_code == 200
 
 
 def test_logout_revoca_refresh(client):

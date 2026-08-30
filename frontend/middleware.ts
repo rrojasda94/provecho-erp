@@ -3,8 +3,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   COOKIE_REFRESH,
   COOKIE_TOKEN,
-  MAX_AGE_ACCESS,
-  MAX_AGE_REFRESH,
   convieneRenovar,
   opcionesCookie,
   refrescarSesion,
@@ -48,12 +46,12 @@ const GOOGLE_ESTATICO = "https://*.gstatic.com";
  * render, y ponerlo en un latido del navegador no cubre a la pestaña que
  * estuvo quieta media hora y vuelve con un clic.
  *
- * Se dispara cuando la cookie de acceso no está —Next la planta con el mismo
- * plazo que el token, así que el navegador la borra al vencer— **o** cuando
- * el token que trae está por vencer. Lo segundo no sobra: son dos relojes
- * distintos, y basta un desfase de segundos entre el navegador y la API para
- * que el token muera con la cookie todavía puesta. Esa ventana es el 401 que
- * deja la caja en `/login` a mitad de un pedido.
+ * Se dispara cuando la cookie de acceso no está o cuando el token que trae
+ * está por vencer. Desde ADR-084 lo segundo es lo que manda: las cookies
+ * pasaron a ser de sesión —mueren al cerrar el navegador— y ya no caducan
+ * solas, así que el `exp` del token es el único aviso. Que además cubre el
+ * desfase entre el reloj del navegador y el de la API, que era su motivo
+ * original.
  *
  * Además del `Set-Cookie`, reescribe la cookie del **request**: sin eso, la
  * petición que disparó la renovación seguiría viajando sin token y el
@@ -137,19 +135,11 @@ export async function middleware(request: NextRequest) {
   const respuesta = NextResponse.next({ request: { headers: cabeceras } });
   respuesta.headers.set("Content-Security-Policy", csp);
   if (renovados) {
-    respuesta.cookies.set(
-      COOKIE_TOKEN,
-      renovados.access_token,
-      opcionesCookie(MAX_AGE_ACCESS),
-    );
+    respuesta.cookies.set(COOKIE_TOKEN, renovados.access_token, opcionesCookie());
     // El refresh también rota (detección de reuso del lado de la API): si no
     // se guarda el nuevo, la próxima renovación mandaría el viejo y la API
     // lo leería como token robado, revocando la sesión entera.
-    respuesta.cookies.set(
-      COOKIE_REFRESH,
-      renovados.refresh_token,
-      opcionesCookie(MAX_AGE_REFRESH),
-    );
+    respuesta.cookies.set(COOKIE_REFRESH, renovados.refresh_token, opcionesCookie());
   }
   return respuesta;
 }

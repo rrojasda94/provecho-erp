@@ -3,6 +3,21 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-08-30 **La sesión no sobrevive a cerrar el navegador** (ADR-084):
+  cookies de sesión más corte por inactividad de 8 h en `auth.refresh`.
+- ⬜ **`refresh_token` no se purga nunca** (2026-08-30): la rotación inserta
+  una fila por renovación —una cada quince minutos por caja activa— y nada
+  borra las vencidas ni las revocadas. Es anterior a ADR-084 y ese cambio no
+  lo empeora, pero ahora hay más filas muertas por sesión. Va a una tarea de
+  Celery junto al resto del mantenimiento (`src/core/tasks_salud.py`).
+- ⬜ **El pad de asistencia pide login tras apagar la tablet** (2026-08-30,
+  consecuencia aceptada de ADR-084). Corre bajo la sesión de una cuenta de
+  servicio, y con cookies de sesión un local que apaga la tablet en la noche
+  entra a la mañana tecleando seis dígitos. El enrolamiento del dispositivo no
+  se pierde (`COOKIE_TERMINAL`, un año, ADR-079). Si molesta en la operación,
+  la salida es una marca por cuenta —"sesión persistente"— y no aflojarle el
+  plazo a todos.
+
 - ⬜ **El hub de sucursal sigue autenticándose con username + PIN**
   (`cloud_sync_username` / `cloud_sync_pin`), aunque desde 2026-08-08 existe
   la credencial correcta para una cuenta de servicio (`token_agente`,

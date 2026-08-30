@@ -52,12 +52,22 @@ test("el login deja el token en una cookie httpOnly y el logout la borra", async
 }) => {
   await ingresar(page, ADMIN);
 
-  const token = (await context.cookies()).find((c) => c.name === "provecho_token");
+  const cookies = await context.cookies();
+  const token = cookies.find((c) => c.name === "provecho_token");
+  const refresh = cookies.find((c) => c.name === "provecho_refresh");
   expect(token).toBeDefined();
   // `httpOnly` es la razón de ser de esta prueba: un token legible por
   // `document.cookie` lo roba cualquier XSS, y es un atributo que no se ve
   // en ninguna pantalla — se rompe en silencio.
   expect(token?.httpOnly).toBe(true);
+
+  // Y las dos son **de sesión**: mueren al cerrar el navegador (ADR-084).
+  // Playwright representa esa ausencia de vencimiento como `-1`. Se afirma
+  // por el mismo motivo que `httpOnly`: un `maxAge` agregado sin querer
+  // devolvería la sesión que sobrevive a apagar la PC, y no rompería ninguna
+  // otra prueba.
+  expect(token?.expires).toBe(-1);
+  expect(refresh?.expires).toBe(-1);
 
   // Salir dejó de ser un botón suelto en la barra: vive en el menú de la
   // sesión, junto a las preferencias de presentación.
