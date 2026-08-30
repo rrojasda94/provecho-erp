@@ -1,14 +1,19 @@
-# Imagen de Superset con el driver de Postgres (ADR-083 Fase C).
+# Imagen de Superset con el driver de Postgres y el cliente OAuth (ADR-083
+# Fase C).
 #
 # La imagen oficial `apache/superset` en su tag "lean" (sin sufijo `-dev` —
 # el que corresponde a producción, los `-dev` traen un devserver que no se
-# usa acá) NO trae `psycopg2`. Comprobado al ensayar esta fase:
+# usa acá) NO trae `psycopg2` ni `authlib`. Comprobado al ensayar esta fase:
 # `superset db upgrade` contra la Postgres de staging fallaba con
-# `ModuleNotFoundError: No module named 'psycopg2'`. La documentación
-# oficial resuelve esto con un `requirements-local.txt` que el entrypoint
-# instala en cada arranque; se prefiere una imagen propia — determinista y
-# sin depender de que el droplet tenga salida a internet cada vez que el
-# contenedor arranca.
+# `ModuleNotFoundError: No module named 'psycopg2'`, y con `AUTH_TYPE =
+# AUTH_OAUTH` puesto (`superset_config.py`, SSO de la Fase B) el arranque
+# vuelve a fallar igual con `ModuleNotFoundError: No module named
+# 'authlib'` — flask-appbuilder importa `authlib.integrations.flask_client`
+# recién al armar el `SecurityManager`, así que sin `AUTH_OAUTH` el hueco
+# queda invisible. La documentación oficial resuelve esto con un
+# `requirements-local.txt` que el entrypoint instala en cada arranque; se
+# prefiere una imagen propia — determinista y sin depender de que el
+# droplet tenga salida a internet cada vez que el contenedor arranca.
 FROM apache/superset:6.1.0
 
 USER root
@@ -19,5 +24,9 @@ USER root
 # distinto: la primera "funciona" pero instala en el lugar que nadie usa; la
 # segunda ni siquiera encuentra el binario. `uv` sí viene en la imagen y
 # apunta al intérprete que se le diga.
-RUN uv pip install --python /app/.venv/bin/python psycopg2-binary
+# `httpx` es para `scripts/superset_init.py` (Fase C, provisiona la
+# conexión analítica + los 10 datasets + RLS por la API REST) — no lo usa
+# Superset en sí, pero corre *dentro* de este contenedor (no hay Python en
+# el droplet aparte del venv de la imagen), así que tiene que estar acá.
+RUN uv pip install --python /app/.venv/bin/python psycopg2-binary authlib httpx
 USER superset
