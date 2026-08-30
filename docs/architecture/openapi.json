@@ -30804,7 +30804,7 @@
         ]
       },
       "post": {
-        "description": "Ingreso o retiro de efectivo del cajón durante el turno (RN-MDP-007).\n\n**Retirar exige autorización de supervisor** con su PIN (el token de\n`POST /auth/autorizar`); ingresar no, porque meter plata al cajón no es\nla operación de la que hay que desconfiar.",
+        "description": "Ingreso o retiro de efectivo del cajón durante el turno (RN-MDP-007).\n\n**Retirar exige autorización de supervisor** con su PIN (el token de\n`POST /auth/autorizar`, de un solo uso); ingresar no, porque meter plata\nal cajón no es la operación de la que hay que desconfiar.",
         "operationId": "registrar_movimiento_caja_api_v1_accounting_cajas_apertura__apertura_caja_id__movimientos_post",
         "parameters": [
           {
@@ -48547,6 +48547,7 @@
     },
     "/api/v1/rrhh/trabajadores": {
       "get": {
+        "description": "La remuneración viaja en `null` sin `rrhh.nomina_gestionar`.",
         "operationId": "listar_trabajadores_api_v1_rrhh_trabajadores_get",
         "parameters": [
           {
@@ -48673,6 +48674,7 @@
     },
     "/api/v1/rrhh/trabajadores/{trabajador_id}": {
       "get": {
+        "description": "La remuneración viaja en `null` sin `rrhh.nomina_gestionar`.",
         "operationId": "ver_trabajador_api_v1_rrhh_trabajadores__trabajador_id__get",
         "parameters": [
           {
@@ -48835,7 +48837,7 @@
     },
     "/api/v1/rrhh/trabajadores/{trabajador_id}/legajo": {
       "get": {
-        "description": "El expediente completo en una sola lectura: contratos, amonestaciones,\nmemorándums, certificados, permisos y pactos.\n\n**La nómina va solo con `rrhh.nomina_gestionar`.** Boletas y\nliquidaciones llevan remuneración, y `rrhh.leer` lo tiene el supervisor,\nque necesita ver las amonestaciones de su gente pero no cuánto gana. Que\nuna boleta ya fuera legible pidiéndola por su id no es razón para\nvolverla navegable. Cuando no viaja, `nomina_visible` lo dice: un legajo\nsin sueldos no puede leerse igual que uno censurado.\n\n`asistencia` no entra acá — crece una fila por día y por trabajador, y\nse pide por `GET /rrhh/asistencia` acotada por rango.",
+        "description": "El expediente completo en una sola lectura: contratos, amonestaciones,\nmemorándums, certificados, permisos y pactos.\n\n**La nómina va solo con `rrhh.nomina_gestionar`**: boletas,\nliquidaciones y la `remuneracion_base` de la ficha del trabajador. Las\ntres llevan remuneración, y `rrhh.leer` lo tiene el supervisor,\nque necesita ver las amonestaciones de su gente pero no cuánto gana. Que\nuna boleta ya fuera legible pidiéndola por su id no es razón para\nvolverla navegable. Cuando no viaja, `nomina_visible` lo dice: un legajo\nsin sueldos no puede leerse igual que uno censurado.\n\n`asistencia` no entra acá — crece una fila por día y por trabajador, y\nse pide por `GET /rrhh/asistencia` acotada por rango.",
         "operationId": "ver_legajo_api_v1_rrhh_trabajadores__trabajador_id__legajo_get",
         "parameters": [
           {

@@ -723,8 +723,9 @@ de su módulo y se prueban de forma aislada.
   de un dato que el operario pueda escribir: un identificador suelto en el
   pedido es una firma falsificable, y el registro de quién autorizó
   —que es la razón de ser del control— dejaría de valer nada. La
-  autorización es puntual: cubre una acción, no abre sesión, no se renueva
-  y caduca en minutos.
+  autorización es puntual: cubre **una** acción —se gasta al usarla, no
+  vale para la siguiente—, no abre sesión, no se renueva y caduca en
+  minutos. Reintentar la misma acción no cuenta como segunda acción.
 
 ## Dato
 

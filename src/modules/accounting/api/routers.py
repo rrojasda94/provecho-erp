@@ -507,8 +507,8 @@ def registrar_movimiento_caja(
     """Ingreso o retiro de efectivo del cajón durante el turno (RN-MDP-007).
 
     **Retirar exige autorización de supervisor** con su PIN (el token de
-    `POST /auth/autorizar`); ingresar no, porque meter plata al cajón no es
-    la operación de la que hay que desconfiar.
+    `POST /auth/autorizar`, de un solo uso); ingresar no, porque meter plata
+    al cajón no es la operación de la que hay que desconfiar.
     """
     exigir_apertura_caja(session, apertura_caja_id, tenant)
     autorizado_por = None
@@ -519,7 +519,11 @@ def registrar_movimiento_caja(
                 "retirar efectivo requiere autorización de supervisor",
             )
         try:
-            autorizado_por = autorizacion.verificar(body.autorizacion, CAJA_RETIRAR)
+            # `uso`: la elevación se gasta al usarla, pero el reintento de
+            # este mismo retiro no cuenta como reuso.
+            autorizado_por = autorizacion.verificar(
+                body.autorizacion, CAJA_RETIRAR, uso=body.idempotency_key
+            )
         except TokenInvalido as e:
             raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
     movimiento = caja.registrar_movimiento_caja(
