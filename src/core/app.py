@@ -8,7 +8,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from src.config.settings import settings
-from src.core import error_handlers
+from src.core import error_handlers, validacion
 from src.core.auditoria_router import router as auditoria_router
 from src.core.bi_router import router as bi_router
 from src.core.consulta_router import router as consulta_router
@@ -193,6 +193,11 @@ def create_app() -> FastAPI:
         redoc_url=None,
         openapi_url=None if settings.es_produccion else "/openapi.json",
         openapi_tags=TAGS_METADATA,
+        # El 422 del ERP no es el de FastAPI: `detail` es un texto legible y
+        # los campos rechazados van aparte (`src/core/validacion.py`).
+        # Declararlo acá reemplaza el `HTTPValidationError` que FastAPI
+        # documentaría solo, y el contrato exportado dice la verdad.
+        responses={422: {"model": validacion.ErrorValidacion, "description": "Entrada inválida"}},
     )
 
     # Errores de negocio → 4xx, en un solo lugar. Primero el genérico y
@@ -200,6 +205,9 @@ def create_app() -> FastAPI:
     # por MRO), pero se lee mejor de lo general a lo particular.
     error_handlers.registrar(app)
     users_error_handlers.registrar(app)
+    # La validación de entrada no es un error de dominio: la levanta FastAPI
+    # antes de que corra el endpoint, y por eso tiene su propio traductor.
+    validacion.registrar(app)
 
     @app.exception_handler(FueraDeAlcance)
     async def fuera_de_alcance(request: Request, exc: FueraDeAlcance):

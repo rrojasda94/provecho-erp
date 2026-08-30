@@ -1,5 +1,6 @@
 import { Rastro } from "@/components/shell/rastro";
 import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { fechaHora } from "@/lib/fechas";
 import { obtenerSesion } from "@/lib/sesion";
 
 type SkuDetalle = {
@@ -164,7 +165,7 @@ export default async function SkuPage({
                 {movimientos.map((m) => (
                   <tr key={m.id} className="border-t border-gray/10">
                     <td className="px-3 py-2">
-                      {new Date(m.ts).toLocaleString("es-PE")}
+                      {fechaHora(m.ts)}
                     </td>
                     <td className="px-3 py-2">{m.almacen}</td>
                     <td className="px-3 py-2">
