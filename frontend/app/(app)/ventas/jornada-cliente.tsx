@@ -12,6 +12,7 @@ import {
   type LineaVenta,
 } from "./actions";
 import { Combobox } from "@/components/ui/combobox";
+import { tienePermiso } from "@/lib/permisos";
 
 export type Venta = {
   id: string;
@@ -36,9 +37,14 @@ export type Comprobante = {
 };
 export type Sucursal = { id: string; nombre: string };
 
-// `cerrada` es el consumo de personal ya entregado (RN-COM-027): no se
-// cobra, así que sin este filtro no habría forma de listarlo en la jornada.
-const ESTADOS = ["orden", "pagada", "entregada", "cerrada", "anulada"];
+// Los cinco valores de `estado_venta`, en el orden en que una venta los
+// recorre. Salen de `sales.domain.rules.ESTADOS_VENTA` y un test de
+// coherencia impide que vuelvan a separarse: `entregada` no existe acá —es
+// estado de ítem, del KDS— y sin `facturada` no había forma de listar lo
+// cobrado, que es donde termina casi todo. `cerrada` es el consumo de
+// personal ya entregado (RN-COM-027): no se cobra, y sin este filtro no
+// habría forma de listarlo en la jornada.
+const ESTADOS = ["orden", "pagada", "facturada", "cerrada", "anulada"];
 
 function EstadoVenta({ estado }: { estado: string }) {
   const clase =
@@ -54,10 +60,49 @@ function EstadoVenta({ estado }: { estado: string }) {
   );
 }
 
-function CeldaComprobante({ comprobante }: { comprobante?: Comprobante }) {
+/** Lo que se ofrece cuando la emisión falló. Reintentar exige el permiso de
+ * emitir; el motivo del rechazo se muestra igual sin él, que es la mitad útil
+ * de la celda para quien solo mira la jornada. */
+function AvisoEmision({
+  comprobante,
+  permisos,
+}: {
+  comprobante: Comprobante;
+  permisos: string[];
+}) {
   const [pendiente, startTransition] = useTransition();
   const [error, setError] = useState("");
+  const detalle = error || comprobante.detalle_emision;
 
+  return (
+    <>
+      {tienePermiso(permisos, "sales.emitir_comprobante") && (
+        <button
+          type="button"
+          disabled={pendiente}
+          onClick={() =>
+            startTransition(async () => {
+              const r = await reintentarComprobanteAction(comprobante.id);
+              setError(r.error);
+            })
+          }
+          className="self-start text-xs font-bold text-primary hover:underline"
+        >
+          {pendiente ? "Reintentando..." : "Reintentar emisión"}
+        </button>
+      )}
+      {detalle && <span className="text-xs text-secondary">{detalle}</span>}
+    </>
+  );
+}
+
+function CeldaComprobante({
+  comprobante,
+  permisos,
+}: {
+  comprobante?: Comprobante;
+  permisos: string[];
+}) {
   if (!comprobante) {
     return <span className="text-xs text-gray">sin cuenta cerrada</span>;
   }
@@ -72,28 +117,7 @@ function CeldaComprobante({ comprobante }: { comprobante?: Comprobante }) {
         {comprobante.estado_emision}
         {comprobante.intentos_emision > 1 && ` · ${comprobante.intentos_emision} intentos`}
       </span>
-      {fallo && (
-        <>
-          <button
-            type="button"
-            disabled={pendiente}
-            onClick={() =>
-              startTransition(async () => {
-                const r = await reintentarComprobanteAction(comprobante.id);
-                setError(r.error);
-              })
-            }
-            className="self-start text-xs font-bold text-primary hover:underline"
-          >
-            {pendiente ? "Reintentando..." : "Reintentar emisión"}
-          </button>
-          {(error || comprobante.detalle_emision) && (
-            <span className="text-xs text-secondary">
-              {error || comprobante.detalle_emision}
-            </span>
-          )}
-        </>
-      )}
+      {fallo && <AvisoEmision comprobante={comprobante} permisos={permisos} />}
     </div>
   );
 }
@@ -110,6 +134,58 @@ const MOTIVOS_NC = [
   { codigo: "03", texto: "Corrección por error en la descripción", corrige: true },
 ];
 
+/** Qué se devuelve de cada línea. Los tres estados de la carga se dibujan
+ * distinto a propósito: "todavía no llegó", "falló" y "esta venta no tiene
+ * líneas" llevaban al mismo cartel, y el fallo se leía como una venta vacía
+ * — justo antes de acreditarla. */
+function LineasAcreditables({
+  lineas,
+  cargando,
+  error,
+}: {
+  lineas: LineaVenta[];
+  cargando: boolean;
+  error: string;
+}) {
+  return (
+    <div className="mt-1 flex flex-col gap-1.5">
+      {cargando && <span className="text-xs text-gray">Cargando las líneas...</span>}
+      {error && (
+        <span role="alert" className="text-xs font-semibold text-secondary">
+          {error} No se puede acreditar por línea sin saber qué se vendió; vuelve a
+          abrir el diálogo para reintentar.
+        </span>
+      )}
+      {!cargando && !error && lineas.length === 0 && (
+        <span className="text-xs text-gray">Esta venta no tiene líneas que acreditar.</span>
+      )}
+      {lineas.map((linea) => (
+        <div key={linea.id} className="flex items-center gap-2 text-sm">
+          <input type="hidden" name="linea_id" value={linea.id} />
+          <span className="flex-1">
+            {linea.nombre}{" "}
+            <span className="text-xs text-gray">(vendidas {linea.cantidad})</span>
+          </span>
+          <input
+            name="linea_cantidad"
+            type="number"
+            step="0.001"
+            min="0"
+            max={linea.cantidad}
+            defaultValue="0"
+            aria-label={`Cantidad a devolver de ${linea.nombre}`}
+            className="w-24 rounded border border-gray/40 px-2 py-1"
+          />
+        </div>
+      ))}
+      <span className="text-xs text-gray">
+        Cero = no se devuelve. Cuenta contra lo que quede sin acreditar, no contra lo
+        vendido.
+      </span>
+    </div>
+  );
+}
+
 function DialogoNotaCredito({
   venta,
   comprobante,
@@ -122,6 +198,8 @@ function DialogoNotaCredito({
   const [motivo, setMotivo] = useState("01");
   const [alcance, setAlcance] = useState<"total" | "parcial">("total");
   const [lineas, setLineas] = useState<LineaVenta[]>([]);
+  const [errorLineas, setErrorLineas] = useState("");
+  const [cargandoLineas, setCargandoLineas] = useState(false);
   const [estado, formAction, pendiente] = useActionState(
     emitirNotaCreditoAction,
     ESTADO_INICIAL,
@@ -133,7 +211,12 @@ function DialogoNotaCredito({
 
   const abrir = async () => {
     dialogRef.current?.showModal();
-    if (lineas.length === 0) setLineas(await lineasDeVentaAction(venta.id));
+    if (lineas.length > 0) return;
+    setCargandoLineas(true);
+    const r = await lineasDeVentaAction(venta.id);
+    setLineas(r.lineas);
+    setErrorLineas(r.error);
+    setCargandoLineas(false);
   };
 
   const deCorreccion = MOTIVOS_NC.find((m) => m.codigo === motivo)?.corrige ?? false;
@@ -200,36 +283,7 @@ function DialogoNotaCredito({
               Solo algunas líneas
             </label>
             {alcance === "parcial" && (
-              <div className="mt-1 flex flex-col gap-1.5">
-                {lineas.length === 0 && (
-                  <span className="text-xs text-gray">Cargando las líneas...</span>
-                )}
-                {lineas.map((linea) => (
-                  <div key={linea.id} className="flex items-center gap-2 text-sm">
-                    <input type="hidden" name="linea_id" value={linea.id} />
-                    <span className="flex-1">
-                      {linea.nombre}{" "}
-                      <span className="text-xs text-gray">
-                        (vendidas {linea.cantidad})
-                      </span>
-                    </span>
-                    <input
-                      name="linea_cantidad"
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      max={linea.cantidad}
-                      defaultValue="0"
-                      aria-label={`Cantidad a devolver de ${linea.nombre}`}
-                      className="w-24 rounded border border-gray/40 px-2 py-1"
-                    />
-                  </div>
-                ))}
-                <span className="text-xs text-gray">
-                  Cero = no se devuelve. Cuenta contra lo que quede sin acreditar, no
-                  contra lo vendido.
-                </span>
-              </div>
+              <LineasAcreditables lineas={lineas} cargando={cargandoLineas} error={errorLineas} />
             )}
           </fieldset>
 
@@ -277,19 +331,46 @@ function DialogoNotaCredito({
 }
 
 /** Anular o acreditar, nunca las dos: antes de cobrar se anula, después
- * solo queda la nota de crédito (RN-CPP-009). */
-function Acciones({ venta, comprobante }: { venta: Venta; comprobante?: Comprobante }) {
-  if (venta.estado === "orden") return <BotonAnular venta={venta} />;
-  const acreditable =
-    comprobante !== undefined &&
+ * solo queda la nota de crédito (RN-CPP-009).
+ *
+ * El permiso decide si la acción se ofrece, no solo el estado: la API es
+ * quien autoriza de verdad, pero un botón que siempre termina en 403 es peor
+ * que no tenerlo. Anular admite `sales.cobrar` **o** `sales.anular` porque el
+ * endpoint concede con cualquiera de los dos (`check_permission`): el cajero
+ * cobra y no anula, el supervisor anula y no cobra. */
+function puedeAnular(permisos: string[]): boolean {
+  return tienePermiso(permisos, "sales.cobrar") || tienePermiso(permisos, "sales.anular");
+}
+
+function admiteNotaCredito(comprobante: Comprobante, permisos: string[]): boolean {
+  return (
     comprobante.tipo !== "nc" &&
     comprobante.estado_emision === "aceptado" &&
-    !comprobante.anulado_por_nc_id;
-  if (acreditable) return <DialogoNotaCredito venta={venta} comprobante={comprobante} />;
+    !comprobante.anulado_por_nc_id &&
+    tienePermiso(permisos, "sales.emitir_nota_credito")
+  );
+}
+
+function Acciones({
+  venta,
+  comprobante,
+  permisos,
+}: {
+  venta: Venta;
+  comprobante?: Comprobante;
+  permisos: string[];
+}) {
+  const guion = <span className="text-xs text-gray">—</span>;
+  if (venta.estado === "orden") {
+    return puedeAnular(permisos) ? <BotonAnular venta={venta} /> : guion;
+  }
+  if (comprobante !== undefined && admiteNotaCredito(comprobante, permisos)) {
+    return <DialogoNotaCredito venta={venta} comprobante={comprobante} />;
+  }
   if (comprobante?.anulado_por_nc_id) {
     return <span className="text-xs text-gray">acreditado</span>;
   }
-  return <span className="text-xs text-gray">—</span>;
+  return guion;
 }
 
 
@@ -325,6 +406,7 @@ export function JornadaCliente({
   sucursalId,
   fecha,
   estado,
+  permisos,
 }: {
   ventas: Venta[];
   comprobantes: Record<string, Comprobante>;
@@ -332,6 +414,7 @@ export function JornadaCliente({
   sucursalId: string;
   fecha: string;
   estado: string;
+  permisos: string[];
 }) {
   const router = useRouter();
 
@@ -445,10 +528,10 @@ export function JornadaCliente({
                   <EstadoVenta estado={v.estado} />
                 </td>
                 <td className="py-2 pr-4">
-                  <CeldaComprobante comprobante={comprobantes[v.id]} />
+                  <CeldaComprobante comprobante={comprobantes[v.id]} permisos={permisos} />
                 </td>
                 <td className="py-2">
-                  <Acciones venta={v} comprobante={comprobantes[v.id]} />
+                  <Acciones venta={v} comprobante={comprobantes[v.id]} permisos={permisos} />
                 </td>
               </tr>
             ))}

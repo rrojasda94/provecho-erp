@@ -265,7 +265,7 @@ def listar_ventas(
     sucursal_id: uuid.UUID | None = None,
     desde: date | None = None,
     hasta: date | None = None,
-    estado: str | None = None,
+    estado: rules.EstadoVenta | None = None,
     punto_venta_id: uuid.UUID | None = None,
     tipo: str | None = None,
     _: Usuario = Depends(require_permission(LEER)),
