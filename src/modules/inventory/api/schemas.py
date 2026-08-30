@@ -200,8 +200,24 @@ class MovimientoOut(BaseModel):
 
 
 class StockOut(BaseModel):
+    """Una fila del stock, ya rotulada.
+
+    Los nombres viajan con la fila y no se resuelven en el cliente: la
+    pantalla pediría el catálogo entero de SKUs y de almacenes para dibujar
+    50 filas, y con el catálogo creciendo esa es la petición que se rompe
+    primero. Mismo criterio que `StockDeSkuOut`, que ya traía `almacen`.
+    """
+
     almacen_id: uuid.UUID
+    almacen: str
     sku_id: uuid.UUID
+    sku_codigo: str | None = None
+    articulo_id: uuid.UUID | None = None
+    articulo: str | None = None
+    unidad: str | None = None
+    # Con cuántos decimales se expresa la cantidad en esa unidad
+    # (RN-GER-010): media botella no existe y 0,5 kg sí.
+    decimales: int | None = None
     # `cantidad` es el stock físico; `disponible` = físico − reservas
     # activas (RN-INV-009), y es contra ese que se compromete stock nuevo.
     cantidad: Decimal
@@ -209,6 +225,29 @@ class StockOut(BaseModel):
     disponible: Decimal
     stock_minimo: Decimal | None
     bajo_minimo: bool
+
+
+class MovimientoKardexOut(BaseModel):
+    """Una línea del kardex. `MovimientoOut` es lo que devuelve el alta;
+    esto es lo que se lee, y por eso trae rótulos y no solo ids."""
+
+    id: uuid.UUID
+    almacen_id: uuid.UUID
+    almacen: str
+    sku_id: uuid.UUID
+    sku_codigo: str | None = None
+    articulo_id: uuid.UUID | None = None
+    articulo: str | None = None
+    unidad: str | None = None
+    decimales: int | None = None
+    # Con signo: + ingreso, − salida.
+    cantidad: Decimal
+    tipo: str
+    motivo_ajuste: str | None
+    lote_id: uuid.UUID | None
+    referencia: str | None
+    usuario_id: uuid.UUID | None
+    ts: datetime
 
 
 # --- Reservas ---

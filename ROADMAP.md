@@ -185,6 +185,23 @@ la reconciliación completa estilo Odoo 18 entre compras/inventario/
 contabilidad (más allá de los eventos puntuales que ya existen) y la caja
 chica que la compra directa todavía no usa para pagar.
 
+## Parche 0.9.1 — tercer turno de prueba en staging (2026-08-30)
+
+Siete reportes. **Cinco no eran código faltante en el backend**: eran
+superficies que nunca se construyeron sobre endpoints que ya existían y ya
+tenían pruebas verdes — el patrón que se repite desde la 0.8.0 y que este
+parche corta. Los otros dos sí eran decisiones pendientes: cuánto dura una
+sesión y de dónde sale la cuenta contable de lo que se compra y se vende.
+
+| # | Qué | Estado |
+|---|---|---|
+| 2 | El dashboard ofrece el pase al BI (existía el módulo, faltaba el enlace) | ✅ 2026-08-30 |
+| 6 | El despacho embebido en el PDV vuelve con un botón rotulado, no con una × muda | ✅ 2026-08-30 |
+| 1 | Pantalla de stock (`GET /inventory/stock` no lo consumía nadie) y kardex (`GET /inventory/movimientos`, nuevo) | ✅ 2026-08-30 |
+| 3 | La sesión muere con el navegador y a las 8 h quietas (ADR-084) | ⬜ |
+| 4 y 5 | Ciclo de la OC en pantalla y factura de proveedor completa (ADR-085) | ⬜ |
+| 7 | La cuenta contable se configura en la categoría y se hereda (ADR-086) | ⬜ |
+
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)
 
 Rama `feat/catalogo-odoo`, sobre v0.6.0. El catálogo pasa al modelo de

@@ -2,6 +2,8 @@
 (segregación de funciones). SQLite en memoria + override de get_db.
 """
 
+import uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -529,4 +531,148 @@ def test_leer_sin_permiso_403(env):
     r = client.post("/api/v1/inventory/categorias", headers=h, json={
         "empresa_id": ids["empresa_id"], "nombre": "Lácteos",
     })
+    assert r.status_code == 403
+
+
+# --- Pantalla de stock: rótulos, filtros y kardex ----------------------------
+def _con_stock(client, ids, cantidad="100"):
+    h = _token(client)
+    client.post("/api/v1/inventory/movimientos", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": cantidad, "tipo": "recepcion_compra",
+    })
+    return h
+
+
+def test_el_stock_viaja_con_sus_nombres(env):
+    """Sin esto la pantalla dibuja UUID, o pide el catálogo entero de SKUs y
+    de almacenes para rotular 50 filas."""
+    client, ids, _ = env
+    h = _con_stock(client, ids)
+    fila = client.get("/api/v1/inventory/stock", headers=h).json()["items"][0]
+    assert fila["almacen"] == "Central"
+    assert fila["articulo"] == "Harina"
+    assert fila["sku_codigo"] == "SKU-HARINA"
+    assert fila["unidad"] == "Kilo"
+    assert fila["articulo_id"] == ids["articulo_id"]
+
+
+def test_el_stock_filtra_por_bajo_minimo(env):
+    client, ids, TestSession = env
+    h = _con_stock(client, ids, cantidad="3")
+    assert client.get(
+        "/api/v1/inventory/stock?bajo_minimo=true", headers=h
+    ).json()["total"] == 0
+
+    from src.modules.inventory.infrastructure.models import Stock
+    with TestSession() as s:
+        s.scalar(select(Stock)).stock_minimo = Decimal("5")
+        s.commit()
+
+    pagina = client.get("/api/v1/inventory/stock?bajo_minimo=true", headers=h).json()
+    assert pagina["total"] == 1
+    assert pagina["items"][0]["bajo_minimo"] is True
+
+
+def test_el_stock_filtra_por_texto_del_articulo_y_del_sku(env):
+    client, ids, _ = env
+    h = _con_stock(client, ids)
+    assert client.get("/api/v1/inventory/stock?q=harin", headers=h).json()["total"] == 1
+    assert client.get("/api/v1/inventory/stock?q=SKU-HAR", headers=h).json()["total"] == 1
+    assert client.get("/api/v1/inventory/stock?q=queso", headers=h).json()["total"] == 0
+
+
+def test_el_stock_filtra_por_categoria(env):
+    client, ids, TestSession = env
+    h = _con_stock(client, ids)
+    cat = client.post("/api/v1/inventory/categorias", headers=h, json={
+        "empresa_id": ids["empresa_id"], "nombre": "Abarrotes",
+    }).json()
+    assert client.get(
+        f"/api/v1/inventory/stock?categoria_id={cat['id']}", headers=h
+    ).json()["total"] == 0
+
+    from src.modules.inventory.infrastructure.models import Articulo as Art
+    with TestSession() as s:
+        s.get(Art, uuid.UUID(ids["articulo_id"])).categoria_id = uuid.UUID(cat["id"])
+        s.commit()
+
+    assert client.get(
+        f"/api/v1/inventory/stock?categoria_id={cat['id']}", headers=h
+    ).json()["total"] == 1
+
+
+def test_el_stock_filtra_por_sucursal_del_almacen(env):
+    """El almacén de la fixture es central (`sucursal_id` NULL): pedir una
+    sucursal cualquiera no puede devolverlo."""
+    client, ids, TestSession = env
+    h = _con_stock(client, ids)
+    with TestSession() as s:
+        sucursal_id = s.scalar(select(Sucursal.id))
+    assert client.get(
+        f"/api/v1/inventory/stock?sucursal_id={sucursal_id}", headers=h
+    ).json()["total"] == 0
+
+    from src.modules.users.infrastructure.models import Almacen as Alm
+    with TestSession() as s:
+        s.get(Alm, uuid.UUID(ids["almacen_id"])).sucursal_id = sucursal_id
+        s.commit()
+
+    assert client.get(
+        f"/api/v1/inventory/stock?sucursal_id={sucursal_id}", headers=h
+    ).json()["total"] == 1
+
+
+def test_el_kardex_lista_los_movimientos_del_mas_nuevo_al_mas_viejo(env):
+    """`movimiento_inventario` se escribía desde el primer slice y no había
+    forma de leerlo: la pantalla decía cuánto queda y nunca por qué.
+
+    El `ts` se fija a mano porque su `server_default` en SQLite tiene
+    resolución de segundo y las dos altas caen en el mismo: lo que se afirma
+    acá es el orden por fecha, no el desempate entre movimientos simultáneos
+    (una salida FEFO repartida entre lotes son varios en el mismo instante,
+    y ahí el orden lo decide el id — estable, aunque arbitrario).
+    """
+    client, ids, TestSession = env
+    h = _con_stock(client, ids, cantidad="10")
+    client.post("/api/v1/inventory/movimientos", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "-4", "tipo": "consumo_venta",
+    })
+    from src.modules.inventory.infrastructure.models import MovimientoInventario
+    with TestSession() as s:
+        for mov in s.scalars(select(MovimientoInventario)).all():
+            mov.ts = datetime(2026, 8, 30, 9 if mov.cantidad > 0 else 10, tzinfo=UTC)
+        s.commit()
+
+    pagina = client.get(
+        f"/api/v1/inventory/movimientos?sku_id={ids['sku_id']}", headers=h
+    ).json()
+    assert pagina["total"] == 2
+    assert [m["tipo"] for m in pagina["items"]] == ["consumo_venta", "recepcion_compra"]
+    assert Decimal(pagina["items"][0]["cantidad"]) == Decimal("-4")
+    assert pagina["items"][0]["articulo"] == "Harina"
+    assert pagina["items"][0]["almacen"] == "Central"
+
+
+def test_el_kardex_de_otra_empresa_no_se_ve(env):
+    """Mismo criterio que el resto de inventory: el alcance sale del almacén
+    (ADR-004), no de lo que pida el cliente."""
+    client, ids, TestSession = env
+    h = _con_stock(client, ids)
+    with TestSession() as s:
+        grupo_id = s.scalar(select(Empresa.grupo_id))
+        otra = Empresa(
+            grupo_id=grupo_id, ruc="20999999999", razon_social="Ajena EIRL",
+            domicilio_fiscal="Lima", tipo="operativa",
+        )
+        s.add(otra)
+        s.flush()
+        ajeno = Almacen(empresa_id=otra.id, nombre="Ajeno", tipo="central")
+        s.add(ajeno)
+        s.commit()
+        ajeno_id = str(ajeno.id)
+    # 403 y no 404: `exigir_almacen` distingue "no existe" de "no es tuyo",
+    # y el almacén existe. Es la convención del módulo entero.
+    r = client.get(f"/api/v1/inventory/movimientos?almacen_id={ajeno_id}", headers=h)
     assert r.status_code == 403

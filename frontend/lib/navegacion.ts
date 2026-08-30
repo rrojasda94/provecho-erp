@@ -43,7 +43,11 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Divisas", href: "/gerencia/divisas" },
   ],
   inventario: [
-    // Primero lo que se hace todos los días: pedir y contar.
+    // Primera de todas: la pregunta con la que se abre el módulo es qué hay.
+    // Hasta ahora el único saldo visible era el de la ficha de un SKU, a la
+    // que solo se llegaba sabiendo de antemano cuál mirar.
+    { label: "Stock", href: "/inventario/stock" },
+    // Después lo que se hace todos los días: pedir y contar.
     { label: "Requerimientos", href: "/inventario/solicitudes" },
     { label: "Conteos", href: "/inventario/conteos" },
     { label: "Artículos", href: "/inventario/articulos" },

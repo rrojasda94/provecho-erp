@@ -66,20 +66,33 @@ function Kpi({
   valor,
   detalle,
   alerta,
+  href,
 }: {
   titulo: string;
   valor: string | number;
   detalle?: string;
   alerta?: boolean;
+  /** A dónde lleva la cifra. Un indicador que dice "hay 12" y no ofrece
+   * verlos obliga a buscar esos doce a mano en otra pantalla. */
+  href?: string;
 }) {
-  return (
-    <article className="rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-sm">
+  const cuerpo = (
+    <>
       <h2 className="rotulo">{titulo}</h2>
       <p className={`cifra mt-2 text-3xl font-semibold ${alerta ? "text-secondary" : ""}`}>
         {valor}
       </p>
       {detalle && <p className="cifra mt-0.5 text-sm text-gray">{detalle}</p>}
-    </article>
+    </>
+  );
+  const clase =
+    "rounded-lg border border-border bg-card p-4 transition-shadow hover:shadow-sm";
+  return href ? (
+    <Link href={href} className={`${clase} block`}>
+      {cuerpo}
+    </Link>
+  ) : (
+    <article className={clase}>{cuerpo}</article>
   );
 }
 
@@ -178,6 +191,8 @@ export default async function DashboardPage() {
             titulo="Stock bajo mínimo"
             valor={resumen.datos.stock_bajo_minimo}
             alerta={resumen.datos.stock_bajo_minimo > 0}
+            detalle="Ver cuáles"
+            href="/inventario/stock?bajo=1"
           />
           <Kpi
             titulo="Incidencias de inventario (7d)"

@@ -14030,6 +14030,161 @@
         "title": "MovimientoDineroOut",
         "type": "object"
       },
+      "MovimientoKardexOut": {
+        "description": "Una línea del kardex. `MovimientoOut` es lo que devuelve el alta;\nesto es lo que se lee, y por eso trae rótulos y no solo ids.",
+        "properties": {
+          "almacen": {
+            "title": "Almacen",
+            "type": "string"
+          },
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "articulo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo"
+          },
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "decimales": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decimales"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
+          "motivo_ajuste": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Ajuste"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          },
+          "sku_codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sku Codigo"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "unidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad"
+          },
+          "usuario_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usuario Id"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "almacen",
+          "sku_id",
+          "cantidad",
+          "tipo",
+          "motivo_ajuste",
+          "lote_id",
+          "referencia",
+          "usuario_id",
+          "ts"
+        ],
+        "title": "MovimientoKardexOut",
+        "type": "object"
+      },
       "MovimientoMayorOut": {
         "properties": {
           "asiento_id": {
@@ -15570,6 +15725,37 @@
           "page_size"
         ],
         "title": "Pagina[MovimientoDineroOut]",
+        "type": "object"
+      },
+      "Pagina_MovimientoKardexOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MovimientoKardexOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[MovimientoKardexOut]",
         "type": "object"
       },
       "Pagina_NotificacionOut_": {
@@ -24957,11 +25143,39 @@
         "type": "object"
       },
       "StockOut": {
+        "description": "Una fila del stock, ya rotulada.\n\nLos nombres viajan con la fila y no se resuelven en el cliente: la\npantalla pediría el catálogo entero de SKUs y de almacenes para dibujar\n50 filas, y con el catálogo creciendo esa es la petición que se rompe\nprimero. Mismo criterio que `StockDeSkuOut`, que ya traía `almacen`.",
         "properties": {
+          "almacen": {
+            "title": "Almacen",
+            "type": "string"
+          },
           "almacen_id": {
             "format": "uuid",
             "title": "Almacen Id",
             "type": "string"
+          },
+          "articulo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo"
+          },
+          "articulo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Articulo Id"
           },
           "bajo_minimo": {
             "title": "Bajo Minimo",
@@ -24972,6 +25186,17 @@
             "title": "Cantidad",
             "type": "string"
           },
+          "decimales": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decimales"
+          },
           "disponible": {
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Disponible",
@@ -24981,6 +25206,17 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Reservado",
             "type": "string"
+          },
+          "sku_codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sku Codigo"
           },
           "sku_id": {
             "format": "uuid",
@@ -24998,10 +25234,22 @@
               }
             ],
             "title": "Stock Minimo"
+          },
+          "unidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad"
           }
         },
         "required": [
           "almacen_id",
+          "almacen",
           "sku_id",
           "cantidad",
           "reservado",
@@ -35616,6 +35864,104 @@
       }
     },
     "/api/v1/inventory/movimientos": {
+      "get": {
+        "description": "El kardex. `movimiento_inventario` se escribe desde el primer slice y\nhasta ahora no había forma de leerlo: la pantalla decía cuánto queda y\nnunca por qué cambió.",
+        "operationId": "consultar_movimientos_api_v1_inventory_movimientos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sku_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sku Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_MovimientoKardexOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Consultar Movimientos",
+        "tags": [
+          "inventory"
+        ]
+      },
       "post": {
         "description": "Devuelve una lista porque una salida FEFO puede repartirse entre\nvarios lotes, y cada lote es un movimiento propio (ADR-015).",
         "operationId": "registrar_movimiento_api_v1_inventory_movimientos_post",
@@ -37465,6 +37811,7 @@
     },
     "/api/v1/inventory/stock": {
       "get": {
+        "description": "Qué hay y dónde. Los filtros son los de la pantalla de stock: por\nalmacén, por sucursal (todos sus almacenes), por categoría, solo lo que\nestá bajo su punto de reorden, o por texto sobre el artículo y el SKU.",
         "operationId": "consultar_stock_api_v1_inventory_stock_get",
         "parameters": [
           {
@@ -37482,6 +37829,67 @@
                 }
               ],
               "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "categoria_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Categoria Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bajo_minimo",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Bajo Minimo",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
             }
           },
           {

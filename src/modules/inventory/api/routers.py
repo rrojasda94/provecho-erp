@@ -370,15 +370,54 @@ def obtener_sku(
 @router.get("/stock", response_model=Pagina[schemas.StockOut])
 def consultar_stock(
     almacen_id: uuid.UUID | None = None,
+    sucursal_id: uuid.UUID | None = None,
+    categoria_id: uuid.UUID | None = None,
+    bajo_minimo: bool = False,
+    q: str | None = Query(default=None, max_length=100),
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
+    """Qué hay y dónde. Los filtros son los de la pantalla de stock: por
+    almacén, por sucursal (todos sus almacenes), por categoría, solo lo que
+    está bajo su punto de reorden, o por texto sobre el artículo y el SKU."""
     if almacen_id is not None:
         exigir_almacen(session, almacen_id, tenant)
     return stock_uc.consultar_stock_pagina(
-        session, p, almacen_id, tenant.filtro_empresa()
+        session,
+        p,
+        almacen_id,
+        tenant.filtro_empresa(),
+        sucursal_id=sucursal_id,
+        categoria_id=categoria_id,
+        bajo_minimo=bajo_minimo,
+        texto=q,
+    )
+
+
+@router.get("/movimientos", response_model=Pagina[schemas.MovimientoKardexOut])
+def consultar_movimientos(
+    almacen_id: uuid.UUID | None = None,
+    sku_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """El kardex. `movimiento_inventario` se escribe desde el primer slice y
+    hasta ahora no había forma de leerlo: la pantalla decía cuánto queda y
+    nunca por qué cambió."""
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
+    if sku_id is not None:
+        exigir_sku(session, sku_id, tenant)
+    return stock_uc.consultar_movimientos_pagina(
+        session,
+        p,
+        almacen_id=almacen_id,
+        sku_id=sku_id,
+        empresa_id=tenant.filtro_empresa(),
     )
 
 

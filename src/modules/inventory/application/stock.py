@@ -15,7 +15,13 @@ from src.core.events import event_bus
 from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application.errors import ReglaNegocio, StockInsuficiente
 from src.modules.inventory.domain import rules
-from src.modules.inventory.infrastructure.models import MovimientoInventario, Stock
+from src.modules.inventory.infrastructure.models import (
+    Articulo,
+    MovimientoInventario,
+    Sku,
+    Stock,
+    UnidadMedida,
+)
 from src.modules.inventory.infrastructure.repositories import (
     LoteRepo,
     MovimientoRepo,
@@ -288,14 +294,33 @@ def consultar_stock_pagina(
     p: Paginacion,
     almacen_id: uuid.UUID | None = None,
     empresa_id: uuid.UUID | None = None,
+    *,
+    sucursal_id: uuid.UUID | None = None,
+    categoria_id: uuid.UUID | None = None,
+    bajo_minimo: bool | None = None,
+    texto: str | None = None,
 ) -> dict:
     """Igual que `consultar_stock`, pero una página a la vez (ADR-026).
 
-    El corte va sobre `stock`, y las reservas se componen solo para las
-    filas de esa página: es donde vive el volumen (un SKU por almacén).
+    El corte va sobre `stock`, y las reservas y los nombres se componen solo
+    para las filas de esa página: es donde vive el volumen (un SKU por
+    almacén).
     """
-    pagina = paginar(session, StockRepo(session).q_list(almacen_id, empresa_id), p)
-    pagina["items"] = _componer(session, pagina["items"], almacen_id, empresa_id)
+    pagina = paginar(
+        session,
+        StockRepo(session).q_list(
+            almacen_id,
+            empresa_id,
+            sucursal_id=sucursal_id,
+            categoria_id=categoria_id,
+            bajo_minimo=bajo_minimo,
+            q=texto,
+        ),
+        p,
+    )
+    pagina["items"] = _componer(
+        session, pagina["items"], almacen_id, empresa_id, con_nombres=True
+    )
     return pagina
 
 
@@ -346,18 +371,62 @@ def _nombres_de_almacen(session: Session, ids) -> dict[uuid.UUID, str]:
     )
 
 
+def rotulos_de_sku(session: Session, ids) -> dict[uuid.UUID, dict]:
+    """Cómo se llama cada SKU: su código, su artículo y la unidad en que se
+    cuenta.
+
+    Una consulta para todos, no una por fila. Es el mismo criterio que
+    `_nombres_de_almacen`: la pantalla de stock pide 50 filas y resolver el
+    nombre de a uno serían 150 viajes.
+    """
+    ids = {i for i in ids if i is not None}
+    if not ids:
+        return {}
+    filas = session.execute(
+        select(
+            Sku.id,
+            Sku.codigo,
+            Articulo.id,
+            Articulo.nombre,
+            UnidadMedida.nombre,
+            UnidadMedida.decimales,
+        )
+        .join(Articulo, Articulo.id == Sku.articulo_id)
+        .join(UnidadMedida, UnidadMedida.id == Articulo.unidad_medida_id)
+        .where(Sku.id.in_(ids))
+    ).all()
+    return {
+        sku_id: {
+            "sku_codigo": codigo,
+            "articulo_id": articulo_id,
+            "articulo": articulo,
+            "unidad": unidad,
+            "decimales": decimales,
+        }
+        for sku_id, codigo, articulo_id, articulo, unidad, decimales in filas
+    }
+
+
 def _componer(
     session: Session,
     filas: list,
     almacen_id: uuid.UUID | None,
     empresa_id: uuid.UUID | None,
+    *,
+    con_nombres: bool = False,
 ) -> list[dict]:
     reservado: dict[tuple[uuid.UUID, uuid.UUID], Decimal] = {}
     for r in ReservaRepo(session).activas(almacen_id, None, empresa_id):
         clave = (r.almacen_id, r.sku_id)
         reservado[clave] = reservado.get(clave, Decimal(0)) + r.cantidad
-    return [
-        {
+    # Los rótulos solo se piden cuando alguien los va a leer: los consumidores
+    # internos (reservas, transferencias, conteos) trabajan con ids y pagarían
+    # dos consultas de más por fila que nunca se dibuja.
+    almacenes = _nombres_de_almacen(session, [f.almacen_id for f in filas]) if con_nombres else {}
+    skus = rotulos_de_sku(session, [f.sku_id for f in filas]) if con_nombres else {}
+    compuestas = []
+    for s in filas:
+        fila = {
             "almacen_id": s.almacen_id,
             "sku_id": s.sku_id,
             "cantidad": s.cantidad,
@@ -368,8 +437,51 @@ def _componer(
             "stock_minimo": s.stock_minimo,
             "bajo_minimo": rules.stock_bajo(s.cantidad, s.stock_minimo),
         }
-        for s in filas
+        if con_nombres:
+            # "(borrado)" y no `None`: la fila de stock de un almacén dado de
+            # baja sigue existiendo, y esconderla mentiría sobre el total.
+            fila["almacen"] = almacenes.get(s.almacen_id, "(borrado)")
+            fila.update(skus.get(s.sku_id, {}))
+        compuestas.append(fila)
+    return compuestas
+
+
+def consultar_movimientos_pagina(
+    session: Session,
+    p: Paginacion,
+    *,
+    almacen_id: uuid.UUID | None = None,
+    sku_id: uuid.UUID | None = None,
+    empresa_id: uuid.UUID | None = None,
+) -> dict:
+    """El kardex: qué entró y qué salió, con su rótulo.
+
+    `movimiento_inventario` se escribía desde el primer slice y no había
+    ninguna forma de leerlo: la pantalla decía cuánto queda y nunca por qué.
+    """
+    pagina = paginar(
+        session, MovimientoRepo(session).q_list(almacen_id, sku_id, empresa_id), p
+    )
+    almacenes = _nombres_de_almacen(session, [m.almacen_id for m in pagina["items"]])
+    skus = rotulos_de_sku(session, [m.sku_id for m in pagina["items"]])
+    pagina["items"] = [
+        {
+            "id": m.id,
+            "almacen_id": m.almacen_id,
+            "almacen": almacenes.get(m.almacen_id, "(borrado)"),
+            "sku_id": m.sku_id,
+            "cantidad": m.cantidad,
+            "tipo": m.tipo,
+            "motivo_ajuste": m.motivo_ajuste,
+            "lote_id": m.lote_id,
+            "referencia": m.referencia,
+            "usuario_id": m.usuario_id,
+            "ts": m.ts,
+            **skus.get(m.sku_id, {}),
+        }
+        for m in pagina["items"]
     ]
+    return pagina
 
 
 def contar_bajo_minimo(session: Session, empresa_id: uuid.UUID) -> int:

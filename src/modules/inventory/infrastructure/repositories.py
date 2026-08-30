@@ -311,20 +311,48 @@ class StockRepo:
         almacen_id: uuid.UUID | None = None,
         empresa_id: uuid.UUID | None = None,
         sku_id: uuid.UUID | None = None,
+        *,
+        sucursal_id: uuid.UUID | None = None,
+        categoria_id: uuid.UUID | None = None,
+        bajo_minimo: bool | None = None,
+        q: str | None = None,
     ):
-        q = select(Stock)
+        consulta = select(Stock)
         if almacen_id is not None:
-            q = q.where(Stock.almacen_id == almacen_id)
+            consulta = consulta.where(Stock.almacen_id == almacen_id)
         if sku_id is not None:
-            q = q.where(Stock.sku_id == sku_id)
-        if empresa_id is not None:
-            # El stock no lleva empresa: la hereda del almacén (ADR-004).
-            q = q.join(Almacen, Almacen.id == Stock.almacen_id).where(
-                Almacen.empresa_id == empresa_id
+            consulta = consulta.where(Stock.sku_id == sku_id)
+        if empresa_id is not None or sucursal_id is not None:
+            # El stock no lleva empresa ni sucursal: las hereda del almacén
+            # (ADR-004). Un solo join sirve a las dos.
+            consulta = consulta.join(Almacen, Almacen.id == Stock.almacen_id)
+            if empresa_id is not None:
+                consulta = consulta.where(Almacen.empresa_id == empresa_id)
+            if sucursal_id is not None:
+                consulta = consulta.where(Almacen.sucursal_id == sucursal_id)
+        if categoria_id is not None or q:
+            # La categoría y el nombre son del artículo, dos saltos más
+            # arriba: `stock` habla de SKU y el SKU cuelga del artículo.
+            consulta = consulta.join(Sku, Sku.id == Stock.sku_id).join(
+                Articulo, Articulo.id == Sku.articulo_id
+            )
+            if categoria_id is not None:
+                consulta = consulta.where(Articulo.categoria_id == categoria_id)
+            if q:
+                patron = f"%{q.strip()}%"
+                consulta = consulta.where(
+                    or_(Articulo.nombre.ilike(patron), Sku.codigo.ilike(patron))
+                )
+        if bajo_minimo:
+            # La misma condición que `rules.stock_bajo`, expresada en SQL —
+            # traerse la tabla entera para filtrar en Python es lo que
+            # `contar_bajo_minimo` ya dejó de hacer.
+            consulta = consulta.where(
+                Stock.stock_minimo.is_not(None), Stock.cantidad <= Stock.stock_minimo
             )
         # Orden estable: sin él, dos páginas seguidas pueden repetir u
         # omitir filas (Postgres no promete orden sin `ORDER BY`).
-        return q.order_by(Stock.almacen_id, Stock.sku_id)
+        return consulta.order_by(Stock.almacen_id, Stock.sku_id)
 
     def list(
         self,
@@ -349,18 +377,47 @@ class MovimientoRepo:
         self.s.flush()
         return mov
 
-    def q_list(self, almacen_id: uuid.UUID, sku_id: uuid.UUID):
-        return (
-            select(MovimientoInventario)
-            .where(
-                MovimientoInventario.almacen_id == almacen_id,
-                MovimientoInventario.sku_id == sku_id,
-            )
-            .order_by(MovimientoInventario.ts)
+    def q_list(
+        self,
+        almacen_id: uuid.UUID | None = None,
+        sku_id: uuid.UUID | None = None,
+        empresa_id: uuid.UUID | None = None,
+    ):
+        """El kardex, de lo más reciente a lo más viejo.
+
+        Los tres filtros son opcionales porque la pregunta de la pantalla no
+        siempre es la misma: «qué pasó con este SKU acá» al abrir una ficha,
+        «qué se movió hoy en este almacén» al cuadrar el día.
+
+        El orden se invirtió respecto de la consulta original —que nadie
+        llegó a usar—: quien mira un kardex quiere el último movimiento
+        arriba, y con paginación el orden ascendente dejaba lo importante en
+        la última página.
+        """
+        consulta = select(MovimientoInventario)
+        if almacen_id is not None:
+            consulta = consulta.where(MovimientoInventario.almacen_id == almacen_id)
+        if sku_id is not None:
+            consulta = consulta.where(MovimientoInventario.sku_id == sku_id)
+        if empresa_id is not None:
+            # El movimiento hereda la empresa de su almacén (ADR-004).
+            consulta = consulta.join(
+                Almacen, Almacen.id == MovimientoInventario.almacen_id
+            ).where(Almacen.empresa_id == empresa_id)
+        # `id` desempata: dos movimientos del mismo `ts` (una salida FEFO
+        # repartida entre lotes se inserta en el mismo instante) se
+        # ordenarían distinto en cada página.
+        return consulta.order_by(
+            MovimientoInventario.ts.desc(), MovimientoInventario.id.desc()
         )
 
-    def list(self, almacen_id: uuid.UUID, sku_id: uuid.UUID) -> list[MovimientoInventario]:
-        return list(self.s.scalars(self.q_list(almacen_id, sku_id)))
+    def list(
+        self,
+        almacen_id: uuid.UUID | None = None,
+        sku_id: uuid.UUID | None = None,
+        empresa_id: uuid.UUID | None = None,
+    ) -> list[MovimientoInventario]:
+        return list(self.s.scalars(self.q_list(almacen_id, sku_id, empresa_id)))
 
 
 class LoteRepo:
