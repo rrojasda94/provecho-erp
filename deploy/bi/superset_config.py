@@ -16,6 +16,17 @@ from superset.security import SupersetSecurityManager
 # --- Identidad del proceso ---------------------------------------------
 SECRET_KEY = os.environ["SUPERSET_SECRET_KEY"]
 
+# Caddy le habla a este proceso por HTTP dentro de la red de Docker (TLS
+# termina en Caddy, ver Caddyfile) — sin esto, Superset no tiene forma de
+# saber que la conexión de verdad llegó por HTTPS y arma sus propias URLs
+# (el `redirect_uri` que le manda a Provecho al armar el login OAuth,
+# `oauth_authorize_url` de Authlib) con esquema `http://`. La comparación de
+# `redirect_uri` en `src/core/oauth/servicio.py` es exacta, no por prefijo,
+# así que ese esquema equivocado alcanza para que el login falle con
+# "server_error" — comprobado a mano contra el droplet BI real. Un solo
+# proxy por delante (Caddy): confiar un salto de `X-Forwarded-*` alcanza.
+ENABLE_PROXY_FIX = True
+
 # --- Metadata de Superset: esquema aparte de la Postgres de staging -----
 # Rol `superset_meta`, creado por `scripts/superset_provision_db.sql` —
 # CRUD solo sobre su propio esquema, cero acceso a las tablas de Provecho ni
@@ -45,7 +56,19 @@ OAUTH_PROVIDERS = [
             "api_base_url": f"{PROVECHO_API_URL}/api/v1/oauth/",
             "access_token_url": f"{PROVECHO_API_URL}/api/v1/oauth/token",
             "authorize_url": f"{PROVECHO_WEB_URL}/oauth/authorize",
-            "client_kwargs": {"scope": "profile"},
+            # Sin esto, Authlib manda client_id/client_secret por HTTP Basic
+            # (su default, RFC 6749 §2.3.1) — pero POST /oauth/token
+            # (src/core/oauth/router.py) los espera como campos del form
+            # (Form(...), RFC 6749 §2.3.1 "or" la otra mitad), y FastAPI
+            # rechaza el request con 422 antes de llegar a la lógica de
+            # negocio: sin ningún log de OAuthError que lo explique, solo
+            # "Error returning OAuth user info: 'access_token'" del lado de
+            # Superset, porque el token nunca llegó. Comprobado a mano
+            # contra el droplet BI real.
+            "client_kwargs": {
+                "scope": "profile",
+                "token_endpoint_auth_method": "client_secret_post",
+            },
         },
     }
 ]
