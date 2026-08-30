@@ -7,7 +7,7 @@ deuda técnica, ver ROADMAP).
 """
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -69,9 +69,7 @@ def crear_orden_compra(
     tipo: str = "insumo",
 ) -> OrdenCompra:
     if tipo != "insumo":
-        raise ReglaNegocio(
-            "OC tipo 'activo' requiere requerimiento_activo — aún no soportado"
-        )
+        raise ReglaNegocio("OC tipo 'activo' requiere requerimiento_activo — aún no soportado")
     if not items:
         raise ReglaNegocio("una OC requiere al menos un ítem")
 
@@ -217,13 +215,12 @@ def emitir_orden_compra(
     )
     if rules.requiere_aprobacion(orden.total, umbral) and not puede_aprobar_monto:
         raise ReglaNegocio(
-            f"total {orden.total} supera el umbral {umbral}; "
-            "requiere permiso purchases.aprobar"
+            f"total {orden.total} supera el umbral {umbral}; requiere permiso purchases.aprobar"
         )
     estado_previo = orden.estado
     orden.estado = "emitida"
     orden.emitido_por = actor_id
-    orden.fecha_emision = datetime.now()
+    orden.fecha_emision = datetime.now(UTC)
     auditoria.registrar(
         session,
         usuario_id=actor_id,
@@ -286,9 +283,7 @@ def recibir_orden_compra(
     for it in items:
         oc_item = items_oc.get(it["orden_compra_item_id"])
         if oc_item is None:
-            raise NoEncontrado(
-                f"ítem {it['orden_compra_item_id']} no pertenece a esta OC"
-            )
+            raise NoEncontrado(f"ítem {it['orden_compra_item_id']} no pertenece a esta OC")
         cantidad_recibida = Decimal(str(it["cantidad_recibida"]))
         if cantidad_recibida <= 0:
             raise ReglaNegocio("cantidad_recibida debe ser > 0")
@@ -316,9 +311,7 @@ def recibir_orden_compra(
                 # único que queda para reprocesar (RN-VNC-002).
                 lote_codigo=it.get("lote_codigo"),
                 fecha_vencimiento=(
-                    date.fromisoformat(vencimiento)
-                    if isinstance(vencimiento, str)
-                    else vencimiento
+                    date.fromisoformat(vencimiento) if isinstance(vencimiento, str) else vencimiento
                 ),
             )
         )
@@ -331,9 +324,7 @@ def recibir_orden_compra(
                 # artículo no controla lote (RN-VNC-002).
                 "lote_codigo": it.get("lote_codigo"),
                 "fecha_vencimiento": (
-                    vencimiento.isoformat()
-                    if hasattr(vencimiento, "isoformat")
-                    else vencimiento
+                    vencimiento.isoformat() if hasattr(vencimiento, "isoformat") else vencimiento
                 ),
             }
         )
@@ -363,9 +354,7 @@ def anular_orden_compra(
     if orden is None:
         raise NoEncontrado("orden de compra no encontrada")
     if not rules.puede_anular(orden.estado):
-        raise Conflicto(
-            f"OC {orden.estado}: con recepción registrada no admite anulación directa"
-        )
+        raise Conflicto(f"OC {orden.estado}: con recepción registrada no admite anulación directa")
     orden.estado = "anulada"
     event_bus.publish(
         "purchases.oc_anulada",

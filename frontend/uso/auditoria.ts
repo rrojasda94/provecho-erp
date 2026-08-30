@@ -14,8 +14,23 @@ export type Hallazgo = {
   detalle: string;
 };
 
+/** Marca de que no había pantalla que auditar, no de que la pantalla esté
+ * mal. La compara `revisar()` para reintentar; viaja como texto porque el
+ * cuerpo del `evaluate` corre en el navegador y no ve el módulo. */
+export const EN_VUELO = "navegación en vuelo";
+
 export async function auditar(page: Page): Promise<Hallazgo[]> {
   return page.evaluate(() => {
+    // Un documento sin raíz es una navegación a medio commitear: Chromium
+    // deja `document.documentElement` en null mientras reemplaza el
+    // documento, y medirlo no da un hallazgo, da un TypeError. Es la otra
+    // cara del "Execution context was destroyed" que `revisar()` ya
+    // reintenta — pasa cuando la ruta redirige después de empezar a
+    // transmitir (los `/<modulo>` lo hacen: cargan un documento y saltan al
+    // siguiente), así que `goto()` puede volver entre los dos.
+    const raiz = document.scrollingElement ?? document.documentElement;
+    if (!raiz) throw new Error("navegación en vuelo");
+
     const nombre = (el: Element) => {
       const t = (el.getAttribute("aria-label") ?? el.textContent ?? "").trim();
       const cls = el.className.toString().split(" ")[0] || "-";
@@ -128,7 +143,6 @@ export async function auditar(page: Page): Promise<Hallazgo[]> {
           detalle: `${nombre(x.d)} desvío x=${Math.round(x.v.x)} y=${Math.round(x.v.y)}`,
         }));
 
-    const raiz = document.scrollingElement ?? document.documentElement;
     const desbordePagina =
       raiz.scrollWidth > raiz.clientWidth + 1
         ? [

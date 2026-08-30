@@ -323,6 +323,8 @@ finanzas documentados en el área:
 
 "+ PIN" = token de `POST /auth/autorizar` en el cuerpo (`autorizacion`): la
 sesión del cajero no alcanza, tiene que firmar quien recibe o autoriza
-(RN-MDP-002, RN-AUD-005). Se pide donde la plata cambia de manos o donde se
+(RN-MDP-002, RN-AUD-005). El token es de **un solo uso** — se gasta en la
+operación que lo presenta; reintentar esa misma operación con su
+`idempotency_key` no cuenta como reuso. Se pide donde la plata cambia de manos o donde se
 corrige evidencia ya escrita — **no** para abrir ni cerrar el turno, que son
 actos del cajero (RN-MDP-008, ADR-049).

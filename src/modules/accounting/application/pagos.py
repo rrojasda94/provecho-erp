@@ -8,7 +8,7 @@ un contador lo registra a mano)."""
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -121,7 +121,7 @@ def ejecutar_pago(
     movimiento.medio_pago = medio_pago
     movimiento.constancia = constancia
     movimiento.aprobado_por = actor_id
-    movimiento.fecha_ejecucion = datetime.now()
+    movimiento.fecha_ejecucion = datetime.now(UTC)
     auditoria.registrar(
         session,
         usuario_id=actor_id,
