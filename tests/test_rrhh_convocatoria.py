@@ -98,6 +98,19 @@ def _postular(client, token, **overrides):
     return client.post(f"/api/v1/rrhh/postulaciones/{token}", json=body)
 
 
+def _postular_y_id(client, h, convocatoria_id, token, **overrides):
+    """Postula y devuelve el id de la ficha.
+
+    El acuse público ya no la trae (ADR-087): el id sale del tablero, que es
+    de donde lo saca quien de verdad trabaja el proceso."""
+    assert _postular(client, token, **overrides).status_code == 201
+    tablero = client.get(
+        f"/api/v1/rrhh/convocatorias/{convocatoria_id}/tablero", headers=h
+    ).json()
+    recibidos = next(c for c in tablero if c["estado"] == "recibido")["postulantes"]
+    return recibidos[-1]["id"]
+
+
 def test_convocatoria_sin_perfil_no_se_publica(env):
     """RN-RRHH-013: sin perfil de puesto aprobado no hay convocatoria."""
     client, ids, _ = env
@@ -137,12 +150,53 @@ def test_postulacion_publica_sin_jwt_entra_al_tablero(env):
     r = _postular(client, token)
 
     assert r.status_code == 201
-    postulante = r.json()
+    # El acuse es mínimo a propósito: quien postuló no tiene sesión, así que
+    # no recibe su id, ni la empresa, ni el estado interno del proceso.
+    assert r.json() == {"recibida": True, "puesto": "Pizzero"}
+
+    postulante_id = _postular_y_id(client, h, convocatoria_id, token, nombres="Ana")
+    postulante = client.get(f"/api/v1/rrhh/postulantes/{postulante_id}", headers=h).json()
     assert postulante["estado"] == "recibido"
     assert postulante["empresa_id"] == ids["empresa_id"]
     assert postulante["puesto_postulado"] == "Pizzero"
     assert postulante["persona_id"] is None  # el candidato no entra a `persona`
     assert postulante["respuestas"] == {"¿Tiene carné de sanidad?": "Sí, vigente"}
+
+
+def test_convocatoria_publica_se_lee_sin_jwt_y_no_filtra_de_mas(env):
+    """Lo que la página pública necesita para dibujar el formulario, y nada
+    más: sin `id`, sin `empresa_id` y sin el rango salarial (ADR-087)."""
+    client, ids, _ = env
+    h = _token(client)
+    convocatoria_id = _crear_convocatoria(
+        client, h, ids, fecha_limite="2030-12-31"
+    ).json()["id"]
+    token = _publicar(client, h, convocatoria_id).json()["token_publico"]
+
+    r = client.get(f"/api/v1/rrhh/postulaciones/{token}")
+
+    assert r.status_code == 200
+    assert r.json() == {
+        "puesto": "Pizzero",
+        "vacantes": 1,
+        "jornada_horas_semana": None,
+        "fecha_limite": "2030-12-31",
+    }
+
+
+def test_convocatoria_publica_cerrada_o_vencida_no_se_lee(env):
+    client, ids, _ = env
+    h = _token(client)
+    assert client.get("/api/v1/rrhh/postulaciones/token-que-no-existe").status_code == 404
+
+    vencida = _crear_convocatoria(client, h, ids, fecha_limite="2020-01-01").json()["id"]
+    token_vencido = _publicar(client, h, vencida).json()["token_publico"]
+    assert client.get(f"/api/v1/rrhh/postulaciones/{token_vencido}").status_code == 409
+
+    abierta = _crear_convocatoria(client, h, ids).json()["id"]
+    token = _publicar(client, h, abierta).json()["token_publico"]
+    client.post(f"/api/v1/rrhh/convocatorias/{abierta}/cerrar", headers=h)
+    assert client.get(f"/api/v1/rrhh/postulaciones/{token}").status_code == 404
 
 
 def test_postulacion_sin_consentimiento_rechazada(env):
@@ -192,7 +246,7 @@ def test_avance_por_el_tablero_solo_a_la_columna_siguiente(env):
     h = _token(client)
     convocatoria_id = _crear_convocatoria(client, h, ids).json()["id"]
     token = _publicar(client, h, convocatoria_id).json()["token_publico"]
-    postulante_id = _postular(client, token).json()["id"]
+    postulante_id = _postular_y_id(client, h, convocatoria_id, token)
 
     salto = client.post(
         f"/api/v1/rrhh/postulantes/{postulante_id}/avanzar",
@@ -215,7 +269,7 @@ def test_descartar_exige_motivo_y_queda_registrado(env):
     h = _token(client)
     convocatoria_id = _crear_convocatoria(client, h, ids).json()["id"]
     token = _publicar(client, h, convocatoria_id).json()["token_publico"]
-    postulante_id = _postular(client, token).json()["id"]
+    postulante_id = _postular_y_id(client, h, convocatoria_id, token)
 
     sin_motivo = client.post(
         f"/api/v1/rrhh/postulantes/{postulante_id}/descartar", headers=h, json={"motivo": ""}
@@ -235,7 +289,7 @@ def test_descartar_exige_motivo_y_queda_registrado(env):
 def _hasta_oferta(client, h, ids):
     convocatoria_id = _crear_convocatoria(client, h, ids).json()["id"]
     token = _publicar(client, h, convocatoria_id).json()["token_publico"]
-    postulante_id = _postular(client, token).json()["id"]
+    postulante_id = _postular_y_id(client, h, convocatoria_id, token)
     for etapa in ("preseleccionado", "entrevistado", "verificado", "oferta_enviada"):
         client.post(
             f"/api/v1/rrhh/postulantes/{postulante_id}/avanzar",

@@ -16,7 +16,8 @@ Administrador/gerente.
 - Requisición aprobada + perfil de puesto
 - Plantilla: [convocatoria-puesto](../../../../templates/rrhh/convocatoria-puesto.md)
 - ERP: módulo RRHH → Convocatorias (crear, publicar, cerrar)
-- Formulario de postulación en **Google Forms** conectado al ERP (ver abajo)
+- Formulario de postulación: el del propio ERP (ver abajo). Google Forms
+  sigue sirviendo para quien ya lo tenga armado
 - Canales: grupos de Facebook de empleo de la zona, Computrabajo/Indeed,
   cartel en el local, referidos del personal actual
 
@@ -32,10 +33,13 @@ Administrador/gerente.
    **El ERP no puede revisar esto: lo revisa el administrador antes de
    publicar** (RN-RRHH-013).
 4. Publicar la convocatoria en el ERP. Sin perfil de puesto registrado el
-   sistema la rechaza. Al publicar, el ERP entrega el **token** del formulario.
-5. Duplicar el Google Form modelo, pegar el token en su Apps Script (abajo) y
-   poner el enlace del formulario como canal único de postulación en el aviso,
-   junto con la fecha límite.
+   sistema la rechaza. Al publicar, el ERP entrega el **enlace del formulario**
+   —con su botón de copiar, en la misma pantalla de contratación—.
+5. Pegar ese enlace como canal único de postulación en el aviso, junto con la
+   fecha límite. Nada que configurar: la página ya muestra el puesto y el plazo
+   de esta convocatoria. (Solo si se prefiere Google Forms: duplicar el
+   formulario modelo y pegar el **token** —lo último de la URL— en su Apps
+   Script, ver abajo.)
 6. Publicar el aviso en mínimo 2 canales: referidos internos + 1 canal público.
    Avisar al personal actual — un referido de un buen trabajador suele ser
    el mejor canal.
@@ -48,10 +52,16 @@ Administrador/gerente.
 
 ## Conexión del formulario con el ERP
 
-Google Forms es el formulario porque es gratis, el candidato ya sabe usarlo
-desde el celular y no hay nada que hospedar. El puente al ERP es un Apps
-Script del propio formulario (**Extensiones → Apps Script**), con un
-disparador `onFormSubmit`:
+El camino normal no tiene conexión que armar: la página de postulación **es**
+del ERP (ADR-087). El enlace que entrega la pantalla de contratación al
+publicar ya trae el token de esta convocatoria, muestra el puesto y el plazo, y
+la postulación cae directo en la columna «recibido» del tablero. El candidato
+autoriza el tratamiento de sus datos en el mismo formulario (RN-PER-004).
+
+**Google Forms sigue siendo válido** —y conviene cuando la búsqueda necesita
+preguntas propias, que la página del ERP no tiene—. El puente es un Apps Script
+del propio formulario (**Extensiones → Apps Script**), con un disparador
+`onFormSubmit`. El `TOKEN` es lo último del enlace de postulación:
 
 ```javascript
 const TOKEN = 'PEGAR-AQUI-EL-TOKEN-DE-LA-CONVOCATORIA';
@@ -78,14 +88,15 @@ function alEnviarFormulario(e) {
 }
 ```
 
-El formulario debe incluir sí o sí la pregunta de autorización de datos
+Ese formulario debe incluir sí o sí la pregunta de autorización de datos
 (obligatoria, opciones Sí/No): sin consentimiento el ERP rechaza la
 postulación (RN-PER-004, Ley 29733). Las demás preguntas son libres — se
 guardan tal cual y se ven en la ficha del postulante.
 
 Si el token cambia (convocatoria nueva), se actualiza la constante `TOKEN` del
 script del formulario duplicado. Un token de una convocatoria cerrada deja de
-funcionar solo.
+funcionar solo — y con él, el enlace de la página del ERP, que a partir de ahí
+muestra «esta convocatoria ya cerró».
 
 ## Excepciones
 - Si en 5 días no llegan postulantes → revisar sueldo ofrecido contra mercado
@@ -105,7 +116,8 @@ funcionar solo.
 - [ ] Convocatoria registrada en el ERP con perfil de puesto
 - [ ] Aviso redactado desde el perfil con la plantilla
 - [ ] Sin requisitos discriminatorios
-- [ ] Convocatoria publicada en el ERP y token pegado en el formulario
+- [ ] Convocatoria publicada en el ERP y enlace de postulación copiado
+- [ ] Enlace abierto una vez para confirmar que muestra el puesto correcto
 - [ ] Enlace del formulario y fecha límite en el aviso
 - [ ] Publicado en ≥ 2 canales (incluye referidos internos)
 - [ ] Convocatoria cerrada en fecha límite

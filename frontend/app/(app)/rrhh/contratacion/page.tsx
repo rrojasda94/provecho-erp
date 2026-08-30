@@ -22,10 +22,15 @@ function elegirConvocatoria(
 }
 
 /** El enlace del formulario público solo existe si la convocatoria está
- * publicada: el token nace al publicar. */
+ * publicada: el token nace al publicar.
+ *
+ * Es la página del ERP (ADR-087) y no la ruta de la API: esta última solo
+ * acepta POST, así que quien la abría en el navegador —o la pegaba en un
+ * aviso— se topaba con un 405. El mismo token sigue sirviendo para el Apps
+ * Script de un Google Forms, que se copia del final de la URL. */
 function enlaceDe(convocatoria: Convocatoria | undefined): string | null {
   if (!convocatoria?.token_publico) return null;
-  return `/api/v1/rrhh/postulaciones/${convocatoria.token_publico}`;
+  return `/postular/${convocatoria.token_publico}`;
 }
 
 export default async function ContratacionPage({

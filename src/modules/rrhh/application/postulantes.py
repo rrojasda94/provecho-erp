@@ -14,7 +14,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src.config.settings import settings
-from src.modules.rrhh.application import trabajadores
+from src.modules.rrhh.application import convocatorias, trabajadores
 from src.modules.rrhh.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.rrhh.domain import rules
 from src.modules.rrhh.infrastructure.models import Postulante
@@ -103,11 +103,7 @@ def recibir_postulacion(
     """Entrada del formulario público. El token identifica la convocatoria y
     es lo único que autoriza a escribir — de ahí que solo exista mientras
     está publicada."""
-    convocatoria = ConvocatoriaRepo(session).get_por_token(token)
-    if convocatoria is None or convocatoria.estado != "publicada":
-        raise NoEncontrado("convocatoria no encontrada o cerrada")
-    if convocatoria.fecha_limite is not None and fecha_postulacion > convocatoria.fecha_limite:
-        raise Conflicto("la convocatoria cerró su fecha límite")
+    convocatoria = convocatorias.publicada_por_token(session, token, fecha_postulacion)
 
     return PostulanteRepo(session).add(
         _nuevo_postulante(

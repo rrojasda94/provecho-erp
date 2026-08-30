@@ -152,6 +152,22 @@ class ConvocatoriaOut(BaseModel):
     estado: str
 
 
+class ConvocatoriaPublicaOut(BaseModel):
+    """Lo que ve quien abre el enlace del formulario **sin sesión**.
+
+    Cuatro campos y ninguno más: el candidato necesita saber a qué postula y
+    hasta cuándo. `remuneracion_min`/`max` quedan fuera a propósito —el rango
+    es dato de negociación, no del aviso— y también el `id`, el `empresa_id` y
+    el estado, que solo le sirven a quien ya tiene permiso de leer la ficha.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+    puesto: str
+    vacantes: int
+    jornada_horas_semana: Decimal | None
+    fecha_limite: date | None
+
+
 # --- Postulante -----------------------------------------------------------------
 
 _MAX_RESPUESTAS = 40
@@ -205,6 +221,15 @@ class PostulacionPublica(BaseModel):
     respuestas: dict[str, str] | None = None
 
     _respuestas_acotadas = field_validator("respuestas")(_valida_respuestas)
+
+
+class PostulacionRecibidaOut(BaseModel):
+    """Acuse del formulario público. No devuelve la ficha: quien postuló no
+    tiene sesión, y `PostulanteOut` le entregaría su `id`, el `empresa_id` y
+    el estado interno del proceso a cualquiera que sepa el token."""
+
+    recibida: bool
+    puesto: str
 
 
 class PostulanteUpdate(BaseModel):

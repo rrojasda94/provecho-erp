@@ -99,6 +99,24 @@ def cerrar_convocatoria(session: Session, convocatoria_id: uuid.UUID) -> Convoca
     return convocatoria
 
 
+def publicada_por_token(session: Session, token: str, hoy: date) -> Convocatoria:
+    """La convocatoria detrás del token del formulario público.
+
+    El token es lo único que autoriza a leerla y a escribirle, y por eso solo
+    existe mientras está publicada: `publicar_convocatoria` lo genera y
+    `cerrar_convocatoria` lo retira. Vive acá y no en `postulantes` porque
+    ahora lo usan los dos lados del formulario —la página que lo dibuja y el
+    envío que lo recibe— y la regla de cuándo una convocatoria sigue abierta
+    se escribe una sola vez.
+    """
+    convocatoria = ConvocatoriaRepo(session).get_por_token(token)
+    if convocatoria is None or convocatoria.estado != "publicada":
+        raise NoEncontrado("convocatoria no encontrada o cerrada")
+    if convocatoria.fecha_limite is not None and hoy > convocatoria.fecha_limite:
+        raise Conflicto("la convocatoria cerró su fecha límite")
+    return convocatoria
+
+
 def listar_convocatorias(
     session: Session, empresa_id: uuid.UUID | None = None, estado: str | None = None
 ) -> list[Convocatoria]:

@@ -86,14 +86,14 @@ export default function ReconocerteCliente({
   return (
     <form
       ref={formulario}
-      className="reconocerte-form"
+      className="publico-form"
       onSubmit={(e) => {
         e.preventDefault();
         const datos = new FormData(e.currentTarget);
         startTransition(() => despachar(datos));
       }}
     >
-      <label className="reconocerte-campo">
+      <label className="publico-campo">
         <span>DNI</span>
         <input
           name="numero_documento"
@@ -106,7 +106,7 @@ export default function ReconocerteCliente({
         <small>Con tu DNI completamos tu nombre y es tu código de descuento.</small>
       </label>
 
-      <label className="reconocerte-campo">
+      <label className="publico-campo">
         <span>Nombres y apellidos</span>
         <input
           name="nombre"
@@ -118,12 +118,12 @@ export default function ReconocerteCliente({
         />
       </label>
 
-      <label className="reconocerte-campo">
+      <label className="publico-campo">
         <span>Teléfono</span>
         <input name="telefono" type="tel" inputMode="tel" autoComplete="tel" required />
       </label>
 
-      <label className="reconocerte-campo">
+      <label className="publico-campo">
         <span>Fecha de cumpleaños</span>
         <input name="fecha_nacimiento" type="date" autoComplete="bday" />
       </label>
@@ -137,11 +137,11 @@ export default function ReconocerteCliente({
       <CampoDireccion
         nombre="direccion"
         etiqueta="Dirección"
-        claseEtiqueta="reconocerte-campo"
-        claseCampo="reconocerte-input"
+        claseEtiqueta="publico-campo"
+        claseCampo="publico-input"
       />
 
-      <label className="reconocerte-terminos">
+      <label className="publico-consentimiento">
         <input type="checkbox" name="acepta_terminos" required />
         <span>
           Acepto los{" "}
@@ -154,16 +154,16 @@ export default function ReconocerteCliente({
       </label>
 
       {estado.error ? (
-        <p className="reconocerte-error" role="alert">
+        <p className="publico-error" role="alert">
           {estado.error}
         </p>
       ) : null}
 
-      <button type="submit" className="reconocerte-boton" disabled={pendiente}>
+      <button type="submit" className="publico-boton" disabled={pendiente}>
         {pendiente ? "Registrando..." : `Quiero mi ${descuento}% de descuento`}
       </button>
 
-      <p className="reconocerte-letra-chica">
+      <p className="publico-letra-chica">
         El cupón vale {vigenciaDias} días desde que lo recibes y se usa una sola vez.
       </p>
     </form>

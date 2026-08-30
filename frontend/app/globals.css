@@ -1166,8 +1166,79 @@ dialog:modal {
         font-size: 0.875rem;
     }
 
-    /* --- Formulario ------------------------------------------------------- */
-    .reconocerte-form {
+    /* --- Postulación pública (ADR-087) ------------------------------------ */
+    /* Sobria a propósito: acá no vende Charlie's, contrata Majambo. El aviso
+       con el sueldo y las funciones ya lo leyó el candidato en el canal por
+       el que llegó — esta página es el formulario, no el afiche. */
+    .postular-hero {
+        margin-bottom: 2rem;
+    }
+
+    .postular-sobretitulo {
+        font-size: 0.8125rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .postular-titulo {
+        font-family: var(--fuente-logo), sans-serif;
+        text-transform: uppercase;
+        font-size: clamp(1.75rem, 7vw, 2.5rem);
+        line-height: 1.1;
+        color: var(--marca-dark);
+        margin-bottom: 1rem;
+    }
+
+    .postular-datos {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .postular-datos dt {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted-foreground);
+    }
+
+    .postular-datos dd {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--foreground);
+    }
+
+    .postular-bajada {
+        font-size: 1.0625rem;
+        line-height: 1.5;
+        color: var(--foreground);
+    }
+
+    .postular-gracias {
+        display: grid;
+        gap: 0.75rem;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: calc(var(--radius) * 2);
+        padding: 2rem 1.5rem;
+        box-shadow: var(--sombra-2);
+        animation: revelar 320ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    }
+
+    .postular-gracias-titulo {
+        font-size: 1.0625rem;
+        font-weight: 600;
+    }
+
+    /* --- Formulario (compartido por las páginas de `(publico)`) ----------- */
+    /* Nacieron en la landing «RE-conocerte» con su nombre; se renombraron a
+       `publico-*` cuando la postulación pública estrenó el segundo formulario
+       del grupo (ADR-087). Lo específico de cada página sigue con el suyo. */
+    .publico-form {
         display: grid;
         gap: 1.125rem;
         background: var(--card);
@@ -1180,7 +1251,7 @@ dialog:modal {
     /* El peso va en la etiqueta y los campos lo resetean, en vez de al revés:
        `CampoDireccion` pone su texto suelto dentro del `<label>` (sin `span`)
        y con la regla al revés ese rótulo quedaría en peso normal. */
-    .reconocerte-campo {
+    .publico-campo {
         display: grid;
         gap: 0.375rem;
         font-size: 0.875rem;
@@ -1188,11 +1259,12 @@ dialog:modal {
         color: var(--foreground);
     }
 
-    /* `.reconocerte-input` es para `CampoDireccion`: su prop `claseCampo` va
+    /* `.publico-input` es para `CampoDireccion`: su prop `claseCampo` va
        al `<input>`, no al contenedor, así que un descendiente no lo alcanza. */
-    .reconocerte-campo input,
-    .reconocerte-campo select,
-    .reconocerte-input {
+    .publico-campo input,
+    .publico-campo select,
+    .publico-campo textarea,
+    .publico-input {
         width: 100%;
         /* 16px exactos: por debajo de eso Safari en iOS hace zoom al enfocar
            un campo y descuadra la página entera. */
@@ -1208,20 +1280,21 @@ dialog:modal {
         transition: border-color var(--transicion), box-shadow var(--transicion);
     }
 
-    .reconocerte-campo input:focus-visible,
-    .reconocerte-input:focus-visible {
+    .publico-campo input:focus-visible,
+    .publico-campo textarea:focus-visible,
+    .publico-input:focus-visible {
         outline: none;
         border-color: var(--primary);
         box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
     }
 
-    .reconocerte-campo small {
+    .publico-campo small {
         font-size: 0.75rem;
         font-weight: 400;
         color: var(--muted-foreground);
     }
 
-    .reconocerte-terminos {
+    .publico-consentimiento {
         display: flex;
         align-items: flex-start;
         gap: 0.625rem;
@@ -1230,7 +1303,7 @@ dialog:modal {
         color: var(--muted-foreground);
     }
 
-    .reconocerte-terminos input {
+    .publico-consentimiento input {
         flex: none;
         width: 1.125rem;
         height: 1.125rem;
@@ -1238,12 +1311,12 @@ dialog:modal {
         accent-color: var(--primary);
     }
 
-    .reconocerte-terminos a {
+    .publico-consentimiento a {
         color: var(--primary);
         text-decoration: underline;
     }
 
-    .reconocerte-boton {
+    .publico-boton {
         min-height: 3rem;
         font-size: 1rem;
         font-weight: 700;
@@ -1255,26 +1328,26 @@ dialog:modal {
         transition: background var(--transicion), transform var(--transicion);
     }
 
-    .reconocerte-boton:not(:disabled):hover {
+    .publico-boton:not(:disabled):hover {
         background: color-mix(in srgb, var(--primary) 88%, var(--marca-dark));
     }
 
-    .reconocerte-boton:not(:disabled):active {
+    .publico-boton:not(:disabled):active {
         transform: translateY(1px);
     }
 
-    .reconocerte-boton:disabled {
+    .publico-boton:disabled {
         opacity: 0.65;
         cursor: default;
     }
 
-    .reconocerte-error {
+    .publico-error {
         color: var(--destructive);
         font-size: 0.875rem;
         font-weight: 600;
     }
 
-    .reconocerte-letra-chica {
+    .publico-letra-chica {
         font-size: 0.75rem;
         color: var(--muted-foreground);
         text-align: center;

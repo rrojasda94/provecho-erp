@@ -7076,6 +7076,51 @@
         "title": "ConvocatoriaOut",
         "type": "object"
       },
+      "ConvocatoriaPublicaOut": {
+        "description": "Lo que ve quien abre el enlace del formulario **sin sesión**.\n\nCuatro campos y ninguno más: el candidato necesita saber a qué postula y\nhasta cuándo. `remuneracion_min`/`max` quedan fuera a propósito —el rango\nes dato de negociación, no del aviso— y también el `id`, el `empresa_id` y\nel estado, que solo le sirven a quien ya tiene permiso de leer la ficha.",
+        "properties": {
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite"
+          },
+          "jornada_horas_semana": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jornada Horas Semana"
+          },
+          "puesto": {
+            "title": "Puesto",
+            "type": "string"
+          },
+          "vacantes": {
+            "title": "Vacantes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "puesto",
+          "vacantes",
+          "jornada_horas_semana",
+          "fecha_limite"
+        ],
+        "title": "ConvocatoriaPublicaOut",
+        "type": "object"
+      },
       "ConvocatoriaPublicar": {
         "properties": {
           "fecha_publicacion": {
@@ -19010,6 +19055,25 @@
         "title": "PostulacionPublica",
         "type": "object"
       },
+      "PostulacionRecibidaOut": {
+        "description": "Acuse del formulario público. No devuelve la ficha: quien postuló no\ntiene sesión, y `PostulanteOut` le entregaría su `id`, el `empresa_id` y\nel estado interno del proceso a cualquiera que sepa el token.",
+        "properties": {
+          "puesto": {
+            "title": "Puesto",
+            "type": "string"
+          },
+          "recibida": {
+            "title": "Recibida",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "recibida",
+          "puesto"
+        ],
+        "title": "PostulacionRecibidaOut",
+        "type": "object"
+      },
       "PostulanteAnonimizar": {
         "properties": {
           "motivo": {
@@ -30197,7 +30261,7 @@
   "info": {
     "description": "ERP modular para grupo de restaurantes multi-marca. Convenciones de la API: docs/engineering/api-guidelines.md.",
     "title": "Provecho ERP",
-    "version": "0.9.1"
+    "version": "0.6.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -47467,8 +47531,49 @@
       }
     },
     "/api/v1/rrhh/postulaciones/{token}": {
+      "get": {
+        "description": "Lo que la página pública necesita para dibujar el formulario (ADR-087).\n\nSin JWT y sin tenant, igual que el POST de abajo: el token es toda la\nautorización que hay. Una convocatoria cerrada, vencida o un token\ninventado responden error —cuál, no le importa a quien pregunta desde\ninternet— y la página muestra lo mismo en los tres casos.",
+        "operationId": "ver_convocatoria_publica_api_v1_rrhh_postulaciones__token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConvocatoriaPublicaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ver Convocatoria Publica",
+        "tags": [
+          "rrhh"
+        ]
+      },
       "post": {
-        "description": "Endpoint público del formulario de postulación (Google Forms vía Apps\nScript, o cualquier formulario propio). Sin JWT: el token de la\nconvocatoria publicada es lo único que autoriza a escribir, y solo puede\ncrear un postulante.",
+        "description": "Endpoint público del formulario de postulación (la página del ERP, un\nGoogle Forms vía Apps Script o cualquier formulario propio). Sin JWT: el\ntoken de la convocatoria publicada es lo único que autoriza a escribir, y\nsolo puede crear un postulante.",
         "operationId": "recibir_postulacion_api_v1_rrhh_postulaciones__token__post",
         "parameters": [
           {
@@ -47496,7 +47601,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PostulanteOut"
+                  "$ref": "#/components/schemas/PostulacionRecibidaOut"
                 }
               }
             },
