@@ -50,7 +50,11 @@ import { useBorradoresPdv } from "./use-borradores-pdv";
 import { useCajaPdv } from "./use-caja-pdv";
 import { useImpresionPdv } from "./use-impresion-pdv";
 import { useDatosPdv } from "./use-datos-pdv";
-import { UBICACION_VACIA, type Ubicacion } from "@/components/direccion/ubicacion";
+import {
+  soloUbicacion,
+  UBICACION_VACIA,
+  type Ubicacion,
+} from "@/components/direccion/ubicacion";
 import { Combobox } from "@/components/ui/combobox";
 
 type Props = {
@@ -785,7 +789,7 @@ export default function PdvCliente({
     parchar({
       cliente: encontrado,
       direccion: encontrado.direccion,
-      ubicacion: encontrado,
+      ubicacion: soloUbicacion(encontrado),
     });
     notificar(`${encontrado.nombre} ${queLePaso}`);
     return true;
@@ -1319,7 +1323,11 @@ export default function PdvCliente({
           // El texto y su ancla viajan juntos: nunca uno sin el otro
           // (ADR-053), o el reparto cotizaría contra un punto ajeno al
           // texto que se ve en pantalla.
-          parchar({ cliente: c, direccion: c.direccion, ubicacion: c });
+          parchar({
+            cliente: c,
+            direccion: c.direccion,
+            ubicacion: soloUbicacion(c),
+          });
           setDialogo(null);
         }}
         onCrear={crearCliente}
