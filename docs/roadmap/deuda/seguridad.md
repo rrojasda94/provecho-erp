@@ -158,3 +158,28 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   de marca se arma con una fila de `usuario_sucursal` por local. Alcanza
   mientras sean pocos locales por supervisor; con un grupo grande, cada
   sucursal nueva obliga a repartirla a mano en cada cuenta.
+- ✅ 2026-08-30 **La elevación de supervisor dejó de ser reusable**
+  (auditoría backend↔frontend del 2026-08-30, hallazgo #7; ADR-018 §6).
+  `emitir` ponía un `jti` en el token desde el primer día y `verificar`
+  nunca lo miraba: durante los tres minutos de vida, la misma firma
+  autorizaba una operación tras otra. El cajero conseguía la autorización
+  legítima para un descuento y se la aplicaba a las ventas siguientes, con
+  el reporte de descuentos —la razón de ser del campo— nombrando al
+  supervisor en todas. Ahora el `jti` se consume al verificarlo
+  (`marcar_uso_unico`, `src/core/rate_limit.py`: `SET NX EX` con el TTL de
+  la elevación, sobre el mismo cliente y el mismo corta-circuito del rate
+  limit). La marca guarda la clave de idempotencia de la operación cuando la
+  hay, para que un reintento de red no obligue al supervisor a volver al
+  mostrador a teclear de nuevo.
+  - ⬜ **Sin Redis no hay anti-replay**: la guarda es fail-open, igual que
+    el contador del rate limit — un Redis caído no puede cerrar el
+    restaurante. Con Redis abajo el token vuelve a ser reusable dentro de
+    sus 3 minutos y su permiso. Cerrarlo del todo pide llevar la marca a
+    Postgres (tabla + purga), y no vale la pena hasta que un Redis caído sea
+    algo más que un incidente raro.
+  - ⬜ **El token se consume aunque la operación falle después**: se verifica
+    antes de ejecutar, así que un 409 de dominio (stock, caja) deja la
+    elevación gastada y obliga a pedir el PIN de nuevo. Consumirla recién al
+    terminar reabriría la ventana de replay entre dos requests concurrentes;
+    se prefirió la fricción. Si molesta en el mostrador, la salida es
+    reservar y confirmar, no volver atrás.

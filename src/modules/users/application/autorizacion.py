@@ -17,6 +17,12 @@ de descuentos —que es la razón de ser del campo— dejaría de valer nada.
 
 La elevación NO es una sesión: no sirve para llamar a cualquier endpoint,
 no se refresca y muere en `AUTORIZACION_MINUTOS`.
+
+Y es de **un solo uso**: una elevación, una operación. El `jti` se consume
+al verificarlo. Sin eso, el cajero que consiguió una autorización legítima
+para un descuento la reusaba en las ventas siguientes durante tres minutos,
+y el reporte de descuentos —la razón de ser del campo— se las atribuía todas
+al supervisor.
 """
 
 import uuid
@@ -28,6 +34,7 @@ from sqlalchemy.orm import Session
 
 from src.config.settings import settings
 from src.core.logging_config import logger_seguridad
+from src.core.rate_limit import marcar_uso_unico
 from src.modules.users.application.errors import CredencialesInvalidas, TokenInvalido
 from src.modules.users.domain import rules
 from src.modules.users.infrastructure.repositories import UsuarioRepo
@@ -103,11 +110,16 @@ def emitir(
     }
 
 
-def verificar(token: str, permiso: str) -> uuid.UUID:
+def verificar(token: str, permiso: str, *, uso: str | None = None) -> uuid.UUID:
     """Devuelve el `usuario_id` que autorizó, o lanza `TokenInvalido`.
 
-    Comprueba el permiso pedido contra el del token: una elevación obtenida
-    para descontar no puede reutilizarse para anular.
+    Comprueba el permiso pedido contra el del token —una elevación obtenida
+    para descontar no puede reutilizarse para anular— y **consume el token**:
+    la segunda vez que se presente, ya no vale.
+
+    `uso` es la clave de idempotencia de la operación, cuando la tiene. Sirve
+    para que el reintento del mismo request no se confunda con un reuso: el
+    supervisor no tiene que volver al mostrador porque se cortó el wifi.
     """
     try:
         claims: dict[str, Any] = jwt.decode(
@@ -121,4 +133,13 @@ def verificar(token: str, permiso: str) -> uuid.UUID:
         raise TokenInvalido("El token presentado no es una autorización")
     if claims.get("permiso") != permiso:
         raise TokenInvalido(f"La autorización no cubre el permiso {permiso}")
+    jti = claims.get("jti")
+    if not jti:
+        # Toda elevación emitida acá lleva `jti`. Una sin él es un token
+        # armado a mano con el secreto, o uno de antes de este cambio.
+        raise TokenInvalido("La autorización no se puede consumir")
+    if not marcar_uso_unico(
+        TIPO_TOKEN, jti, AUTORIZACION_MINUTOS * 60, marca=uso or "1"
+    ):
+        raise TokenInvalido("La autorización ya fue usada")
     return uuid.UUID(claims["sub"])

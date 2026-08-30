@@ -1,4 +1,5 @@
-"""Rate limiting con contador en Redis (ventana fija).
+"""Guardas con estado efímero en Redis: contador de ventana fija y marca de
+un solo uso.
 
 El lockout de `usuario` (5 intentos) protege una cuenta; esto protege el
 endpoint: frena a quien prueba muchos usernames distintos desde una misma IP.
@@ -15,6 +16,10 @@ Dos formas de llavear el contador, y la diferencia importa:
 El contador, el fail-open y el corta-circuito son los mismos para las dos: dos
 implementaciones del mismo mecanismo es cómo una de las dos termina sin el
 fail-open, que es la parte que evita que un Redis caído cierre el restaurante.
+
+`marcar_uso_unico` vive acá por lo mismo: es otra guarda de vida corta sobre
+el mismo Redis, y duplicar el cliente y el corta-circuito para ella sería
+volver a escribir la parte difícil.
 """
 
 import time
@@ -71,6 +76,48 @@ def consumir(nombre: str, sujeto: str, intentos: int, ventana_segundos: int) -> 
             "Demasiadas solicitudes; reintentar más tarde",
             headers={"Retry-After": str(ventana_segundos)},
         )
+
+
+def marcar_uso_unico(
+    nombre: str, clave: str, ttl_segundos: int, marca: str = "1"
+) -> bool:
+    """`True` la primera vez que se ve `clave`; `False` si ya se había usado.
+
+    Es la otra mitad de un token de un solo uso: la firma dice que el token
+    es auténtico, esto dice que todavía no se gastó.
+
+    `marca` distingue el reintento de la misma operación del reuso: si la
+    clave ya estaba pero con la misma marca, es el mismo request llegando
+    dos veces (un timeout de red, una tablet que reintenta) y no un replay.
+    Sin eso, cada reintento obligaría al supervisor a volver al mostrador a
+    teclear su PIN.
+
+    ponytail: fail-open, igual que el contador — con Redis caído no hay
+    anti-replay, pero el restaurante sigue cobrando. Ese es el techo; si
+    alguna vez hace falta garantía dura, la marca va a Postgres.
+    """
+    global _reintentar_desde
+    if time.monotonic() < _reintentar_desde:
+        return True
+    clave_redis = f"uso:{nombre}:{clave}"
+    try:
+        if _client.set(clave_redis, marca, nx=True, ex=ttl_segundos):
+            return True
+        previa = _client.get(clave_redis)
+    except redis.RedisError:
+        _reintentar_desde = time.monotonic() + PAUSA_TRAS_FALLO_SEGUNDOS
+        logger.warning("Uso único inactivo: Redis no disponible (%s)", nombre)
+        return True
+    if isinstance(previa, bytes):
+        previa = previa.decode()
+    if previa == marca:
+        return True
+    logger.warning(
+        "Reuso de una marca de un solo uso en %s",
+        nombre,
+        extra={"guarda": nombre, "clave": clave},
+    )
+    return False
 
 
 def rate_limit(nombre: str, intentos: int, ventana_segundos: int):
