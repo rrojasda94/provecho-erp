@@ -1,3 +1,7 @@
+// Extensión explícita: estos dos módulos los carga `node --test`, que
+// resuelve ESM por ruta real (mismo motivo que en `lib/carga.test.ts`).
+import { type ErrorCampo, leerError } from "./errores.ts";
+
 /**
  * Base de la API vista desde el SERVIDOR de Next.js (Server Actions,
  * Server Components) — no confundir con NEXT_PUBLIC_API_URL, que es la
@@ -23,6 +27,8 @@ export type Pagina<T> = {
 
 export class ApiError extends Error {
   status: number;
+  /** Campos que el servidor rechazó (422). Vacío en todo lo demás. */
+  campos: ErrorCampo[];
   /**
    * Segundos del `Retry-After` cuando el servidor lo manda (hoy solo el 429
    * de `core/rate_limit.py`). Es el único dato que dice **cuánto** esperar:
@@ -31,10 +37,16 @@ export class ApiError extends Error {
    */
   reintentarEn?: number;
 
-  constructor(status: number, message: string, reintentarEn?: number) {
+  constructor(
+    status: number,
+    message: string,
+    reintentarEn?: number,
+    campos: ErrorCampo[] = [],
+  ) {
     super(message);
     this.status = status;
     this.reintentarEn = reintentarEn;
+    this.campos = campos;
   }
 }
 
@@ -45,19 +57,6 @@ function reintentarEn(respuesta: Response): number | undefined {
   const crudo = respuesta.headers.get("Retry-After");
   const segundos = crudo === null ? NaN : Number(crudo);
   return Number.isFinite(segundos) && segundos > 0 ? segundos : undefined;
-}
-
-async function mensajeDeError(respuesta: Response): Promise<string> {
-  try {
-    const cuerpo = await respuesta.json();
-    if (typeof cuerpo.detail === "string") return cuerpo.detail;
-    if (Array.isArray(cuerpo.detail)) {
-      return cuerpo.detail.map((d: { msg?: string }) => d.msg).join("; ");
-    }
-  } catch {
-    // cuerpo no era JSON — se usa el mensaje genérico de abajo.
-  }
-  return `Error ${respuesta.status}`;
 }
 
 /** Llama a la API con el token del usuario. Lanza `ApiError` si falla —
@@ -77,11 +76,8 @@ export async function apiFetch<T>(
   });
 
   if (!respuesta.ok) {
-    throw new ApiError(
-      respuesta.status,
-      await mensajeDeError(respuesta),
-      reintentarEn(respuesta),
-    );
+    const { mensaje, campos } = await leerError(respuesta);
+    throw new ApiError(respuesta.status, mensaje, reintentarEn(respuesta), campos);
   }
   // 204 no trae cuerpo (asignar/quitar rol, marcar leída): pedirle `.json()`
   // revienta con "Unexpected end of JSON input" sobre una llamada que salió

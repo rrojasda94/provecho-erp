@@ -9,28 +9,22 @@
  * distintos para la misma API.
  */
 
+// Extensión explícita: estos dos módulos los carga `node --test`, que
+// resuelve ESM por ruta real (mismo motivo que en `lib/carga.test.ts`).
+import { type ErrorCampo, leerError } from "./errores.ts";
+
 const BASE = "/api/proxy/api/v1";
 
 export class ErrorApi extends Error {
   status: number;
+  /** Campos que el servidor rechazó (422). Vacío en todo lo demás. */
+  campos: ErrorCampo[];
 
-  constructor(status: number, mensaje: string) {
+  constructor(status: number, mensaje: string, campos: ErrorCampo[] = []) {
     super(mensaje);
     this.status = status;
+    this.campos = campos;
   }
-}
-
-async function mensajeDeError(respuesta: Response): Promise<string> {
-  try {
-    const cuerpo = await respuesta.json();
-    if (typeof cuerpo.detail === "string") return cuerpo.detail;
-    if (Array.isArray(cuerpo.detail)) {
-      return cuerpo.detail.map((d: { msg?: string }) => d.msg).join("; ");
-    }
-  } catch {
-    // Cuerpo no-JSON: cae al mensaje genérico.
-  }
-  return `Error ${respuesta.status}`;
 }
 
 export async function pedir<T>(
@@ -43,7 +37,8 @@ export async function pedir<T>(
     body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined,
   });
   if (!respuesta.ok) {
-    throw new ErrorApi(respuesta.status, await mensajeDeError(respuesta));
+    const { mensaje, campos } = await leerError(respuesta);
+    throw new ErrorApi(respuesta.status, mensaje, campos);
   }
   // 204 (los DELETE) no traen cuerpo: pedirle `.json()` a una respuesta
   // vacía revienta con un error de sintaxis que no dice nada.
@@ -68,7 +63,8 @@ export async function pedirArchivo(
     body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined,
   });
   if (!respuesta.ok) {
-    throw new ErrorApi(respuesta.status, await mensajeDeError(respuesta));
+    const { mensaje, campos } = await leerError(respuesta);
+    throw new ErrorApi(respuesta.status, mensaje, campos);
   }
   const nombre = /filename="([^"]+)"/.exec(
     respuesta.headers.get("Content-Disposition") ?? "",
@@ -88,7 +84,8 @@ export async function subir<T>(ruta: string, archivo: File): Promise<T> {
   cuerpo.append("archivo", archivo);
   const respuesta = await fetch(`${BASE}${ruta}`, { method: "POST", body: cuerpo });
   if (!respuesta.ok) {
-    throw new ErrorApi(respuesta.status, await mensajeDeError(respuesta));
+    const { mensaje, campos } = await leerError(respuesta);
+    throw new ErrorApi(respuesta.status, mensaje, campos);
   }
   return (await respuesta.json()) as T;
 }
