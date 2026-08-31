@@ -143,7 +143,10 @@ cuatro huecos que el punto de venta necesitaba y el modelo no daba.
   para clientes registrados (RN-PTS-005) — regla derivada
   `rules.cliente_identificado`, no una columna. Búsqueda de caja por
   teléfono, documento o nombre en `GET /sales/clientes/buscar?q=`
-  (RN-PTS-006). **Trabajador y usuario siguen exigiendo documento**: esa
+  (RN-PTS-006). El vocabulario de `tipo_documento` es el de
+  `src/shared/documento.py`; acá solo se aceptan los de persona natural
+  (`NATURALES`), porque 11 dígitos hacen al cliente **jurídico** y su RUC va
+  en `cliente.ruc`, no en la persona. **Trabajador y usuario siguen exigiendo documento**: esa
   validación vive en `users.application.admin`, no en el esquema.
 
   **Qué se corrige de un cliente** (2026-08-10, dirección propia desde

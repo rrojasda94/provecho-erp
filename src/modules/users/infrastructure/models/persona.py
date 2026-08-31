@@ -12,7 +12,7 @@ fila. Ver `docs/architecture/adr/ADR-011-derechos-arco-anonimizacion.md`.
 
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Enum, String
+from sqlalchemy import CheckConstraint, Date, DateTime, Enum, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -23,6 +23,7 @@ from src.core.model_base import (
     UuidPkMixin,
     VersionedMixin,
 )
+from src.shared.documento import TIPOS
 
 
 class Persona(
@@ -35,6 +36,19 @@ class Persona(
 ):
     __tablename__ = "persona"
 
+    # El CHECK va explícito y no como `Enum(create_constraint=True)`: el que
+    # genera el tipo queda ligado a él (`_type_bound`) y `alembic check` lo
+    # ignora del lado del modelo, así que ve el de la base como un constraint
+    # sobrante y pide borrarlo en cada corrida. Declarado aquí, el modelo y la
+    # migración `c9f4a2e70b18` cuentan la misma historia. Mismo patrón que
+    # `reports.regla_destinatario`.
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_documento IN ({})".format(", ".join(f"'{t}'" for t in TIPOS)),
+            name="tipo_documento",
+        ),
+    )
+
     nombres: Mapped[str] = mapped_column(String(100))
     apellidos: Mapped[str] = mapped_column(String(100))
     # Documento OPCIONAL desde 2026-07-28 (ADR-018): un cliente de mostrador
@@ -45,7 +59,11 @@ class Persona(
     # es compartida y no todos sus roles tienen la misma exigencia.
     # El UNIQUE se conserva: un índice único admite varios NULL.
     tipo_documento: Mapped[str | None] = mapped_column(
-        Enum("dni", "ce", "pasaporte", name="tipo_documento", native_enum=False),
+        # El `Enum` por sí solo no emite ningún CHECK (default desde 1.4): el
+        # valor fuera del vocabulario entra sin ruido y revienta 500 en **cada
+        # lectura** posterior de esa fila. Quien lo impide es el
+        # `CheckConstraint` de `__table_args__`. Ver migración `c9f4a2e70b18`.
+        Enum(*TIPOS, name="tipo_documento", native_enum=False),
         nullable=True,
     )
     numero_documento: Mapped[str | None] = mapped_column(

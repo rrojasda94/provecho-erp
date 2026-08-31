@@ -100,7 +100,7 @@ class PersonaUpdate(UbicacionMixin):
     nombres: str | None = None
     apellidos: str | None = None
     tipo_documento: str | None = None
-    numero_documento: str | None = None
+    numero_documento: str | None = Field(default=None, max_length=20)
     fecha_nacimiento: date | None = None
     domicilio: str | None = None
     telefono: str | None = None
@@ -112,8 +112,8 @@ class PersonaOut(UbicacionMixin):
     id: uuid.UUID
     nombres: str
     apellidos: str
-    tipo_documento: str
-    numero_documento: str
+    tipo_documento: str | None
+    numero_documento: str | None
     fecha_nacimiento: date | None
     domicilio: str | None
     telefono: str | None

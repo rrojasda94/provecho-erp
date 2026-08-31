@@ -148,7 +148,7 @@ roles siguen diciendo *qué puede* (RN-GEN-004).
 | POST/GET | `/api/v1/roles` | Crear / listar roles |
 | POST/DELETE | `/api/v1/roles/{id}/permisos[/{permiso_id}]` | Asignar / quitar permiso a rol |
 | POST/GET | `/api/v1/permisos` | Crear / listar permisos |
-| POST/GET/PATCH | `/api/v1/personas[/{id}]` | CRUD de persona (party model) — `PATCH` exige `version` |
+| POST/GET/PATCH | `/api/v1/personas[/{id}]` | CRUD de persona (party model) — `PATCH` exige `version`. `tipo_documento` ∈ `dni`/`ce`/`pasaporte`/`ruc` (`carne_extranjeria` se acepta y se normaliza a `ce`) y el número se valida contra su tipo: DNI 8 dígitos, RUC 11, CE y pasaporte alfanuméricos de 6 a 20. El vocabulario vive en `src/shared/documento.py` — antes estaba escrito a mano en el modelo, en `sales` y en tres formularios distintos, y elegir «RUC» guardaba una fila que después hacía fallar toda lectura con 500 |
 | POST | `/api/v1/personas/{id}/anonimizar` | Derecho de cancelación (Ley 29733) — permiso `personas.anonimizar` |
 
 ### Búsqueda de persona (permiso `personas.leer`, no `users.gestionar`)
