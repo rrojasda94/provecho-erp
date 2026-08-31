@@ -21,7 +21,7 @@ No hay `ALTER COLUMN`: el valor más largo del vocabulario sigue siendo
 `pasaporte` (9 caracteres), así que `VARCHAR(9)` ya alcanza.
 
 Revision ID: c9f4a2e70b18
-Revises: 0a056863874b
+Revises: f74025d6c871
 Create Date: 2026-08-30
 
 """
@@ -30,7 +30,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "c9f4a2e70b18"
-down_revision = "0a056863874b"
+down_revision = "f74025d6c871"
 branch_labels = None
 depends_on = None
 

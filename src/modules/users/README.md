@@ -77,6 +77,7 @@ desde donde medir un reparto (ADR-054).
 | POST | `/api/v1/auth/refresh` | `{refresh_token}` | tokens nuevos (rotación) |
 | POST | `/api/v1/auth/logout` | `{refresh_token}` | 204 |
 | POST | `/api/v1/auth/verificar-pin` | `{pin}` | 204 \| 401 \| 423 |
+| POST | `/api/v1/auth/autorizar` | `{username, pin, permiso}` | `{autorizacion, autorizado_por, expira_en_minutos}` |
 | GET | `/api/v1/users/me` | — | usuario + roles + sucursales + permisos |
 
 `verificar-pin` (2026-08-13, ADR-045, RN-POS-014) responde una sola
@@ -90,6 +91,14 @@ para preservar, y `autorizar` está para elevar a **otro** (exige un código de
 permiso, RN-AUD-005). Va detrás del mismo rate limit y **cuenta contra el
 mismo lockout** que el login: un contador propio sería la vía cómoda para
 probar PINes sin agotar los cinco intentos.
+
+`autorizar` (RN-AUD-005, ADR-018 §6) es la elevación que el supervisor firma
+con su PIN en el terminal de otro. Devuelve un JWT de 3 minutos acotado a un
+permiso, y **de un solo uso**: el `jti` se consume al verificarlo, así que la
+misma firma no cubre la operación siguiente. La marca del `jti` vive en Redis
+(`marcar_uso_unico`, `src/core/rate_limit.py`) y lleva la clave de
+idempotencia de la operación cuando la hay, para que reintentar el mismo
+request no cuente como reuso.
 
 Claims del JWT: `sub` (usuario_id), `tipo`, `roles`, `sucursales`, `empresa_id`, `iat`, `exp`, `jti`.
 

@@ -59,7 +59,7 @@ Los tres caminos con PIN responden preguntas distintas y no se sustituyen:
 | Endpoint | Pregunta | Efecto |
 |---|---|---|
 | `/auth/login` | ¿quién sos? | abre sesión (rota tokens) |
-| `/auth/autorizar` | ¿este OTRO tiene tal permiso? | token corto acotado a una acción (RN-AUD-005) |
+| `/auth/autorizar` | ¿este OTRO tiene tal permiso? | token corto acotado a una acción y **de un solo uso** (RN-AUD-005) |
 | `/auth/verificar-pin` | ¿seguís siendo vos? | ninguno — 204 o 401 (RN-POS-014) |
 
 ## Matriz de permisos (semilla)

@@ -1,6 +1,8 @@
+import tomllib
 from datetime import date
 from decimal import Decimal
 from importlib import metadata
+from pathlib import Path
 from typing import Annotated
 
 from pydantic import field_validator, model_validator
@@ -13,12 +15,40 @@ _PASSWORD_DB_POR_DEFECTO = "provecho:provecho@"
 #: imagen ni con `pip install -e ".[dev]"`, que es el primer paso del README).
 _VERSION_DESCONOCIDA = "0.0.0"
 
+#: `src/config/settings.py` → la raíz del repo. En la imagen es `/app`, donde
+#: el `Dockerfile` copia el `pyproject.toml` junto al código.
+_PYPROJECT = Path(__file__).resolve().parents[2] / "pyproject.toml"
+
+
+def _version_del_pyproject() -> str | None:
+    """El archivo del checkout, que es el que `cortar_version.py` mueve."""
+    try:
+        with _PYPROJECT.open("rb") as archivo:
+            return tomllib.load(archivo)["project"]["version"]
+    except (OSError, KeyError, tomllib.TOMLDecodeError):
+        return None
+
 
 def _version_del_paquete() -> str:
-    """La versión sale de `pyproject.toml`, vía la metadata del paquete
-    instalado. Tenerla escrita a mano acá fue justamente lo que la dejó cuatro
-    releases atrás: `cortar_version.py` movía el CHANGELOG y el tag, y este
-    literal no se enteraba."""
+    """La versión sale de `pyproject.toml`. Tenerla escrita a mano acá fue lo
+    que la dejó cuatro releases atrás: `cortar_version.py` movía el CHANGELOG
+    y el tag, y este literal no se enteraba.
+
+    **El archivo manda sobre la metadata del paquete instalado**, y no al
+    revés, porque en un `pip install -e .` esa metadata se escribe una sola
+    vez: el código queda en vivo y la versión no. En una máquina de desarrollo
+    eso significa reportar la versión de la rama que estaba abierta el día que
+    se instaló —y como `openapi.json` se regenera con esta versión adentro y
+    el CI lo compara con `git diff --exit-code`, el contrato se ensucia sin
+    que nadie haya tocado un endpoint—. La imagen y CI instalan de cero en
+    cada corrida, así que para ellos las dos fuentes dicen lo mismo.
+
+    La metadata queda de respaldo para la instalación no editable, donde el
+    paquete vive en `site-packages` y no hay `pyproject.toml` al lado.
+    """
+    del_archivo = _version_del_pyproject()
+    if del_archivo is not None:
+        return del_archivo
     try:
         return metadata.version("provecho")
     except metadata.PackageNotFoundError:

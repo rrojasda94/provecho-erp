@@ -631,11 +631,18 @@ export const api = {
     pedir<void>(`/sales/borradores/${borradorId}`, { metodo: "DELETE" }),
 
   /** Suma líneas a una orden ya enviada (RN-COM-029). Sin autorización: la
-   * mesa que pide de a poco no debería terminar con dos cuentas. */
-  agregarLineas: (ventaId: string, items: VentaNueva["items"]) =>
+   * mesa que pide de a poco no debería terminar con dos cuentas.
+   *
+   * La excepción es el consumo de personal, donde cada aumento es comida
+   * regalada más y el servidor exige el token del encargado (RN-COM-025). */
+  agregarLineas: (
+    ventaId: string,
+    items: VentaNueva["items"],
+    autorizacion?: string,
+  ) =>
     pedir<Venta>(`/sales/ventas/${ventaId}/items`, {
       metodo: "POST",
-      cuerpo: { items },
+      cuerpo: { items, ...(autorizacion ? { autorizacion } : {}) },
     }),
 
   /** Mover productos entre pedidos, o separar la cuenta del mismo pedido

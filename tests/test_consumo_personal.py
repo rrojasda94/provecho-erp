@@ -19,6 +19,7 @@ from sqlalchemy.pool import StaticPool
 import src.core.models_registry  # noqa: F401
 from src.core.app import create_app
 from src.core.database import Base
+from src.core.events import event_bus
 from src.modules.accounting.application import listeners as accounting_listeners
 from src.modules.inventory.application import listeners as inventory_listeners
 from src.modules.inventory.infrastructure.models import (
@@ -376,6 +377,72 @@ def test_la_entrega_cierra_el_consumo_sin_pasar_por_caja(env):
     assert r.status_code == 200, r.text
     with TestSession() as s:
         assert s.get(Venta, uuid.UUID(venta["id"])).estado == "cerrada"
+
+
+def test_sumar_productos_a_un_consumo_lo_firma_el_encargado(env):
+    """Cada aumento es comida regalada más: la firma del alta autorizó ese
+    pedido, no los que vengan después (RN-COM-025)."""
+    client, ids, _ = env
+    h = _token(client)
+    venta = _crear_consumo(client, h, ids).json()
+    linea = {"producto_comercial_id": ids["producto_id"], "cantidad": "1"}
+
+    sin_firma = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/items",
+        headers=h,
+        json={"items": [linea]},
+    )
+    assert sin_firma.status_code == 403, sin_firma.text
+
+    con_firma = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/items",
+        headers=h,
+        json={"items": [linea], "autorizacion": _autorizacion(client)},
+    )
+    assert con_firma.status_code == 201, con_firma.text
+    items = client.get(f"/api/v1/sales/ventas/{venta['id']}/items", headers=h).json()
+    assert len(items) == 2
+
+
+def test_quitar_una_linea_del_consumo_se_firma_aunque_este_en_la_ventana(env):
+    """La ventana de corrección exime al cajero de firmar un tecleo suyo. En
+    un consumo no aplica: sacar una línea deshace lo que un encargado ya
+    firmó, y el insumo vuelve al almacén (RN-COM-025)."""
+    client, ids, _ = env
+    h = _token(client)
+    venta = _crear_consumo(
+        client,
+        h,
+        ids,
+        items=[
+            {"producto_comercial_id": ids["producto_id"], "cantidad": "1"},
+            {"producto_comercial_id": ids["producto_id"], "cantidad": "1"},
+        ],
+    ).json()
+    items = client.get(f"/api/v1/sales/ventas/{venta['id']}/items", headers=h).json()
+
+    # Recién enviada: en una venta normal esto pasaría sin firma de nadie.
+    r = client.post(
+        f"/api/v1/sales/ventas/{venta['id']}/anular-lineas",
+        headers=h,
+        json={"venta_item_ids": [items[0]["id"]], "motivo": "se pidió de más"},
+    )
+    assert r.status_code == 403, r.text
+
+
+def test_el_consumo_registrado_viaja_con_lo_que_el_reporte_necesita(env):
+    """Sin número de orden ni autorizador, el reporte del turno dice «hubo un
+    consumo» y no se puede rastrear contra el pedido que salió de cocina."""
+    client, ids, _ = env
+    h = _token(client)
+    capturados: list[dict] = []
+    event_bus.subscribe("sales.consumo_personal_registrado", capturados.append)
+    venta = _crear_consumo(client, h, ids).json()
+
+    (payload,) = capturados
+    assert payload["numero_orden"] == venta["numero_orden"]
+    assert payload["consumo_autorizado_por"]
+    assert payload["consumo_motivo"] == "feriado"
 
 
 # --- Inventario y contabilidad ------------------------------------------------

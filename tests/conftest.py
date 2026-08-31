@@ -127,10 +127,12 @@ def auth_headers(session, username: str = "admin") -> dict[str, str]:
 
 
 class RedisFalso:
-    """Contador en memoria con la superficie que usa el limiter."""
+    """Redis en memoria con la superficie que usan las guardas de
+    `core.rate_limit`: el contador del limiter y la marca de un solo uso."""
 
     def __init__(self) -> None:
         self.claves: dict[str, int] = {}
+        self.marcas: dict[str, bytes] = {}
 
     def incr(self, clave: str) -> int:
         self.claves[clave] = self.claves.get(clave, 0) + 1
@@ -138,6 +140,18 @@ class RedisFalso:
 
     def expire(self, clave: str, segundos: int) -> None:
         pass
+
+    def set(self, clave: str, valor, nx: bool = False, ex: int | None = None):
+        # El TTL no se emula: cada test arranca con un contador limpio, y
+        # emularlo pediría un reloj falso para probar lo que ya prueba el
+        # `exp` del propio token.
+        if nx and clave in self.marcas:
+            return None
+        self.marcas[clave] = valor.encode() if isinstance(valor, str) else valor
+        return True
+
+    def get(self, clave: str) -> bytes | None:
+        return self.marcas.get(clave)
 
 
 @pytest.fixture(autouse=True, scope="session")

@@ -172,17 +172,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   reversa; reversarlo por una línea borraría el gasto de las que sí se
   comieron, y reasentar la diferencia exige valorizar solo lo quitado. Es la
   misma limitación que la nota de crédito parcial.
-- ⬜ **Reporte de consumo de personal** (ADR-034): el gasto se registra y se
-  asienta, pero no hay reporte propio en el catálogo cerrado (ADR-024). Hoy
-  se lee con `GET /sales/ventas?tipo=consumo_personal` y con los movimientos
-  `consumo_interno` de inventario — sirve para revisar, no para que gerencia
-  compare sucursales por mes. Falta también el consumo por **motivo**, que
-  es la razón por la que el motivo es un enum cerrado.
-  `inventory.consumo_personal_valorizado` tampoco tiene **emisión** en el
-  catálogo de `reports` (ADR-033): nadie se entera del gasto salvo que lo
-  vaya a buscar. Es una entrada en `reports/domain/catalogo.py` más su fila
-  en `events.md`, pero primero hay que decidir a qué área se dirige —
-  gerencia, contabilidad, o el encargado del local.
+- 🔶 **Reporte de consumo de personal** (ADR-034). Resuelto a medias el
+  2026-08-30: `sales.consumo_personal_registrado` **ya es una emisión** del
+  catálogo de `reports` (ADR-033), dirigida a Gerencia y Contabilidad, con
+  número de orden, motivo y autorizador — nadie tiene que ir a buscar el
+  gasto. Lo que **sigue abierto** es el **acumulado**: no hay reporte que
+  compare sucursales por mes ni que sume por **motivo**, que es la razón por
+  la que el motivo es un enum cerrado. Hoy eso se arma a mano con
+  `GET /sales/ventas?tipo=consumo_personal` y los movimientos
+  `consumo_interno`. `inventory.consumo_personal_valorizado` —el monto
+  valorizado— tampoco tiene emisión propia; se dejó fuera a propósito para no
+  avisar dos veces del mismo plato: el aviso útil es el del hecho, no el de
+  su costeo.
 - ✅ 2026-08-15 **Los íconos del home ya no llevan a 404** — y hacía rato que no
   lo hacían: los siete destinos que la deuda enumeraba (`/produccion`, `/rrhh`,
   `/marketing`, `/gerencia`, `/usuarios`, `/contabilidad` y el resto de
@@ -701,3 +702,52 @@ que es una decisión de pantalla y no un bug de una línea.
   `importacion_clientes.py:437` convierte cualquier valor desconocido en `dni`
   en vez de rechazar la fila con un motivo. La plantilla ya no promete `ruc`
   (se corrigió el texto el 2026-08-30), pero el silencio sigue.
+
+## Auditoría del 2026-08-20 — lo que la Ola 1 dejó abierto
+
+- ⬜ **La pestaña «cobrados» del PDV pierde la venta en cuanto SUNAT acepta**
+  (2026-08-30). `use-datos-pdv.ts` la pide con `estado="pagada"` a secas y la
+  emisión mueve la venta a `facturada` a los segundos, así que en el siguiente
+  refresco desaparece de la lista — y con ella el botón de reimprimir el
+  comprobante. Es el mismo bug que ya se parcheó en el KDS en la 0.8.1
+  (`kds.ESTADOS_EN_COCINA`), en la otra pantalla. Cerrarlo exige que
+  `api.ventasDelDia` acepte más de un estado: hoy manda uno solo, y
+  `frontend/lib/contrato.test.ts` congela esa firma.
+- ⬜ **`estado_emision = "error"` es un valor de enum que `sales` nunca
+  escribe** (2026-08-30). Los tres caminos reales dejan `pendiente`,
+  `aceptado` o `rechazado`; el único que escribe `error` es
+  `inventory/application/guias.py`. Consecuencias: filtrar
+  `GET /comprobantes?estado_emision=error` no devuelve nada nunca, y un fallo
+  de transporte queda indistinguible de "todavía no se intentó" —los dos son
+  `pendiente`, solo los separa `intentos_emision`. O `sales` lo escribe, o el
+  valor sale del enum de `comprobante`.
+- ⬜ **«Reintentar emisión» aparece justo donde no sirve** (2026-08-30). El
+  botón se ofrece para `rechazado` y `error`: `rechazado` es un veredicto
+  sobre datos malos y reenviarlo da el mismo rechazo (lo dice el propio
+  `ComprobanteRepo.pendientes` y ADR-005), y `error` no existe (arriba). El
+  caso donde el reintento sí sirve —`pendiente` con intentos acumulados, o sea
+  el barrido que no llegó— no muestra botón. Corregirlo depende de la deuda
+  anterior: sin distinguir "falló el transporte" de "nunca se intentó", no hay
+  condición que escribir.
+- ⬜ **Tras una NC de corrección no hay forma de emitir el comprobante
+  corregido** (2026-08-30). `notas_credito` y `mapper` documentan en tres
+  lugares que los motivos `02` (error en el RUC) y `03` (error en la
+  descripción) dejan la venta viva "para reemitir el corregido", pero ese
+  camino no existe: `crear_comprobante_pendiente` es idempotente por
+  `(venta_id, grupo_cobro)` y devuelve el viejo, `emitir_comprobante` hace
+  early-return sobre un `aceptado`, y no hay endpoint que corrija
+  `receptor_num_doc`/`receptor_nombre`. Hoy la NC de corrección deja la venta
+  en un callejón sin salida.
+- ⬜ **Con cuenta dividida la venta puede quedarse en `pagada` para siempre**
+  (2026-08-30). `emitir_comprobante` solo promueve a `facturada` si en ese
+  instante la venta está `pagada`; con `grupo_cobro > 1` el comprobante del
+  grupo 1 se acepta mientras la venta sigue en `orden` y ese flip se pierde.
+  No hay reconciliación posterior que lo repare.
+- ⬜ **Los otros seis botones que prometen 403** (auditoría §3): «Ejecutar» /
+  «Rechazar» pago, «+ Asiento manual», «+ Nuevo trabajador» / «Cesar»,
+  «+ Nuevo artículo» / «Editar», «+ Nueva devolución» y «Emitir» OC sobre
+  umbral. Mismo arreglo que ya se aplicó en la jornada: `permisos` como prop y
+  `tienePermiso` por acción. Viven en otros módulos y van en su propia rama.
+- ⬜ **Los otros dos errores tragados** (auditoría §11): `rechazarPagoAction`
+  descarta el resultado —si falla, cero feedback— y la carta del PDV dibuja un
+  error de red como "no hay productos" (esta última ya estaba declarada).

@@ -79,3 +79,44 @@ sea un worker de Celery o el motor de sincronización.
 - `except SalesError` en el replay del hub pasa a `except AppError`: algo
   más amplio, que es lo que ese punto quería decir (cualquier error de
   negocio esperado al reproducir un registro).
+
+## Addendum (2026-08-30) — el 422 de validación entra al mismo sobre
+
+La decisión de arriba cubre los errores **de dominio**. La validación de
+entrada no es uno: la levanta FastAPI antes de que el endpoint corra, y
+quedó fuera del handler global. El resultado era que el ERP tenía dos
+formatos de error: `{"detail": str}` en todo lo propio y
+`{"detail": [{loc, msg, type}]}` —con el `msg` en inglés— en los 422 de
+Pydantic. El frontend descartaba `loc` y concatenaba los `msg`, así que un
+formulario con tres campos mal cargados mostraba tres veces "Field
+required" sin nombrar ninguno. Como el cliente **no** replica `pattern`,
+`minimum` ni los enums a propósito, ese texto era el único mensaje de error
+para toda esa clase de fallos.
+
+`src/core/validacion.py` registra el handler de `RequestValidationError` y
+devuelve el mismo sobre que el resto: `detail` como texto legible, más un
+`errores[]` con `campo`/`etiqueta`/`mensaje` para que el formulario marque
+el input culpable. `errores` va vacío en los 422 que no vienen de la
+validación de entrada (`PinInvalido`, los `HTTPException(422)` de los
+routers), así que el schema `ErrorValidacion` describe a los dos.
+
+**Se traduce por `type` de Pydantic, no por el texto del `msg`**: el `type`
+es un código estable y el `msg` es prosa que cambia entre versiones. Un
+`type` que no esté en la tabla cae al `msg` original — quedar en inglés es
+menos malo que perder el dato.
+
+**No es i18n.** No hay catálogo de traducciones ni negociación de idioma:
+la API habla español, igual que los mensajes de `AppError` que ya estaban
+escritos en el código. Montar i18n para un solo idioma es infraestructura
+que hay que mantener sin nadie del otro lado.
+
+Las etiquetas (`unidad_medida_id` → "Unidad de medida") viven en
+`src/shared/etiquetas.py` y son **por palabra**, no por campo: `codigo`,
+`codigo_barras` y `numero_orden` se corrigen con tres entradas en vez de
+una por cada campo de cada schema, que es lo que se desincroniza. Las
+terminadas en `-ción`/`-sión` ni eso necesitan: hay una regla.
+
+Costo aceptado: declarar el 422 propio a nivel de app hace que las 31
+operaciones sin parámetros (de 464) documenten un 422 que nunca van a
+devolver. Es sobre-declaración, y la alternativa era envolver
+`app.openapi()` para reescribir el `$ref` operación por operación.

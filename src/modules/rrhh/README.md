@@ -192,7 +192,11 @@ versión genérica.
   amonestaciones de su gente pero no cuánto gana, y que una boleta ya fuera
   legible pidiéndola por su id no es razón para volverla navegable. Cuando
   no viaja, `nomina_visible=false` lo dice — un legajo censurado no puede
-  leerse igual que uno sin boletas.
+  leerse igual que uno sin boletas. Desde 2026-08-30 el mismo permiso rige
+  `trabajador.remuneracion_base`: viaja en `null` en el listado, en la ficha
+  y en el legajo para quien no tenga `rrhh.nomina_gestionar`. Esconder las
+  boletas y dejar el sueldo base en el listado era censurar la puerta y
+  dejar la ventana abierta.
   Suma también `GET /solicitudes-permiso` (bandeja de aprobación, ordenada
   por la que envejece primero: quien aprueba entra por "qué tengo
   pendiente", no por un trabajador) y `GET /asistencia` con rango.

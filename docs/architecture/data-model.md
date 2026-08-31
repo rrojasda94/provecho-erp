@@ -612,7 +612,10 @@ en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
   `dentro_margen` **lo calcula el servidor** en los dos productores de
   ajustes (cierre de conteo y ajuste ad-hoc) contra el parámetro
   `inventory/margen_error_ajuste`: recibirlo del cliente permitía apagar la
-  alerta desde el request que la provoca.
+  alerta desde el request que la provoca. `lote_id` (nullable — solo si el
+  artículo controla lote y el ajuste es una entrada, `cantidad` positiva):
+  el lote declarado al solicitar, para no perder la fecha de vencimiento que
+  el lote automático de `registrar_movimiento` no pide.
 - **incidencia_inventario** (implementada 2026-08-06): empresa_id, origen
   (`venta` | `orden_compra` | `orden_produccion`), referencia (id del
   documento, sin FK — los tres orígenes viven en módulos distintos), tipo

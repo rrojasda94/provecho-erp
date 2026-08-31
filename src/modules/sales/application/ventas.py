@@ -734,7 +734,20 @@ def _confirmar(
     )
     event_bus.publish(
         "sales.consumo_personal_registrado",
-        {**payload, "tipo": venta.tipo, "consumo_motivo": venta.consumo_motivo},
+        {
+            **payload,
+            "tipo": venta.tipo,
+            "consumo_motivo": venta.consumo_motivo,
+            # Para el reporte del turno: sin el número de orden y sin quién
+            # firmó, el hecho llega como "hubo un consumo" y no se puede
+            # rastrear contra el pedido que salió de cocina (RN-COM-025).
+            "numero_orden": venta.numero_orden,
+            "consumo_autorizado_por": (
+                str(venta.consumo_autorizado_por)
+                if venta.consumo_autorizado_por
+                else None
+            ),
+        },
         session=session,
     )
 

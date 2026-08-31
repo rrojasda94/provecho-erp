@@ -5,8 +5,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type { EstadoFormulario } from "@/components/formulario/dialogo-formulario";
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 const RUTA = "/inventario/conteos";
 
@@ -19,10 +20,6 @@ async function token(): Promise<string> {
 
 function texto(formData: FormData, campo: string): string {
   return String(formData.get(campo) ?? "").trim();
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 /**
@@ -50,7 +47,7 @@ export async function abrirConteoAction(
     });
     id = conteo.id;
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo abrir el conteo."), ok: false };
+    return estadoDeError(e, "No se pudo abrir el conteo.");
   }
   revalidatePath(RUTA);
   redirect(`${RUTA}/${id}`);
@@ -75,7 +72,7 @@ export async function registrarCantidadesAction(
       cuerpo: { items: cantidades },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo guardar lo contado."), ok: false };
+    return estadoDeError(e, "No se pudo guardar lo contado.");
   }
   revalidatePath(`${RUTA}/${conteoId}`);
   return { error: "", ok: true };
@@ -94,11 +91,7 @@ export async function cerrarConteoAction(
     revalidatePath(`${RUTA}/${conteoId}`);
     return { error: "", ok: true, ajustes: r.ajustes.length };
   } catch (e) {
-    return {
-      error: mensajeDe(e, "No se pudo cerrar el conteo."),
-      ok: false,
-      ajustes: 0,
-    };
+    return { ...estadoDeError(e, "No se pudo cerrar el conteo."), ajustes: 0 };
   }
 }
 
@@ -120,7 +113,7 @@ export async function anularConteoAction(
       cuerpo: { motivo },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo anular el conteo."), ok: false };
+    return estadoDeError(e, "No se pudo anular el conteo.");
   }
   revalidatePath(`${RUTA}/${conteoId}`);
   return { error: "", ok: true };

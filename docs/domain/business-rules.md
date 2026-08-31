@@ -723,8 +723,9 @@ de su módulo y se prueban de forma aislada.
   de un dato que el operario pueda escribir: un identificador suelto en el
   pedido es una firma falsificable, y el registro de quién autorizó
   —que es la razón de ser del control— dejaría de valer nada. La
-  autorización es puntual: cubre una acción, no abre sesión, no se renueva
-  y caduca en minutos.
+  autorización es puntual: cubre **una** acción —se gasta al usarla, no
+  vale para la siguiente—, no abre sesión, no se renueva y caduca en
+  minutos. Reintentar la misma acción no cuenta como segunda acción.
 
 ## Dato
 
@@ -1234,7 +1235,11 @@ producción se hace en cocinas de sucursal. Ver
   (`parametro_empresa`, aprobado por Gerencia — RN-GER-009); el sistema los
   calcula, nunca los declara quien solicita el ajuste.
 - **RN-INV-016** Un ajuste se origina por sobrante, faltante, merma/daño,
-  o error de registro.
+  o error de registro. Una entrada de stock manual —sobrante o corrección de
+  error de registro, siempre con `cantidad` positiva— de un artículo con
+  control de lote puede declarar código de lote y vencimiento al solicitar
+  el ajuste (RN-LOT-002); combinarlo con una `cantidad` negativa se rechaza,
+  porque esa salida reparte por FEFO y no toma un lote explícito.
 - **RN-INV-017** Toda merma se reporta en el módulo de producción o en el
   de inventario; debe estudiarse y rendir cuentas ante el almacén y el
   área contable. Mecanismo exacto de registro dentro de una auditoría
@@ -1476,13 +1481,24 @@ producción se hace en cocinas de sucursal. Ver
   `sales.crear`— y se registra con **motivo** (`fin_semana`, `feriado`,
   `alta_actividad`, `capacitacion`, `otro`). Sin motivo no hay con qué
   explicar el gasto, y sin firma cualquiera se sirve gratis. El acto queda
-  en `audit_log` (RN-AUD-005).
+  en `audit_log` (RN-AUD-005). La firma es **por cada cambio de la orden**,
+  no solo por el alta: sumarle platos a un consumo ya enviado lo autoriza un
+  encargado otra vez, y quitarle una línea también — ahí la ventana de
+  corrección de RN-COM-029 **no aplica**, porque no es el cajero arreglando
+  su propio tecleo sino alguien deshaciendo lo que un encargado firmó. En una
+  venta normal nada de esto cambia: agregar es libre y quitar solo se firma
+  pasados los 5 minutos (RN-COM-020).
 - **RN-COM-027** El costo del consumo de personal **sale del inventario
   como `consumo_interno`** —no como `consumo_venta`— y se reconoce
   valorizado a costo promedio como **gasto de alimentación de personal**,
   no como costo de ventas. La orden queda en estado `cerrada` al
-  entregarse: es su único cierre posible, porque nunca pasa por caja.
-  Anularla repone el insumo y **reversa el asiento**.
+  entregarse: es su único cierre posible, porque nunca pasa por caja. El PDV
+  lo cierra con **"Cerrar cuenta"** —el botón que ocupa el lugar de
+  "Cobrar"—, que registra esa misma entrega y exige lo mismo que el despacho:
+  todos los ítems en `listo`. La orden cerrada **queda listada entre las
+  cuentas cerradas del turno**, marcada como consumo y sin monto: no suma
+  plata, pero sin ella el turno no puede reconstruir qué se preparó sin
+  cobrar. Anularla repone el insumo y **reversa el asiento**.
 - **RN-COM-028** Una línea de venta puede llevar **restas**: insumos de la
   receta que ese plato NO lleva ("sin cebolla"). Es el último tramo del
   orden de modificadores (RN-PRD-004). Lo que se puede quitar **es** lo que

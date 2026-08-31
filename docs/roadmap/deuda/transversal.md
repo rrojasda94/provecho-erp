@@ -153,10 +153,28 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   verificación en el navegador con clave puesta: si un mapa muere con un error
   de `eval` en consola, esa es la línea que falta y la decisión hay que volver a
   tomarla a conciencia, no agregarla de reflejo.
-- ⬜ Los tests de `conteos` comparan contra `date.today()` local mientras
-  `created_at` usa `CURRENT_TIMESTAMP` (UTC): corriendo después de las
-  19:00 hora Perú fallan cuatro casos por un día de diferencia. Falla
-  preexistente de zona horaria, no de la lógica de conteo.
+- ✅ 2026-08-30 **Cinco escrituras seguían leyendo el reloj del proceso**, que
+  el barrido de `tests/test_fechas_negocio.py` no veía porque buscaba el
+  literal `date.today()` y nada más. Tres `datetime.now()` a secas sobre
+  columnas `timestamptz` —`movimiento.fecha_ejecucion`,
+  `periodo.fecha_cierre`, `orden.fecha_emision`— pasan a `datetime.now(UTC)`,
+  que es lo que hacen los otros 47 sitios: son instantes, no fechas de
+  calendario. Y dos `default=date.today` **sin paréntesis** (`venta.fecha_orden`
+  —la que gobierna el correlativo diario y todo reporte de ventas— y
+  `implementacion_material_sucursal.fecha`) pasan a `default=fechas.hoy`: la
+  función viajaba sin llamar, así que toda inserción que omitiera el campo
+  (seeder, replay del hub, escritura directa del repo) fechaba en día UTC.
+  El guard ahora barre las tres formas —`date.today` con y sin paréntesis,
+  `datetime.now()` y `datetime.utcnow`— y nombra cuál usar en su lugar.
+- ⬜ **Dos sitios hardcodean `"America/Lima"`** en vez de leer
+  `settings.zona_horaria` (2026-08-30): `rrhh/application/pad_asistencia.py`
+  (y de ahí `avisos_asistencia.py`) y `core/celery_app.py`, que fija la zona
+  de todos los `crontab()`. Hoy dan lo mismo; el día que el grupo abra en
+  otro país son dos relojes que no se enteran.
+- ⬜ **`purchases/comprobantes.py` trunca sobre UTC crudo** (2026-08-30):
+  `func.date(Comprobante.created_at)` compara contra fechas que el usuario
+  piensa en hora Perú, que es exactamente el borde de cinco horas que
+  `fechas.inicio_dia_utc`/`fin_dia_utc` existen para no correr.
 - ✅ 2026-08-02 `users`: aplicar **restricciones JSONB** por permiso
   (ADR-022). `rules.ContextoPermiso`/`cumple_restricciones` (monto/estado/
   horario) + `UsuarioRepo.restricciones` + `check_permission(...,
@@ -287,8 +305,10 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   **lectura**, con `LookupError` → 500 en cada consulta que cargue esa fila. No
   es un alta rechazada: es una fila ilegible para todos hasta que alguien la
   corrija a mano en la base. `persona.tipo_documento` es la que mordió (se le
-  puso `create_constraint=True` y el CHECK en la migración `c9f4a2e70b18`); el
-  patrón está en todo el repo. Barrerlo es una migración con un CHECK por
+  puso un `CheckConstraint` explícito en `__table_args__` y el CHECK en la
+  migración `c9f4a2e70b18` — explícito y no `create_constraint=True` porque el
+  CHECK que genera el tipo queda ligado a él y `alembic check` no lo ve del
+  lado del modelo); el patrón está en todo el repo. Barrerlo es una migración con un CHECK por
   columna y el saneo previo de cada una, así que va aparte. De paso: SQLite
   **sí** hace cumplir los CHECK, así que ponerlos también cierra el hueco de
   que la suite pase en verde sobre algo que Postgres rechaza.

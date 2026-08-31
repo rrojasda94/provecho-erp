@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { contar, dialogo, ingresar } from "../e2e/util";
-import { auditar } from "./auditoria";
+import { auditar, EN_VUELO } from "./auditoria";
 
 /**
  * Que todas las pantallas se puedan **usar** en las tres medidas reales del
@@ -121,13 +121,30 @@ async function revisar(page: Page, donde: string, fallas: Falla[]) {
   // pide, y en frío eso puede tardar más que la espera de después del
   // `goto()`. La pantalla queda pintando el esqueleto de carga cuando
   // `auditar()` arranca, y si termina de resolver justo en el medio, el
-  // `page.evaluate()` se cae con "execution context was destroyed" — no es
-  // un hallazgo, es la propia navegación todavía en vuelo.
+  // `page.evaluate()` se cae — no es un hallazgo, es la propia navegación
+  // todavía en vuelo.
+  //
+  // Tiene dos caras y hay que reintentar por las dos. Chromium a veces
+  // destruye el contexto de ejecución en el medio del `evaluate`, y a veces
+  // lo deja correr sobre un documento que todavía no tiene `<html>`. Lo
+  // segundo pasa en las rutas que redirigen **después** de empezar a
+  // transmitir —`/inventario`, `/compras`, `/contabilidad` y el resto de las
+  // raíces de módulo cargan un documento y saltan al siguiente—, así que
+  // `goto()` puede volver entre los dos y la espera de `esperarCarga()`
+  // engancharse al documento que está por morir.
+  const enVuelo = (e: unknown) =>
+    e instanceof Error &&
+    (e.message.includes("Execution context was destroyed") || e.message.includes(EN_VUELO));
+
   try {
     for (const h of await auditar(page)) fallas.push({ donde, ...h });
   } catch (e) {
-    if (!(e instanceof Error) || !e.message.includes("Execution context was destroyed")) throw e;
+    if (!enVuelo(e)) throw e;
+    // Vuelve a esperar la carga, no solo a esperar: la espera anterior se
+    // enganchó al documento que se estaba yendo, así que dio por cargada una
+    // pantalla que ni había empezado a pintarse.
     await page.waitForTimeout(1500);
+    await esperarCarga(page);
     for (const h of await auditar(page)) fallas.push({ donde, ...h });
   }
 }

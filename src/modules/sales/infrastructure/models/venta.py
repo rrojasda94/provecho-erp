@@ -31,7 +31,9 @@ from sqlalchemy.orm import Mapped, column_property, declared_attr, mapped_column
 
 from src.core.database import Base
 from src.core.model_base import TimestampMixin, UbicacionMixin, UuidPkMixin
+from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models.mesa import Mesa
+from src.shared import fechas
 
 
 class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
@@ -48,7 +50,7 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     # Día de negocio de la orden (lo fija la aplicación al crear) — base
     # estable para el correlativo, independiente de la hora exacta de
     # created_at.
-    fecha_orden: Mapped[date] = mapped_column(default=date.today)
+    fecha_orden: Mapped[date] = mapped_column(default=fechas.hoy)
     numero_orden: Mapped[int] = mapped_column(Integer)
     punto_venta_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("punto_venta.id"))
     canal: Mapped[str] = mapped_column(
@@ -61,9 +63,7 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     # cotización aceptada por el cliente (RN-COM-004). Entidad `cotizacion`
     # se modela en el slice de Compras/Comercial que la comparte.
     cotizacion_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
-    cliente_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("cliente.id"), nullable=True
-    )
+    cliente_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("cliente.id"), nullable=True)
     # Cajero o agente_ia — quien atendió; base del ranking de venta por
     # trabajador (join usuario_id -> trabajador.usuario_id).
     usuario_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuario.id"))
@@ -72,15 +72,7 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     # orden sin precio quedaría `orden` para siempre, contada como cuenta
     # abierta en el PDV y en el cierre de caja.
     estado: Mapped[str] = mapped_column(
-        Enum(
-            "orden",
-            "pagada",
-            "facturada",
-            "anulada",
-            "cerrada",
-            name="estado_venta",
-            native_enum=False,
-        ),
+        Enum(*rules.ESTADOS_VENTA, name="estado_venta", native_enum=False),
         default="orden",
     )
     # --- Consumo de personal (RN-COM-025) ------------------------------------
@@ -110,18 +102,14 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     idempotency_key: Mapped[str] = mapped_column(String(100), unique=True)
     # `rappi` | `ubereats` | `pedidosya` | ... si un rider de plataforma
     # externa hizo el delivery (RN-PER-003).
-    repartidor_externo_plataforma: Mapped[str | None] = mapped_column(
-        String(30), nullable=True
-    )
+    repartidor_externo_plataforma: Mapped[str | None] = mapped_column(String(30), nullable=True)
     # Contador de impresiones de comanda (>1 = reimpresión, auditable).
     comanda_impresa_veces: Mapped[int] = mapped_column(Integer, default=0)
     # Para quién es el pedido, como lo canta el mesero: "Carlos",
     # "Rappi #1042". Texto libre — no exige cliente registrado. Visible en
     # KDS y comanda para aclarar problemas en cocina. Para `modalidad=mesa`
     # el dato tipado es `mesa_id`; este campo queda para takeout/delivery.
-    referencia_atencion: Mapped[str | None] = mapped_column(
-        String(50), nullable=True
-    )
+    referencia_atencion: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # Adónde va el pedido de delivery, congelada al tomarlo: si el cliente se
     # muda el mes que viene, este pedido siguió yendo adonde fue. Mismo
     # criterio que las direcciones congeladas de la guía de remisión.
@@ -131,18 +119,12 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     direccion_entrega: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Lo cotizado al crear la orden, no lo que daría recalcular hoy: la
     # tarifa cambia y el pedido de ayer no puede cambiar de precio (ADR-054).
-    distancia_entrega_km: Mapped[Decimal | None] = mapped_column(
-        Numeric(6, 2), nullable=True
-    )
-    costo_entrega: Mapped[Decimal | None] = mapped_column(
-        Numeric(10, 2), nullable=True
-    )
+    distancia_entrega_km: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    costo_entrega: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     # Solo si modalidad=mesa (validado en el dominio, no en el esquema).
     # Nullable también por compatibilidad: las ventas anteriores a la
     # entidad `mesa` solo tienen `referencia_atencion`.
-    mesa_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("mesa.id"), nullable=True
-    )
+    mesa_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("mesa.id"), nullable=True)
 
     # Derivado, no columna: el número que ve el personal ("Mesa 7").
     #
@@ -188,9 +170,7 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
         Enum("porcentaje", "monto", name="modo_descuento_venta", native_enum=False),
         nullable=True,
     )
-    descuento_valor: Mapped[Decimal | None] = mapped_column(
-        Numeric(10, 2), nullable=True
-    )
+    descuento_valor: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     descuento_motivo: Mapped[str | None] = mapped_column(String(60), nullable=True)
     # Quién lo autorizó con su PIN — nunca es el mismo acto que aplicarlo.
     descuento_autorizado_por: Mapped[uuid.UUID | None] = mapped_column(
