@@ -47812,11 +47812,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ErrorValidacion"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "Entrada inválida"
           }
         },
         "summary": "Ver Convocatoria Publica",
