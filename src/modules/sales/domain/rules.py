@@ -316,6 +316,9 @@ _DOC_SUNAT_POR_TIPO_PERSONA = {
     "dni": DOC_SUNAT_DNI,
     "ce": DOC_SUNAT_CARNE_EXTRANJERIA,
     "pasaporte": DOC_SUNAT_PASAPORTE,
+    # Una persona natural con negocio tiene RUC (empieza en 10). Sin esta
+    # entrada su comprobante saldría declarado como «sin documento».
+    "ruc": DOC_SUNAT_RUC,
 }
 
 

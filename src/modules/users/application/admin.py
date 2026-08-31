@@ -11,6 +11,7 @@ from src.modules.users.application.errors import (
     Conflicto,
     NoEncontrado,
     PinInvalido,
+    ReglaNegocio,
 )
 from src.modules.users.domain import rules
 from src.modules.users.infrastructure.models import (
@@ -36,7 +37,7 @@ from src.modules.users.infrastructure.repositories import (
     UsuarioRepo,
 )
 from src.modules.users.infrastructure.security import hash_pin, verify_pin
-from src.shared import auditoria
+from src.shared import auditoria, documento
 from src.shared.ubicacion import desanclar
 
 
@@ -198,6 +199,17 @@ def q_usuarios(session: Session):
 
 
 # --- Persona (party model, RN-GEN-007) --------------------------------------
+def _documento(tipo: str | None, numero: str | None) -> tuple[str | None, str | None]:
+    """El vocabulario y los largos viven en `shared.documento`, que es de
+    donde también los lee el frontend. Acá se traduce su `ValueError` a la
+    jerarquía de la capa de aplicación para que salga 422 y no 500 —que es
+    lo que devolvía elegir «RUC», porque nadie validaba antes de SQLAlchemy."""
+    try:
+        return documento.validar(tipo, numero)
+    except ValueError as exc:
+        raise ReglaNegocio(str(exc)) from exc
+
+
 def crear_persona(
     session: Session,
     *,
@@ -215,8 +227,9 @@ def crear_persona(
     ubicacion_plus_code: str | None = None,
     ubicacion_distrito: str | None = None,
 ) -> Persona:
+    tipo_documento, numero_documento = _documento(tipo_documento, numero_documento)
     repo = PersonaRepo(session)
-    if repo.get_by_documento(numero_documento):
+    if numero_documento and repo.get_by_documento(numero_documento):
         raise Conflicto(f"numero_documento '{numero_documento}' ya existe")
     return repo.add(
         Persona(
@@ -276,6 +289,11 @@ def editar_persona(
     actual = _get(repo.get(persona_id), "persona")
     if actual.anonimizado_at is not None:
         raise Conflicto("persona anonimizada (Ley 29733): no admite rectificación")
+    if campos.get("tipo_documento") or campos.get("numero_documento"):
+        campos["tipo_documento"], campos["numero_documento"] = _documento(
+            campos.get("tipo_documento") or actual.tipo_documento,
+            campos.get("numero_documento") or actual.numero_documento,
+        )
     numero_nuevo = campos.get("numero_documento")
     if numero_nuevo:
         otra = repo.get_by_documento(numero_nuevo)

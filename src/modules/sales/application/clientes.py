@@ -34,11 +34,15 @@ from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models import Cliente
 from src.modules.sales.infrastructure.repositories import ClienteRepo
 from src.modules.users.infrastructure.models import Empresa, Persona
+from src.shared import documento
 from src.shared.integrations.factiliza import nombres_desde_dni, razon_social_desde_ruc
 from src.shared.ubicacion import CAMPOS as CAMPOS_UBICACION
 from src.shared.ubicacion import desanclar_si_cambio_el_texto
 
-TIPOS_DOCUMENTO_NATURAL = ("dni", "ce", "pasaporte")
+#: El vocabulario vive en `shared.documento`; acá solo los de una persona
+#: natural: un documento de 11 dígitos hace al cliente **jurídico** y su RUC
+#: va en `cliente.ruc`, no en la persona.
+TIPOS_DOCUMENTO_NATURAL = documento.NATURALES
 
 
 def grupo_de_empresa(session: Session, empresa_id: uuid.UUID) -> uuid.UUID:
@@ -150,6 +154,7 @@ def crear_cliente(
         raise ReglaNegocio(
             "un cliente sin documento necesita teléfono para poder identificarlo"
         )
+    tipo_documento = documento.normalizar(tipo_documento)
     if tipo_documento not in TIPOS_DOCUMENTO_NATURAL:
         raise ReglaNegocio(f"tipo de documento inválido: {tipo_documento}")
 
@@ -255,6 +260,7 @@ def actualizar_documento(
         cliente.ruc = numero_documento
         return cliente
 
+    tipo_documento = documento.normalizar(tipo_documento)
     if tipo_documento not in TIPOS_DOCUMENTO_NATURAL:
         raise ReglaNegocio(f"tipo de documento inválido: {tipo_documento}")
     ajeno = _persona_por_documento(session, numero_documento)

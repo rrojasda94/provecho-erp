@@ -10,6 +10,12 @@ import {
   valor,
 } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import {
+  ETIQUETA_DOCUMENTO,
+  LARGO_MAXIMO_DOCUMENTO,
+  TIPOS_DOCUMENTO,
+  type TipoDocumento,
+} from "@/lib/documento";
 
 import { crearPersonaAction, editarPersonaAction } from "./actions";
 import { CampoDireccion } from "@/components/direccion/campo-direccion";
@@ -18,8 +24,9 @@ export type Persona = {
   id: string;
   nombres: string;
   apellidos: string;
-  tipo_documento: string;
-  numero_documento: string;
+  // Nulos desde ADR-018: una persona creada en caja nace sin documento.
+  tipo_documento: string | null;
+  numero_documento: string | null;
   fecha_nacimiento: string | null;
   domicilio: string | null;
   ubicacion_place_id: string | null;
@@ -33,7 +40,6 @@ export type Persona = {
   anonimizado_at: string | null;
 };
 
-const TIPOS_DOCUMENTO = ["dni", "ce", "pasaporte", "ruc"] as const;
 
 /** Los mismos campos en el alta y en la corrección: una persona es una
  * persona, y tener dos formularios distintos para la misma ficha es cómo
@@ -58,7 +64,7 @@ function CamposPersona({ persona, permisos }: { persona?: Persona; permisos: str
           <select name="tipo_documento" defaultValue={p.tipo_documento ?? "dni"}>
             {TIPOS_DOCUMENTO.map((t) => (
               <option key={t} value={t}>
-                {t.toUpperCase()}
+                {ETIQUETA_DOCUMENTO[t]}
               </option>
             ))}
           </select>
@@ -68,7 +74,7 @@ function CamposPersona({ persona, permisos }: { persona?: Persona; permisos: str
           <input
             name="numero_documento"
             required
-            maxLength={20}
+            maxLength={LARGO_MAXIMO_DOCUMENTO}
             defaultValue={valor(p.numero_documento)}
           />
         </label>
@@ -169,7 +175,10 @@ export function PersonasCliente({
       {
         id: "documento",
         header: "Documento",
-        accessorFn: (p) => `${p.tipo_documento.toUpperCase()} ${p.numero_documento}`,
+        accessorFn: (p) =>
+          p.tipo_documento
+            ? `${ETIQUETA_DOCUMENTO[p.tipo_documento as TipoDocumento] ?? p.tipo_documento} ${p.numero_documento ?? ""}`.trim()
+            : "—",
       },
       { accessorKey: "telefono", header: "Teléfono" },
       { accessorKey: "email", header: "Email" },
