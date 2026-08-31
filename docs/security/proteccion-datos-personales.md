@@ -68,6 +68,16 @@ sobrevive es deliberadamente no identificable: puesto, canal, fechas y el
 criterio del descarte. Por eso **`motivo_descarte` se redacta como criterio
 ("sin disponibilidad para turno noche"), nunca con datos personales**.
 
+**Dónde se recoge el consentimiento del postulante** (2026-08-30, ADR-087):
+en el formulario de `frontend/app/(publico)/postular/[token]`, que declara la
+finalidad —este proceso de selección—, el plazo de conservación y el correo por
+el que se ejercen los derechos ARCO. Es texto en la página, no el aviso de
+privacidad formal que sigue pendiente de redacción abajo: cuando ese aviso
+exista, esta es la primera pantalla que tiene que enlazarlo. Un Google Forms
+conectado al mismo endpoint sigue obligado a su propia pregunta de
+autorización (RN-PER-004) — el ERP rechaza la postulación sin ella, venga de
+donde venga.
+
 **Plazo de conservación aplicado, no solo declarado**: cada ficha nace con
 `plazo_conservacion_declarado` (`RRHH_PLAZO_CONSERVACION_POSTULANTE_MESES`,
 12 meses por defecto) y `python -m src.modules.rrhh.purga` anonimiza lo

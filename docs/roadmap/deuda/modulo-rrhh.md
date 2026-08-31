@@ -32,6 +32,42 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `postulante` con datos propios y `respuestas` JSONB (el candidato no entra
   a `persona` hasta contratar) y un solo tablero de 8 columnas + `descartado`
   para los 13 pasos de incorporación. Tests: `tests/test_rrhh_convocatoria.py`.
+- ✅ 2026-08-30 (ADR-087) **La postulación se llena en el ERP**: el enlace que
+  la pantalla de contratación entregaba al publicar era la ruta **POST-only**
+  de la API (405 al abrirla en el navegador, que es justo lo que el rótulo
+  «Formulario público de postulación» invita a hacer). Ahora
+  `frontend/app/(publico)/postular/[token]` es la página, `GET
+  /rrhh/postulaciones/{token}` le da los cuatro campos que necesita y el acuse
+  del `POST` dejó de ser la ficha completa del postulante. Google Forms sigue
+  entrando por el mismo endpoint con el mismo token.
+  - ⬜ **La convocatoria no tiene texto del aviso**: la página muestra puesto,
+    vacantes, jornada y plazo. Las funciones, el sueldo y los requisitos viven
+    en el canal por el que el candidato llegó (SOP de publicación, plantilla
+    `convocatoria-puesto`). Un campo `descripcion` es una migración y un editor
+    en pantalla; vale la pena recién si el enlace empieza a compartirse solo,
+    sin aviso alrededor.
+  - ⬜ **Sin adjuntar CV**: `postulante.cv_archivo_id` existe y el formulario
+    público no lo ofrece. Bloqueado a propósito por la deuda de
+    `docs/roadmap/deuda/proteccion-de-datos-personales.md` — anonimizar no
+    borra el archivo, y aceptar archivos antes de poder borrarlos crea un
+    problema de Ley 29733 en vez de resolver uno.
+  - ⬜ **Sin preguntas configurables por convocatoria**: hay una sola pregunta
+    abierta, que viaja en `respuestas`. Un cuestionario por convocatoria es
+    entidad nueva más pantalla de armado; quien lo necesite tiene Google Forms
+    por el mismo endpoint.
+  - ⬜ **Nada impide postular dos veces**: `recibir_postulacion` no valida
+    unicidad por email o teléfono dentro de la convocatoria; el único techo es
+    el rate limit por IP. Se ve en el tablero como dos fichas iguales y se
+    descarta una a mano.
+  - ⬜ **Una convocatoria no se puede corregir**: solo hay `POST`, `publicar` y
+    `cerrar`. Un typo en el puesto o una fecha límite mal puesta obligan a
+    cerrarla y crear otra, lo que invalida el enlace ya publicado. Un `PATCH`
+    en borrador es el arreglo chico; en publicada hay que decidir antes qué
+    campos pueden cambiar con el aviso ya en la calle.
+  - ⬜ **Sin e2e del camino público**: verificado en navegador de punta a punta
+    (crear → publicar → copiar enlace → postular sin sesión → ficha en
+    `recibido` → cerrar → el enlace deja de recibir), igual que el recorrido de
+    2026-08-05. `frontend/e2e/` no lo cubre.
 - ⬜ **Perfil de puesto sigue siendo documental**: `convocatoria.perfil_puesto`
   guarda el slug de `docs/rrhh/perfiles/`; no hay tabla `perfil_puesto` ni
   validación de que el slug exista. Vale la pena recién cuando los perfiles

@@ -545,6 +545,36 @@ function Convocatorias({
   );
 }
 
+/**
+ * El enlace que se pega en el aviso, con su botón de copiar.
+ *
+ * La URL absoluta se arma al hacer clic y no al renderizar: el servidor no
+ * conoce el dominio por el que entró el navegador, y calcularla durante el
+ * render rompería la hidratación.
+ */
+function EnlaceFormulario({ ruta }: { ruta: string }) {
+  const [copiado, setCopiado] = useState(false);
+
+  return (
+    <p className="flex flex-wrap items-center gap-2 text-sm text-gray">
+      Formulario público de postulación:{" "}
+      <a className="text-primary hover:underline" href={ruta} target="_blank" rel="noreferrer">
+        {ruta}
+      </a>
+      <button
+        type="button"
+        className="rounded bg-cream px-2 py-0.5 text-xs"
+        onClick={async () => {
+          await navigator.clipboard.writeText(`${window.location.origin}${ruta}`);
+          setCopiado(true);
+        }}
+      >
+        {copiado ? "Copiado" : "Copiar enlace"}
+      </button>
+    </p>
+  );
+}
+
 export function TableroCliente({
   convocatorias,
   columnas,
@@ -602,14 +632,7 @@ export function TableroCliente({
         </p>
       ) : (
         <div className="flex flex-col gap-3">
-          {enlaceFormulario && (
-            <p className="text-sm text-gray">
-              Formulario público de postulación:{" "}
-              <code className="rounded bg-cream px-1.5 py-0.5 text-xs">
-                {enlaceFormulario}
-              </code>
-            </p>
-          )}
+          {enlaceFormulario && <EnlaceFormulario ruta={enlaceFormulario} />}
           <div className="flex gap-4 overflow-x-auto pb-2">
             {ETAPAS.map((etapa) => (
               <ColumnaTablero

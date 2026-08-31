@@ -97,6 +97,11 @@ ANONIMIZAR = "personas.anonimizar"
 # una familia postulando desde la misma casa o cabina.
 _rate_limit_postulacion = rate_limit("postulacion", 20, 3600)
 
+# Leer el aviso es más barato que postular y el candidato puede recargar la
+# página varias veces antes de decidirse. El token son 43 caracteres al azar:
+# nadie llega a una convocatoria ajena probando.
+_rate_limit_convocatoria_publica = rate_limit("convocatoria_publica", 60, 3600)
+
 
 def _sin_sueldo_si_no_corresponde(trabajador, visible: bool):
     """El sueldo solo viaja con `rrhh.nomina_gestionar`.
@@ -447,9 +452,28 @@ def ver_tablero(
 
 
 # --- Postulante --------------------------------------------------------------
+@router.get(
+    "/postulaciones/{token}",
+    response_model=schemas.ConvocatoriaPublicaOut,
+    dependencies=[Depends(_rate_limit_convocatoria_publica)],
+)
+def ver_convocatoria_publica(
+    token: str,
+    session: Session = Depends(get_db),
+):
+    """Lo que la página pública necesita para dibujar el formulario (ADR-087).
+
+    Sin JWT y sin tenant, igual que el POST de abajo: el token es toda la
+    autorización que hay. Una convocatoria cerrada, vencida o un token
+    inventado responden error —cuál, no le importa a quien pregunta desde
+    internet— y la página muestra lo mismo en los tres casos.
+    """
+    return convocatorias.publicada_por_token(session, token, fechas.hoy())
+
+
 @router.post(
     "/postulaciones/{token}",
-    response_model=schemas.PostulanteOut,
+    response_model=schemas.PostulacionRecibidaOut,
     status_code=201,
     dependencies=[Depends(_rate_limit_postulacion)],
 )
@@ -458,15 +482,15 @@ def recibir_postulacion(
     body: schemas.PostulacionPublica,
     session: Session = Depends(get_db),
 ):
-    """Endpoint público del formulario de postulación (Google Forms vía Apps
-    Script, o cualquier formulario propio). Sin JWT: el token de la
-    convocatoria publicada es lo único que autoriza a escribir, y solo puede
-    crear un postulante."""
+    """Endpoint público del formulario de postulación (la página del ERP, un
+    Google Forms vía Apps Script o cualquier formulario propio). Sin JWT: el
+    token de la convocatoria publicada es lo único que autoriza a escribir, y
+    solo puede crear un postulante."""
     postulante = postulantes.recibir_postulacion(
         session, token=token, fecha_postulacion=fechas.hoy(), **body.model_dump()
     )
     session.commit()
-    return postulante
+    return {"recibida": True, "puesto": postulante.puesto_postulado}
 
 
 @router.post("/postulantes", response_model=schemas.PostulanteOut, status_code=201)

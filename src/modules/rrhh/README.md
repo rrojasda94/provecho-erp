@@ -75,16 +75,28 @@ fallar toda lectura de esa persona con 500.
 
 ## Formulario público de postulación
 
-`POST /rrhh/postulaciones/{token}` — **sin JWT**. El token lo genera
-`publicar_convocatoria` y desaparece al cerrarla: es lo único que autoriza a
-escribir y solo puede crear un postulante de esa convocatoria. Protegido con
-rate limit por IP (20/hora), campos acotados y consentimiento obligatorio
-(RN-PER-004). La fecha de postulación la pone el servidor, no el cliente —
-si no, se podría postular fuera de la fecha límite.
+Dos rutas **sin JWT** sobre el mismo path, y el token es toda la autorización
+que hay. Lo genera `publicar_convocatoria` y desaparece al cerrarla, así que
+una convocatoria no publicada no tiene formulario que valga.
 
-El formulario en sí es **Google Forms** (gratis, conocido por el candidato,
-sin nada que hospedar); un Apps Script de ~12 líneas reenvía cada respuesta a
-ese endpoint. El script y su configuración están en el SOP
+- `GET /rrhh/postulaciones/{token}` — puesto, vacantes, jornada y fecha
+  límite: lo que la página necesita para dibujarse, y nada más. Sin `id`, sin
+  `empresa_id` y sin el rango salarial. Rate limit 60/hora por IP.
+- `POST /rrhh/postulaciones/{token}` — crea un postulante de esa convocatoria
+  y nada más. Rate limit 20/hora por IP, campos acotados y consentimiento
+  obligatorio (RN-PER-004). La fecha de postulación la pone el servidor, no el
+  cliente — si no, se podría postular fuera de la fecha límite. Responde
+  `{recibida, puesto}`: quien postuló no tiene sesión, así que no recibe su
+  ficha (ADR-087).
+
+Cerrada, vencida y token inventado responden error sin distinguirse para quien
+pregunta desde internet.
+
+El formulario es la página del ERP, `frontend/app/(publico)/postular/[token]`
+(ADR-087) — el enlace sale de la pantalla de contratación al publicar. **Google
+Forms sigue siendo válido** por el mismo endpoint, con un Apps Script de ~12
+líneas: el token se copia del final de esa URL. El script y su configuración
+están en el SOP
 [publicacion-convocatoria](../../../docs/diagrams/Procesos/Recursos-Humanos/Reclutamiento/publicacion-convocatoria.md).
 
 ## Datos personales del candidato (Ley 29733)
