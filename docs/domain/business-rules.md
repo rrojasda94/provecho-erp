@@ -723,8 +723,9 @@ de su módulo y se prueban de forma aislada.
   de un dato que el operario pueda escribir: un identificador suelto en el
   pedido es una firma falsificable, y el registro de quién autorizó
   —que es la razón de ser del control— dejaría de valer nada. La
-  autorización es puntual: cubre una acción, no abre sesión, no se renueva
-  y caduca en minutos.
+  autorización es puntual: cubre **una** acción —se gasta al usarla, no
+  vale para la siguiente—, no abre sesión, no se renueva y caduca en
+  minutos. Reintentar la misma acción no cuenta como segunda acción.
 
 ## Dato
 
@@ -1234,7 +1235,11 @@ producción se hace en cocinas de sucursal. Ver
   (`parametro_empresa`, aprobado por Gerencia — RN-GER-009); el sistema los
   calcula, nunca los declara quien solicita el ajuste.
 - **RN-INV-016** Un ajuste se origina por sobrante, faltante, merma/daño,
-  o error de registro.
+  o error de registro. Una entrada de stock manual —sobrante o corrección de
+  error de registro, siempre con `cantidad` positiva— de un artículo con
+  control de lote puede declarar código de lote y vencimiento al solicitar
+  el ajuste (RN-LOT-002); combinarlo con una `cantidad` negativa se rechaza,
+  porque esa salida reparte por FEFO y no toma un lote explícito.
 - **RN-INV-017** Toda merma se reporta en el módulo de producción o en el
   de inventario; debe estudiarse y rendir cuentas ante el almacén y el
   área contable. Mecanismo exacto de registro dentro de una auditoría

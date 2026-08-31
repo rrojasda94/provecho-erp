@@ -683,3 +683,52 @@ que es una decisión de pantalla y no un bug de una línea.
   `venta_repo.items(venta.id)` para calcular el total. Barato hoy (un salón
   tiene decenas de mesas, no miles); se vuelve un problema si el mapa se
   refresca muy seguido desde muchas tablets a la vez.
+
+## Auditoría del 2026-08-20 — lo que la Ola 1 dejó abierto
+
+- ⬜ **La pestaña «cobrados» del PDV pierde la venta en cuanto SUNAT acepta**
+  (2026-08-30). `use-datos-pdv.ts` la pide con `estado="pagada"` a secas y la
+  emisión mueve la venta a `facturada` a los segundos, así que en el siguiente
+  refresco desaparece de la lista — y con ella el botón de reimprimir el
+  comprobante. Es el mismo bug que ya se parcheó en el KDS en la 0.8.1
+  (`kds.ESTADOS_EN_COCINA`), en la otra pantalla. Cerrarlo exige que
+  `api.ventasDelDia` acepte más de un estado: hoy manda uno solo, y
+  `frontend/lib/contrato.test.ts` congela esa firma.
+- ⬜ **`estado_emision = "error"` es un valor de enum que `sales` nunca
+  escribe** (2026-08-30). Los tres caminos reales dejan `pendiente`,
+  `aceptado` o `rechazado`; el único que escribe `error` es
+  `inventory/application/guias.py`. Consecuencias: filtrar
+  `GET /comprobantes?estado_emision=error` no devuelve nada nunca, y un fallo
+  de transporte queda indistinguible de "todavía no se intentó" —los dos son
+  `pendiente`, solo los separa `intentos_emision`. O `sales` lo escribe, o el
+  valor sale del enum de `comprobante`.
+- ⬜ **«Reintentar emisión» aparece justo donde no sirve** (2026-08-30). El
+  botón se ofrece para `rechazado` y `error`: `rechazado` es un veredicto
+  sobre datos malos y reenviarlo da el mismo rechazo (lo dice el propio
+  `ComprobanteRepo.pendientes` y ADR-005), y `error` no existe (arriba). El
+  caso donde el reintento sí sirve —`pendiente` con intentos acumulados, o sea
+  el barrido que no llegó— no muestra botón. Corregirlo depende de la deuda
+  anterior: sin distinguir "falló el transporte" de "nunca se intentó", no hay
+  condición que escribir.
+- ⬜ **Tras una NC de corrección no hay forma de emitir el comprobante
+  corregido** (2026-08-30). `notas_credito` y `mapper` documentan en tres
+  lugares que los motivos `02` (error en el RUC) y `03` (error en la
+  descripción) dejan la venta viva "para reemitir el corregido", pero ese
+  camino no existe: `crear_comprobante_pendiente` es idempotente por
+  `(venta_id, grupo_cobro)` y devuelve el viejo, `emitir_comprobante` hace
+  early-return sobre un `aceptado`, y no hay endpoint que corrija
+  `receptor_num_doc`/`receptor_nombre`. Hoy la NC de corrección deja la venta
+  en un callejón sin salida.
+- ⬜ **Con cuenta dividida la venta puede quedarse en `pagada` para siempre**
+  (2026-08-30). `emitir_comprobante` solo promueve a `facturada` si en ese
+  instante la venta está `pagada`; con `grupo_cobro > 1` el comprobante del
+  grupo 1 se acepta mientras la venta sigue en `orden` y ese flip se pierde.
+  No hay reconciliación posterior que lo repare.
+- ⬜ **Los otros seis botones que prometen 403** (auditoría §3): «Ejecutar» /
+  «Rechazar» pago, «+ Asiento manual», «+ Nuevo trabajador» / «Cesar»,
+  «+ Nuevo artículo» / «Editar», «+ Nueva devolución» y «Emitir» OC sobre
+  umbral. Mismo arreglo que ya se aplicó en la jornada: `permisos` como prop y
+  `tienePermiso` por acción. Viven en otros módulos y van en su propia rama.
+- ⬜ **Los otros dos errores tragados** (auditoría §11): `rechazarPagoAction`
+  descarta el resultado —si falla, cero feedback— y la carta del PDV dibuja un
+  error de red como "no hay productos" (esta última ya estaba declarada).

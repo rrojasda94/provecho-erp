@@ -42,16 +42,21 @@ def test_pyproject_va_a_la_par_del_changelog():
     )
 
 
-def test_settings_reporta_la_version_del_paquete():
-    """`app_version` alimenta el `release` de GlitchTip y la versión de
-    `/docs`. Se lee de la metadata del paquete instalado, no de un literal —
-    que fue lo que se congeló durante cuatro releases.
+def test_settings_reporta_la_version_del_checkout():
+    r"""`app_version` alimenta el `release` de GlitchTip, la versión de `/docs`
+    y la que queda escrita en `docs/architecture/openapi.json`.
 
-    Que acá diga `0.0.0` significa que el paquete no está instalado
-    (`pip install -e ".[dev]"`); un literal viejo no puede volver a pasar.
+    Se lee del `pyproject.toml` del checkout y no de la metadata del paquete
+    instalado, porque en un `pip install -e .` esa metadata se escribe una
+    sola vez: el código queda en vivo y la versión no. Una máquina de
+    desarrollo terminaba reportando la versión de la rama que estaba abierta
+    el día que se instaló —se vio un venv en 0.6.0 con el repo en 0.9.1— y
+    regenerar el contrato ahí lo ensuciaba con esa versión ajena, haciendo
+    fallar el `git diff --exit-code` del CI sin que nadie tocara un endpoint.
+
+    Un `assert` de igualdad y no de formato: `\d+\.\d+\.\d+` daba verde con
+    los cuatro releases de diferencia, que es lo que había que detectar.
     """
-    from src.config.settings import _VERSION_DESCONOCIDA, settings
+    from src.config.settings import settings
 
-    if settings.app_version == _VERSION_DESCONOCIDA:
-        return
-    assert re.fullmatch(r"\d+\.\d+\.\d+", settings.app_version), settings.app_version
+    assert settings.app_version == _version_de_pyproject()

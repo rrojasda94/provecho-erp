@@ -5,8 +5,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type { EstadoFormulario } from "@/components/formulario/dialogo-formulario";
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 import { ubicacionDe } from "@/lib/ubicacion-form";
 
 export type EstadoCliente = EstadoFormulario;
@@ -22,10 +23,6 @@ async function token(): Promise<string> {
 
 function texto(formData: FormData, campo: string): string {
   return String(formData.get(campo) ?? "").trim();
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 /** Corrección de un cliente **jurídico**: razón social, RUC y contacto.
@@ -56,7 +53,7 @@ export async function editarClienteAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo guardar el cliente."), ok: false };
+    return estadoDeError(e, "No se pudo guardar el cliente.");
   }
 
   revalidatePath(RUTA);
@@ -89,7 +86,7 @@ export async function completarDocumentoAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo registrar el documento."), ok: false };
+    return estadoDeError(e, "No se pudo registrar el documento.");
   }
 
   revalidatePath(RUTA);

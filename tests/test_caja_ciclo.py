@@ -247,6 +247,87 @@ def test_el_cajero_no_puede_firmar_que_recibio_su_propio_efectivo(env):
     assert _custodia_de(client, lector, apertura["id"])["estado"] == "en_caja"
 
 
+
+# --- La elevación es de un solo uso (RN-AUD-005) ------------------------------
+def _retirar(client, h, apertura_id, token, idempotency_key, monto="10.00"):
+    return client.post(
+        f"/api/v1/accounting/cajas/apertura/{apertura_id}/movimientos",
+        headers=h,
+        json={
+            "tipo": "retiro",
+            "monto": monto,
+            "motivo": "pago al repartidor",
+            "idempotency_key": idempotency_key,
+            "autorizacion": token,
+        },
+    )
+
+
+def test_una_autorizacion_no_sirve_para_dos_retiros(env):
+    """Una elevación, una operación.
+
+    Sin esto, el cajero conseguía la firma del supervisor para un retiro y
+    la reusaba durante los tres minutos siguientes: el rastro se los
+    atribuía todos al supervisor, que es justo lo que la elevación existe
+    para evitar.
+    """
+    client, ids, _ = env
+    h = _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    token = _autorizacion(client, "accounting.caja_retirar")
+
+    assert _retirar(client, h, apertura["id"], token, "mov-uso-1").status_code == 201
+    segundo = _retirar(client, h, apertura["id"], token, "mov-uso-2")
+    assert segundo.status_code == 403
+    assert "ya fue usada" in segundo.json()["detail"]
+
+
+def test_el_reintento_del_mismo_retiro_no_cuenta_como_reuso(env):
+    """Un timeout de red no puede obligar al supervisor a volver al
+    mostrador: mismo `idempotency_key`, misma operación."""
+    client, ids, _ = env
+    h = _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    token = _autorizacion(client, "accounting.caja_retirar")
+
+    primero = _retirar(client, h, apertura["id"], token, "mov-reintento")
+    reintento = _retirar(client, h, apertura["id"], token, "mov-reintento")
+    assert primero.status_code == 201
+    assert reintento.status_code == 201
+    # Y no se retiró dos veces: la idempotencia devuelve el mismo movimiento.
+    assert reintento.json()["id"] == primero.json()["id"]
+
+
+def test_con_redis_caido_la_autorizacion_sigue_valiendo(env, monkeypatch):
+    """Fail-open declarado: sin Redis no hay anti-replay, pero el
+    restaurante sigue operando (mismo criterio que el rate limit)."""
+    import redis
+
+    from src.core import rate_limit
+
+    class _Caido:
+        def set(self, *a, **k):
+            raise redis.RedisError("sin conexión")
+
+        def get(self, *a, **k):
+            raise redis.RedisError("sin conexión")
+
+        def incr(self, *a, **k):
+            raise redis.RedisError("sin conexión")
+
+        def expire(self, *a, **k):
+            raise redis.RedisError("sin conexión")
+
+    monkeypatch.setattr(rate_limit, "_client", _Caido())
+    monkeypatch.setattr(rate_limit, "_reintentar_desde", 0.0)
+    client, ids, _ = env
+    h = _token(client)
+    apertura = _abrir_caja(client, h, ids, monto="100.00").json()
+    token = _autorizacion(client, "accounting.caja_retirar")
+
+    assert _retirar(client, h, apertura["id"], token, "mov-caido").status_code == 201
+
+
 # --- POS de tarjeta (RN-POS-009/010/011) --------------------------------------
 def _crear_pos(client, headers, ids, serie="POS-001", emergencia=False, sucursal=True):
     return client.post(

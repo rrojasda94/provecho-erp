@@ -25,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
+from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models import AlertaPedido, Venta, VentaItem
 from src.modules.users.infrastructure.models import Sucursal
 from src.shared import parametros
@@ -37,8 +38,13 @@ UMBRAL_DEFECTO_MINUTOS = 15
 # Estados que significan "cocina todavía lo tiene".
 EN_COCINA = ("pendiente", "en_preparacion")
 
-# Una venta anulada no se demora: dejó de existir para la cocina.
-ESTADOS_VIVOS = ("confirmada", "pagada", "facturada")
+# Una venta anulada no se demora: dejó de existir para la cocina. El resto sí,
+# `orden` la primera: es el pedido enviado a cocina y todavía sin cobrar, o
+# sea el caso normal de una mesa — decía `confirmada`, que no es ninguno de
+# los cinco valores de `estado_venta`, y por eso la alerta nunca disparaba
+# donde más falta hacía. `cerrada` es el consumo de personal, que también se
+# prepara y también se demora.
+ESTADOS_VIVOS = tuple(e for e in rules.ESTADOS_VENTA if e != "anulada")
 
 
 def umbral_minutos(session: Session, empresa_id: uuid.UUID | None) -> int:

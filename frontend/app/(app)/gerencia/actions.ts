@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { ApiError, apiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { estadoDeError } from "@/lib/errores";
 
 export type EstadoGerencia = { error: string; ok: boolean };
 
@@ -14,10 +15,6 @@ async function token(): Promise<string> {
   const valor = store.get(COOKIE_TOKEN)?.value;
   if (!valor) redirect("/login");
   return valor;
-}
-
-function mensajeDe(e: unknown, porDefecto: string): string {
-  return e instanceof ApiError ? e.message : porDefecto;
 }
 
 /** El valor de un parámetro es una magnitud con su unidad (RN-GER-010): un
@@ -66,7 +63,7 @@ export async function proponerParametroAction(
       cuerpo: propuesta,
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo proponer el parámetro."), ok: false };
+    return estadoDeError(e, "No se pudo proponer el parámetro.");
   }
   revalidatePath("/gerencia/parametros");
   return { error: "", ok: true };
@@ -161,7 +158,7 @@ export async function proponerTarifaDeliveryAction(
     // Sin transacción a propósito: son propuestas independientes y las que
     // entraron quedan a la vista abajo, esperando aprobación. Reintentar
     // vuelve a proponer solo lo que siga distinto.
-    return { error: mensajeDe(e, "No se pudo proponer la tarifa."), ok: false };
+    return estadoDeError(e, "No se pudo proponer la tarifa.");
   }
   revalidatePath("/gerencia/delivery");
   return { error: "", ok: true };
@@ -224,7 +221,7 @@ export async function proponerSemaforoKdsAction(
   } catch (e) {
     // Sin transacción, igual que la tarifa: son propuestas independientes y
     // las que entraron quedan a la vista esperando aprobación.
-    return { error: mensajeDe(e, "No se pudo proponer el semáforo."), ok: false };
+    return estadoDeError(e, "No se pudo proponer el semáforo.");
   }
   revalidatePath("/gerencia/kds");
   return { error: "", ok: true };
@@ -247,7 +244,7 @@ export async function aprobarParametroAction(
       cuerpo: { valor: modificar ? armarValor(formData) : null },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo aprobar el parámetro."), ok: false };
+    return estadoDeError(e, "No se pudo aprobar el parámetro.");
   }
   revalidatePath("/gerencia/parametros");
   revalidatePath("/gerencia/delivery");
@@ -272,7 +269,7 @@ export async function rechazarParametroAction(
       cuerpo: { motivo_rechazo: motivo },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo rechazar el parámetro."), ok: false };
+    return estadoDeError(e, "No se pudo rechazar el parámetro.");
   }
   revalidatePath("/gerencia/parametros");
   return { error: "", ok: true };
@@ -315,7 +312,7 @@ export async function registrarDecisionAction(
       cuerpo: acta,
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo registrar el acta."), ok: false };
+    return estadoDeError(e, "No se pudo registrar el acta.");
   }
   revalidatePath("/gerencia/decisiones");
   return { error: "", ok: true };
@@ -344,7 +341,7 @@ export async function crearDivisaAction(
       },
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo crear la divisa."), ok: false };
+    return estadoDeError(e, "No se pudo crear la divisa.");
   }
   revalidatePath("/gerencia/divisas");
   return { error: "", ok: true };
@@ -361,7 +358,7 @@ export async function editarDivisaAction(
       cuerpo: campos,
     });
   } catch (e) {
-    return { error: mensajeDe(e, "No se pudo editar la divisa."), ok: false };
+    return estadoDeError(e, "No se pudo editar la divisa.");
   }
   revalidatePath("/gerencia/divisas");
   return { error: "", ok: true };
