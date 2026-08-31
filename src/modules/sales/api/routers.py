@@ -674,19 +674,29 @@ def anular_lineas(
     falta la firma de un supervisor (RN-COM-020) — la pide el cajero y la da
     el supervisor con su PIN en el mismo terminal.
 
+    En un **consumo de personal** la ventana no exime a nadie (RN-COM-025):
+    la comida es gratis y sacarle una línea deshace lo que un encargado
+    firmó, así que se firma siempre.
+
     Antes de enviar, el pedido vive en el PDV y no pasa por acá.
     """
     if body is None:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY, "indica las líneas a anular"
         )
-    exigir_venta(session, venta_id, tenant)
+    venta = exigir_venta(session, venta_id, tenant)
     autorizado_por = actor.id
-    if not ventas.lineas_en_ventana(session, venta_id, body.venta_item_ids):
+    consumo = rules.es_consumo_personal(venta.tipo)
+    if consumo or not ventas.lineas_en_ventana(
+        session, venta_id, body.venta_item_ids
+    ):
         if not body.autorizacion:
             raise HTTPException(
                 status.HTTP_403_FORBIDDEN,
-                "pasaron más de "
+                "quitar una línea de un consumo de personal lo autoriza un "
+                "supervisor con su PIN"
+                if consumo
+                else "pasaron más de "
                 f"{int(rules.VENTANA_CORRECCION.total_seconds() // 60)} minutos: "
                 "quitar la línea lo autoriza un supervisor con su PIN",
             )
@@ -720,8 +730,23 @@ def agregar_lineas(
     obligar a abrir una orden nueva para la segunda ronda termina en dos
     cuentas y dos entregas para la misma mesa. Lo que sigue necesitando firma
     —después de la ventana— es **quitar**, porque repone inventario.
+
+    La excepción es el **consumo de personal** (RN-COM-025): ahí cada plato
+    que se suma es comida regalada más, y la firma del alta autorizó ese
+    pedido, no los que vengan después. Se firma cada aumento.
     """
-    exigir_venta(session, venta_id, tenant)
+    venta = exigir_venta(session, venta_id, tenant)
+    if rules.es_consumo_personal(venta.tipo):
+        if not body.autorizacion:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "sumar productos a un consumo de personal lo autoriza un "
+                "encargado con su PIN",
+            )
+        try:
+            autorizacion.verificar(body.autorizacion, CONSUMO_PERSONAL)
+        except TokenInvalido as e:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
     venta = ventas.agregar_lineas(
         session,
         venta_id=venta_id,

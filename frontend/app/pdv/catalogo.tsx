@@ -13,7 +13,10 @@ const ETIQUETA_VISTA: Record<Vista, string> = {
   catalogo: "Catálogo",
   mesas: "Mesas",
   abiertas: "Cuentas",
-  cobrados: "Cobrados",
+  // "Cerradas" y no "Cobrados": desde RN-COM-025 acá también cae el consumo
+  // de personal, que se cierra sin cobrarse. Rotularlo "Cobrados" lo contaría
+  // como venta, que es justo lo que el tipo de orden existe para evitar.
+  cobrados: "Cerradas",
 };
 
 type Props = {
@@ -406,28 +409,44 @@ function Cobrados({
     );
   }
   if (!ventas.datos.length) {
-    return <p className="pdv-nada">Todavía no hay pedidos cobrados hoy.</p>;
+    return <p className="pdv-nada">Todavía no hay cuentas cerradas hoy.</p>;
   }
+  // El total es de la plata del turno. Un consumo de personal vale cero, así
+  // que sumarlo no lo movería — pero contarlo entre los "pedidos" sí haría
+  // creer que se cobraron más cuentas de las que se cobraron.
+  const consumos = ventas.datos.filter((v) => v.tipo === "consumo_personal");
+  const cobrados = ventas.datos.length - consumos.length;
   const total = ventas.datos.reduce((a, v) => a + Number(v.total), 0);
   return (
     <div className="pdv-cobrados">
       <div className="pdv-cobrados-cab">
         <span>
-          {ventas.datos.length} {ventas.datos.length === 1 ? "pedido" : "pedidos"}
+          {cobrados} {cobrados === 1 ? "cobrado" : "cobrados"}
+          {consumos.length > 0 &&
+            ` · ${consumos.length} de personal`}
         </span>
         <strong>{soles(total)}</strong>
       </div>
       <ul>
-        {ventas.datos.map((v) => (
-          <li key={v.id}>
-            <button type="button" onClick={() => onVer(v)}>
-              <span className="pdv-cobrado-orden">#{v.numero_orden}</span>
-              <span className="pdv-cobrado-modalidad">{v.modalidad}</span>
-              <span className="pdv-cobrado-estado">{v.estado}</span>
-              <strong>{soles(v.total)}</strong>
-            </button>
-          </li>
-        ))}
+        {ventas.datos.map((v) => {
+          const consumo = v.tipo === "consumo_personal";
+          return (
+            <li key={v.id}>
+              <button type="button" onClick={() => onVer(v)}>
+                <span className="pdv-cobrado-orden">#{v.numero_orden}</span>
+                <span className="pdv-cobrado-modalidad">
+                  {consumo ? "Consumo de personal" : v.modalidad}
+                </span>
+                <span className="pdv-cobrado-estado">
+                  {consumo ? (v.consumo_motivo ?? "cerrada") : v.estado}
+                </span>
+                {/* Sin monto, igual que en el ticket: un "S/ 0.00" en la
+                    columna de plata se lee como una venta que no cobró. */}
+                <strong>{consumo ? "—" : soles(v.total)}</strong>
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

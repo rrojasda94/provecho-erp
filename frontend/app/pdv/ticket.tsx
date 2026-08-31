@@ -39,6 +39,7 @@ type Props = {
   onAnular: () => void;
   onEnviar: () => void;
   onCobrar: () => void;
+  onCerrarCuenta: () => void;
   onConsumoPersonal: () => void;
 };
 
@@ -398,6 +399,7 @@ function Pago({
   ocupado,
   onEnviar,
   onCobrar,
+  onCerrarCuenta,
 }: Props & { activo: Borrador }) {
   const enviado = Boolean(activo.ventaId);
   const vacio = activo.lineas.length === 0;
@@ -414,6 +416,11 @@ function Pago({
     : pendientes.length > 0
       ? `Enviar aumento (${pendientes.length})`
       : "Enviado";
+  // El consumo se cierra cuando la cocina ya marcó todo listo: es la misma
+  // entrega del despacho, tocada desde acá. Con un aumento sin mandar el
+  // cierre sería mentira —hay comida que ni siquiera entró a la cola—, así
+  // que primero se envía.
+  const cerrable = enviado && pendientes.length === 0;
   return (
     <div className="pdv-pago">
       <button
@@ -426,17 +433,62 @@ function Pago({
       >
         {etiquetaEnvio}
       </button>
-      {!consumo && (
-        <button
-          type="button"
-          className="pdv-boton-pri"
-          disabled={ocupado || vacio}
-          onClick={onCobrar}
-        >
-          {seleccion.size > 0 ? `Cobrar ${seleccion.size}` : "Cobrar"}
-        </button>
-      )}
+      <AccionFinal
+        consumo={consumo}
+        cerrable={cerrable}
+        bloqueado={ocupado || vacio}
+        seleccionados={seleccion.size}
+        onCobrar={onCobrar}
+        onCerrarCuenta={onCerrarCuenta}
+      />
     </div>
+  );
+}
+
+/** El botón que termina el pedido. Una venta se cobra; un consumo de
+ * personal se cierra (RN-COM-025) — sin este botón su única salida era la
+ * pantalla de despacho, y la cuenta quedaba abierta en el arqueo del turno. */
+function AccionFinal({
+  consumo,
+  cerrable,
+  bloqueado,
+  seleccionados,
+  onCobrar,
+  onCerrarCuenta,
+}: {
+  consumo: boolean;
+  cerrable: boolean;
+  bloqueado: boolean;
+  seleccionados: number;
+  onCobrar: () => void;
+  onCerrarCuenta: () => void;
+}) {
+  if (consumo) {
+    return (
+      <button
+        type="button"
+        className="pdv-boton-pri"
+        disabled={bloqueado || !cerrable}
+        title={
+          cerrable
+            ? "Da el consumo por entregado y cierra la cuenta"
+            : "Envía el pedido y espera a que la cocina lo marque listo"
+        }
+        onClick={onCerrarCuenta}
+      >
+        Cerrar cuenta
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className="pdv-boton-pri"
+      disabled={bloqueado}
+      onClick={onCobrar}
+    >
+      {seleccionados > 0 ? `Cobrar ${seleccionados}` : "Cobrar"}
+    </button>
   );
 }
 

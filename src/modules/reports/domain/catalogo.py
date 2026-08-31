@@ -265,6 +265,32 @@ CATALOGO: tuple[Emision, ...] = (
         clave_referencia="origen_venta_id",
         clave_actor="usuario_id",
     ),
+    Emision(
+        codigo="sales.consumo_personal_registrado",
+        nombre="Consumo de personal",
+        descripcion=(
+            "Se preparó comida para el turno sin cobrarla (RN-COM-025). Es "
+            "un acto de autoridad: lo firma un encargado con su PIN y su "
+            "costo sale del inventario como gasto, no como costo de ventas."
+        ),
+        permiso="sales.leer",
+        ambito="sucursal",
+        campos=(
+            "venta_id",
+            "sucursal_id",
+            "numero_orden",
+            "consumo_motivo",
+            "consumo_autorizado_por",
+        ),
+        titulo="Consumo de personal en la orden #{numero_orden}",
+        cuerpo="Motivo: {consumo_motivo}.",
+        # Gerencia porque es comida regalada y contabilidad porque el gasto
+        # termina en su libro: son los dos que preguntan cuánto se consumió.
+        areas_sugeridas=("gerencia", "contabilidad"),
+        referencia_tipo="venta",
+        clave_referencia="venta_id",
+        clave_actor="consumo_autorizado_por",
+    ),
     # --- inventory -----------------------------------------------------------
     Emision(
         codigo="inventory.stock_bajo_minimo",
