@@ -12,6 +12,250 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.9.2] - 2026-08-31
+
+### Added
+
+- **El consumo de personal se cierra desde el PDV** (2026-08-30). La orden de
+  comida del personal no muestra "Cobrar" —no se cobra— y su único cierre era
+  la entrega desde la pantalla de despacho, así que en la práctica quedaba
+  abierta y aparecía como cuenta pendiente en cada arqueo. Ahora el ticket
+  tiene **"Cerrar cuenta"** en el lugar donde iría "Cobrar": llama a la misma
+  entrega (`POST /sales/ventas/{id}/entrega`) y no a un cierre propio, para
+  que un plato tenga un solo rastro. Sigue exigiendo que la cocina haya
+  marcado todo listo: cerrar comida que ni salió sería mentirle al KDS.
+- **Las cuentas cerradas del turno incluyen los consumos de personal**
+  (2026-08-30). La pestaña "Cobrados" pasó a llamarse **"Cerradas"** y lista
+  también las órdenes en estado `cerrada`, marcadas como consumo y con "—" en
+  vez de S/ 0.00 — rotularlas "Cobrados" las contaría como venta, que es
+  exactamente lo que el tipo de orden existe para evitar. Sin esto, la comida
+  del personal desaparecía de "Cuentas" al cerrarse y no reaparecía en ningún
+  lado: el turno no tenía dónde ver qué se preparó sin cobrar.
+- **`sales.consumo_personal_registrado` es un reporte del catálogo**
+  (2026-08-30). Llega a Gerencia y Contabilidad con el número de orden, el
+  motivo y quién lo firmó — el evento ahora viaja con esos dos últimos datos.
+  Era la deuda que ADR-034 dejó declarada: el consumo se leía a mano por
+  `GET /sales/ventas?tipo=consumo_personal`.
+
+- **Entrada de stock manual, con lote** (2026-08-30). `/inventario/ajustes`
+  solo dibujaba Aprobar/Rechazar: el `POST /ajustes` que registra una entrada
+  ya existía, pero no había ningún formulario que lo llamara. Ahora la
+  pantalla ofrece "Registrar entrada de stock" (queda `pendiente`, la aprueba
+  otro usuario — RN-INV-006) y, si el artículo controla lote, puede declarar
+  código de lote y fecha de vencimiento al solicitarla. Antes esa fecha se
+  perdía: el lote automático que crea `registrar_movimiento` cuando nadie
+  pasa `lote_id` no la pide, y toda carga manual de un artículo con lote
+  quedaba sin trazabilidad de vencimiento.
+
+- **El «enlace del formulario público» no era un formulario** (2026-08-30,
+  ADR-087). Al publicar una convocatoria, la pantalla de contratación mostraba
+  `/api/v1/rrhh/postulaciones/<token>` rotulado «Formulario público de
+  postulación». Es una ruta **POST-only** de la API: quien la abría en el
+  navegador —o la pegaba en el aviso, que es lo que el rótulo invita a hacer—
+  recibía un 405. El único camino real era duplicar un Google Form y pegarle el
+  token a mano en un Apps Script, por cada convocatoria. Ahora el ERP sirve su
+  propia página, `/postular/{token}`: muestra puesto, vacantes, jornada y plazo,
+  y la postulación cae en la columna «recibido» del tablero. El enlace se copia
+  de la misma pantalla. **Google Forms sigue funcionando** por el mismo endpoint
+  y con el mismo token —los scripts vivos no se tocan—, y conviene cuando la
+  búsqueda necesita preguntas propias. Suma `GET /rrhh/postulaciones/{token}`
+  (público, rate limit 60/h por IP) con cuatro campos y ninguno más: sin `id`,
+  sin `empresa_id` y sin el rango salarial, que es dato de negociación y no del
+  aviso. De paso, el `POST` deja de devolverle la ficha completa a un anónimo
+  —le entregaba el id, la empresa, el estado interno del proceso y el plazo de
+  conservación— y responde `{recibida, puesto}`: con un Apps Script que ignora
+  la respuesta eso era inofensivo, con un navegador del otro lado no. Lo que la
+  página **no** hace, y por qué: sin adjuntar CV (anonimizar todavía no borra el
+  archivo, sería crear un problema de Ley 29733 en vez de resolver uno), sin
+  preguntas configurables por convocatoria (para eso está Google Forms) y sin el
+  texto del aviso, que vive en el canal por el que el candidato llegó.
+
+### Changed
+
+- **Agregar o quitar productos de un consumo de personal se firma cada vez**
+  (2026-08-30). La firma del alta autorizaba *ese* pedido, no los aumentos que
+  vinieran después, y con la orden ya creada cualquiera podía seguir sumando
+  platos gratis. Ahora `POST /sales/ventas/{id}/items` exige el token de
+  `POST /auth/autorizar` con `sales.registrar_consumo_personal` cuando la
+  orden es un consumo, y `anular-lineas` pide firma **aunque la línea esté
+  dentro de la ventana de corrección**: esa ventana existe para que el cajero
+  arregle su propio tecleo, no para deshacer lo que un encargado firmó.
+  **Las ventas normales no cambian**: agregar sigue sin pedirle firma a nadie
+  (RN-COM-029) y quitar sigue exigiéndola solo pasados los 5 minutos.
+
+### Fixed
+
+- **Elegir «RUC» al dar de alta una persona devolvía 500 — y envenenaba la
+  lista** (2026-08-30). El vocabulario de `tipo_documento` estaba escrito en
+  cuatro sitios que no coincidían: el `Enum` del modelo conocía
+  `dni`/`ce`/`pasaporte`, el formulario de Personas ofrecía además `ruc` y el
+  tablero de Contratación mandaba `carne_extranjeria`. Nadie validaba en el
+  medio. Y lo peor no era el rechazo: como `Enum(native_enum=False)` no emite
+  ningún CHECK (`create_constraint` vale `False` desde SQLAlchemy 1.4), el
+  INSERT **entraba** y lo que reventaba era la **lectura** — una sola fila con
+  `ruc` tumbaba `GET /personas` para todos, hasta corregirla a mano.
+  Ahora `ruc` es un tipo legítimo de persona (una persona natural con negocio
+  lo tiene, y su comprobante ya sale con el código 6 del catálogo 06 de SUNAT
+  en vez de «sin documento»), `carne_extranjeria` se normaliza a `ce`, el
+  número se valida contra su tipo (DNI 8 dígitos, RUC 11, CE y pasaporte
+  alfanuméricos) y el vocabulario vive una sola vez en `src/shared/documento.py`
+  y `frontend/lib/documento.ts`. La migración `c9f4a2e70b18` sanea lo que haya
+  quedado guardado y **crea el CHECK que nunca existió**: el mismo error vuelve
+  a ser un alta rechazada y no una fila ilegible para siempre.
+- **La ficha de una persona sin documento rompía la serialización**: `PersonaOut`
+  declaraba `tipo_documento` y `numero_documento` obligatorios contra columnas
+  nulas desde `e1c4a9d6b038` (ADR-018), y toda persona creada desde el PDV nace
+  sin documento. Costo aceptado: el barrido del resto del contrato
+  (`openapi.json`, ADR-010) queda para su propia rama.
+
+- **Una pantalla que revienta ya no deja el ERP en blanco** (2026-08-30). No
+  existía ningún error boundary: un throw al renderizar —el de
+  `(app)/layout.tsx`, que pide la sesión, tumbaba la aplicación entera— caía
+  en la pantalla por defecto de Next, que en producción es blanca y sin
+  salida. En una tablet detrás de una barra eso se resuelve apagando el
+  equipo. `frontend/app/error.tsx` vive en `app/` y no en `app/(app)/` para
+  cubrir también PDV, KDS, asistencia, login y las rutas públicas, que
+  cuelgan directo del layout raíz; reintenta con `reset()` y muestra el
+  `digest`, que en producción es lo único que ata la pantalla al log. Costo
+  aceptado: es uno solo y en paleta clara, así que reemplaza la pantalla
+  entera y se ve fuera de tono sobre el PDV.
+- **La fecha renderizada en el servidor salía cinco horas adelantada**
+  (2026-08-30). El kardex de un SKU y la ficha de una devolución formateaban
+  con `new Date(iso).toLocaleString("es-PE")`, y `"es-PE"` fija el idioma y
+  no la zona: la ponía el proceso, que en Docker es UTC, así que un
+  movimiento de las 20:00 se leía como la 01:00 del día siguiente. Ahora la
+  zona viaja explícita en `frontend/lib/fechas.ts` —vale igual en el
+  servidor, en `npm run dev` y en una tablet mal configurada— y
+  `frontend/Dockerfile` fija `TZ` con `tzdata` como defensa en profundidad,
+  porque alpine no trae la base de zonas y sin ella `TZ` se ignora en
+  silencio. La fecha de cierre de un periodo contable dejó de mostrarse
+  cortando el ISO con `slice(0, 10)`, que era el día UTC.
+- **Cinco escrituras del backend leían el reloj del proceso** (2026-08-30).
+  `movimiento.fecha_ejecucion`, `periodo.fecha_cierre` y
+  `orden.fecha_emision` usaban `datetime.now()` a secas sobre columnas
+  `timestamptz`; son instantes, así que pasan a `datetime.now(UTC)` como los
+  otros 47 sitios. `venta.fecha_orden` —la que gobierna el correlativo
+  diario— e `implementacion_material_sucursal.fecha` tenían
+  `default=date.today` **sin paréntesis**: la función viajaba sin llamar y
+  toda inserción que omitiera el campo (seeder, replay del hub, escritura
+  directa del repo) fechaba en día UTC. El barrido de
+  `tests/test_fechas_negocio.py` no las veía porque buscaba solo el literal
+  `date.today()`; ahora cubre las tres formas y dice cuál usar en su lugar.
+
+- **Un error de validación se leía en inglés y sin decir qué campo era**
+  (2026-08-30). La API respondía los 422 con el formato crudo de FastAPI
+  —`detail` como lista de `{loc, msg, type}`— y el frontend, que descarta
+  `loc`, los mostraba concatenados: un formulario con tres campos mal
+  cargados decía "Field required; Field required; Input should be..." tres
+  veces lo mismo y ninguna nombraba un campo. Y como el cliente **no**
+  replica `pattern`, `minimum` ni los enums a propósito, ese texto era el
+  único mensaje de error para toda esa clase de fallos. Ahora `detail` es un
+  texto en español que nombra cada campo ("Código: máximo 5 caracteres;
+  Módulo: valor no válido: se espera 'compras' o 'rrhh'") y viaja además un
+  `errores[]` con el que el diálogo de formulario marca y enfoca el primer
+  input rechazado. La traducción va por `type` de Pydantic —un código
+  estable— y no por el texto del mensaje; lo que no esté en la tabla cae al
+  mensaje original, porque quedar en inglés es menos malo que perder el
+  dato.
+- **El parseo del error estaba duplicado byte por byte** en los dos clientes
+  HTTP del frontend (`lib/api.ts` y `lib/cliente-api.ts`), y el helper
+  `mensajeDe(e, porDefecto)` copiado en quince `actions.ts`. Todo eso vive
+  ahora en `lib/errores.ts`. De paso deja de escribir "undefined; undefined"
+  cuando un `detail` de lista viene sin `msg`.
+
+- **La versión que reporta el ERP salía de la metadata del paquete instalado,
+  que en desarrollo se congela** (2026-08-30). `settings.app_version` leía
+  `importlib.metadata.version("provecho")`, y en un `pip install -e .` esa
+  metadata se escribe **una sola vez**: el código queda en vivo y la versión
+  no. Como el `.venv` es uno solo para todos los worktrees, terminaba
+  reportando la versión de la rama que estuviera abierta el día que se
+  instaló — se encontró un venv en 0.6.0 con el repo en 0.9.1. No afectaba ni
+  a la imagen ni a CI, que instalan de cero en cada corrida, pero sí ensuciaba
+  `docs/architecture/openapi.json`: regenerarlo en local le metía esa versión
+  ajena y el `git diff --exit-code` del CI fallaba sin que nadie hubiera
+  tocado un endpoint. Ahora la versión sale del `pyproject.toml` del checkout
+  —el archivo que `cortar_version.py` mueve— y la metadata queda de respaldo
+  para la instalación no editable, donde el paquete vive en `site-packages` y
+  no tiene el `pyproject.toml` al lado. El test pasa de comprobar el formato
+  (`\d+\.\d+\.\d+`, que daba verde con cuatro releases de diferencia) a
+  comparar contra el archivo.
+
+- **Un delivery con cliente registrado no se podía enviar: "tipo de venta
+  inválido: natural"** (2026-08-30). Al elegir el cliente, el PDV guardaba el
+  objeto entero como ubicación del pedido (`ClienteBuscado` es
+  `{...} & Ubicacion`, así que el tipo no se quejaba) y después lo esparcía en
+  el cuerpo de la venta: viajaban también su `id`, su `nombre` y su `tipo`
+  —`natural`—, que el servidor leía como tipo de venta. Ahora hay
+  `soloUbicacion()` que recorta al ancla; el costo aceptado es tener que
+  llamarla en cada asignación, porque el tipo estructural no lo puede exigir.
+
+- **El filtro de estados de la jornada de ventas mentía en silencio**
+  (2026-08-30, auditoría del 2026-08-20 §1). El desplegable de `/ventas`
+  ofrecía `entregada` —que es estado de **ítem**, del KDS, no de venta— y
+  filtrar por ella devolvía siempre cero filas sin ningún error: el endpoint
+  aceptaba `estado: str` libre y lo metía crudo en un `IN`. Al mismo tiempo
+  faltaba `facturada`, que es donde termina casi toda venta cobrada en cuanto
+  SUNAT acepta el comprobante, así que la mayoría de la jornada no era
+  filtrable. Ahora los cinco estados salen de una fuente única en el dominio
+  (`sales.domain.rules.ESTADOS_VENTA`), de la que también se arma el `Enum` de
+  la columna y el `Literal` del query param: un valor inexistente responde 422
+  en vez de una lista vacía, y un test de coherencia impide que la lista de la
+  pantalla vuelva a separarse del enum.
+- **La alerta de pedido demorado no disparaba para el caso más común**
+  (2026-08-30). `ESTADOS_VIVOS` era `("confirmada", "pagada", "facturada")` y
+  `confirmada` **no existe** entre los valores de `estado_venta`: faltaba
+  `orden`, que es exactamente el pedido enviado a cocina con la cuenta todavía
+  abierta —una mesa cualquiera—, y también `cerrada`, el consumo de personal.
+  Los tests no lo veían porque todos creaban la venta ya `pagada`. Es el mismo
+  defecto que el punto anterior y lo cierra la misma constante.
+- **Tres botones de la jornada prometían un 403** (auditoría §3, parcial).
+  «Reintentar emisión», «Nota de crédito» y «Anular» se dibujaban para
+  cualquiera con `sales.leer`, que es lo único que la pantalla exige para
+  cargar. Ahora se gatean con `sales.emitir_comprobante`,
+  `sales.emitir_nota_credito` y `sales.cobrar` **o** `sales.anular`
+  respectivamente —el OR es el mismo criterio del endpoint, donde el cajero
+  cobra sin anular y el supervisor anula sin cobrar—, con el `tienePermiso`
+  que ya usaba la ficha de orden de compra. Quien no puede reintentar sigue
+  viendo el estado de emisión y el motivo del rechazo, que es la información
+  útil de la celda. La autorización real la sigue haciendo la API.
+- **Un fallo al traer las líneas para la nota de crédito se veía como una
+  venta sin líneas** (auditoría §11, parcial). `lineasDeVentaAction` hacía
+  `catch { return [] }`: con la API caída, el diálogo se quedaba en «Cargando
+  las líneas...» para siempre y el único camino que ofrecía era acreditar a
+  ciegas. Ahora devuelve el error y el diálogo distingue los tres casos —
+  cargando, falló, y la venta de verdad no tiene líneas.
+
+### Security
+
+- **El token de autorización de supervisor se podía reusar durante sus tres
+  minutos** (2026-08-30, hallazgo #7 de la auditoría backend↔frontend;
+  ADR-018 §6). `POST /auth/autorizar` emitía un `jti` desde el primer día y
+  `verificar()` nunca lo miraba: el cajero conseguía la firma legítima del
+  supervisor para un descuento y se la aplicaba a las ventas siguientes, con
+  el reporte de descuentos —la razón de ser del campo— nombrando al
+  supervisor en todas. Ahora la elevación cubre **una** operación: el `jti`
+  se consume al verificarlo, con la marca en Redis (`marcar_uso_unico` en
+  `src/core/rate_limit.py`, `SET NX EX` con el TTL de la elevación, sobre el
+  mismo cliente y corta-circuito del rate limit). La marca guarda la clave
+  de idempotencia de la operación cuando la hay, para que un reintento de
+  red no obligue al supervisor a volver al mostrador. Costo aceptado: la
+  guarda es fail-open como el rate limit, así que con Redis caído no hay
+  anti-replay — el token sigue acotado a 3 minutos y a un permiso. Llevar la
+  marca a Postgres cerraría eso y pide tabla y purga; queda en la deuda.
+
+- **La remuneración de toda la plantilla se leía con solo `rrhh.leer`**
+  (2026-08-30, hallazgo #6 de la auditoría backend↔frontend). El legajo
+  escondía boletas y liquidaciones salvo `rrhh.nomina_gestionar`, pero
+  `GET /rrhh/trabajadores` devolvía `remuneracion_base` a cualquiera con
+  `rrhh.leer` — que es lo que tiene el rol `supervisor`. Esconder la nómina
+  del legajo y dejar el sueldo base en el listado era censurar la puerta y
+  dejar la ventana abierta. Ahora el campo viaja en `null` sin ese permiso,
+  en el listado, en la ficha y en el `trabajador` embebido del legajo. Se
+  censura a `null` en vez de agregar un `remuneracion_visible`: el legajo ya
+  trae `nomina_visible` y era el único lugar donde hacía falta distinguir
+  "no te lo muestro" de "no tiene sueldo cargado". Queda anotado en la deuda
+  que el `PATCH` sigue pidiendo solo `rrhh.trabajador_gestionar`.
+
 ## [0.9.1] - 2026-08-30
 
 ### Added
