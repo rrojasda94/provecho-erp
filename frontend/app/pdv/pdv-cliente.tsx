@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { esSinPermiso, type Falla } from "@/lib/carga";
+import { apiKds } from "@/lib/kds";
 import { tienePermiso } from "@/lib/permisos";
 import {
   api,
@@ -38,6 +39,7 @@ import {
 } from "./dialogos";
 import Ticket from "./ticket";
 import {
+  esConsumoPersonal,
   faltaEnBorrador,
   lineasPendientes,
   totalBorrador,
@@ -56,6 +58,25 @@ import {
   type Ubicacion,
 } from "@/components/direccion/ubicacion";
 import { Combobox } from "@/components/ui/combobox";
+
+/**
+ * El servidor rechazó un aumento por falta de firma del encargado
+ * (RN-COM-025). Es lo único que se reintenta pidiendo PIN: un 403 sobre una
+ * venta normal es un permiso que falta, y ahí el PIN de nadie ayuda.
+ *
+ * Se pregunta cuando el servidor lo pide y no antes: la regla vive en la
+ * API, y adelantarla acá la duplicaría.
+ */
+const faltaFirmaDelConsumo = (
+  e: unknown,
+  borrador: Borrador,
+  yaFirmado: string | undefined,
+): boolean =>
+  !yaFirmado &&
+  Boolean(borrador.ventaId) &&
+  esConsumoPersonal(borrador) &&
+  e instanceof ErrorApi &&
+  e.status === 403;
 
 type Props = {
   sucursalId: string;
@@ -358,6 +379,8 @@ export default function PdvCliente({
   const [firmandoAnulacion, setFirmandoAnulacion] = useState(false);
   // Qué línea espera la firma del supervisor, o `null` si ninguna.
   const [lineaFirmando, setLineaFirmando] = useState<string | null>(null);
+  // El aumento de un consumo de personal esperando la firma del encargado.
+  const [firmandoAumento, setFirmandoAumento] = useState(false);
   // Qué línea se está quitando, mientras se pregunta el motivo.
   const [lineaAQuitar, setLineaAQuitar] = useState<{
     id: string;
@@ -556,7 +579,7 @@ export default function PdvCliente({
    * quitar o mover una línea después (RN-COM-020, RN-COM-043) manda ese id,
    * no el uuid que el navegador inventó mientras era un borrador.
    */
-  const enviar = async () => {
+  const enviar = async (autorizacion?: string) => {
     if (!activo || !revisarAntesDeSalir(activo, "enviar")) return;
     const pendientes = lineasPendientes(activo);
     if (pendientes.length === 0) return;
@@ -564,7 +587,11 @@ export default function PdvCliente({
     try {
       const esAumento = Boolean(activo.ventaId);
       const venta = esAumento
-        ? await api.agregarLineas(activo.ventaId!, pendientes.map(cuerpoLinea))
+        ? await api.agregarLineas(
+            activo.ventaId!,
+            pendientes.map(cuerpoLinea),
+            autorizacion,
+          )
         : await api.crearVenta(cuerpoVenta(activo));
       const items = await api.itemsDeVenta(venta.id);
       parchar({
@@ -584,7 +611,62 @@ export default function PdvCliente({
       datos.mesas.recargar();
       datos.abiertas.recargar();
     } catch (e) {
+      if (faltaFirmaDelConsumo(e, activo, autorizacion)) {
+        setFirmandoAumento(true);
+        return;
+      }
       notificar(mensajeDe(e, "No se pudo enviar el pedido"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  /** Canjea el PIN del encargado y reintenta el aumento que el servidor
+   * rechazó por falta de firma. */
+  const firmarAumento = async (encargado: { username: string; pin: string }) => {
+    setFirmandoAumento(false);
+    setOcupado(true);
+    try {
+      const { autorizacion } = await api.autorizar(
+        encargado.username,
+        encargado.pin,
+        "sales.registrar_consumo_personal",
+      );
+      await enviar(autorizacion);
+    } catch (e) {
+      notificar(mensajeDe(e, "No se pudo autorizar el aumento"));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  /**
+   * Cierra un consumo de personal (RN-COM-025).
+   *
+   * Es la **misma entrega** del despacho —`POST /sales/ventas/{id}/entrega`—
+   * y no un cierre propio: un consumo se cierra cuando sale de cocina, y
+   * tener dos caminos para el mismo hecho daría dos rastros distintos del
+   * mismo plato. Lo que cambia es de dónde se toca: el cajero ya no tiene
+   * que abrir la pantalla de despacho para sacar la cuenta del turno.
+   */
+  const cerrarCuenta = async () => {
+    if (!activo?.ventaId) return;
+    setOcupado(true);
+    try {
+      await apiKds.entregar(activo.ventaId);
+      const orden = activo.numeroOrden;
+      cerrarPedido(activo.id);
+      notificar(`Consumo de personal #${orden} entregado y cerrado`);
+      datos.mesas.recargar();
+      datos.abiertas.recargar();
+      datos.cobrados.recargar();
+    } catch (e) {
+      notificar(
+        mensajeDe(
+          e,
+          "No se pudo cerrar la cuenta: la cocina tiene que marcar todo listo",
+        ),
+      );
     } finally {
       setOcupado(false);
     }
@@ -1170,8 +1252,9 @@ export default function PdvCliente({
           onTipo={() => setDialogo("tipo")}
           onDescuento={() => setDialogo("descuento")}
           onAnular={anularPedido}
-          onEnviar={enviar}
+          onEnviar={() => enviar()}
           onCobrar={abrirCobro}
+          onCerrarCuenta={cerrarCuenta}
           onConsumoPersonal={() => {
             // Quitar la marca no necesita firma: deja el pedido como venta
             // normal, que es el camino que sí cobra.
@@ -1204,6 +1287,14 @@ export default function PdvCliente({
           setLineaFirmando(null);
           if (id) await anularLineaEnviada(id, motivoAnulacion, encargado);
         }}
+      />
+      <DialogoAutorizacion
+        abierto={firmandoAumento}
+        titulo="Sumar productos al consumo"
+        detalle="Cada plato que se agrega a una comida de personal es consumo regalado más: lo firma el encargado con su PIN (RN-COM-025)."
+        ocupado={ocupado}
+        onCerrar={() => setFirmandoAumento(false)}
+        onFirmar={firmarAumento}
       />
       <DialogoAutorizacion
         abierto={firmandoAnulacion}

@@ -115,7 +115,22 @@ export function useDatosPdv(puntoVentaId: string, sucursalId: string) {
 
 const traerMesas = (sucursalId: string) => api.mapaMesas(sucursalId);
 
-const traerCobrados = (sucursalId: string) => api.ventasDelDia(sucursalId, "pagada");
+/** Las cuentas que ya se cerraron en el turno: lo cobrado y **también los
+ * consumos de personal**, que cierran sin pasar por caja (RN-COM-025).
+ *
+ * Sin ellos el turno no cuadra contra lo que salió de cocina: la comida del
+ * personal desaparecía de la pestaña de abiertas al cerrarse y no aparecía
+ * en ningún otro lado, así que el cajero no tenía dónde ver qué se preparó
+ * sin cobrar. No suma plata —vale cero— pero sí rastro. */
+const traerCobrados = async (sucursalId: string) => {
+  const [pagadas, cerradas] = await Promise.all([
+    api.ventasDelDia(sucursalId, "pagada"),
+    api.ventasDelDia(sucursalId, "cerrada"),
+  ]);
+  return [...pagadas, ...cerradas].sort(
+    (a, b) => b.numero_orden - a.numero_orden,
+  );
+};
 
 /** Todo lo enviado a cocina y sin cobrar, **incluidas las mesas**.
  *

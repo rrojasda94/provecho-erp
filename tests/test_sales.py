@@ -506,3 +506,31 @@ def test_listado_con_rango_invertido_400(env):
         f"/api/v1/sales/ventas?desde={hoy}&hasta={hoy - timedelta(days=1)}", headers=h
     )
     assert r.status_code == 400
+
+
+def test_listado_con_un_estado_que_no_existe_422(env):
+    """Antes `estado` era un `str` libre: pedir `entregada` —que es estado de
+    ítem del KDS, no de venta— devolvía 200 con lista vacía, y la pantalla
+    mostraba "no hay ventas en esa jornada" para un filtro que nunca podría
+    encontrar nada (auditoría del 2026-08-20, hallazgo 1)."""
+    client, _, _ = env
+    h = _token(client)
+
+    r = client.get("/api/v1/sales/ventas?estado=entregada", headers=h)
+    assert r.status_code == 422, r.text
+
+
+def test_listado_filtra_por_facturada(env):
+    """`facturada` es donde termina casi toda venta cobrada (la emisión la
+    mueve ahí en cuanto SUNAT acepta) y no era filtrable desde la pantalla."""
+    client, ids, TestSession = env
+    h = _token(client)
+    venta = client.post("/api/v1/sales/ventas", headers=h, json=_venta_body(ids)).json()
+    with TestSession() as s:
+        s.get(Venta, uuid.UUID(venta["id"])).estado = "facturada"
+        s.commit()
+
+    assert client.get("/api/v1/sales/ventas?estado=facturada", headers=h).json()[
+        "total"
+    ] == 1
+    assert client.get("/api/v1/sales/ventas?estado=orden", headers=h).json()["total"] == 0

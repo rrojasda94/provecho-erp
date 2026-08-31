@@ -48,7 +48,7 @@ async function jornadaDe(
 }
 
 export default async function VentasPage({ searchParams }: { searchParams: Params }) {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
   const filtros = await searchParams;
 
   let sucursales: Sucursal[];
@@ -87,6 +87,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Param
       sucursalId={sucursalId}
       fecha={filtros.fecha ?? ""}
       estado={filtros.estado ?? ""}
+      permisos={usuario.permisos}
     />
   );
 }

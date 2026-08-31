@@ -31,6 +31,7 @@ from sqlalchemy.orm import Mapped, column_property, declared_attr, mapped_column
 
 from src.core.database import Base
 from src.core.model_base import TimestampMixin, UbicacionMixin, UuidPkMixin
+from src.modules.sales.domain import rules
 from src.modules.sales.infrastructure.models.mesa import Mesa
 from src.shared import fechas
 
@@ -71,15 +72,7 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     # orden sin precio quedaría `orden` para siempre, contada como cuenta
     # abierta en el PDV y en el cierre de caja.
     estado: Mapped[str] = mapped_column(
-        Enum(
-            "orden",
-            "pagada",
-            "facturada",
-            "anulada",
-            "cerrada",
-            name="estado_venta",
-            native_enum=False,
-        ),
+        Enum(*rules.ESTADOS_VENTA, name="estado_venta", native_enum=False),
         default="orden",
     )
     # --- Consumo de personal (RN-COM-025) ------------------------------------

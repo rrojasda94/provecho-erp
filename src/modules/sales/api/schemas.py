@@ -195,6 +195,10 @@ class AgregarLineasCreate(BaseModel):
     # mismo envío devuelve la orden sin volver a mandar la comanda a cocina
     # (RN-COM-002).
     idempotency_key: str | None = Field(default=None, max_length=100)
+    # Token de `POST /auth/autorizar`. Obligatorio **solo** en un consumo de
+    # personal: cada aumento es comida regalada más y lo firma un encargado
+    # (RN-COM-025). En una venta normal agregar no pide firma de nadie.
+    autorizacion: str | None = None
 
 
 class NotaCocinaIn(BaseModel):
