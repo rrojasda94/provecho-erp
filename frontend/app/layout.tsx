@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Anton, Archivo, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+import { AvisoSesionExpirada } from "@/components/sesion/aviso-sesion-expirada";
 import { PiePagina } from "@/components/shell/pie-pagina";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -80,6 +81,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {/* Avisos flotantes (guardado, alertas de cocina). Vive en el
                     layout raíz para que cualquier pantalla pueda emitirlos. */}
                 <Toaster richColors closeButton />
+                {/* La sesión puede morir en cualquier pantalla, y las tres
+                    que hablan con la API desde el navegador —KDS, PDV y la
+                    campana del shell— viven en árboles distintos. El aviso
+                    se monta una sola vez, acá. */}
+                <AvisoSesionExpirada />
             </body>
         </html>
     );

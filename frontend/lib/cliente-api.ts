@@ -12,6 +12,7 @@
 // Extensión explícita: estos dos módulos los carga `node --test`, que
 // resuelve ESM por ruta real (mismo motivo que en `lib/carga.test.ts`).
 import { type ErrorCampo, leerError } from "./errores.ts";
+import { estaMuerta, marcarMuerta } from "./sesion-muerta.ts";
 
 const BASE = "/api/proxy/api/v1";
 
@@ -27,19 +28,40 @@ export class ErrorApi extends Error {
   }
 }
 
+/**
+ * Lo que se hace con una respuesta que no vino bien, en un solo lugar para
+ * las tres funciones que salen a la red.
+ *
+ * El 401 es el que importa: llega solo cuando el refresco tampoco valió (ver
+ * `lib/sesion-muerta.ts`), así que se anota antes de lanzar. Sin esto, el
+ * KDS lo mostraba como un aviso de 4 segundos y seguía reintentando cada 3;
+ * la campana lo tragaba entero; y el PDV borraba su huella de guardado y
+ * reintentaba el PUT con cada tecla, en silencio.
+ */
+async function lanzar(respuesta: Response): Promise<never> {
+  if (respuesta.status === 401) marcarMuerta();
+  const { mensaje, campos } = await leerError(respuesta);
+  throw new ErrorApi(respuesta.status, mensaje, campos);
+}
+
+/** Con la sesión ya muerta no se sale a la red: es lo que apaga el bucle de
+ * refresco del KDS y el guardado por tecla del PDV, que si no seguirían
+ * golpeando el proxy detrás del aviso hasta que alguien recargue. */
+function abortarSiMuerta(): void {
+  if (estaMuerta()) throw new ErrorApi(401, "Sesión expirada");
+}
+
 export async function pedir<T>(
   ruta: string,
   opciones: { metodo?: string; cuerpo?: unknown } = {},
 ): Promise<T> {
+  abortarSiMuerta();
   const respuesta = await fetch(`${BASE}${ruta}`, {
     method: opciones.metodo ?? "GET",
     headers: { "Content-Type": "application/json" },
     body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined,
   });
-  if (!respuesta.ok) {
-    const { mensaje, campos } = await leerError(respuesta);
-    throw new ErrorApi(respuesta.status, mensaje, campos);
-  }
+  if (!respuesta.ok) await lanzar(respuesta);
   // 204 (los DELETE) no traen cuerpo: pedirle `.json()` a una respuesta
   // vacía revienta con un error de sintaxis que no dice nada.
   if (respuesta.status === 204) return undefined as T;
@@ -57,15 +79,13 @@ export async function pedirArchivo(
   ruta: string,
   opciones: { metodo?: string; cuerpo?: unknown } = {},
 ): Promise<{ blob: Blob; nombre: string }> {
+  abortarSiMuerta();
   const respuesta = await fetch(`${BASE}${ruta}`, {
     method: opciones.metodo ?? "GET",
     headers: { "Content-Type": "application/json" },
     body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined,
   });
-  if (!respuesta.ok) {
-    const { mensaje, campos } = await leerError(respuesta);
-    throw new ErrorApi(respuesta.status, mensaje, campos);
-  }
+  if (!respuesta.ok) await lanzar(respuesta);
   const nombre = /filename="([^"]+)"/.exec(
     respuesta.headers.get("Content-Disposition") ?? "",
   )?.[1];
@@ -80,13 +100,11 @@ export async function pedirArchivo(
  * servidor con un error que no menciona la palabra "boundary".
  */
 export async function subir<T>(ruta: string, archivo: File): Promise<T> {
+  abortarSiMuerta();
   const cuerpo = new FormData();
   cuerpo.append("archivo", archivo);
   const respuesta = await fetch(`${BASE}${ruta}`, { method: "POST", body: cuerpo });
-  if (!respuesta.ok) {
-    const { mensaje, campos } = await leerError(respuesta);
-    throw new ErrorApi(respuesta.status, mensaje, campos);
-  }
+  if (!respuesta.ok) await lanzar(respuesta);
   return (await respuesta.json()) as T;
 }
 
