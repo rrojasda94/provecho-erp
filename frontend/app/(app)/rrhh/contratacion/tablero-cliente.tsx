@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import { BuscarDocumento } from "@/components/consulta/buscar-documento";
+import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 
 import {
   avanzarPostulanteAction,
@@ -48,8 +49,6 @@ export type Postulante = {
 
 export type Columna = { estado: string; postulantes: Postulante[] };
 
-const ESTADO_INICIAL: EstadoRrhh = { error: "", ok: false };
-
 /** Las ocho etapas en orden, con el nombre que usa quien contrata — no el
  * del enum. El orden es el del dominio (`rules.ETAPAS_POSTULANTE`) y de él
  * sale cuál es "la siguiente": el tablero avanza **de a una columna**. */
@@ -72,7 +71,17 @@ function siguienteEtapa(estado: string): { clave: string; titulo: string } | nul
   return ETAPAS[indice + 1];
 }
 
-function DialogoFormulario({
+/**
+ * El diálogo del tablero: el molde común más los dos rasgos propios de esta
+ * pantalla —campos ocultos por lote y un disparador destructivo—, que sus
+ * cuatro llamadores dan por sentados.
+ *
+ * Era una copia entera del molde **con el mismo nombre**, `DialogoFormulario`,
+ * y su propio `EstadoRrhh` en vez de `EstadoFormulario`: dos componentes
+ * distintos llamados igual en el mismo repositorio, y el de acá sin el
+ * arreglo de React 19 ni el marcado de campos del 422.
+ */
+function DialogoTablero({
   etiqueta,
   titulo,
   descripcion,
@@ -91,60 +100,22 @@ function DialogoFormulario({
   destructivo?: boolean;
   textoBoton?: string;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [estado, formAction, pendiente] = useActionState(accion, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className={`text-xs font-bold hover:underline ${
-          destructivo ? "text-secondary" : "text-primary"
-        }`}
-      >
-        {etiqueta}
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-3 p-6">
-          {Object.entries(ocultos ?? {}).map(([nombre, valor]) => (
-            <input key={nombre} type="hidden" name={nombre} value={valor} />
-          ))}
-          <h2 className="font-heading text-lg text-dark">{titulo}</h2>
-          {descripcion && <p className="text-sm text-gray">{descripcion}</p>}
-          {children}
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Guardando..." : textoBoton}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo={titulo}
+      disparador={etiqueta}
+      claseDisparador={`text-xs font-bold hover:underline ${
+        destructivo ? "text-status-danger" : "text-primary"
+      }`}
+      etiquetaEnvio={textoBoton}
+      accion={accion}
+      ayuda={descripcion}
+    >
+      {Object.entries(ocultos ?? {}).map(([nombre, valor]) => (
+        <input key={nombre} type="hidden" name={nombre} value={valor} />
+      ))}
+      {children}
+    </DialogoFormulario>
   );
 }
 
@@ -217,7 +188,7 @@ function Ficha({
               sucursalConvocatoria={sucursalConvocatoria}
             />
           )}
-          <DialogoFormulario
+          <DialogoTablero
             etiqueta="Descartar"
             titulo="Descartar postulante"
             descripcion={
@@ -239,7 +210,7 @@ function Ficha({
               maxLength={255}
               placeholder="No cumple el requisito de experiencia en cocina"
             />
-          </DialogoFormulario>
+          </DialogoTablero>
         </div>
       )}
     </li>
@@ -258,7 +229,7 @@ function DialogoContratar({
   sucursalConvocatoria: string | null;
 }) {
   return (
-    <DialogoFormulario
+    <DialogoTablero
       etiqueta="→ Contratar"
       titulo={`Contratar a ${postulante.nombres}`}
       descripcion={
@@ -341,7 +312,7 @@ function DialogoContratar({
         min={0}
         step="0.10"
       />
-    </DialogoFormulario>
+    </DialogoTablero>
   );
 }
 
@@ -401,7 +372,7 @@ function Convocatorias({
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="font-heading text-lg text-dark">Convocatorias</h2>
-        <DialogoFormulario
+        <DialogoTablero
           etiqueta="+ Nueva convocatoria"
           titulo="Nueva convocatoria"
           descripcion="La búsqueda arranca en borrador. No se publica sin perfil de puesto."
@@ -432,7 +403,7 @@ function Convocatorias({
             <Campo etiqueta="Se necesita para" nombre="fecha_objetivo" type="date" />
             <Campo etiqueta="Cierra el" nombre="fecha_limite" type="date" />
           </div>
-        </DialogoFormulario>
+        </DialogoTablero>
       </div>
 
       {convocatorias.length === 0 ? (
@@ -490,7 +461,7 @@ function Convocatorias({
                   <td className="py-2">
                     <div className="flex items-center gap-3">
                       {c.estado === "borrador" && (
-                        <DialogoFormulario
+                        <DialogoTablero
                           etiqueta="Publicar"
                           titulo={`Publicar: ${c.puesto}`}
                           descripcion={
@@ -519,7 +490,7 @@ function Convocatorias({
                               placeholder="docs/rrhh/perfiles/cocina.md"
                             />
                           )}
-                        </DialogoFormulario>
+                        </DialogoTablero>
                       )}
                       {c.estado === "publicada" && (
                         <button
