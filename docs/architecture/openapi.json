@@ -1722,6 +1722,81 @@
         "title": "ArticuloCreate",
         "type": "object"
       },
+      "ArticuloDeAlmacenIn": {
+        "description": "Un artículo que el almacén pasa a manejar.\n\n`cantidad_inicial` es opcional: declararlo en cero ya alcanza para que\naparezca en la pantalla de stock y entre en un conteo.",
+        "properties": {
+          "cantidad_inicial": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad Inicial"
+          },
+          "lote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Id"
+          },
+          "sku_id": {
+            "format": "uuid",
+            "title": "Sku Id",
+            "type": "string"
+          },
+          "stock_maximo": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Maximo"
+          },
+          "stock_minimo": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Minimo"
+          }
+        },
+        "required": [
+          "sku_id"
+        ],
+        "title": "ArticuloDeAlmacenIn",
+        "type": "object"
+      },
       "ArticuloImportadoIn": {
         "description": "Una fila de la hoja «Artículos», ya revisada por la pantalla.\n\n`unidad_medida_id` puede venir en `None` al actualizar: la unidad de un\nartículo que ya existe no se cambia por planilla (ADR-052).",
         "properties": {
@@ -7990,6 +8065,23 @@
           "archivo_id"
         ],
         "title": "DecisionGerencialOut",
+        "type": "object"
+      },
+      "DeclararArticulosIn": {
+        "properties": {
+          "articulos": {
+            "items": {
+              "$ref": "#/components/schemas/ArticuloDeAlmacenIn"
+            },
+            "minItems": 1,
+            "title": "Articulos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "articulos"
+        ],
+        "title": "DeclararArticulosIn",
         "type": "object"
       },
       "DeliveryConfiguracionOut": {
@@ -34627,6 +34719,69 @@
         ]
       }
     },
+    "/api/v1/inventory/almacenes/{almacen_id}/articulos": {
+      "post": {
+        "description": "Qué artículos maneja este almacén, y con cuánto arranca cada uno.\n\nEs el punto de partida que faltaba: hasta ahora la fila de `stock` nacía\nsola con el primer movimiento, así que un almacén nuevo no tenía forma\nde mostrarse ni de contarse — se veía vacío y no había acción para\nsalir de ahí.",
+        "operationId": "declarar_articulos_del_almacen_api_v1_inventory_almacenes__almacen_id__articulos_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "almacen_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Almacen Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeclararArticulosIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/StockOut"
+                  },
+                  "title": "Response Declarar Articulos Del Almacen Api V1 Inventory Almacenes  Almacen Id  Articulos Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Declarar Articulos Del Almacen",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
     "/api/v1/inventory/articulos": {
       "get": {
         "operationId": "listar_articulos_api_v1_inventory_articulos_get",
@@ -37896,7 +38051,7 @@
     },
     "/api/v1/inventory/solicitudes": {
       "get": {
-        "description": "Los borradores no aparecen acá salvo pidiendo `estado=borrador`: una\nlista que nadie envió todavía no le pidió nada a nadie.",
+        "description": "Los borradores no aparecen acá salvo pidiendo `estado=borrador`: una\nlista que nadie envió todavía no le pidió nada a nadie.\n\n`almacen_abastecedor_id` es la bandeja del que despacha —\"qué me piden\"—,\nla contracara de `almacen_solicitante_id`. Sin ella el central veía todos\nlos requerimientos de la empresa mezclados y ninguno era su cola.",
         "operationId": "listar_solicitudes_api_v1_inventory_solicitudes_get",
         "parameters": [
           {
@@ -37914,6 +38069,23 @@
                 }
               ],
               "title": "Almacen Solicitante Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "almacen_abastecedor_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Abastecedor Id"
             }
           },
           {

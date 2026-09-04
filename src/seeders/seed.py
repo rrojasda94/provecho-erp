@@ -582,6 +582,17 @@ ROLES_POR_AREA = {
 USUARIOS_SEMILLA = (
     ("admin", "admin"),
     ("cajero1", "cajero"),
+    # Inventario exige **dos** personas distintas: quien solicita un ajuste no
+    # puede aprobarlo (RN-INV-006), y lo mismo vale para el requerimiento
+    # (solicitar_insumos vs aprobar_solicitud). Con solo `admin` operativo el
+    # circuito no se puede cerrar ni para probarlo —es exactamente donde quedó
+    # trabado staging: nadie podía cargar stock— y `admin` tampoco sirve de
+    # segundo usuario contra sí mismo.
+    ("almacen1", "almacenero"),
+    # `aprobador1` y no `supervisor1`: cuatro suites de tests crean su propio
+    # `supervisor1` con otro PIN y sembrarlo acá les rompe el alta. El nombre
+    # dice además para qué existe — ser el segundo par de ojos.
+    ("aprobador1", "supervisor"),
 )
 
 

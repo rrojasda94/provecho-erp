@@ -784,3 +784,88 @@ def test_el_abastecedor_pedido_a_mano_no_cae_al_respaldo(env):
     # al caso de uso; lo que importa acá es que **no hay fallback**.
     assert r.status_code == 404, r.text
     assert "no encontrado" in r.json()["detail"]
+
+
+def test_el_circuito_completo_de_abastecimiento_interno(env):
+    """Declarar → cargar → pedir → aprobar → despachar → recibir.
+
+    El recorrido que el usuario no podía hacer y ningún test cubría entero.
+    Cada paso estaba probado por separado y el circuito igual estaba roto:
+    faltaba la primitiva del arranque (sin filas de `stock` la solicitud ni
+    se aprueba, porque reservar exige disponible > 0) y faltaba la bandeja
+    del abastecedor para encontrar qué despachar.
+    """
+    client, ids, _ = env
+    h_admin = _token(client)
+    h_alm = _token(client, "almacenero1", "654321")
+
+    # 1. El central declara qué maneja y con cuánto arranca. Sin segundo
+    #    usuario: es carga inicial, no un ajuste.
+    declarar = client.post(
+        f"/api/v1/inventory/almacenes/{ids['central_id']}/articulos",
+        headers=h_alm,
+        json={"articulos": [
+            {"sku_id": ids["sku_servilleta"], "cantidad_inicial": "100"},
+        ]},
+    )
+    assert declarar.status_code == 201
+    assert Decimal(declarar.json()[0]["cantidad"]) == Decimal("100")
+
+    # 2. El local pide.
+    solicitud = client.post("/api/v1/inventory/solicitudes", headers=h_alm, json={
+        "almacen_solicitante_id": ids["local_id"],
+        "items": [{"sku_id": ids["sku_servilleta"], "cantidad": "30"}],
+    }).json()
+    client.post(
+        f"/api/v1/inventory/solicitudes/{solicitud['id']}/enviar", headers=h_alm
+    )
+
+    # 3. El central la ve en SU bandeja — antes no había forma de preguntar
+    #    "qué me piden", solo "qué pedí".
+    bandeja = client.get(
+        f"/api/v1/inventory/solicitudes?almacen_abastecedor_id={ids['central_id']}",
+        headers=h_admin,
+    ).json()
+    assert [s["id"] for s in bandeja["items"]] == [solicitud["id"]]
+
+    # 4. Aprobar (reserva) y despachar (mueve el stock).
+    aprobar = client.post(
+        f"/api/v1/inventory/solicitudes/{solicitud['id']}/aprobar",
+        headers=h_admin, json={"aprobadas": []},
+    )
+    assert aprobar.status_code == 200
+
+    transferencia = client.post("/api/v1/inventory/transferencias", headers=h_alm, json={
+        "origen_almacen_id": ids["central_id"],
+        "destino_almacen_id": ids["local_id"],
+        "solicitud_id": solicitud["id"],
+        "items": [{"sku_id": ids["sku_servilleta"], "cantidad": "30"}],
+    })
+    assert transferencia.status_code == 201
+    assert transferencia.json()["estado"] == "en_transito"
+
+    # Salió del central y todavía no está en el local.
+    assert _cantidad(client, h_admin, ids["central_id"], ids["sku_servilleta"]) == Decimal("70")
+    assert _cantidad(client, h_admin, ids["local_id"], ids["sku_servilleta"]) is None
+
+    # 5. El local recibe: recién ahí entra.
+    recibir = client.post(
+        f"/api/v1/inventory/transferencias/{transferencia.json()['id']}/recibir",
+        headers=h_alm, json={"items": [], "parcial": False},
+    )
+    assert recibir.status_code == 200
+    assert _cantidad(client, h_admin, ids["local_id"], ids["sku_servilleta"]) == Decimal("30")
+
+    detalle = client.get(
+        f"/api/v1/inventory/solicitudes/{solicitud['id']}", headers=h_admin
+    ).json()
+    assert detalle["estado"] == "recibida"
+
+
+def _cantidad(client, h, almacen_id, sku_id):
+    """El saldo de un SKU en un almacén, o `None` si ni siquiera tiene fila."""
+    filas = client.get(
+        f"/api/v1/inventory/stock?almacen_id={almacen_id}&sku_id={sku_id}",
+        headers=h,
+    ).json()["items"]
+    return Decimal(filas[0]["cantidad"]) if filas else None

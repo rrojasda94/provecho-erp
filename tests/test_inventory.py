@@ -386,6 +386,119 @@ def test_listar_skus_incluye_controla_lote(env):
     assert fila["controla_lote"] is False
 
 
+def _declarar(client, h, almacen_id, articulos):
+    return client.post(
+        f"/api/v1/inventory/almacenes/{almacen_id}/articulos",
+        headers=h,
+        json={"articulos": articulos},
+    )
+
+
+def test_declarar_un_articulo_lo_hace_visible_aunque_este_en_cero(env):
+    """La primitiva que faltaba. La fila de `stock` nacía sola con el primer
+    movimiento, así que un almacén nuevo se veía vacío en todas partes y no
+    había acción para salir de ahí — así quedó staging."""
+    client, ids, _ = env
+    h = _token(client)
+    assert client.get("/api/v1/inventory/stock", headers=h).json()["total"] == 0
+
+    r = _declarar(client, h, ids["almacen_id"], [
+        {"sku_id": ids["sku_id"], "stock_minimo": "5"},
+    ])
+    assert r.status_code == 201
+
+    filas = client.get("/api/v1/inventory/stock", headers=h).json()["items"]
+    assert len(filas) == 1
+    assert Decimal(filas[0]["cantidad"]) == Decimal(0)
+    assert Decimal(filas[0]["stock_minimo"]) == Decimal("5")
+
+
+def test_declarar_con_cantidad_carga_el_stock_inicial(env):
+    client, ids, _ = env
+    h = _token(client)
+    _declarar(client, h, ids["almacen_id"], [
+        {"sku_id": ids["sku_id"], "cantidad_inicial": "40"},
+    ])
+
+    filas = client.get("/api/v1/inventory/stock", headers=h).json()["items"]
+    assert Decimal(filas[0]["cantidad"]) == Decimal("40")
+    movs = client.get("/api/v1/inventory/movimientos", headers=h).json()["items"]
+    assert [m["tipo"] for m in movs] == ["carga_inicial"]
+
+
+def test_declarar_dos_veces_no_duplica_ni_vuelve_a_cargar(env):
+    """Idempotente en lo que importa: los topes se actualizan, la cantidad no
+    se suma de nuevo — reenviar la lista no puede inflar el inventario."""
+    client, ids, _ = env
+    h = _token(client)
+    _declarar(client, h, ids["almacen_id"], [
+        {"sku_id": ids["sku_id"], "cantidad_inicial": "40"},
+    ])
+
+    otra = _declarar(client, h, ids["almacen_id"], [
+        {"sku_id": ids["sku_id"], "cantidad_inicial": "40", "stock_minimo": "7"},
+    ])
+    assert otra.status_code == 409
+
+    solo_topes = _declarar(client, h, ids["almacen_id"], [
+        {"sku_id": ids["sku_id"], "stock_minimo": "7"},
+    ])
+    assert solo_topes.status_code == 201
+    filas = client.get("/api/v1/inventory/stock", headers=h).json()["items"]
+    assert len(filas) == 1
+    assert Decimal(filas[0]["cantidad"]) == Decimal("40")
+    assert Decimal(filas[0]["stock_minimo"]) == Decimal("7")
+
+
+def test_la_carga_inicial_no_sirve_para_corregir_despues(env):
+    """Lo único que separa `carga_inicial` de un ajuste encubierto: con
+    historia, corregir el saldo vuelve a exigir solicitar/aprobar."""
+    client, ids, _ = env
+    h = _token(client)
+    client.post("/api/v1/inventory/movimientos", headers=h, json={
+        "almacen_id": ids["almacen_id"], "sku_id": ids["sku_id"],
+        "cantidad": "10", "tipo": "recepcion_compra",
+    })
+
+    r = _declarar(client, h, ids["almacen_id"], [
+        {"sku_id": ids["sku_id"], "cantidad_inicial": "99"},
+    ])
+    assert r.status_code == 409
+    assert "ajuste" in r.json()["detail"]
+
+
+def test_un_servicio_no_se_declara_en_un_almacen(env):
+    client, ids, _ = env
+    h = _token(client)
+    art = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "S900", "nombre": "Flete",
+        "unidad_medida_id": ids["udm_id"], "tipo": "servicio",
+    }).json()
+    sku = client.post("/api/v1/inventory/skus", headers=h, json={
+        "articulo_id": art["id"], "codigo": "SKU-FLETE",
+    })
+    # Un servicio ni siquiera llega a tener SKU (ADR-086).
+    assert sku.status_code == 409
+
+
+def test_un_conteo_cuenta_lo_declarado_aunque_este_en_cero(env):
+    """El conteo arma sus ítems desde las filas de `stock`. Declarado en cero
+    ya hay qué contar — y es así como se carga el inventario por primera vez
+    sin pedirle nada a un segundo usuario."""
+    client, ids, _ = env
+    h = _token(client)
+    _declarar(client, h, ids["almacen_id"], [{"sku_id": ids["sku_id"]}])
+
+    conteo = client.post("/api/v1/inventory/conteos", headers=h, json={
+        "almacen_id": ids["almacen_id"], "tipo": "rutina",
+    })
+    assert conteo.status_code == 201
+    detalle = client.get(
+        f"/api/v1/inventory/conteos/{conteo.json()['id']}", headers=h
+    ).json()
+    assert [i["sku_id"] for i in detalle["items"]] == [ids["sku_id"]]
+
+
 def test_stock_bajo_minimo_flag(env):
     client, ids, TestSession = env
     h = _token(client)

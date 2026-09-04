@@ -533,7 +533,13 @@ en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
 
 ## 4. Inventario (módulo inventory)
 
-- **stock**: almacen_id, sku_id, cantidad (en la UdM del artículo),
+- **stock**: almacen_id, sku_id, cantidad (en la UdM del artículo).
+  **Una fila en cero significa "este almacén maneja este artículo"**: es lo
+  que lo hace visible en la pantalla de stock, contable en un conteo y
+  visible para el requerimiento de la jornada. Se crea al declararlo
+  (`POST /inventory/almacenes/{id}/articulos`) o sola con el primer
+  movimiento; sin fila el artículo existe en el catálogo pero no en ese
+  almacén.
   stock_minimo (= punto de reorden: demanda_diaria × lead_time_dias +
   stock_seguridad, default stock_seguridad = demanda_diaria, RN-INV-013),
   stock_maximo (única por par almacén/SKU; reglas por artículo definidas
@@ -629,7 +635,10 @@ en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
 - **movimiento_inventario**: almacen_id, sku_id, cantidad (+/-), tipo
   (`recepcion_compra` | `transferencia_salida` | `transferencia_entrada` |
   `consumo_venta` | `consumo_produccion` | **`consumo_interno`** |
-  `produccion_entrada` | `ajuste` | `devolucion`), motivo_ajuste (`sobrante` | `faltante` | `merma` |
+  `produccion_entrada` | `ajuste` | `devolucion` | **`carga_inicial`** — el
+  saldo de partida de un almacén, sin aprobación de un segundo usuario porque
+  no corrige nada, y solo admitido mientras ese (almacén, SKU) no tenga
+  ningún movimiento), motivo_ajuste (`sobrante` | `faltante` | `merma` |
   `error_registro` — solo si tipo=`ajuste`, dentro del margen de error de
   almacén/contabilidad, RN-INV-015), lote_id (nullable), **motivo_lote**
   (nullable; obligatorio al tomar un lote distinto del que sugiere FEFO,

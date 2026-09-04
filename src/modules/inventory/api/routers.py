@@ -409,6 +409,36 @@ def consultar_stock(
     )
 
 
+@router.post(
+    "/almacenes/{almacen_id}/articulos",
+    response_model=list[schemas.StockOut],
+    status_code=201,
+)
+def declarar_articulos_del_almacen(
+    almacen_id: uuid.UUID,
+    body: schemas.DeclararArticulosIn,
+    actor: Usuario = Depends(require_permission(MOVIMIENTO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Qué artículos maneja este almacén, y con cuánto arranca cada uno.
+
+    Es el punto de partida que faltaba: hasta ahora la fila de `stock` nacía
+    sola con el primer movimiento, así que un almacén nuevo no tenía forma
+    de mostrarse ni de contarse — se veía vacío y no había acción para
+    salir de ahí.
+    """
+    exigir_almacen(session, almacen_id, tenant)
+    filas = stock_uc.declarar_articulos(
+        session,
+        almacen_id=almacen_id,
+        articulos=[a.model_dump() for a in body.articulos],
+        usuario_id=actor.id,
+    )
+    session.commit()
+    return stock_uc.componer_filas(session, filas, almacen_id, tenant.filtro_empresa())
+
+
 @router.get("/movimientos", response_model=Pagina[schemas.MovimientoKardexOut])
 def consultar_movimientos(
     almacen_id: uuid.UUID | None = None,
@@ -614,6 +644,7 @@ def crear_solicitud(
 @router.get("/solicitudes", response_model=Pagina[schemas.SolicitudOut])
 def listar_solicitudes(
     almacen_solicitante_id: uuid.UUID | None = None,
+    almacen_abastecedor_id: uuid.UUID | None = None,
     estado: str | None = None,
     sucursal_id: uuid.UUID | None = None,
     marca_id: uuid.UUID | None = None,
@@ -623,14 +654,21 @@ def listar_solicitudes(
     session: Session = Depends(get_db),
 ):
     """Los borradores no aparecen acá salvo pidiendo `estado=borrador`: una
-    lista que nadie envió todavía no le pidió nada a nadie."""
-    if almacen_solicitante_id is not None:
-        exigir_almacen(session, almacen_solicitante_id, tenant)
+    lista que nadie envió todavía no le pidió nada a nadie.
+
+    `almacen_abastecedor_id` es la bandeja del que despacha —"qué me piden"—,
+    la contracara de `almacen_solicitante_id`. Sin ella el central veía todos
+    los requerimientos de la empresa mezclados y ninguno era su cola.
+    """
+    for almacen_id in (almacen_solicitante_id, almacen_abastecedor_id):
+        if almacen_id is not None:
+            exigir_almacen(session, almacen_id, tenant)
     return paginar(
         session,
         solicitudes_uc.q_listar(
             session,
             almacen_solicitante_id=almacen_solicitante_id,
+            almacen_abastecedor_id=almacen_abastecedor_id,
             estado=estado,
             empresa_id=tenant.filtro_empresa(),
             sucursal_id=sucursal_id,

@@ -289,6 +289,80 @@ def registrar_salida(
     return movs
 
 
+def declarar_articulos(
+    session: Session,
+    *,
+    almacen_id: uuid.UUID,
+    articulos: list[dict],
+    usuario_id: uuid.UUID | None = None,
+) -> list[Stock]:
+    """Declara qué artículos maneja este almacén, con su saldo de partida.
+
+    **Una fila de `stock` en cero significa "este almacén maneja este
+    artículo"**, y hasta ahora no había forma de crear una: la fila nacía
+    sola con el primer movimiento (`aplicar_a_stock`). Un almacén recién
+    dado de alta quedaba entonces invisible en todas partes —la pantalla de
+    stock lista filas de `stock`, el conteo arma sus ítems desde ellas, el
+    requerimiento de la jornada las recorre—, y no existía ninguna acción
+    para salir de ese cero. Así quedó staging: tres almacenes, 244 artículos
+    y ninguna fila.
+
+    `cantidad_inicial` es opcional: declarar el artículo en cero ya sirve
+    para que aparezca y se pueda contar. Cuando viene, entra como movimiento
+    `carga_inicial`, que no pasa por solicitar/aprobar y solo se admite
+    mientras ese (almacén, SKU) no tenga historia (RN-INV-006 sigue rigiendo
+    para toda corrección posterior).
+
+    Idempotente: reenviar un SKU ya declarado actualiza sus topes y no
+    duplica nada; si además ya se movió, la cantidad se rechaza en vez de
+    sumarse dos veces.
+    """
+    if not articulos:
+        raise ReglaNegocio("no hay artículos que declarar")
+
+    repo = StockRepo(session)
+    movimientos = MovimientoRepo(session)
+    filas = []
+    for entrada in articulos:
+        sku_id = entrada["sku_id"]
+        articulo = lotes_uc.articulo_de_sku(session, sku_id)
+        if articulo.tipo == rules.TIPO_SERVICIO:
+            raise ReglaNegocio(
+                f"'{articulo.nombre}' es un servicio: no tiene existencias"
+            )
+        cantidad = entrada.get("cantidad_inicial") or Decimal(0)
+        if cantidad < 0:
+            raise ReglaNegocio("la carga inicial no puede ser negativa")
+        if cantidad > 0 and not rules.carga_inicial_permitida(
+            movimientos.hubo_alguno(almacen_id, sku_id)
+        ):
+            raise ReglaNegocio(
+                f"'{articulo.nombre}' ya tiene movimientos en este almacén: "
+                "corregir su saldo es un ajuste, no una carga inicial"
+            )
+
+        if cantidad > 0:
+            _, fila = registrar_movimiento(
+                session,
+                almacen_id=almacen_id,
+                sku_id=sku_id,
+                cantidad=cantidad,
+                tipo=rules.TIPO_CARGA_INICIAL,
+                usuario_id=usuario_id,
+                lote_id=entrada.get("lote_id"),
+            )
+        else:
+            fila = repo.get(almacen_id, sku_id) or aplicar_a_stock(
+                session, almacen_id, sku_id, Decimal(0)
+            )
+        if entrada.get("stock_minimo") is not None:
+            fila.stock_minimo = entrada["stock_minimo"]
+        if entrada.get("stock_maximo") is not None:
+            fila.stock_maximo = entrada["stock_maximo"]
+        filas.append(fila)
+    return filas
+
+
 def consultar_stock_pagina(
     session: Session,
     p: Paginacion,
@@ -405,6 +479,25 @@ def rotulos_de_sku(session: Session, ids) -> dict[uuid.UUID, dict]:
         }
         for sku_id, codigo, articulo_id, articulo, unidad, decimales in filas
     }
+
+
+def componer_filas(
+    session: Session,
+    filas: list,
+    almacen_id: uuid.UUID | None = None,
+    empresa_id: uuid.UUID | None = None,
+    *,
+    con_nombres: bool = True,
+) -> list[dict]:
+    """Las filas de stock con reservas y rótulos, listas para la pantalla.
+
+    Pública desde que `declarar_articulos` devuelve lo que acaba de crear:
+    el router necesita la misma forma que ya devuelve la consulta, y
+    rearmarla aparte serían dos verdades sobre qué es una fila de stock.
+    """
+    return _componer(
+        session, filas, almacen_id, empresa_id, con_nombres=con_nombres
+    )
 
 
 def _componer(

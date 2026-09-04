@@ -387,6 +387,22 @@ class MovimientoRepo:
         self.s.flush()
         return mov
 
+    def hubo_alguno(self, almacen_id: uuid.UUID, sku_id: uuid.UUID) -> bool:
+        """Si ese SKU ya se movió alguna vez en ese almacén. Lo pregunta la
+        carga inicial, que solo vale mientras no haya historia
+        (`rules.carga_inicial_permitida`)."""
+        return (
+            self.s.scalar(
+                select(MovimientoInventario.id)
+                .where(
+                    MovimientoInventario.almacen_id == almacen_id,
+                    MovimientoInventario.sku_id == sku_id,
+                )
+                .limit(1)
+            )
+            is not None
+        )
+
     def q_list(
         self,
         almacen_id: uuid.UUID | None = None,
@@ -632,11 +648,19 @@ class SolicitudRepo:
         sucursal_id: uuid.UUID | None = None,
         marca_id: uuid.UUID | None = None,
         incluir_borradores: bool = False,
+        almacen_abastecedor_id: uuid.UUID | None = None,
     ):
         q = select(SolicitudInsumos)
         if almacen_solicitante_id is not None:
             q = q.where(
                 SolicitudInsumos.almacen_solicitante_id == almacen_solicitante_id
+            )
+        if almacen_abastecedor_id is not None:
+            # La bandeja del que despacha. Faltaba: se podía preguntar "qué
+            # pedí" pero no "qué me piden", y el central no tenía dónde ver su
+            # cola de trabajo.
+            q = q.where(
+                SolicitudInsumos.almacen_abastecedor_id == almacen_abastecedor_id
             )
         if estado is not None:
             q = q.where(SolicitudInsumos.estado == estado)

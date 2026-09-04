@@ -54,6 +54,9 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Stock", href: "/inventario/stock" },
     // Después lo que se hace todos los días: pedir y contar.
     { label: "Requerimientos", href: "/inventario/solicitudes" },
+    // Al lado del requerimiento porque es su continuación: lo que se aprueba
+    // se despacha, y sale de acá hasta que el destino lo recibe.
+    { label: "Traslados", href: "/inventario/transferencias" },
     { label: "Conteos", href: "/inventario/conteos" },
     { label: "Artículos", href: "/inventario/articulos" },
     { label: "Categorías", href: "/inventario/categorias" },

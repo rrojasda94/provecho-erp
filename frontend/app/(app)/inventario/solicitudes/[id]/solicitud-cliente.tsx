@@ -13,6 +13,7 @@ import {
   aprobarSolicitudAction,
   cambiarCantidadAction,
   cancelarSolicitudAction,
+  despacharSolicitudAction,
   enviarSolicitudAction,
   quitarItemAction,
   rechazarSolicitudAction,
@@ -76,6 +77,8 @@ export function SolicitudCliente({
   };
 
   const urgentes = solicitud.items.filter((i) => i.bajo_minimo_al_pedir).length;
+  // El picking muestra qué se está sacando, no UUIDs.
+  const nombreDeSku = Object.fromEntries(skus.map((s) => [s.id, s.etiqueta]));
 
   return (
     <div className="flex flex-col gap-4">
@@ -85,7 +88,9 @@ export function SolicitudCliente({
           solicitud={solicitud}
           editable={editable}
           puedeAprobar={tienePermiso(permisos, "inventory.aprobar_solicitud")}
+          puedeDespachar={tienePermiso(permisos, "inventory.transferir")}
           skus={skus}
+          nombreDeSku={nombreDeSku}
           pendiente={pendiente}
           correr={correr}
         />
@@ -146,14 +151,18 @@ function Acciones({
   solicitud,
   editable,
   puedeAprobar,
+  puedeDespachar,
   skus,
+  nombreDeSku,
   pendiente,
   correr,
 }: {
   solicitud: SolicitudDetalle;
   editable: boolean;
   puedeAprobar: boolean;
+  puedeDespachar: boolean;
   skus: OpcionSku[];
+  nombreDeSku: Record<string, string>;
   pendiente: boolean;
   correr: Correr;
 }) {
@@ -201,7 +210,97 @@ function Acciones({
     );
   }
 
+  // Aprobada y esperando que el abastecedor la saque. Hasta hoy esta rama no
+  // existía y el central llegaba a un detalle sin ningún botón.
+  if (solicitud.estado === "aprobada" && puedeDespachar) {
+    return (
+      <Picking
+        solicitud={solicitud}
+        nombreDeSku={nombreDeSku}
+        pendiente={pendiente}
+      />
+    );
+  }
+
   return null;
+}
+
+/**
+ * El picking: qué sale de verdad del almacén abastecedor.
+ *
+ * Arranca con lo aprobado y deja bajar cada línea, porque el caso real es
+ * que el central no tenga todo — `despachar` admite despachar de menos y la
+ * diferencia queda a la vista en la solicitud (RN-INV-001 solo prohíbe
+ * despachar de más). El lote no se pide: lo elige FEFO al salir (ADR-015).
+ */
+function Picking({
+  solicitud,
+  nombreDeSku,
+  pendiente,
+}: {
+  solicitud: SolicitudDetalle;
+  nombreDeSku: Record<string, string>;
+  pendiente: boolean;
+}) {
+  const aprobadas = solicitud.items.filter(
+    (i) => Number(i.cantidad_aprobada ?? i.cantidad_solicitada) > 0,
+  );
+  const [cantidades, setCantidades] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      aprobadas.map((i) => [
+        i.sku_id,
+        String(i.cantidad_aprobada ?? i.cantidad_solicitada),
+      ]),
+    ),
+  );
+
+  const aDespachar = aprobadas
+    .map((i) => ({ sku_id: i.sku_id, cantidad: cantidades[i.sku_id] ?? "0" }))
+    .filter((l) => Number(l.cantidad) > 0);
+
+  return (
+    <DialogoFormulario
+      titulo="Despachar el requerimiento"
+      disparador="Despachar"
+      accion={async () => {
+        const r = await despacharSolicitudAction(
+          solicitud.id,
+          solicitud.almacen_abastecedor_id,
+          solicitud.almacen_solicitante_id,
+          aDespachar,
+        );
+        return r;
+      }}
+      etiquetaEnvio="Despachar"
+      ayuda="Sale del almacén que abastece y queda en tránsito hasta que el solicitante la reciba. Si no tienes todo, baja la cantidad: la diferencia queda anotada."
+      envioDeshabilitado={pendiente || aDespachar.length === 0}
+    >
+      {aprobadas.map((item) => (
+        <label
+          key={item.sku_id}
+          className="flex items-center justify-between gap-3 text-sm font-semibold"
+        >
+          <span className="min-w-0 flex-1 truncate">
+            {nombreDeSku[item.sku_id] ?? item.sku_id}
+            <span className="block text-xs font-normal text-gray">
+              aprobado: {item.cantidad_aprobada ?? item.cantidad_solicitada}
+            </span>
+          </span>
+          <input
+            inputMode="decimal"
+            className="w-24 shrink-0"
+            value={cantidades[item.sku_id] ?? ""}
+            onChange={(e) =>
+              setCantidades((previas) => ({
+                ...previas,
+                [item.sku_id]: e.target.value,
+              }))
+            }
+          />
+        </label>
+      ))}
+    </DialogoFormulario>
+  );
 }
 
 function Tabla({

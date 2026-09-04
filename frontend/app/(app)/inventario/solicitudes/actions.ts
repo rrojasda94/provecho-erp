@@ -195,3 +195,40 @@ export async function rechazarSolicitudAction(
     `${RUTA}/${solicitudId}`,
   );
 }
+
+/**
+ * Despacha un requerimiento aprobado: saca el stock del abastecedor y lo deja
+ * en tránsito hacia el solicitante.
+ *
+ * Es el paso que faltaba en la pantalla. El backend lo tenía completo desde
+ * el slice de transferencias —`despachar` mueve el stock, cierra la reserva y
+ * deja la solicitud en `despachada`— pero `Acciones` no tenía rama para el
+ * estado `aprobada`, así que el central llegaba al detalle y no encontraba
+ * ningún botón: "no puede generar ni picking ni despacho ni nada".
+ *
+ * `items` recorta por SKU: el central puede no tener todo, y despachar de
+ * menos es válido (la diferencia queda a la vista en la solicitud). Sin
+ * líneas se despacha lo aprobado tal cual.
+ */
+export async function despacharSolicitudAction(
+  solicitudId: string,
+  origenAlmacenId: string,
+  destinoAlmacenId: string,
+  items: { sku_id: string; cantidad: string }[],
+): Promise<EstadoFormulario> {
+  return ejecutar(
+    async () =>
+      apiFetch("/api/v1/inventory/transferencias", {
+        token: await token(),
+        metodo: "POST",
+        cuerpo: {
+          origen_almacen_id: origenAlmacenId,
+          destino_almacen_id: destinoAlmacenId,
+          solicitud_id: solicitudId,
+          items,
+        },
+      }),
+    "No se pudo despachar.",
+    `${RUTA}/${solicitudId}`,
+  );
+}

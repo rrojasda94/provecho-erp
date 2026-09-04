@@ -1,7 +1,8 @@
 import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { tienePermiso } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
 
-import { StockCliente, type FilaStock } from "./stock-cliente";
+import { StockCliente, type FilaStock, type OpcionSku } from "./stock-cliente";
 
 type Params = Promise<{
   almacen?: string;
@@ -43,8 +44,10 @@ function queryDeStock(filtros: Awaited<Params>): URLSearchParams {
   return query;
 }
 
+type Sku = { id: string; codigo: string; articulo_nombre: string };
+
 export default async function StockPage({ searchParams }: { searchParams: Params }) {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
   const filtros = await searchParams;
   const query = queryDeStock(filtros);
 
@@ -62,10 +65,11 @@ export default async function StockPage({ searchParams }: { searchParams: Params
     return <p className="text-secondary">{mensaje}</p>;
   }
 
-  const [almacenes, sucursales, categorias] = await Promise.all([
+  const [almacenes, sucursales, categorias, skus] = await Promise.all([
     apiFetch<Opcion[]>("/api/v1/almacenes", { token }).catch(() => []),
     apiFetch<Opcion[]>("/api/v1/sucursales", { token }).catch(() => []),
     apiFetch<Opcion[]>("/api/v1/inventory/categorias", { token }).catch(() => []),
+    apiFetch<Sku[]>("/api/v1/inventory/skus", { token }).catch(() => []),
   ]);
 
   return (
@@ -76,6 +80,16 @@ export default async function StockPage({ searchParams }: { searchParams: Params
       almacenes={almacenes}
       sucursales={sucursales}
       categorias={categorias}
+      skus={skus.map(
+        (s): OpcionSku => ({
+          id: s.id,
+          etiqueta: `${s.articulo_nombre} (${s.codigo})`,
+        }),
+      )}
+      puedeDeclarar={tienePermiso(
+        usuario.permisos,
+        "inventory.registrar_movimiento",
+      )}
       filtros={{
         almacen: filtros.almacen ?? "",
         sucursal: filtros.sucursal ?? "",

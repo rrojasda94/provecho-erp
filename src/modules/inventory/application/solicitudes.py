@@ -462,12 +462,16 @@ def q_listar(
     empresa_id: uuid.UUID | None = None,
     sucursal_id: uuid.UUID | None = None,
     marca_id: uuid.UUID | None = None,
+    almacen_abastecedor_id: uuid.UUID | None = None,
 ):
     """La consulta sin ejecutar, para que el router la pagine (ADR-026).
 
     `sucursal_id` y `marca_id` se resuelven por el almacén solicitante: la
     solicitud vive por almacén y las dos preguntas están arriba de él. Los
     borradores quedan fuera salvo que se pida ese estado explícitamente.
+
+    `almacen_abastecedor_id` responde la pregunta contraria —"qué me piden"—,
+    que es la cola de trabajo del que despacha.
     """
     return SolicitudRepo(session).q_list(
         almacen_solicitante_id,
@@ -475,4 +479,5 @@ def q_listar(
         empresa_id,
         sucursal_id=sucursal_id,
         marca_id=marca_id,
+        almacen_abastecedor_id=almacen_abastecedor_id,
     )
