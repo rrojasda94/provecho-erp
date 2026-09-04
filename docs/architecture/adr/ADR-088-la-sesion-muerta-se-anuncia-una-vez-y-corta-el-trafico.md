@@ -107,11 +107,18 @@ que tapa incluso un diálogo de formulario abierto sin pelear `z-index`.
   perdiéndose — el aviso dice que la sesión murió, no rescata el formulario a
   medio llenar. Recuperar eso pide guardar el borrador en el navegador antes
   de reintentar, que es otra decisión y otro alcance.
-- **Un 401 legítimo que no sea de sesión** (un endpoint que respondiera 401
-  por otra razón) también dispararía el aviso. Hoy no existe: la API usa 403
-  para "no te corresponde" y el 401 queda para "no sos nadie". Si algún día
-  aparece, el discriminador tendría que ser un código en el cuerpo, no el
-  status.
+- **Hay dos 401 que no son de sesión, y hay que declararlos.** La regla
+  general se sostiene —la API usa 403 para "no te corresponde" y el 401 para
+  "no sos nadie"— pero los dos endpoints que **juzgan una credencial**
+  responden 401 cuando el PIN está mal: `POST /auth/verificar-pin`
+  (desbloquear la pantalla del PDV) y `POST /auth/autorizar` (la elevación
+  del supervisor, RN-AUD-005). Ahí el 401 es un veredicto sobre lo tecleado,
+  no sobre la sesión de quien lo teclea. Lo descubrió `e2e/bloqueo.spec.ts`:
+  errarle a un dígito del PIN tapaba el PDV entero con el aviso de "volvé a
+  entrar". `pedir` acepta por eso una marca `credencial` y esos dos son sus
+  únicos llamadores. **Es una lista, no una heurística**: un endpoint nuevo
+  que juzgue credenciales tiene que declararse; si algún día son muchos, el
+  discriminador pasa a ser un código en el cuerpo del error, no el status.
 - **No cubre las Server Actions**, que corren en el servidor de Next y ya
   tienen su `redirect("/login")` en siete lugares. Son dos caminos distintos
   para el mismo hecho y conviene que sigan siéndolo: uno navega, el otro no
