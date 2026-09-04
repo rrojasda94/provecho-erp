@@ -8,12 +8,14 @@ paralelo.
 """
 
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
 
 from src.modules.inventory.infrastructure.models import GuiaRemision
+from src.shared import fechas
 from src.shared.integrations.factiliza import guias as guias_mapper
 from tests.test_transferencias import (  # noqa: F401
     _crear_lote,
@@ -131,8 +133,18 @@ def test_las_lineas_se_agrupan_por_sku_aunque_salgan_de_varios_lotes(env):  # no
     por SKU, y la trazabilidad por lote sigue en `transferencia_item`."""
     client, ids, _ = env
     h = _token(client)
-    lote_viejo = _crear_lote(client, h, ids, "L-VIEJO", "2026-09-01")
-    lote_nuevo = _crear_lote(client, h, ids, "L-NUEVO", "2026-12-01")
+    # Relativas a hoy, no fijas: con "2026-09-01" escrito a mano el lote viejo
+    # se venció el 2026-09-01 y FEFO pasó a bloquearlo en vez de despacharlo,
+    # así que desde ese día las 6 unidades salían de un solo lote y este test
+    # fallaba solo. Lo que la prueba necesita es que uno venza antes que el
+    # otro y que **ninguno** esté vencido.
+    hoy = fechas.hoy()
+    lote_viejo = _crear_lote(
+        client, h, ids, "L-VIEJO", (hoy + timedelta(days=30)).isoformat()
+    )
+    lote_nuevo = _crear_lote(
+        client, h, ids, "L-NUEVO", (hoy + timedelta(days=120)).isoformat()
+    )
     _ingresar(client, h, ids["central_id"], ids["sku_queso"], 4, lote_viejo)
     _ingresar(client, h, ids["central_id"], ids["sku_queso"], 10, lote_nuevo)
 

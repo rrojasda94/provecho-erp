@@ -155,6 +155,24 @@ factura de luz generaba una falsa alarma que alguien tenía que descartar.
 Sin migración: `articulo.tipo` es `String(30)` con enum extensible a
 propósito.
 
+### Todo artículo nace con un SKU (RN-PRD-006)
+
+`crear_articulo` cierra llamando a `catalogo.asegurar_sku`, que le da uno con
+el `id_interno` de código (sufijado si ese código ya está tomado). El servicio
+queda fuera —no tiene existencias, ver arriba— y la importación masiva lo
+pospone (`sku_por_defecto=False`) hasta después de crear los que declare la
+hoja «SKUs»: los de la planilla mandan, y el por defecto solo aparece si no
+vino ninguno.
+
+Es la regla que faltaba aplicar y costó caro: `stock` y
+`movimiento_inventario` cuelgan de `sku_id`, no de `articulo_id`, así que un
+artículo sin SKU es inerte **y en silencio** — no tiene existencias que ver,
+no entra en un conteo, y la recepción de una compra lo saltea anotando una
+incidencia `sin_sku` que nadie mira mientras la OC igual pasa a `recibida`.
+En staging entraron 244 artículos así (la hoja «SKUs» es opcional) y el
+módulo entero parecía roto: stock vacío, conteos imposibles, compras que no
+movían nada. La migración `12f51f21f27e` repara los que ya existan.
+
 ## Casos de uso
 
 - CRUD de artículos y categorías.

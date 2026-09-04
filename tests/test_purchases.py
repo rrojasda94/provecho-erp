@@ -325,6 +325,67 @@ def test_flujo_oc_completo_actualiza_stock_y_costo(env):
         assert art.costo_promedio == Decimal("10.0000")
 
 
+def test_recibir_un_articulo_dado_de_alta_por_la_api_mueve_stock(env):
+    """La forma real de producción, y la que ningún test cubría.
+
+    Los demás tests de recepción arman el SKU a mano en el fixture, así que
+    pasaban en verde mientras en staging la misma compra no movía nada: los
+    244 artículos habían entrado por el catálogo, sin SKU, y el listener los
+    salteaba anotando una incidencia `sin_sku` que nadie mira (RN-PRD-006).
+    """
+    client, ids, TestSession = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    udm_id = client.get("/api/v1/inventory/unidades-medida", headers=h).json()[0]["id"]
+
+    articulo_id = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "AZUC", "nombre": "Azúcar",
+        "unidad_medida_id": udm_id, "tipo": "insumo",
+    }).json()["id"]
+
+    oc_id = client.post("/api/v1/purchases/ordenes-compra", headers=h, json={
+        "proveedor_id": proveedor_id,
+        "almacen_destino_id": ids["almacen_id"],
+        "idempotency_key": "oc-key-sin-sku-previo",
+        "items": [
+            {"articulo_id": articulo_id, "cantidad": "40", "costo_unitario": "3.00"}
+        ],
+    }).json()["id"]
+    client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
+
+    from src.modules.purchases.infrastructure.models import OrdenCompraItem
+    with TestSession() as s:
+        item_id = str(
+            s.scalar(
+                select(OrdenCompraItem).where(
+                    OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id)
+                )
+            ).id
+        )
+
+    recepcion = client.post(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones", headers=h, json={
+            "idempotency_key": "recep-key-sin-sku-previo",
+            "items": [{"orden_compra_item_id": item_id, "cantidad_recibida": "40"}],
+        },
+    )
+    assert recepcion.status_code == 201
+
+    # Lo que staging no tenía: una fila de stock para lo que se recibió.
+    from src.modules.inventory.infrastructure.models import Sku
+    with TestSession() as s:
+        sku_id = s.scalar(
+            select(Sku.id).where(Sku.articulo_id == uuid.UUID(articulo_id))
+        )
+    assert sku_id is not None, "el artículo nació sin SKU: la compra no puede entrar"
+
+    stock = client.get(
+        f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}&sku_id={sku_id}",
+        headers=h,
+    ).json()["items"]
+    assert Decimal(stock[0]["cantidad"]) == Decimal("40")
+
+
 def test_la_recepcion_conserva_el_lote_que_declaro_el_proveedor(env):
     """El dato viajaba solo en el evento: si el listener de `inventory`
     fallaba, no quedaba dónde leerlo para reprocesar (RN-VNC-002)."""

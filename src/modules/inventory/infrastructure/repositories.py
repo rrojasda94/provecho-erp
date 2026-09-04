@@ -268,6 +268,16 @@ class SkuRepo:
     def get_by_codigo(self, codigo: str) -> Sku | None:
         return self.s.scalar(select(Sku).where(Sku.codigo == codigo))
 
+    def tiene_alguno(self, articulo_id: uuid.UUID) -> bool:
+        """Si el artículo ya tiene SKU. Lo pregunta `catalogo.asegurar_sku`
+        antes de crear el suyo por defecto (RN-PRD-006)."""
+        return (
+            self.s.scalar(
+                select(Sku.id).where(Sku.articulo_id == articulo_id).limit(1)
+            )
+            is not None
+        )
+
     def list(self, empresa_id: uuid.UUID | None = None) -> "list[tuple[Sku, Articulo]]":
         """SKUs con el artículo que representan.
 

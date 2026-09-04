@@ -125,6 +125,71 @@ def test_crear_articulo_y_sku(env):
     assert r2.status_code == 201
 
 
+def test_articulo_nace_con_sku(env):
+    """RN-PRD-006. Un artículo sin SKU es inerte y en silencio: `stock` y
+    `movimiento_inventario` cuelgan de `sku_id`, así que no tiene existencias
+    que ver, no entra en un conteo y la recepción de una compra lo saltea.
+    Así entraron los 244 artículos de staging."""
+    client, ids, _ = env
+    h = _token(client)
+    art = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "Q005", "nombre": "Queso",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    }).json()
+
+    suyos = [
+        s for s in client.get("/api/v1/inventory/skus", headers=h).json()
+        if s["articulo_id"] == art["id"]
+    ]
+    assert len(suyos) == 1
+    # El código que la gente lee en el estante, no un UUID.
+    assert suyos[0]["codigo"] == "Q005"
+
+
+def test_servicio_no_lleva_sku(env):
+    """Un servicio no tiene existencias: `crear_sku` lo rechaza, así que el
+    alta tampoco puede fabricarle uno por defecto."""
+    client, ids, _ = env
+    h = _token(client)
+    art = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "S001", "nombre": "Flete",
+        "unidad_medida_id": ids["udm_id"], "tipo": "servicio",
+    }).json()
+
+    suyos = [
+        s for s in client.get("/api/v1/inventory/skus", headers=h).json()
+        if s["articulo_id"] == art["id"]
+    ]
+    assert suyos == []
+
+
+def test_sku_por_defecto_no_choca_con_uno_existente(env):
+    """El código del SKU es único en todo el grupo. Si el `id_interno` del
+    artículo nuevo ya lo ocupa el SKU de otro, se sufija — el alta nunca
+    falla por esto."""
+    client, ids, _ = env
+    h = _token(client)
+    primero = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "X001", "nombre": "Uno",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    }).json()
+    # Le robamos el código al siguiente artículo.
+    client.post("/api/v1/inventory/skus", headers=h, json={
+        "articulo_id": primero["id"], "codigo": "X002",
+    })
+
+    r = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "X002", "nombre": "Dos",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    })
+    assert r.status_code == 201
+    suyos = [
+        s for s in client.get("/api/v1/inventory/skus", headers=h).json()
+        if s["articulo_id"] == r.json()["id"]
+    ]
+    assert [s["codigo"] for s in suyos] == ["X002-1"]
+
+
 def test_id_interno_duplicado_409(env):
     client, ids, _ = env
     h = _token(client)

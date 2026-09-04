@@ -226,13 +226,20 @@ def crear_articulo(
     costo_promedio: Decimal = Decimal(0),
     controla_lote: bool = False,
     dias_alerta_vencimiento: int | None = None,
+    sku_por_defecto: bool = True,
 ) -> Articulo:
+    """Alta de artículo. Nace con un SKU (RN-PRD-006).
+
+    `sku_por_defecto=False` lo desactiva para quien va a declarar los suyos
+    a continuación —hoy solo la importación masiva—: crearlo igual dejaría
+    un SKU fantasma con el código del artículo al lado de los reales.
+    """
     _existe(session, UnidadMedida, unidad_medida_id, "unidad de medida")
     _existe(session, Categoria, categoria_id, "categoría")
     repo = ArticuloRepo(session)
     if repo.get_by_id_interno(id_interno):
         raise Conflicto(f"id_interno '{id_interno}' ya existe")
-    return repo.add(
+    articulo = repo.add(
         Articulo(
             empresa_id=empresa_id,
             id_interno=id_interno,
@@ -245,6 +252,36 @@ def crear_articulo(
             dias_alerta_vencimiento=dias_alerta_vencimiento,
         )
     )
+    if sku_por_defecto:
+        asegurar_sku(session, articulo)
+    return articulo
+
+
+def asegurar_sku(session: Session, articulo: Articulo) -> Sku | None:
+    """Le garantiza al artículo al menos un SKU (RN-PRD-006). Idempotente.
+
+    Un artículo sin SKU es inerte y **en silencio**: `stock` y
+    `movimiento_inventario` cuelgan de `sku_id`, no de `articulo_id`, así que
+    no tiene existencias que ver, no entra en un conteo y la recepción de una
+    compra lo saltea anotando una incidencia `sin_sku` que nadie mira. Así
+    quedaron los 244 artículos importados a staging: el módulo entero parecía
+    roto y lo que faltaba era esta fila.
+
+    El código por defecto es el `id_interno`, que ya es único y es lo que la
+    gente lee en el estante. Si ese código lo ocupa el SKU de otro artículo,
+    se sufija — el alta nunca falla por esto.
+    """
+    if articulo.tipo == rules.TIPO_SERVICIO:
+        return None
+    repo = SkuRepo(session)
+    if repo.tiene_alguno(articulo.id):
+        return None
+    codigo = articulo.id_interno
+    sufijo = 0
+    while repo.get_by_codigo(codigo):
+        sufijo += 1
+        codigo = f"{articulo.id_interno}-{sufijo}"
+    return repo.add(Sku(articulo_id=articulo.id, codigo=codigo))
 
 
 def editar_articulo(session: Session, articulo_id: uuid.UUID, **campos) -> Articulo:
