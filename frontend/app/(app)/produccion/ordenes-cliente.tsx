@@ -1,8 +1,9 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
+import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { ArticuloPicker } from "@/components/articulo-picker/articulo-picker";
 
@@ -10,7 +11,6 @@ import {
   completarOrdenAction,
   crearOrdenAction,
   registrarConsumoAction,
-  type EstadoOrden,
 } from "./actions";
 import { Combobox } from "@/components/ui/combobox";
 
@@ -42,8 +42,6 @@ function comoOpciones(articulos: Articulo[]) {
 
 export type Almacen = { id: string; nombre: string };
 
-const ESTADO_INICIAL: EstadoOrden = { error: "", ok: false };
-
 const ETIQUETA_ESTADO: Record<string, string> = {
   borrador: "Borrador",
   en_proceso: "En proceso",
@@ -52,18 +50,6 @@ const ETIQUETA_ESTADO: Record<string, string> = {
   no_conforme_desechado: "No conforme · desechado",
 };
 
-function useCerrarAlGuardar(ok: boolean) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  useEffect(() => {
-    if (ok) {
-      formRef.current?.reset();
-      dialogRef.current?.close();
-    }
-  }, [ok]);
-  return { dialogRef, formRef };
-}
-
 function DialogoNuevaOrden({
   articulos,
   almacenes,
@@ -71,294 +57,219 @@ function DialogoNuevaOrden({
   articulos: Articulo[];
   almacenes: Almacen[];
 }) {
-  const [estado, formAction, pendiente] = useActionState(crearOrdenAction, ESTADO_INICIAL);
-  const { dialogRef, formRef } = useCerrarAlGuardar(estado.ok);
   // Solo se produce lo que tiene receta: subrecetas y mercadería propia. Un
   // insumo comprado no se fabrica, se compra.
-  const producibles = comoOpciones(
-    articulos.filter((a) => PRODUCIBLES.includes(a.tipo)),
-  );
+  const producibles = comoOpciones(articulos.filter((a) => PRODUCIBLES.includes(a.tipo)));
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-      >
-        + Nueva orden
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg text-dark">Nueva orden</h2>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Qué se produce
-            <ArticuloPicker
-              name="articulo_id"
-              etiqueta="Qué se produce"
-              requerido
-              marcador="Elegir artículo..."
-              tipos={PRODUCIBLES}
-              iniciales={producibles}
-            />
-            <span className="text-xs font-normal text-gray">
-              Sin receta la orden se rechaza: no habría qué consumir.
-            </span>
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Almacén
-            <Combobox
-              name="almacen_id"
-              etiqueta="Almacén"
-              requerido
-              marcador="Elegir almacén..."
-              opciones={almacenes.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Cantidad planeada
-            <input name="cantidad_planeada" type="number" step="0.0001" min="0.0001" required />
-          </label>
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Creando..." : "Crear"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Nueva orden"
+      disparador="+ Nueva orden"
+      etiquetaEnvio="Crear"
+      etiquetaPendiente="Creando..."
+      accion={crearOrdenAction}
+    >
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Qué se produce
+        <ArticuloPicker
+          name="articulo_id"
+          etiqueta="Qué se produce"
+          requerido
+          marcador="Elegir artículo..."
+          tipos={PRODUCIBLES}
+          iniciales={producibles}
+        />
+        <span className="text-xs font-normal text-muted-foreground">
+          Sin receta la orden se rechaza: no habría qué consumir.
+        </span>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Almacén
+        <Combobox
+          name="almacen_id"
+          etiqueta="Almacén"
+          requerido
+          marcador="Elegir almacén..."
+          opciones={almacenes.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Cantidad planeada
+        <input name="cantidad_planeada" type="number" step="0.0001" min="0.0001" required />
+      </label>
+    </DialogoFormulario>
   );
 }
 
 type LineaConsumo = { clave: number; articulo: string; cantidad: string; costo: string };
 
+const CONSUMO_INICIAL: LineaConsumo[] = [{ clave: 1, articulo: "", cantidad: "", costo: "" }];
+
 function DialogoConsumo({ orden, articulos }: { orden: Orden; articulos: Articulo[] }) {
-  const [estado, formAction, pendiente] = useActionState(registrarConsumoAction, ESTADO_INICIAL);
-  const { dialogRef, formRef } = useCerrarAlGuardar(estado.ok);
-  const [lineas, setLineas] = useState<LineaConsumo[]>([
-    { clave: 1, articulo: "", cantidad: "", costo: "" },
-  ]);
+  const [lineas, setLineas] = useState<LineaConsumo[]>(CONSUMO_INICIAL);
 
   const editar = (clave: number, campo: keyof LineaConsumo, valor: string) =>
     setLineas((prev) => prev.map((l) => (l.clave === clave ? { ...l, [campo]: valor } : l)));
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="text-xs font-bold text-primary hover:underline"
-      >
-        Consumo
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-xl rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <input type="hidden" name="orden_id" value={orden.id} />
-          <h2 className="font-heading text-lg text-dark">
-            Consumo de insumos
-          </h2>
-          <p className="text-sm text-gray">
-            Lo que la cocina sacó de verdad del almacén. Descuenta stock y arma el costo
-            real de la orden — por eso se registra antes de completarla.
-          </p>
-          {lineas.map((linea) => (
-            <div key={linea.clave} className="flex items-end gap-2">
-              <label className="flex flex-1 flex-col gap-1 text-xs font-semibold">
-                Insumo
-                <ArticuloPicker
-                  name="consumo_articulo_id"
-                  etiqueta="Insumo"
-                  requerido
-                  marcador="Elegir insumo..."
-                  iniciales={comoOpciones(articulos)}
-                  value={linea.articulo}
-                  alCambiar={(v) => editar(linea.clave, "articulo", v ?? "")}
-                />
-              </label>
-              <label className="flex w-28 flex-col gap-1 text-xs font-semibold">
-                Cantidad
-                <input
-                  name="consumo_cantidad"
-                  type="number"
-                  step="0.0001"
-                  min="0.0001"
-                  required
-                  value={linea.cantidad}
-                  onChange={(e) => editar(linea.clave, "cantidad", e.target.value)}
-                  className="rounded border border-gray/40 px-2 py-1 text-sm"
-                />
-              </label>
-              <label className="flex w-28 flex-col gap-1 text-xs font-semibold">
-                Costo unit.
-                <input
-                  name="consumo_costo"
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  required
-                  value={linea.costo}
-                  onChange={(e) => editar(linea.clave, "costo", e.target.value)}
-                  className="rounded border border-gray/40 px-2 py-1 text-sm"
-                />
-              </label>
-              <button
-                type="button"
-                aria-label="Quitar insumo"
-                disabled={lineas.length <= 1}
-                onClick={() => setLineas((prev) => prev.filter((l) => l.clave !== linea.clave))}
-                className="pb-1.5 text-gray hover:text-secondary disabled:opacity-30"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+    <DialogoFormulario
+      titulo="Consumo de insumos"
+      disparador="Consumo"
+      claseDisparador="text-xs font-bold text-primary hover:underline"
+      etiquetaEnvio="Registrar"
+      etiquetaPendiente="Registrando..."
+      accion={registrarConsumoAction}
+      ancho="max-w-xl"
+      ayuda="Lo que la cocina sacó de verdad del almacén. Descuenta stock y arma el costo real de la orden — por eso se registra antes de completarla."
+      // Las líneas son campos controlados: `form.reset()` no las toca.
+      alAbrir={() => setLineas(CONSUMO_INICIAL)}
+    >
+      <input type="hidden" name="orden_id" value={orden.id} />
+      {lineas.map((linea) => (
+        <div key={linea.clave} className="flex items-end gap-2">
+          <label className="flex flex-1 flex-col gap-1 text-xs font-semibold">
+            Insumo
+            <ArticuloPicker
+              name="consumo_articulo_id"
+              etiqueta="Insumo"
+              requerido
+              marcador="Elegir insumo..."
+              iniciales={comoOpciones(articulos)}
+              value={linea.articulo}
+              alCambiar={(v) => editar(linea.clave, "articulo", v ?? "")}
+            />
+          </label>
+          <label className="flex w-28 flex-col gap-1 text-xs font-semibold">
+            Cantidad
+            <input
+              name="consumo_cantidad"
+              type="number"
+              step="0.0001"
+              min="0.0001"
+              required
+              value={linea.cantidad}
+              onChange={(e) => editar(linea.clave, "cantidad", e.target.value)}
+            />
+          </label>
+          <label className="flex w-28 flex-col gap-1 text-xs font-semibold">
+            Costo unit.
+            <input
+              name="consumo_costo"
+              type="number"
+              step="0.0001"
+              min="0"
+              required
+              value={linea.costo}
+              onChange={(e) => editar(linea.clave, "costo", e.target.value)}
+            />
+          </label>
           <button
             type="button"
-            onClick={() =>
-              setLineas((prev) => [
-                ...prev,
-                { clave: Math.max(...prev.map((l) => l.clave)) + 1, articulo: "", cantidad: "", costo: "" },
-              ])
-            }
-            className="self-start text-sm font-semibold text-primary hover:underline"
+            aria-label="Quitar insumo"
+            disabled={lineas.length <= 1}
+            onClick={() => setLineas((prev) => prev.filter((l) => l.clave !== linea.clave))}
+            className="pb-1.5 text-muted-foreground hover:text-status-danger disabled:opacity-30"
           >
-            + Agregar insumo
+            ×
           </button>
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Registrando..." : "Registrar"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() =>
+          setLineas((prev) => [
+            ...prev,
+            {
+              clave: Math.max(...prev.map((l) => l.clave)) + 1,
+              articulo: "",
+              cantidad: "",
+              costo: "",
+            },
+          ])
+        }
+        className="self-start text-sm font-semibold text-primary hover:underline"
+      >
+        + Agregar insumo
+      </button>
+    </DialogoFormulario>
   );
 }
 
 function DialogoCompletar({ orden }: { orden: Orden }) {
-  const [estado, formAction, pendiente] = useActionState(completarOrdenAction, ESTADO_INICIAL);
-  const { dialogRef, formRef } = useCerrarAlGuardar(estado.ok);
   const [resultado, setResultado] = useState("conforme");
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="text-xs font-bold text-primary hover:underline"
-      >
-        Completar
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <input type="hidden" name="orden_id" value={orden.id} />
-          <h2 className="font-heading text-lg text-dark">
-            Control de calidad
-          </h2>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Resultado
-            <select
-              name="resultado"
-              value={resultado}
-              onChange={(e) => setResultado(e.target.value)}
-            >
-              <option value="conforme">Conforme</option>
-              <option value="no_conforme_reprocesado">No conforme · reprocesado</option>
-              <option value="no_conforme_desechado">No conforme · desechado</option>
-            </select>
-          </label>
-          {resultado === "conforme" && (
-            <label className="flex flex-col gap-1 text-sm font-semibold">
-              Cantidad producida
-              <input
-                name="cantidad_producida"
-                type="number"
-                step="0.0001"
-                min="0.0001"
-                required
-                defaultValue={orden.cantidad_planeada}
-              />
-              <span className="text-xs font-normal text-gray">
-                Lo que salió de verdad, no lo planeado: de acá sale el costo unitario.
-              </span>
-            </label>
-          )}
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Horas hombre
-            <input name="horas_hombre" type="number" step="0.01" min="0" placeholder="Opcional" />
-          </label>
-          <div className="flex gap-2">
-            <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
-              Merma
-              <input name="merma_cantidad" type="number" step="0.0001" min="0.0001" placeholder="Opcional" />
-            </label>
-            <label className="flex flex-[2] flex-col gap-1 text-sm font-semibold">
-              Motivo de la merma
-              <input name="merma_motivo" maxLength={255} placeholder="Obligatorio si hay merma" />
-            </label>
-          </div>
-          {resultado === "no_conforme_desechado" && (
-            <label className="flex flex-col gap-1 text-sm font-semibold">
-              Evidencia de destrucción
-              <input name="evidencia_destruccion_url" maxLength={500} placeholder="URL de la foto o acta" />
-            </label>
-          )}
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Cerrando..." : "Completar"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Control de calidad"
+      disparador="Completar"
+      claseDisparador="text-xs font-bold text-primary hover:underline"
+      etiquetaEnvio="Completar"
+      etiquetaPendiente="Cerrando..."
+      accion={completarOrdenAction}
+      // Desplegable controlado: el `reset()` del formulario no lo devuelve a
+      // «conforme», y la orden siguiente abría con el veredicto de la anterior.
+      alAbrir={() => setResultado("conforme")}
+    >
+      <input type="hidden" name="orden_id" value={orden.id} />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Resultado
+        <select
+          name="resultado"
+          value={resultado}
+          onChange={(e) => setResultado(e.target.value)}
+        >
+          <option value="conforme">Conforme</option>
+          <option value="no_conforme_reprocesado">No conforme · reprocesado</option>
+          <option value="no_conforme_desechado">No conforme · desechado</option>
+        </select>
+      </label>
+      {resultado === "conforme" && (
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Cantidad producida
+          <input
+            name="cantidad_producida"
+            type="number"
+            step="0.0001"
+            min="0.0001"
+            required
+            defaultValue={orden.cantidad_planeada}
+          />
+          <span className="text-xs font-normal text-muted-foreground">
+            Lo que salió de verdad, no lo planeado: de acá sale el costo unitario.
+          </span>
+        </label>
+      )}
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Horas hombre
+        <input name="horas_hombre" type="number" step="0.01" min="0" placeholder="Opcional" />
+      </label>
+      <div className="flex gap-2">
+        <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+          Merma
+          <input
+            name="merma_cantidad"
+            type="number"
+            step="0.0001"
+            min="0.0001"
+            placeholder="Opcional"
+          />
+        </label>
+        <label className="flex flex-[2] flex-col gap-1 text-sm font-semibold">
+          Motivo de la merma
+          <input name="merma_motivo" maxLength={255} placeholder="Obligatorio si hay merma" />
+        </label>
+      </div>
+      {resultado === "no_conforme_desechado" && (
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Evidencia de destrucción
+          <input
+            name="evidencia_destruccion_url"
+            maxLength={500}
+            placeholder="URL de la foto o acta"
+          />
+        </label>
+      )}
+    </DialogoFormulario>
   );
 }
 
