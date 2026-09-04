@@ -50,6 +50,30 @@ test("desuscribirse deja de recibir", () => {
   assert.equal(avisos, 0);
 });
 
+test("un 401 de credencial no mata la sesión: es el PIN, no el usuario", async () => {
+  // El PDV desbloquea la pantalla con `POST /auth/verificar-pin`, que
+  // responde 401 cuando el PIN está mal. Tratarlo como sesión muerta tapaba
+  // el PDV entero con el aviso de "volvé a entrar" por errarle a un dígito.
+  const original = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ detail: "PIN incorrecto" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  try {
+    const { pedir } = await import("./cliente-api.ts");
+    await assert.rejects(() =>
+      pedir("/auth/verificar-pin", { metodo: "POST", cuerpo: { pin: "000000" }, credencial: true }),
+    );
+    assert.equal(estaMuerta(), false);
+    // El mismo 401 sin la marca sí la mata.
+    await assert.rejects(() => pedir("/kds/cola"));
+    assert.equal(estaMuerta(), true);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test("el corte en seco lanza un 401 sin salir a la red", async () => {
   // `pedir` sale por `fetch`: si la bandera no cortara antes, esto reventaría
   // con un error de red en vez de con el 401. No hay servidor detrás.

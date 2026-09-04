@@ -249,7 +249,9 @@ test("con el refresco vencido, la pantalla lo dice en vez de reintentar en silen
   await page.goto("/kds");
   await page.getByRole("link", { name: /Cocina E2E/ }).click();
   await expect(page).toHaveURL(/pantalla=/);
-  await expect(page.getByText(/Sin pedidos en cola/)).toBeVisible({ timeout: 30_000 });
+  // El rótulo de la estación, no "sin pedidos en cola": la cola puede traer
+  // lo que sembraron las pruebas anteriores, y entonces ese texto no existe.
+  await expect(page.getByText("Cocina E2E").first()).toBeVisible({ timeout: 30_000 });
 
   // Las dos cookies: sin `provecho_refresh` el middleware ya no tiene con qué
   // renovar, que es lo que distingue este caso del anterior.

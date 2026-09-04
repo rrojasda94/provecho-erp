@@ -37,9 +37,16 @@ export class ErrorApi extends Error {
  * KDS lo mostraba como un aviso de 4 segundos y seguía reintentando cada 3;
  * la campana lo tragaba entero; y el PDV borraba su huella de guardado y
  * reintentaba el PUT con cada tecla, en silencio.
+ *
+ * Con **una** excepción, y hay que declararla porque no se deduce del
+ * status: los dos endpoints que juzgan una credencial —desbloquear la
+ * pantalla con el PIN y pedirle autorización a un supervisor— responden 401
+ * cuando el PIN está mal. Ahí el 401 es un veredicto sobre lo tecleado, no
+ * sobre la sesión de quien lo teclea, y tratarlo como sesión muerta tapaba
+ * el PDV entero con el aviso de "volvé a entrar" por errarle a un dígito.
  */
-async function lanzar(respuesta: Response): Promise<never> {
-  if (respuesta.status === 401) marcarMuerta();
+async function lanzar(respuesta: Response, credencial: boolean): Promise<never> {
+  if (respuesta.status === 401 && !credencial) marcarMuerta();
   const { mensaje, campos } = await leerError(respuesta);
   throw new ErrorApi(respuesta.status, mensaje, campos);
 }
@@ -53,7 +60,13 @@ function abortarSiMuerta(): void {
 
 export async function pedir<T>(
   ruta: string,
-  opciones: { metodo?: string; cuerpo?: unknown } = {},
+  opciones: {
+    metodo?: string;
+    cuerpo?: unknown;
+    /** El endpoint juzga una credencial: su 401 dice "PIN incorrecto", no
+     * "tu sesión murió". Ver `lanzar`. */
+    credencial?: boolean;
+  } = {},
 ): Promise<T> {
   abortarSiMuerta();
   const respuesta = await fetch(`${BASE}${ruta}`, {
@@ -61,7 +74,7 @@ export async function pedir<T>(
     headers: { "Content-Type": "application/json" },
     body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined,
   });
-  if (!respuesta.ok) await lanzar(respuesta);
+  if (!respuesta.ok) await lanzar(respuesta, opciones.credencial ?? false);
   // 204 (los DELETE) no traen cuerpo: pedirle `.json()` a una respuesta
   // vacía revienta con un error de sintaxis que no dice nada.
   if (respuesta.status === 204) return undefined as T;
@@ -85,7 +98,7 @@ export async function pedirArchivo(
     headers: { "Content-Type": "application/json" },
     body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined,
   });
-  if (!respuesta.ok) await lanzar(respuesta);
+  if (!respuesta.ok) await lanzar(respuesta, false);
   const nombre = /filename="([^"]+)"/.exec(
     respuesta.headers.get("Content-Disposition") ?? "",
   )?.[1];
@@ -104,7 +117,7 @@ export async function subir<T>(ruta: string, archivo: File): Promise<T> {
   const cuerpo = new FormData();
   cuerpo.append("archivo", archivo);
   const respuesta = await fetch(`${BASE}${ruta}`, { method: "POST", body: cuerpo });
-  if (!respuesta.ok) await lanzar(respuesta);
+  if (!respuesta.ok) await lanzar(respuesta, false);
   return (await respuesta.json()) as T;
 }
 
