@@ -743,11 +743,16 @@ que es una decisión de pantalla y no un bug de una línea.
   instante la venta está `pagada`; con `grupo_cobro > 1` el comprobante del
   grupo 1 se acepta mientras la venta sigue en `orden` y ese flip se pierde.
   No hay reconciliación posterior que lo repare.
-- ⬜ **Los otros seis botones que prometen 403** (auditoría §3): «Ejecutar» /
-  «Rechazar» pago, «+ Asiento manual», «+ Nuevo trabajador» / «Cesar»,
-  «+ Nuevo artículo» / «Editar», «+ Nueva devolución» y «Emitir» OC sobre
-  umbral. Mismo arreglo que ya se aplicó en la jornada: `permisos` como prop y
-  `tienePermiso` por acción. Viven en otros módulos y van en su propia rama.
-- ⬜ **Los otros dos errores tragados** (auditoría §11): `rechazarPagoAction`
-  descarta el resultado —si falla, cero feedback— y la carta del PDV dibuja un
-  error de red como "no hay productos" (esta última ya estaba declarada).
+- 🔶 **Los otros botones que prometen 403** (auditoría §3). «Ejecutar» /
+  «Rechazar» pago se cerraron el 2026-09-04 (`fix/contabilidad-pagos-rbac`), y
+  «Emitir» OC sobre umbral ya estaba gateado desde ADR-085 — la auditoría lo
+  contó de más. Faltan «+ Asiento manual», «+ Nuevo trabajador» / «Cesar»,
+  «+ Nuevo artículo» / «Editar» y «+ Nueva devolución». Mismo arreglo que ya
+  se aplicó en la jornada: `permisos` como prop y `tienePermiso` por acción.
+  Viven en otros módulos y van en sus propias ramas
+  (`fix/contabilidad-asientos-rbac`, `fix/rbac-botones-resto`).
+- 🔶 **Los otros dos errores tragados** (auditoría §11).
+  `rechazarPagoAction` se cerró el 2026-09-04: descartaba su resultado con
+  `void`, así que un rechazo fallido se veía igual que uno que salió. Sigue
+  abierta la carta del PDV, que dibuja un error de red como "no hay
+  productos" (ya estaba declarada aparte).

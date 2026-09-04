@@ -9,7 +9,7 @@ export default async function PagosPage({
 }: {
   searchParams: Promise<{ pago?: string }>;
 }) {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
   // `?pago=<id>` es a donde llega `accounting.pago_requiere_aprobacion`.
   const { pago } = await searchParams;
 
@@ -43,6 +43,7 @@ export default async function PagosPage({
     <PagosCliente
       pagos={primeroElDe(pagos, pago ?? null, (p) => p.id)}
       proveedores={proveedores}
+      permisos={usuario.permisos}
     />
   );
 }
