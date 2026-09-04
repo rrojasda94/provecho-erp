@@ -196,6 +196,21 @@ def test_el_sku_de_la_segunda_hoja_se_crea_con_su_articulo(env):
     assert [s["codigo"] for s in skus] == ["TOMA-CJ"]
 
 
+def test_un_articulo_sin_hoja_de_skus_igual_nace_con_el_suyo(env):
+    """La hoja «SKUs» es opcional, y sin esto una planilla que no la trae deja
+    el artículo inerte: sin SKU no hay stock que ver, ni conteo, ni recepción
+    de compra que entre (RN-PRD-006). Así entraron los 244 artículos de
+    staging y el módulo entero parecía roto."""
+    client, _ = env
+    h = _token(client)
+    _importar_limpio(client, h, _libro(
+        [["", "TOMA", "Tomate", "insumo", "Gramo", "", "0.01", "No", "", "No"]],
+        [],
+    ))
+    skus = client.get("/api/v1/inventory/skus", headers=h).json()
+    assert [s["codigo"] for s in skus] == ["TOMA"]
+
+
 def test_un_sku_que_nombra_un_articulo_ausente_se_reporta(env):
     client, _ = env
     h = _token(client)

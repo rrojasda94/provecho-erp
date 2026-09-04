@@ -390,6 +390,12 @@ def importar(session: Session, *, empresa_id: uuid.UUID, articulos: list[dict]) 
                 else:
                     articulo = _actualizar_uno(session, existente, entrada, codigo)
                 _crear_skus(session, articulo, entrada.get("skus", []))
+                # Después de los declarados, no antes: si la planilla trae los
+                # suyos, esos mandan. La hoja «SKUs» es opcional y sin esto una
+                # planilla que no la trae deja el artículo sin ninguno —
+                # inerte para stock, conteo y recepción (RN-PRD-006). Así
+                # entraron los 244 artículos de staging.
+                catalogo_uc.asegurar_sku(session, articulo)
         except AppError as e:
             omitidos.append({"nombre": codigo, "motivo": str(e)})
             continue
@@ -435,6 +441,9 @@ def _crear_uno(session: Session, empresa_id, entrada: dict, codigo: str) -> Arti
         costo_promedio=Decimal(str(entrada.get("costo_promedio") or 0)),
         controla_lote=bool(entrada.get("controla_lote")),
         dias_alerta_vencimiento=entrada.get("dias_alerta_vencimiento"),
+        # Los declara la planilla; `importar` cierra con `asegurar_sku` para
+        # el que no traiga ninguno.
+        sku_por_defecto=False,
     )
 
 

@@ -539,12 +539,22 @@ def test_un_servicio_no_deja_incidencia_de_sin_sku(env):
         assert s.scalars(select(IncidenciaInventario)).all() == []
 
 
-def test_un_insumo_sin_sku_sigue_dejando_su_incidencia(env):
+def test_un_insumo_sin_sku_activo_sigue_dejando_su_incidencia(env):
     """La contracara: lo que sí debía tener SKU y no lo tiene sigue siendo un
-    problema que hay que ver."""
+    problema que hay que ver.
+
+    Desde que todo artículo nace con el suyo (RN-PRD-006) el caso ya no se
+    arma dándolo de alta y punto: queda el SKU dado de baja, que es el que
+    `_sku_de_articulo` sigue descartando por `activo`.
+    """
     client, ids, TestSession = env
     h = _token(client)
     articulo_id = _articulo(client, h, ids, "I001")
+    from src.modules.inventory.infrastructure.models import Sku
+    with TestSession() as s:
+        sku = s.scalar(select(Sku).where(Sku.articulo_id == uuid.UUID(articulo_id)))
+        sku.activo = False
+        s.commit()
 
     inventory_listeners.on_compra_recibida({
         "orden_compra_id": str(uuid.uuid4()),
