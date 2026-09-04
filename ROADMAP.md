@@ -273,7 +273,7 @@ siempre, y endpoints con ADR y pruebas que ninguna pantalla llama.
 | Bloque | Hallazgos | Estado |
 |---|---|---|
 | `fix/contabilidad-pagos-rbac` | #3 ejecutar/rechazar pago sin gate + #4 diálogo con reset-on-error + #11 el rechazo descartaba su resultado | ✅ 2026-09-04 |
-| `fix/contabilidad-asientos-rbac` | #3 «+ asiento manual» y «Anular» sin gate + #4 diálogo + #16 el cuadre se comparaba en `float` | ⬜ |
+| `fix/contabilidad-asientos-rbac` | #3 «+ asiento manual» y «Anular» sin gate + #4 diálogo + #16 el cuadre se comparaba en `float` | ✅ 2026-09-04 |
 | `fix/rbac-botones-resto` | #3 los botones de trabajadores, artículos y devoluciones (la OC ya estaba gateada desde ADR-085) | ⬜ |
 | `fix/sesion-expirada-cliente` | #10 la sesión muere y el cliente no se entera: bucle del KDS, campana muda, borradores del PDV que dejan de guardarse en silencio | ⬜ |
 | `fix/dialogos-migracion-sweep` | #4 los diálogos restantes (10 archivos, 16 diálogos) migran a `DialogoFormulario` | ⬜ |

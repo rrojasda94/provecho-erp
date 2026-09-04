@@ -6,9 +6,14 @@ import { redirect } from "next/navigation";
 
 import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
-import { estadoDeError } from "@/lib/errores";
+import { cuadreDe } from "@/lib/cuadre";
+import { estadoDeError, type EstadoFormulario } from "@/lib/errores";
 
-export type EstadoAsiento = { error: string; ok: boolean };
+/** El estado que devuelve toda acción de este módulo. Es el del ERP entero:
+ * el alias se queda porque catorce firmas de acá lo nombran, pero el tipo es
+ * `EstadoFormulario` —con sus `campos`— y no el par `{error, ok}` que era, que
+ * escondía en el tipo los campos rechazados que `estadoDeError` ya devolvía. */
+export type EstadoAsiento = EstadoFormulario;
 
 async function token(): Promise<string> {
   const store = await cookies();
@@ -34,10 +39,6 @@ function leerLineas(formData: FormData): Linea[] {
     .filter((l) => l.cuenta_contable_id && l.monto > 0);
 }
 
-function suma(lineas: Linea[], tipo: string): number {
-  return lineas.filter((l) => l.tipo === tipo).reduce((t, l) => t + l.monto, 0);
-}
-
 export async function crearAsientoAction(
   _previo: EstadoAsiento,
   formData: FormData,
@@ -50,10 +51,12 @@ export async function crearAsientoAction(
   if (!glosa) return { error: "Falta la glosa: un asiento sin glosa no se audita.", ok: false };
   if (lineas.length < 2) return { error: "Un asiento lleva al menos dos líneas.", ok: false };
   // RN-CTB-001. El backend lo vuelve a validar; acá se evita el viaje y se
-  // dice exactamente cuánto falta.
-  const debe = suma(lineas, "debe");
-  const haber = suma(lineas, "haber");
-  if (debe !== haber) {
+  // dice exactamente cuánto falta. El cuadre se cuenta en centavos
+  // (`lib/cuadre.ts`): comparado en flotante, un asiento de 0.10 + 0.20
+  // contra 0.30 se rechazaba con «no cuadra» por una diferencia que no
+  // existe en la plata, solo en el binario.
+  const { debe, haber, cuadra } = cuadreDe(lineas);
+  if (!cuadra) {
     return {
       error: `El asiento no cuadra: debe ${debe.toFixed(2)} vs. haber ${haber.toFixed(2)}.`,
       ok: false,
