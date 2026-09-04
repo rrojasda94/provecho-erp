@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState } from "react";
 
 import { Insignia, type Tono } from "@/components/estado/insignia";
+import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { Rastro } from "@/components/shell/rastro";
 import { tienePermiso } from "@/lib/permisos";
 
@@ -140,120 +141,84 @@ function DialogoRecepcion({
   orden: OrdenCompra;
   articulos: Articulo[];
 }) {
-  const dialogo = useRef<HTMLDialogElement>(null);
-  const [estado, formAction, pendiente] = useActionState(
-    recibirOrdenCompraAction,
-    ESTADO_INICIAL,
-  );
   const lineas = pendienteDe(orden);
   const porId = new Map(articulos.map((a) => [a.id, a]));
 
-  useEffect(() => {
-    if (estado.ok) dialogo.current?.close();
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogo.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-      >
-        Registrar recepción
-      </button>
-      <dialog ref={dialogo} className="w-full max-w-3xl rounded-lg p-0 backdrop:bg-dark/40">
-        <form action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg text-dark">Qué llegó</h2>
-          <p className="text-xs text-gray">
-            Viene precargado con lo que falta. Corrige la cantidad si el
-            proveedor entregó menos: la OC queda en <em>recibida parcial</em> y
-            admite otra entrega después.
-          </p>
-          <input type="hidden" name="orden_id" value={orden.id} />
-
-          <div className="flex flex-col gap-3">
-            {lineas.map((it) => {
-              const articulo = porId.get(it.articulo_id);
-              return (
-                <div key={it.id} className="rounded border border-gray/20 p-3">
-                  <p className="text-sm font-semibold">
-                    {articulo?.nombre ?? it.articulo_id}
-                    <span className="ml-2 font-normal text-gray">
-                      pendiente {it.pendiente}
-                    </span>
-                  </p>
-                  <input type="hidden" name="orden_compra_item_id[]" value={it.id} />
-                  <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <DialogoFormulario
+      titulo="Qué llegó"
+      disparador="Registrar recepción"
+      etiquetaEnvio="Registrar"
+      etiquetaPendiente="Registrando…"
+      accion={recibirOrdenCompraAction}
+      ancho="max-w-3xl"
+      ayuda={
+        <>
+          Viene precargado con lo que falta. Corrige la cantidad si el proveedor entregó
+          menos: la OC queda en <em>recibida parcial</em> y admite otra entrega después.
+        </>
+      }
+    >
+      <input type="hidden" name="orden_id" value={orden.id} />
+      <div className="flex flex-col gap-3">
+        {lineas.map((it) => {
+          const articulo = porId.get(it.articulo_id);
+          return (
+            <div key={it.id} className="rounded border border-border p-3">
+              <p className="text-sm font-semibold">
+                {articulo?.nombre ?? it.articulo_id}
+                <span className="ml-2 font-normal text-muted-foreground">
+                  pendiente {it.pendiente}
+                </span>
+              </p>
+              <input type="hidden" name="orden_compra_item_id[]" value={it.id} />
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <label className="flex flex-col gap-1 text-xs font-semibold">
+                  Cantidad
+                  <input
+                    name="cantidad_recibida[]"
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    defaultValue={it.pendiente}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs font-semibold">
+                  Costo unitario
+                  <input
+                    name="costo_recibido[]"
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    defaultValue={it.costo_unitario}
+                  />
+                </label>
+                {/* Lote y vencimiento solo donde significan algo: un
+                    artículo que no controla lote los ignora (RN-VNC-002),
+                    y pedirlos igual serían dos campos que nadie llena. */}
+                {articulo?.controla_lote ? (
+                  <>
                     <label className="flex flex-col gap-1 text-xs font-semibold">
-                      Cantidad
-                      <input
-                        name="cantidad_recibida[]"
-                        type="number"
-                        min="0"
-                        step="0.0001"
-                        defaultValue={it.pendiente}
-                      />
+                      Lote
+                      <input name="lote_codigo[]" type="text" maxLength={50} />
                     </label>
                     <label className="flex flex-col gap-1 text-xs font-semibold">
-                      Costo unitario
-                      <input
-                        name="costo_recibido[]"
-                        type="number"
-                        min="0"
-                        step="0.0001"
-                        defaultValue={it.costo_unitario}
-                      />
+                      Vence
+                      <input name="fecha_vencimiento[]" type="date" />
                     </label>
-                    {/* Lote y vencimiento solo donde significan algo: un
-                        artículo que no controla lote los ignora (RN-VNC-002),
-                        y pedirlos igual serían dos campos que nadie llena. */}
-                    {articulo?.controla_lote ? (
-                      <>
-                        <label className="flex flex-col gap-1 text-xs font-semibold">
-                          Lote
-                          <input name="lote_codigo[]" type="text" maxLength={50} />
-                        </label>
-                        <label className="flex flex-col gap-1 text-xs font-semibold">
-                          Vence
-                          <input name="fecha_vencimiento[]" type="date" />
-                        </label>
-                      </>
-                    ) : (
-                      <>
-                        <input type="hidden" name="lote_codigo[]" value="" />
-                        <input type="hidden" name="fecha_vencimiento[]" value="" />
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogo.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Registrando…" : "Registrar"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+                  </>
+                ) : (
+                  <>
+                    <input type="hidden" name="lote_codigo[]" value="" />
+                    <input type="hidden" name="fecha_vencimiento[]" value="" />
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </DialogoFormulario>
   );
 }
 
@@ -323,58 +288,19 @@ export function CamposDeFactura({ rucSugerido }: { rucSugerido?: string | null }
 }
 
 function DialogoFactura({ orden, ruc }: { orden: OrdenCompra; ruc: string | null }) {
-  const dialogo = useRef<HTMLDialogElement>(null);
-  const [estado, formAction, pendiente] = useActionState(
-    registrarFacturaAction,
-    ESTADO_INICIAL,
-  );
-
-  useEffect(() => {
-    if (estado.ok) dialogo.current?.close();
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogo.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-      >
-        Registrar factura
-      </button>
-      <dialog ref={dialogo} className="w-full max-w-2xl rounded-lg p-0 backdrop:bg-dark/40">
-        <form action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg text-dark">La factura del proveedor</h2>
-          <p className="text-xs text-gray">
-            Dar conformidad es lo que encola el pago en Contabilidad y lo que
-            registra el crédito fiscal. Compras sustenta; nunca paga.
-          </p>
-          <input type="hidden" name="orden_id" value={orden.id} />
-          <CamposDeFactura rucSugerido={ruc} />
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogo.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Registrando…" : "Dar conformidad"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="La factura del proveedor"
+      disparador="Registrar factura"
+      etiquetaEnvio="Dar conformidad"
+      etiquetaPendiente="Registrando…"
+      accion={registrarFacturaAction}
+      ancho="max-w-2xl"
+      ayuda="Dar conformidad es lo que encola el pago en Contabilidad y lo que registra el crédito fiscal. Compras sustenta; nunca paga."
+    >
+      <input type="hidden" name="orden_id" value={orden.id} />
+      <CamposDeFactura rucSugerido={ruc} />
+    </DialogoFormulario>
   );
 }
 

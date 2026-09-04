@@ -2,12 +2,13 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
+import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { pedir } from "@/lib/cliente-api";
 
-import { crearOrdenCompraAction, editarOrdenCompraAction, type EstadoOrdenCompra } from "./actions";
+import { crearOrdenCompraAction, editarOrdenCompraAction } from "./actions";
 import { ArticuloPicker } from "@/components/articulo-picker/articulo-picker";
 import { Combobox } from "@/components/ui/combobox";
 
@@ -38,8 +39,6 @@ export type Articulo = {
   // Decide si la recepción pide lote y vencimiento (RN-VNC-002).
   controla_lote: boolean;
 };
-
-const ESTADO_INICIAL: EstadoOrdenCompra = { error: "", ok: false };
 
 const ESTILO_ESTADO: Record<string, string> = {
   borrador: "bg-gray/20 text-gray",
@@ -114,6 +113,53 @@ function FilaItem({
   );
 }
 
+/** Los ítems de una OC, con su total en vivo. Es el mismo bloque en el alta y
+ * en la corrección, y sin él cada diálogo repetía las filas, el botón de
+ * agregar y el cálculo. */
+function ItemsDeOrden({
+  filas,
+  setFilas,
+  articulos,
+}: {
+  filas: Fila[];
+  setFilas: React.Dispatch<React.SetStateAction<Fila[]>>;
+  articulos: Articulo[];
+}) {
+  const total = filas.reduce(
+    (acc, f) => acc + (Number(f.cantidad) || 0) * (Number(f.costoUnitario) || 0),
+    0,
+  );
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <span className="text-sm font-semibold">Ítems</span>
+        {filas.map((fila) => (
+          <FilaItem
+            key={fila.id}
+            fila={fila}
+            articulos={articulos}
+            puedeQuitar={filas.length > 1}
+            onQuitar={() => setFilas((fs) => fs.filter((f) => f.id !== fila.id))}
+            onCambiar={(campo, valor) =>
+              setFilas((fs) => fs.map((f) => (f.id === fila.id ? { ...f, [campo]: valor } : f)))
+            }
+          />
+        ))}
+        <button
+          type="button"
+          onClick={() => setFilas((fs) => [...fs, filaVacia()])}
+          className="self-start text-sm font-semibold text-primary hover:underline"
+        >
+          + Agregar ítem
+        </button>
+      </div>
+      <p className="text-right text-sm font-semibold text-muted-foreground">
+        Total estimado: S/ {total.toFixed(2)}
+      </p>
+    </>
+  );
+}
+
 function DialogoNuevaOC({
   proveedores,
   almacenes,
@@ -123,157 +169,66 @@ function DialogoNuevaOC({
   almacenes: Almacen[];
   articulos: Articulo[];
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
   const [filas, setFilas] = useState<Fila[]>([filaVacia()]);
-  const [estado, formAction, pendiente] = useActionState(crearOrdenCompraAction, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      setFilas([filaVacia()]);
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
-
-  const total = filas.reduce(
-    (acc, f) => acc + (Number(f.cantidad) || 0) * (Number(f.costoUnitario) || 0),
-    0,
-  );
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        disabled={articulos.length === 0}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
-      >
-        + Nueva orden de compra
-      </button>
-      <dialog
-        ref={dialogRef}
-        className="w-full max-w-2xl rounded-lg p-0 backdrop:bg-dark/40"
-        onClose={() => {
-          formRef.current?.reset();
-          setFilas([filaVacia()]);
-        }}
-      >
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg text-dark">
-            Nueva orden de compra
-          </h2>
-          <div className="grid grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1 text-sm font-semibold">
-              Proveedor
-              <Combobox
-                name="proveedor_id"
-                etiqueta="Proveedor"
-                requerido
-                marcador="Elegir..."
-                opciones={proveedores.map((p) => ({
-                  valor: p.id,
-                  etiqueta: p.razon_social ?? p.ruc ?? "",
-                  pista: p.razon_social ? (p.ruc ?? undefined) : undefined,
-                }))}
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-semibold">
-              Almacén destino
-              <Combobox
-                name="almacen_destino_id"
-                etiqueta="Almacén destino"
-                requerido
-                marcador="Elegir..."
-                opciones={almacenes.map((a) => ({
-                  valor: a.id,
-                  etiqueta: a.nombre,
-                  pista: a.tipo,
-                }))}
-              />
-            </label>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-semibold">Ítems</span>
-            {filas.map((fila) => (
-              <FilaItem
-                key={fila.id}
-                fila={fila}
-                articulos={articulos}
-                puedeQuitar={filas.length > 1}
-                onQuitar={() => setFilas((fs) => fs.filter((f) => f.id !== fila.id))}
-                onCambiar={(campo, valor) =>
-                  setFilas((fs) =>
-                    fs.map((f) => (f.id === fila.id ? { ...f, [campo]: valor } : f)),
-                  )
-                }
-              />
-            ))}
-            <button
-              type="button"
-              onClick={() => setFilas((fs) => [...fs, filaVacia()])}
-              className="self-start text-sm font-semibold text-primary hover:underline"
-            >
-              + Agregar ítem
-            </button>
-          </div>
-
-          <p className="text-right text-sm font-semibold text-gray">
-            Total estimado: S/ {total.toFixed(2)}
-          </p>
-
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Creando..." : "Crear (borrador)"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Nueva orden de compra"
+      disparador="+ Nueva orden de compra"
+      etiquetaEnvio="Crear (borrador)"
+      etiquetaPendiente="Creando..."
+      accion={crearOrdenCompraAction}
+      ancho="max-w-2xl"
+      envioDeshabilitado={articulos.length === 0}
+      // Las filas son campos controlados: `form.reset()` no las toca.
+      alAbrir={() => setFilas([filaVacia()])}
+    >
+      <div className="grid grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Proveedor
+          <Combobox
+            name="proveedor_id"
+            etiqueta="Proveedor"
+            requerido
+            marcador="Elegir..."
+            opciones={proveedores.map((p) => ({
+              valor: p.id,
+              etiqueta: p.razon_social ?? p.ruc ?? "",
+              pista: p.razon_social ? (p.ruc ?? undefined) : undefined,
+            }))}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Almacén destino
+          <Combobox
+            name="almacen_destino_id"
+            etiqueta="Almacén destino"
+            requerido
+            marcador="Elegir..."
+            opciones={almacenes.map((a) => ({
+              valor: a.id,
+              etiqueta: a.nombre,
+              pista: a.tipo,
+            }))}
+          />
+        </label>
+      </div>
+      <ItemsDeOrden filas={filas} setFilas={setFilas} articulos={articulos} />
+    </DialogoFormulario>
   );
 }
 
-const ESTADO_EDICION_INICIAL: EstadoOrdenCompra = { error: "", ok: false };
-
 /** OC en borrador es editable (precio/cantidad); desde `emitida` es
- * inmutable. El detalle con ítems se pide recién al abrir el diálogo — la
- * tabla no los trae para no pedir N detalles por cada fila listada. */
+ * inmutable. El detalle con ítems se pide recién **antes de abrir** — la
+ * tabla no los trae para no pedir N detalles por cada fila listada, y abrir
+ * primero mostraba un formulario vacío que se llenaba solo un segundo
+ * después. */
 function BotonEditarOC({ orden, articulos }: { orden: OrdenCompra; articulos: Articulo[] }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
   const [filas, setFilas] = useState<Fila[]>([]);
-  const [cargando, setCargando] = useState(false);
   const [errorCarga, setErrorCarga] = useState("");
-  const [estado, formAction, pendiente] = useActionState(
-    editarOrdenCompraAction,
-    ESTADO_EDICION_INICIAL,
-  );
 
-  useEffect(() => {
-    if (estado.ok) dialogRef.current?.close();
-  }, [estado.ok]);
-
-  async function abrir() {
+  async function cargar() {
     setErrorCarga("");
-    setCargando(true);
-    dialogRef.current?.showModal();
     try {
       const detalle = await pedir<OrdenCompra>(`/purchases/ordenes-compra/${orden.id}`);
       setFilas(
@@ -285,92 +240,30 @@ function BotonEditarOC({ orden, articulos }: { orden: OrdenCompra; articulos: Ar
         })),
       );
     } catch {
+      setFilas([]);
       setErrorCarga("No se pudo cargar el detalle de la orden.");
-    } finally {
-      setCargando(false);
     }
   }
 
-  const total = filas.reduce(
-    (acc, f) => acc + (Number(f.cantidad) || 0) * (Number(f.costoUnitario) || 0),
-    0,
-  );
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={abrir}
-        className="text-sm font-semibold text-primary hover:underline"
-      >
-        Editar
-      </button>
-      <dialog
-        ref={dialogRef}
-        className="w-full max-w-2xl rounded-lg p-0 backdrop:bg-dark/40"
-        onClose={() => formRef.current?.reset()}
-      >
-        {cargando ? (
-          <p className="p-6 text-sm text-gray">Cargando...</p>
-        ) : (
-          <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-            <h2 className="font-heading text-lg text-dark">Editar orden de compra (borrador)</h2>
-            <input type="hidden" name="orden_id" value={orden.id} />
-
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-semibold">Ítems</span>
-              {filas.map((fila) => (
-                <FilaItem
-                  key={fila.id}
-                  fila={fila}
-                  articulos={articulos}
-                  puedeQuitar={filas.length > 1}
-                  onQuitar={() => setFilas((fs) => fs.filter((f) => f.id !== fila.id))}
-                  onCambiar={(campo, valor) =>
-                    setFilas((fs) =>
-                      fs.map((f) => (f.id === fila.id ? { ...f, [campo]: valor } : f)),
-                    )
-                  }
-                />
-              ))}
-              <button
-                type="button"
-                onClick={() => setFilas((fs) => [...fs, filaVacia()])}
-                className="self-start text-sm font-semibold text-primary hover:underline"
-              >
-                + Agregar ítem
-              </button>
-            </div>
-
-            <p className="text-right text-sm font-semibold text-gray">
-              Total estimado: S/ {total.toFixed(2)}
-            </p>
-
-            {(errorCarga || estado.error) && (
-              <p role="alert" className="text-sm font-semibold text-secondary">
-                {errorCarga || estado.error}
-              </p>
-            )}
-            <div className="mt-2 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => dialogRef.current?.close()}
-                className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={pendiente || filas.length === 0}
-                className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-              >
-                {pendiente ? "Guardando..." : "Guardar cambios"}
-              </button>
-            </div>
-          </form>
-        )}
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Editar orden de compra (borrador)"
+      disparador="Editar"
+      claseDisparador="text-sm font-semibold text-primary hover:underline"
+      etiquetaEnvio="Guardar cambios"
+      accion={editarOrdenCompraAction}
+      ancho="max-w-2xl"
+      envioDeshabilitado={filas.length === 0}
+      alAbrir={cargar}
+    >
+      <input type="hidden" name="orden_id" value={orden.id} />
+      {errorCarga && (
+        <p role="alert" className="text-sm font-semibold text-status-danger">
+          {errorCarga}
+        </p>
+      )}
+      <ItemsDeOrden filas={filas} setFilas={setFilas} articulos={articulos} />
+    </DialogoFormulario>
   );
 }
 
