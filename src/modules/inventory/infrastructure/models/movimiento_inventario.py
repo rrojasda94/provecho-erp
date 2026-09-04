@@ -25,6 +25,10 @@ TIPO_MOVIMIENTO = Enum(
     "produccion_entrada",
     "ajuste",
     "devolucion",
+    # El saldo de partida de un almacén (RN-INV-006 no aplica: no corrige
+    # nada). Solo se admite mientras ese (almacén, SKU) no tenga historia —
+    # `rules.carga_inicial_permitida`.
+    "carga_inicial",
     name="tipo_movimiento",
     native_enum=False,
 )

@@ -173,6 +173,48 @@ En staging entraron 244 artículos así (la hoja «SKUs» es opcional) y el
 módulo entero parecía roto: stock vacío, conteos imposibles, compras que no
 movían nada. La migración `12f51f21f27e` repara los que ya existan.
 
+### Qué maneja un almacén: la fila en cero (2026-09-04)
+
+**Una fila de `stock` en cero significa "este almacén maneja este
+artículo".** Es la primitiva del arranque, y no existía: la fila nacía sola
+con el primer movimiento (`aplicar_a_stock`), así que un almacén recién dado
+de alta era invisible en todas partes y no había acción para salir de ese
+cero. Tener SKU no alcanzaba — el SKU dice qué existe en el catálogo; la fila
+de stock dice qué maneja **este** almacén.
+
+`POST /almacenes/{id}/articulos` → `stock.declarar_articulos`. Declarar en
+cero ya sirve para que el artículo aparezca en la pantalla de stock, entre en
+un conteo y lo recorra el requerimiento de la jornada. `cantidad_inicial`
+entra como movimiento **`carga_inicial`**, tipo nuevo que:
+
+- **no pasa por solicitar/aprobar** — no corrige nada, es el punto de
+  partida, y exigirle un segundo usuario deja el sistema sin forma de
+  arrancar (RN-INV-006 sigue rigiendo para toda corrección posterior);
+- **solo se admite mientras ese (almacén, SKU) no tenga movimientos**
+  (`rules.carga_inicial_permitida`). Es lo único que lo separa de una puerta
+  trasera permanente: con historia, corregir el saldo vuelve a ser un ajuste.
+
+Sin migración: `movimiento_inventario.tipo` es `native_enum=False`, o sea
+`VARCHAR(21)` sin CHECK, y `carga_inicial` entra en el largo ya declarado —
+mismo precedente que `consumo_interno` (migración `d5c81a7f3b62`). Lo que sí
+hubo que tocar es el `Enum` de SQLAlchemy del modelo, que valida **al leer**.
+
+### El circuito interno, de punta a punta
+
+`solicitud → aprobación (reserva) → despacho → recepción`. El backend estaba
+completo desde el slice de transferencias y **ninguna pantalla lo llamaba**:
+lo aprobado no tenía botón para despacharse y lo despachado se quedaba
+`en_transito` para siempre. Desde 2026-09-04:
+
+- `GET /solicitudes?almacen_abastecedor_id=` — la bandeja del que despacha
+  ("qué me piden"), la contracara de `almacen_solicitante_id`, que era la
+  única pregunta que se podía hacer.
+- Pantalla de picking en el detalle de una solicitud `aprobada`: cantidad
+  editable por línea, porque despachar de menos es el caso real y la
+  diferencia queda anotada en `cantidad_despachada`.
+- `/inventario/transferencias` — los traslados en tránsito y el botón de
+  recibir.
+
 ## Casos de uso
 
 - CRUD de artículos y categorías.
@@ -596,6 +638,7 @@ Endpoints `/api/v1/inventory`:
 | POST/GET/PATCH | `/articulos[/{id}]` | `gestionar_catalogo` / `leer` — el PATCH corrige `id_interno`, **nunca** `unidad_medida_id` (ver abajo). El GET acepta `?tipo=` (ej. `empaque`): filtra en la base porque la lista viene paginada y una pantalla que filtre lo recibido se queda sin opciones en cuanto el catálogo pasa de una página |
 | POST | `/skus` | `gestionar_catalogo` |
 | GET | `/stock` | `leer` |
+| POST | `/almacenes/{id}/articulos` | `registrar_movimiento` — qué maneja el almacén, con su saldo de partida (ver abajo) |
 | POST | `/movimientos` | `registrar_movimiento` |
 | POST | `/ajustes` | `solicitar_ajuste` — es también la "entrada de stock" manual: un ajuste positivo con motivo `sobrante`/`error_registro` (2026-08-30) |
 | POST | `/ajustes/{id}/aprobar` \| `/rechazar` | `aprobar_ajuste` |

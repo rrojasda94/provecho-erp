@@ -478,6 +478,25 @@ class StockLoteOut(BaseModel):
     por_vencer: bool = False
 
 
+# --- Qué maneja un almacén ---
+class ArticuloDeAlmacenIn(BaseModel):
+    """Un artículo que el almacén pasa a manejar.
+
+    `cantidad_inicial` es opcional: declararlo en cero ya alcanza para que
+    aparezca en la pantalla de stock y entre en un conteo.
+    """
+
+    sku_id: uuid.UUID
+    cantidad_inicial: Decimal | None = Field(default=None, ge=0)
+    stock_minimo: Decimal | None = Field(default=None, ge=0)
+    stock_maximo: Decimal | None = Field(default=None, ge=0)
+    lote_id: uuid.UUID | None = None
+
+
+class DeclararArticulosIn(BaseModel):
+    articulos: list[ArticuloDeAlmacenIn] = Field(min_length=1)
+
+
 # --- Ajustes ---
 class AjusteCreate(BaseModel):
     almacen_id: uuid.UUID

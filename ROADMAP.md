@@ -237,6 +237,24 @@ sesión y de dónde sale la cuenta contable de lo que se compra y se vende.
 | 7 | La cuenta contable se configura en la categoría y se hereda (ADR-086) | ✅ 2026-08-30 |
 | + | Recargar el PDV vuelve al pedido que se estaba armando, no a la primera pestaña (lo encontró la suite `uso`, que estaba roja en `main` por esto) | ✅ 2026-08-30 |
 | + | Entrada de stock manual: `/inventario/ajustes` solo aprobaba/rechazaba, sin forma de solicitar una — el formulario llama al mismo `POST /ajustes` que ya existía, y un artículo con lote puede declarar código y vencimiento al entrar | ✅ 2026-08-30 |
+
+## Inventario operable de punta a punta (2026-09-04)
+
+Cuarto turno de prueba en staging: el módulo seguía inutilizable después de
+arreglar los artículos sin SKU. **Una sola causa, anterior a todo lo demás**:
+la fila de `stock` nacía sola con el primer movimiento, así que un almacén
+recién dado de alta era invisible y no había cómo arrancar. Y otra vez el
+patrón que se repite desde la 0.8.0 — endpoints entregados y probados, sin
+pantalla que los llame.
+
+| # | Qué | Estado |
+|---|---|---|
+| 1 | Un almacén declara qué artículos maneja (fila en cero) y con cuánto arranca (`carga_inicial`, sin segundo aprobador y solo sin historia previa) | ✅ 2026-09-04 |
+| 2 | El conteo ya tiene qué contar; el mensaje vacío deja de mentir ("no hay stock con esos filtros" cuando no había nada declarado) | ✅ 2026-09-04 |
+| 3 | Despacho de un requerimiento aprobado, con pantalla de picking y cantidad por línea | ✅ 2026-09-04 |
+| 4 | Pantalla de Traslados y recepción — lo despachado quedaba `en_transito` para siempre | ✅ 2026-09-04 |
+| 5 | `GET /solicitudes?almacen_abastecedor_id=`: la bandeja del que despacha, que no se podía preguntar | ✅ 2026-09-04 |
+| 6 | El seeder crea `almacen1` y `aprobador1`: sin dos usuarios el circuito no cierra ni para probarlo | ✅ 2026-09-04 |
 | + | El tipo de documento de una persona: «RUC» en el alta devolvía 500 y dejaba la fila ilegible (migración `c9f4a2e70b18`, vocabulario único en `src/shared/documento.py`) | ✅ 2026-08-30 |
 
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)

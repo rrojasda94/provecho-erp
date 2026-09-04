@@ -18,6 +18,14 @@ TIPOS_MOVIMIENTO = {
     "produccion_entrada",
     "ajuste",
     "devolucion",
+    # El punto de partida de un almacén: lo que ya estaba en el estante el
+    # día que el ERP empezó a mirarlo. No es un ajuste —no corrige nada— y
+    # por eso no pasa por solicitar/aprobar (RN-INV-006): pedirle un segundo
+    # usuario a la carga inicial deja el sistema sin forma de arrancar, que
+    # es exactamente donde quedó staging. Lo que lo hace inofensivo es que
+    # solo se admite mientras ese (almacén, SKU) no tenga ningún movimiento:
+    # ver `carga_inicial_permitida`.
+    "carga_inicial",
 }
 
 MOTIVOS_AJUSTE = {"sobrante", "faltante", "merma", "error_registro"}
@@ -64,7 +72,12 @@ FRECUENCIAS_CONTEO: dict[str, int] = {
 }
 
 # Dirección esperada del signo de la cantidad según el tipo de movimiento.
-TIPOS_INGRESO = {"recepcion_compra", "transferencia_entrada", "produccion_entrada"}
+TIPOS_INGRESO = {
+    "recepcion_compra",
+    "transferencia_entrada",
+    "produccion_entrada",
+    "carga_inicial",
+}
 TIPOS_SALIDA = {
     "transferencia_salida",
     "consumo_venta",
@@ -83,6 +96,21 @@ def signo_movimiento_valido(tipo: str, cantidad: Decimal) -> bool:
     if tipo in TIPOS_SALIDA:
         return cantidad < 0
     return True  # ajuste/devolucion: signo libre
+
+
+TIPO_CARGA_INICIAL = "carga_inicial"
+
+
+def carga_inicial_permitida(hubo_movimiento: bool) -> bool:
+    """La carga inicial solo vale mientras no haya pasado nada.
+
+    Es lo único que la separa de un ajuste encubierto: una vez que el
+    (almacén, SKU) tiene historia, corregir su saldo vuelve a exigir
+    solicitar/aprobar con dos usuarios (RN-INV-006). Sin este tope,
+    `carga_inicial` sería una puerta trasera permanente para mover stock
+    sin que nadie lo firme.
+    """
+    return not hubo_movimiento
 
 
 def signo_ajuste_valido(motivo: str, cantidad: Decimal) -> bool:

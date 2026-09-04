@@ -5,9 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
-import { Combobox } from "@/components/ui/combobox";
+import { Combobox, ComboboxMultiple } from "@/components/ui/combobox";
+
+import { declararArticulosAction } from "./actions";
 
 export type FilaStock = {
   almacen_id: string;
@@ -26,6 +29,7 @@ export type FilaStock = {
 };
 
 type Opcion = { id: string; nombre: string };
+export type OpcionSku = { id: string; etiqueta: string };
 
 type Filtros = {
   almacen: string;
@@ -108,6 +112,8 @@ export function StockCliente({
   almacenes,
   sucursales,
   categorias,
+  skus,
+  puedeDeclarar,
   filtros,
 }: {
   filas: FilaStock[];
@@ -116,6 +122,8 @@ export function StockCliente({
   almacenes: Opcion[];
   sucursales: Opcion[];
   categorias: Opcion[];
+  skus: OpcionSku[];
+  puedeDeclarar: boolean;
   filtros: Filtros;
 }) {
   const router = useRouter();
@@ -132,6 +140,18 @@ export function StockCliente({
   };
 
   const totales = useMemo(() => consolidar(filas), [filas]);
+
+  // "No hay stock con esos filtros" era engañoso cuando el almacén todavía no
+  // maneja ningún artículo: no es que los filtros no encuentren nada, es que
+  // no hay nada declarado y hasta que alguien lo declare la pantalla, el
+  // conteo y el requerimiento de la jornada van a seguir vacíos.
+  const sinFiltros =
+    !filtros.almacen && !filtros.sucursal && !filtros.categoria && !filtros.q &&
+    !filtros.bajo;
+  const vacio =
+    total === 0 && sinFiltros
+      ? "Todavía ningún almacén maneja artículos. Empieza por agregarlos."
+      : "No hay stock con esos filtros.";
 
   const columnasPorAlmacen = useMemo<ColumnDef<FilaStock>[]>(
     () => [
@@ -261,23 +281,32 @@ export function StockCliente({
             ya reservado: es contra ese número que se compromete stock nuevo.
           </p>
         </div>
-        <div className="flex rounded-lg border border-border p-0.5 text-xs font-semibold">
-          {[
-            [false, "Por almacén"],
-            [true, "En general"],
-          ].map(([valor, etiqueta]) => (
-            <button
-              key={String(valor)}
-              type="button"
-              aria-pressed={consolidado === valor}
-              onClick={() => setConsolidado(valor as boolean)}
-              className={`rounded-md px-3 py-1 ${
-                consolidado === valor ? "bg-primary text-primary-foreground" : "text-gray"
-              }`}
-            >
-              {etiqueta}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <div className="flex rounded-lg border border-border p-0.5 text-xs font-semibold">
+            {[
+              [false, "Por almacén"],
+              [true, "En general"],
+            ].map(([valor, etiqueta]) => (
+              <button
+                key={String(valor)}
+                type="button"
+                aria-pressed={consolidado === valor}
+                onClick={() => setConsolidado(valor as boolean)}
+                className={`rounded-md px-3 py-1 ${
+                  consolidado === valor ? "bg-primary text-primary-foreground" : "text-gray"
+                }`}
+              >
+                {etiqueta}
+              </button>
+            ))}
+          </div>
+          {puedeDeclarar && (
+            <FormularioDeclararArticulos
+              almacenes={almacenes}
+              skus={skus}
+              almacenElegido={filtros.almacen}
+            />
+          )}
         </div>
       </div>
 
@@ -323,17 +352,88 @@ export function StockCliente({
           columnas={columnasTotal}
           datos={totales}
           placeholderBusqueda="Buscar por artículo o SKU..."
-          vacio="No hay stock con esos filtros."
+          vacio={vacio}
         />
       ) : (
         <TablaDatos
           columnas={columnasPorAlmacen}
           datos={filas}
           placeholderBusqueda="Buscar por artículo, SKU o almacén..."
-          vacio="No hay stock con esos filtros."
+          vacio={vacio}
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Qué artículos maneja un almacén.
+ *
+ * Es la acción que le faltaba a esta pantalla: hasta ahora era de solo
+ * lectura sobre una tabla que solo tiene filas de lo que ya se movió, así
+ * que un almacén nuevo se veía vacío y no había por dónde empezar.
+ */
+function FormularioDeclararArticulos({
+  almacenes,
+  skus,
+  almacenElegido,
+}: {
+  almacenes: Opcion[];
+  skus: OpcionSku[];
+  almacenElegido: string;
+}) {
+  return (
+    <DialogoFormulario
+      titulo="Agregar artículos a un almacén"
+      disparador="+ Agregar artículos"
+      accion={declararArticulosAction}
+      etiquetaEnvio="Agregar"
+      ayuda="Declara qué maneja el almacén. Sin cantidad entran en cero, listos para contarse — que es como se carga un inventario por primera vez."
+      envioDeshabilitado={almacenes.length === 0 || skus.length === 0}
+    >
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Almacén
+        <Combobox
+          name="almacen_id"
+          etiqueta="Almacén"
+          requerido
+          marcador="Elegir…"
+          // Si la pantalla ya está filtrada por un almacén, ese es el que se
+          // quiere cargar: repetir la elección es un paso de más.
+          defaultValue={almacenElegido || null}
+          opciones={almacenes.map((a) => ({ valor: a.id, etiqueta: a.nombre }))}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Artículos
+        <ComboboxMultiple
+          name="sku_ids"
+          etiqueta="Artículos"
+          requerido
+          marcador="Buscar y elegir…"
+          opciones={skus.map((s) => ({ valor: s.id, etiqueta: s.etiqueta }))}
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Cantidad inicial
+        <input name="cantidad_inicial" inputMode="decimal" placeholder="Opcional: 0" />
+        <span className="text-xs font-normal text-gray">
+          Se aplica a todo lo elegido. Solo vale la primera vez: después,
+          corregir un saldo es un ajuste y lo aprueba otro usuario.
+        </span>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Stock mínimo
+        <input name="stock_minimo" inputMode="decimal" placeholder="Opcional" />
+        <span className="text-xs font-normal text-gray">
+          Debajo de este número el artículo entra al requerimiento de la
+          jornada.
+        </span>
+      </label>
+    </DialogoFormulario>
   );
 }
 
