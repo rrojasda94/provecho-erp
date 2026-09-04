@@ -1,8 +1,9 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { useActionState, useEffect, useMemo, useRef, useTransition } from "react";
+import { useMemo, useTransition } from "react";
 
+import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
 
@@ -11,7 +12,6 @@ import {
   descartarPiezaAction,
   publicarPiezaAction,
   validarPiezaAction,
-  type EstadoMarketing,
 } from "../actions";
 import type { Campana, Marca } from "../campanas-cliente";
 
@@ -27,8 +27,6 @@ export type Pieza = {
   estado: string;
 };
 
-const ESTADO_INICIAL: EstadoMarketing = { error: "", ok: false };
-
 function DialogoNuevaPieza({
   campanas,
   marcas,
@@ -36,102 +34,63 @@ function DialogoNuevaPieza({
   campanas: Campana[];
   marcas: Marca[];
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [estado, formAction, pendiente] = useActionState(crearPiezaAction, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-      >
-        + Planificar pieza
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg text-dark">Nueva pieza</h2>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Marca
-            <Combobox
-              name="marca_id"
-              etiqueta="Marca"
-              requerido
-              marcador="Elegir marca..."
-              opciones={marcas.map((m) => ({ valor: m.id, etiqueta: m.nombre }))}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Título
-            <input name="titulo" required minLength={3} maxLength={150} />
-          </label>
-          <div className="flex gap-2">
-            <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
-              Canal
-              <input name="canal" required minLength={2} maxLength={50} placeholder="instagram" />
-            </label>
-            <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
-              Publicación
-              <input name="fecha_publicacion" type="date" required />
-            </label>
-          </div>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Campaña
-            <Combobox
-              name="campana_id"
-              etiqueta="Campaña"
-              marcador="Sin campaña (contenido de marca)"
-              opciones={campanas.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
-            />
-          </label>
-          <fieldset className="flex flex-col gap-1 rounded border border-gray/20 p-3">
-            <legend className="px-1 text-xs font-semibold uppercase text-gray">
-              Validaciones (RN-MKT-001/002)
-            </legend>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="pertinente_marca" />
-              Pertinente a la marca
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="uso_marca_validado" />
-              Uso de marca validado
-            </label>
-            <span className="text-xs text-gray">
-              Se pueden marcar después, pero sin las dos la pieza no se publica.
-            </span>
-          </fieldset>
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Guardando..." : "Planificar"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Nueva pieza"
+      disparador="+ Planificar pieza"
+      etiquetaEnvio="Planificar"
+      accion={crearPiezaAction}
+    >
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Marca
+        <Combobox
+          name="marca_id"
+          etiqueta="Marca"
+          requerido
+          marcador="Elegir marca..."
+          opciones={marcas.map((m) => ({ valor: m.id, etiqueta: m.nombre }))}
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Título
+        <input name="titulo" required minLength={3} maxLength={150} />
+      </label>
+      <div className="flex gap-2">
+        <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+          Canal
+          <input name="canal" required minLength={2} maxLength={50} placeholder="instagram" />
+        </label>
+        <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+          Publicación
+          <input name="fecha_publicacion" type="date" required />
+        </label>
+      </div>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Campaña
+        <Combobox
+          name="campana_id"
+          etiqueta="Campaña"
+          marcador="Sin campaña (contenido de marca)"
+          opciones={campanas.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+        />
+      </label>
+      <fieldset className="flex flex-col gap-1 rounded border border-border p-3">
+        <legend className="px-1 text-xs font-semibold uppercase text-muted-foreground">
+          Validaciones (RN-MKT-001/002)
+        </legend>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="pertinente_marca" />
+          Pertinente a la marca
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="uso_marca_validado" />
+          Uso de marca validado
+        </label>
+        <span className="text-xs text-muted-foreground">
+          Se pueden marcar después, pero sin las dos la pieza no se publica.
+        </span>
+      </fieldset>
+    </DialogoFormulario>
   );
 }
 

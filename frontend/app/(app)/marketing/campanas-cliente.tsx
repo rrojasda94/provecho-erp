@@ -1,15 +1,15 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { useActionState, useEffect, useMemo, useRef, useTransition } from "react";
+import { useMemo, useTransition } from "react";
 
+import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import {
   avanzarCampanaAction,
   completarBriefAction,
   crearCampanaAction,
-  type EstadoMarketing,
 } from "./actions";
 import { Combobox } from "@/components/ui/combobox";
 
@@ -27,8 +27,6 @@ export type Campana = {
   aprobada_por: string | null;
 };
 export type Marca = { id: string; nombre: string };
-
-const ESTADO_INICIAL: EstadoMarketing = { error: "", ok: false };
 
 const TIPOS = ["notoriedad", "impulso_venta", "lanzamiento", "medios", "evento"];
 
@@ -90,140 +88,61 @@ function CamposBrief({ campana }: { campana?: Campana }) {
 }
 
 function DialogoNuevaCampana({ marcas }: { marcas: Marca[] }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [estado, formAction, pendiente] = useActionState(crearCampanaAction, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-      >
-        + Nueva campaña
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg text-dark">Nueva campaña</h2>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Marca
-            <Combobox
-              name="marca_id"
-              etiqueta="Marca"
-              requerido
-              marcador="Elegir marca..."
-              opciones={marcas.map((m) => ({ valor: m.id, etiqueta: m.nombre }))}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Nombre
-            <input name="nombre" required minLength={3} maxLength={120} />
-          </label>
-          <div className="flex gap-2">
-            <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
-              Tipo
-              <select name="tipo" defaultValue="impulso_venta">
-                {TIPOS.map((t) => (
-                  <option key={t} value={t}>
-                    {t.replace("_", " ")}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
-              Canal
-              <input name="canal" required minLength={2} maxLength={50} placeholder="instagram" />
-            </label>
-          </div>
-          <p className="text-xs text-gray">
-            El brief puede completarse después, pero sin sus cuatro campos la campaña no
-            se aprueba ni sale a canal (RN-MKT-003).
-          </p>
-          <CamposBrief />
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Creando..." : "Crear"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Nueva campaña"
+      disparador="+ Nueva campaña"
+      etiquetaEnvio="Crear"
+      etiquetaPendiente="Creando..."
+      accion={crearCampanaAction}
+      ayuda="El brief puede completarse después, pero sin sus cuatro campos la campaña no se aprueba ni sale a canal (RN-MKT-003)."
+    >
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Marca
+        <Combobox
+          name="marca_id"
+          etiqueta="Marca"
+          requerido
+          marcador="Elegir marca..."
+          opciones={marcas.map((m) => ({ valor: m.id, etiqueta: m.nombre }))}
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Nombre
+        <input name="nombre" required minLength={3} maxLength={120} />
+      </label>
+      <div className="flex gap-2">
+        <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+          Tipo
+          <select name="tipo" defaultValue="impulso_venta">
+            {TIPOS.map((t) => (
+              <option key={t} value={t}>
+                {t.replace("_", " ")}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+          Canal
+          <input name="canal" required minLength={2} maxLength={50} placeholder="instagram" />
+        </label>
+      </div>
+      <CamposBrief />
+    </DialogoFormulario>
   );
 }
 
 function DialogoBrief({ campana }: { campana: Campana }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [estado, formAction, pendiente] = useActionState(completarBriefAction, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) dialogRef.current?.close();
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="text-xs font-bold text-primary hover:underline"
-      >
-        Brief
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <input type="hidden" name="campana_id" value={campana.id} />
-          <h2 className="font-heading text-lg text-dark">
-            Brief · {campana.nombre}
-          </h2>
-          <CamposBrief campana={campana} />
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo={`Brief · ${campana.nombre}`}
+      disparador="Brief"
+      claseDisparador="text-xs font-bold text-primary hover:underline"
+      accion={completarBriefAction}
+    >
+      <input type="hidden" name="campana_id" value={campana.id} />
+      <CamposBrief campana={campana} />
+    </DialogoFormulario>
   );
 }
 
