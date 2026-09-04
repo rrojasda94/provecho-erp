@@ -2,6 +2,8 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
+import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
+
 import {
   aprobarParametroAction,
   proponerParametroAction,
@@ -103,86 +105,50 @@ function DialogoProponer({
   divisas: Divisa[];
   empresaId: string;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [estado, formAction, pendiente] = useActionState(
-    proponerParametroAction,
-    ESTADO_INICIAL,
-  );
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-      >
-        + Proponer parámetro
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <input type="hidden" name="empresa_id" value={empresaId} />
-          <h2 className="font-heading text-lg text-dark">
-            Proponer parámetro
-          </h2>
-          <p className="text-xs text-gray">
-            Cada área propone los suyos desde su módulo; el valor no llega al módulo
-            hasta que Gerencia lo aprueba (ADR-014).
-          </p>
-          <div className="flex gap-2">
-            <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
-              Módulo
-              <select name="modulo" defaultValue="purchases">
-                {MODULOS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-[2] flex-col gap-1 text-sm font-semibold">
-              Código
-              <input name="codigo" required maxLength={50} placeholder="oc_umbral" />
-            </label>
-          </div>
-          <CamposValor divisas={divisas} />
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Motivo
-            <input name="motivo" placeholder="Por qué se propone este valor" />
-          </label>
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Enviando..." : "Proponer"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Proponer parámetro"
+      disparador="+ Proponer parámetro"
+      etiquetaEnvio="Proponer"
+      etiquetaPendiente="Enviando..."
+      accion={proponerParametroAction}
+      ayuda="Cada área propone los suyos desde su módulo; el valor no llega al módulo hasta que Gerencia lo aprueba (ADR-014)."
+    >
+      <input type="hidden" name="empresa_id" value={empresaId} />
+      <div className="flex gap-2">
+        <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+          Módulo
+          <select name="modulo" defaultValue="purchases">
+            {MODULOS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-[2] flex-col gap-1 text-sm font-semibold">
+          Código
+          <input name="codigo" required maxLength={50} placeholder="oc_umbral" />
+        </label>
+      </div>
+      <CamposValor divisas={divisas} />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Motivo
+        <input name="motivo" placeholder="Por qué se propone este valor" />
+      </label>
+    </DialogoFormulario>
   );
 }
+
+/* ponytail: `DialogoResolver` (abajo) se queda con su `<dialog>` a mano y no
+   migra con el resto (auditoría del 2026-08-30 §4). No es un
+   diálogo-formulario: es un `<dialog>` con **dos** `<form>` independientes
+   —aprobar y rechazar—, dos `useActionState`, dos avisos de error y un pie
+   con un solo botón «Cerrar». `DialogoFormulario` promete un formulario, un
+   estado y el par Cancelar/Guardar; forzarlo acá sería agrandar el molde
+   para un solo llamador. Queda declarado en
+   `docs/roadmap/deuda/frontend.md`; el día que aparezca un segundo diálogo
+   de dos acciones, ahí sí hay un molde que sacar. */
 
 function DialogoResolver({
   parametro,
