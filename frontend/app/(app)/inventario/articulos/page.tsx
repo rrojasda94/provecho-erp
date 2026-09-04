@@ -9,7 +9,7 @@ import {
 } from "./articulos-cliente";
 
 export default async function ArticulosPage() {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
 
   try {
     // En paralelo: la tabla necesita el listado, el diálogo de alta
@@ -24,6 +24,7 @@ export default async function ArticulosPage() {
         articulos={articulos.items}
         categorias={categorias}
         unidadesMedida={unidadesMedida}
+        permisos={usuario.permisos}
       />
     );
   } catch (e) {

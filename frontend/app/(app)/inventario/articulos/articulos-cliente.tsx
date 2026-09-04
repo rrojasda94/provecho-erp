@@ -8,6 +8,7 @@ import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-f
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
 import { RUTA_EXPORTAR_ARTICULOS } from "@/lib/catalogo";
+import { tienePermiso } from "@/lib/permisos";
 
 import { crearArticuloAction, editarArticuloAction } from "./actions";
 import { ImportarArticulos } from "./importar-articulos";
@@ -203,15 +204,24 @@ function DialogoEditarArticulo({
   );
 }
 
+/** Alta, corrección e importación masiva son la misma potestad para la API
+ * (`inventory.gestionar_catalogo`, también en el `POST /categorias` que el
+ * importador usa al crear una categoría nueva). Exportar no: leer el
+ * catálogo alcanza, y quien llegó a esta pantalla ya lo puede leer. */
+const GESTIONAR_CATALOGO = "inventory.gestionar_catalogo";
+
 export function ArticulosCliente({
   articulos,
   categorias,
   unidadesMedida,
+  permisos,
 }: {
   articulos: Articulo[];
   categorias: Categoria[];
   unidadesMedida: UnidadMedida[];
+  permisos: string[];
 }) {
+  const puedeGestionar = tienePermiso(permisos, GESTIONAR_CATALOGO);
   // La pantalla se renderiza en el servidor: tras importar hay que pedirle
   // los datos de nuevo, no mantener una copia acá.
   const router = useRouter();
@@ -258,16 +268,17 @@ export function ArticulosCliente({
       {
         id: "acciones",
         header: "",
-        cell: ({ row }) => (
-          <DialogoEditarArticulo
-            articulo={row.original}
-            categorias={categorias}
-            nombreUdm={nombreUdm.get(row.original.unidad_medida_id) ?? "—"}
-          />
-        ),
+        cell: ({ row }) =>
+          puedeGestionar ? (
+            <DialogoEditarArticulo
+              articulo={row.original}
+              categorias={categorias}
+              nombreUdm={nombreUdm.get(row.original.unidad_medida_id) ?? "—"}
+            />
+          ) : null,
       },
     ],
-    [nombreCategoria, nombreUdm, categorias],
+    [nombreCategoria, nombreUdm, categorias, puedeGestionar],
   );
 
   return (
@@ -284,8 +295,12 @@ export function ArticulosCliente({
           >
             Exportar
           </a>
-          <ImportarArticulos onImportados={() => router.refresh()} />
-          <DialogoNuevoArticulo categorias={categorias} unidadesMedida={unidadesMedida} />
+          {puedeGestionar && (
+            <>
+              <ImportarArticulos onImportados={() => router.refresh()} />
+              <DialogoNuevoArticulo categorias={categorias} unidadesMedida={unidadesMedida} />
+            </>
+          )}
         </div>
       </div>
       <TablaDatos columnas={columnas} datos={articulos} placeholderBusqueda="Buscar artículo..." />

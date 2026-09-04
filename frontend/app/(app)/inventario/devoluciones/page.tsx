@@ -18,7 +18,7 @@ export default async function DevolucionesPage({
 }: {
   searchParams: Params;
 }) {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
   const { devolucion } = await searchParams;
 
   let devoluciones: Devolucion[];
@@ -50,6 +50,7 @@ export default async function DevolucionesPage({
       skus={skus.map(
         (s): OpcionSku => ({ id: s.id, etiqueta: `${s.articulo_nombre} (${s.codigo})` }),
       )}
+      permisos={usuario.permisos}
     />
   );
 }
