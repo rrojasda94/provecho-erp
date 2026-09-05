@@ -30,6 +30,7 @@ from src.core.events import event_bus
 from src.modules.accounting.application import asientos as asientos_uc
 from src.modules.accounting.application import pagos as pagos_uc
 from src.modules.accounting.application import pcge as pcge_uc
+from src.modules.accounting.domain import plantillas as plantillas_pcge
 from src.modules.inventory.application.queries_publicas import (
     clasificacion_de_articulos,
 )
@@ -210,6 +211,91 @@ def on_venta_confirmada(payload: dict) -> None:
             session.commit()
     except Exception:
         log.exception("fallo generando asiento de venta %s", payload.get("venta_id"))
+
+
+def on_venta_pagada(payload: dict) -> None:
+    """El cobro cancela la cuenta por cobrar y mete la plata donde entró.
+
+    Faltaba entero: `sales.venta_pagada` se publicaba y **no lo escuchaba
+    nadie**, así que la `1212` de cada venta quedaba abierta para siempre y
+    el efectivo cobrado no aparecía en ninguna cuenta. El balance mostraba
+    ingresos y ninguna plata.
+
+    No usa las plantillas del PCGE a propósito: la cuenta del debe no depende
+    del evento sino de **con qué se cobró**, y una venta se cobra con varios
+    medios a la vez. Por lo mismo, una `regla_asiento` de dos líneas no puede
+    expresarlo y acá no se consulta.
+    """
+    try:
+        with session_factory() as session:
+            empresa_id = _empresa_de_sucursal(session, payload["sucursal_id"])
+            if empresa_id is None:
+                log.warning(
+                    "venta %s: sucursal sin empresa, cobro sin asiento",
+                    payload.get("venta_id"),
+                )
+                return
+
+            por_codigo: dict[str, Decimal] = {}
+            for medio in payload.get("medios") or []:
+                codigo = plantillas_pcge.codigo_de_cobro(medio["tipo"])
+                monto = Decimal(medio["monto"])
+                if codigo is None or monto <= 0:
+                    continue
+                por_codigo[codigo] = por_codigo.get(codigo, Decimal(0)) + monto
+            cobrado = sum(por_codigo.values(), Decimal(0))
+            if cobrado <= 0:
+                # Venta al crédito: no entró plata y la cuenta por cobrar
+                # sigue viva, que es exactamente lo correcto.
+                return
+
+            asientos_uc.crear_asiento_de_cobro(
+                session,
+                empresa_id=empresa_id,
+                referencia_origen=payload["venta_id"],
+                glosa=f"Cobro de la venta {payload['venta_id']}",
+                por_codigo=por_codigo,
+                cobrado=cobrado,
+            )
+            session.commit()
+    except Exception:
+        log.exception("fallo generando asiento de cobro de %s", payload.get("venta_id"))
+
+
+def on_venta_anulada(payload: dict) -> None:
+    """La venta se cayó entera: su ingreso también.
+
+    Faltaba, y es de las omisiones caras: `sales.venta_anulada` y
+    `sales.lineas_anuladas` no tenían suscriptor, así que una orden anulada
+    dejaba su asiento de ingreso vivo y el estado de resultados contaba una
+    venta que no existió.
+
+    Solo reversa la **anulación entera** (`venta_anulada: true`). Quitarle
+    algunas líneas a una orden deja el asiento sobrevaluado y eso **no** se
+    arregla reversando —borraría el ingreso de las líneas que quedaron—:
+    pide un asiento de ajuste por la diferencia, que está anotado como deuda.
+
+    Una venta ya cobrada no llega acá: después de cobrar se corrige con nota
+    de crédito, no anulando (RN-CPP-009).
+    """
+    if not payload.get("venta_anulada"):
+        return
+    try:
+        with session_factory() as session:
+            empresa_id = _empresa_de_sucursal(session, payload["sucursal_id"])
+            if empresa_id is None:
+                return
+            asientos_uc.anular_asiento_por_origen(
+                session,
+                empresa_id=empresa_id,
+                evento="sales.venta_confirmada",
+                referencia_origen=payload["venta_id"],
+            )
+            session.commit()
+    except Exception:
+        log.exception(
+            "fallo reversando el asiento de la venta %s", payload.get("venta_id")
+        )
 
 
 def on_consumo_personal_valorizado(payload: dict) -> None:
@@ -463,6 +549,9 @@ def register() -> None:
     event_bus.subscribe("purchases.oc_emitida", on_oc_emitida)
     event_bus.subscribe("purchases.compra_recibida", on_compra_recibida)
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
+    event_bus.subscribe("sales.venta_pagada", on_venta_pagada)
+    event_bus.subscribe("sales.venta_anulada", on_venta_anulada)
+    event_bus.subscribe("sales.lineas_anuladas", on_venta_anulada)
     event_bus.subscribe("purchases.comprobante_conforme", on_comprobante_conforme)
     event_bus.subscribe("sales.comprobante_emitido", on_comprobante_emitido)
     event_bus.subscribe(

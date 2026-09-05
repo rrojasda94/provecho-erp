@@ -887,3 +887,181 @@ def test_sin_plan_de_cuentas_la_omision_dice_que_cuentas_faltan(env):
     assert omitidos[0]["motivo"] == "sin_cuentas"
     assert "1212" in omitidos[0]["detalle"]
 
+
+def _pcge(client, h, ids):
+    return client.post(
+        "/api/v1/accounting/cuentas-contables/pcge",
+        headers=h,
+        json={"empresa_id": ids["empresa_id"]},
+    )
+
+
+def _saldo(client, h, codigo):
+    balance = client.get(
+        "/api/v1/accounting/reportes/balance-comprobacion", headers=h
+    ).json()
+    for fila in balance["cuentas"]:
+        if fila["codigo"] == codigo:
+            return Decimal(fila["debe"]), Decimal(fila["haber"])
+    return Decimal(0), Decimal(0)
+
+
+def test_el_cobro_cancela_la_cuenta_por_cobrar_y_mete_la_plata_en_caja(env):
+    """`sales.venta_pagada` no lo escuchaba nadie: la 1212 de cada venta
+    quedaba abierta para siempre y el efectivo cobrado no aparecía en ninguna
+    cuenta. El balance mostraba ingresos y ninguna plata."""
+    client, ids, _ = env
+    h = _token(client)
+    _pcge(client, h, ids)
+
+    from src.core.events import event_bus
+
+    venta_id = str(uuid.uuid4())
+    event_bus.publish(
+        "sales.venta_confirmada",
+        {
+            "venta_id": venta_id,
+            "sucursal_id": ids["sucursal_id"],
+            "cliente_id": None,
+            "items": [],
+            "total": "120.00",
+        },
+    )
+    event_bus.publish(
+        "sales.venta_pagada",
+        {
+            "venta_id": venta_id,
+            "sucursal_id": ids["sucursal_id"],
+            "total": "120.00",
+            "medios": [
+                {"tipo": "efectivo", "monto": "70.00"},
+                {"tipo": "billetera_digital", "monto": "50.00"},
+            ],
+        },
+    )
+
+    caja_debe, _ = _saldo(client, h, "101")
+    banco_debe, _ = _saldo(client, h, "1041")
+    cobrar_debe, cobrar_haber = _saldo(client, h, "1212")
+    assert caja_debe == Decimal("70.00")
+    assert banco_debe == Decimal("50.00")
+    # La venta la abrió (debe 120) y el cobro la cerró (haber 120).
+    assert cobrar_debe == Decimal("120.00")
+    assert cobrar_haber == Decimal("120.00")
+
+
+def test_una_venta_al_credito_no_inventa_un_ingreso_de_caja(env):
+    """`credito_empresarial` marca la venta como pagada en el ERP pero la
+    plata no llegó: la cuenta por cobrar tiene que seguir viva."""
+    client, ids, _ = env
+    h = _token(client)
+    _pcge(client, h, ids)
+
+    from src.core.events import event_bus
+
+    venta_id = str(uuid.uuid4())
+    event_bus.publish(
+        "sales.venta_confirmada",
+        {
+            "venta_id": venta_id,
+            "sucursal_id": ids["sucursal_id"],
+            "cliente_id": None,
+            "items": [],
+            "total": "200.00",
+        },
+    )
+    event_bus.publish(
+        "sales.venta_pagada",
+        {
+            "venta_id": venta_id,
+            "sucursal_id": ids["sucursal_id"],
+            "total": "200.00",
+            "medios": [{"tipo": "credito_empresarial", "monto": "200.00"}],
+        },
+    )
+
+    caja_debe, _ = _saldo(client, h, "101")
+    _, cobrar_haber = _saldo(client, h, "1212")
+    assert caja_debe == Decimal(0)
+    assert cobrar_haber == Decimal(0)
+
+
+def test_una_venta_anulada_revierte_su_ingreso(env):
+    """Sin esto el estado de resultados contaba una venta que no existió:
+    `sales.venta_anulada` no tenía suscriptor."""
+    client, ids, _ = env
+    h = _token(client)
+    _pcge(client, h, ids)
+
+    from src.core.events import event_bus
+
+    venta_id = str(uuid.uuid4())
+    event_bus.publish(
+        "sales.venta_confirmada",
+        {
+            "venta_id": venta_id,
+            "sucursal_id": ids["sucursal_id"],
+            "cliente_id": None,
+            "items": [],
+            "total": "80.00",
+        },
+    )
+    _, ingreso_haber = _saldo(client, h, "7011")
+    assert ingreso_haber == Decimal("80.00")
+
+    event_bus.publish(
+        "sales.venta_anulada",
+        {
+            "venta_id": venta_id,
+            "sucursal_id": ids["sucursal_id"],
+            "tipo": "venta",
+            "venta_anulada": True,
+            "usuario_id": str(uuid.uuid4()),
+            "items": [],
+        },
+    )
+
+    ingreso_debe, ingreso_haber = _saldo(client, h, "7011")
+    assert ingreso_haber == Decimal("80.00")
+    # La reversión no borra: escribe el asiento inverso (RN-CTB-002).
+    assert ingreso_debe == Decimal("80.00")
+
+
+def test_quitar_lineas_no_reversa_el_asiento_entero(env):
+    """Quitar una pizza de una orden de cinco no puede borrar el ingreso de
+    las otras cuatro. Queda sobrevaluado —anotado como deuda— pero no se
+    convierte en cero."""
+    client, ids, _ = env
+    h = _token(client)
+    _pcge(client, h, ids)
+
+    from src.core.events import event_bus
+
+    venta_id = str(uuid.uuid4())
+    event_bus.publish(
+        "sales.venta_confirmada",
+        {
+            "venta_id": venta_id,
+            "sucursal_id": ids["sucursal_id"],
+            "cliente_id": None,
+            "items": [],
+            "total": "80.00",
+        },
+    )
+    event_bus.publish(
+        "sales.lineas_anuladas",
+        {
+            "venta_id": venta_id,
+            "sucursal_id": ids["sucursal_id"],
+            "tipo": "venta",
+            "venta_anulada": False,
+            "autorizado_por": str(uuid.uuid4()),
+            "motivo": "el cliente se arrepintió de una",
+            "items": [],
+        },
+    )
+
+    ingreso_debe, ingreso_haber = _saldo(client, h, "7011")
+    assert ingreso_haber == Decimal("80.00")
+    assert ingreso_debe == Decimal(0)
+

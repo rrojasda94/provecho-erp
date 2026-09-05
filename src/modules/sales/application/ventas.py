@@ -1097,9 +1097,22 @@ def _cerrar_cuenta(
     ]
     if rules.venta_totalmente_pagada(saldos):
         venta.estado = "pagada"
+        # `sucursal_id` y el desglose por medio de pago son para contabilidad
+        # (ADR-089): sin la sucursal no hay empresa a la que asentar, y sin
+        # saber con qué se cobró no se sabe si la plata entró a caja o al
+        # banco. Antes el payload eran dos claves y **nadie lo escuchaba**:
+        # la cuenta por cobrar de la venta quedaba abierta para siempre.
         event_bus.publish(
             "sales.venta_pagada",
-            {"venta_id": str(venta.id), "total": str(total_a_cobrar(session, venta))},
+            {
+                "venta_id": str(venta.id),
+                "sucursal_id": str(venta.sucursal_id),
+                "total": str(total_a_cobrar(session, venta)),
+                "medios": [
+                    {"tipo": tipo, "monto": str(monto)}
+                    for tipo, monto in repo.cobrado_por_tipo_de_medio(venta.id).items()
+                ],
+            },
             session=session,
         )
     return comprobante
