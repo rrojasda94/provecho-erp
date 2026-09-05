@@ -64,6 +64,11 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Lotes", href: "/inventario/lotes" },
     { label: "Ajustes", href: "/inventario/ajustes" },
     { label: "Devoluciones", href: "/inventario/devoluciones" },
+    // Las dos mitades de por qué el disponible no es el físico: lo apartado
+    // porque ya no sirve y lo apartado porque ya tiene dueño. La columna
+    // «Reservado» de Stock decía cuánto y no había dónde ver de quién.
+    { label: "Mermas", href: "/inventario/mermas" },
+    { label: "Reservas", href: "/inventario/reservas" },
   ],
   marketing: [
     { label: "Campañas", href: "/marketing" },

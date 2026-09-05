@@ -277,7 +277,7 @@ siempre, y endpoints con ADR y pruebas que ninguna pantalla llama.
 | `fix/rbac-botones-resto` | #3 los botones de trabajadores, artículos y devoluciones (la OC ya estaba gateada desde ADR-085) | ✅ 2026-09-04 |
 | `fix/sesion-expirada-cliente` | #10 la sesión muere y el cliente no se entera: bucle del KDS, campana muda, borradores del PDV que dejan de guardarse en silencio (ADR-088) | ✅ 2026-09-04 |
 | `fix/dialogos-migracion-sweep` | #4 los diálogos restantes migran a `DialogoFormulario`: 9 archivos, 15 diálogos, más el clon privado del tablero de contratación | ✅ 2026-09-04 |
-| `feat/inventario-transferencias-mermas` | #13 mermas y reservas sin pantalla; recepción parcial y traslado lateral sin entrada (el ciclo pedido lo cerró `fix/inventario-operable`) | ⬜ |
+| `feat/inventario-transferencias-mermas` | #13 mermas y reservas sin pantalla; recepción parcial y traslado lateral sin entrada (el ciclo pedido lo cerró `fix/inventario-operable`) | ✅ 2026-09-04 — queda la guía de remisión, como deuda |
 
 Tres correcciones al roadmap original, verificadas contra el código antes de
 empezar: `fix/rbac-botones-resto` se achica porque

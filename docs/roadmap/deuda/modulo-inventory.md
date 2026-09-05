@@ -3,6 +3,31 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-09-04 **Mermas, reservas y lo que le faltaba a Traslados** (bloque
+  `feat/inventario-transferencias-mermas` de la auditoría del 2026-08-30).
+  Tres endpoints de merma con ADR-028, pruebas y permisos sembrados tenían
+  **cero llamadores**; `GET /reservas` y `POST /reservas/{id}/liberar`
+  tampoco tenían ninguno, así que `inventory.liberar_reserva` era un permiso
+  que nadie podía ejercer y una reserva colgada de un requerimiento viejo
+  solo se soltaba llamando la API a mano. En Traslados, la recepción mandaba
+  `{items: [], parcial: false}` clavado y `GET /transferencias/{id}` no lo
+  llamaba nadie: quien recibía firmaba a ciegas y no podía declarar que llegó
+  la mitad. Y el traslado lateral —sucursal a sucursal, sin requerimiento—
+  que el backend admite desde el slice original no tenía por dónde crearse.
+- ⬜ **La guía de remisión no tiene pantalla** (2026-09-04). Tres endpoints
+  (`POST /transferencias/{id}/guia`, `GET /transferencias/{id}/guia`,
+  `GET /guias-remision`), permiso propio `inventory.emitir_guia` y 14
+  pruebas, sin un solo llamador desde el frontend. Es el mismo patrón que
+  este bloque vino a cortar, pero es un bloque aparte y no la cola de éste:
+  la guía es un documento con numeración, transportista y validez tributaria,
+  no un botón más en la tabla de traslados.
+- ⬜ **La bandeja de mermas ofrece resolver al que la registró** (2026-09-04).
+  La segregación es del dominio y está bien puesta —quien declara que algo no
+  sirve no firma su baja— pero `MermaOut` no expone `creado_por`, así que la
+  pantalla no puede esconder los botones y quien la registró se come el error
+  al apretarlos. Es la misma familia que el hallazgo §3 de la auditoría (un
+  botón que promete un rechazo); cerrarlo pide un campo más en el esquema de
+  salida, no un cambio de pantalla.
 - ✅ 2026-08-30 **Pantalla de stock y kardex**: `GET /inventory/stock` existía
   desde el primer slice y no lo consumía nadie; `MovimientoRepo.q_list`
   existía sin un solo llamador y no había `GET /inventory/movimientos`. Ahora
