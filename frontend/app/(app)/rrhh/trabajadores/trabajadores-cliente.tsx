@@ -7,6 +7,7 @@ import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-f
 import { PersonaPicker } from "@/components/persona-picker/persona-picker";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
+import { tienePermiso } from "@/lib/permisos";
 
 import {
   cesarTrabajadorAction,
@@ -197,15 +198,25 @@ function DialogoCesarTrabajador({ trabajador }: { trabajador: Trabajador }) {
   );
 }
 
+/** Alta, corrección y cese son la misma potestad para la API
+ * (`rrhh.trabajador_gestionar`): quien puede dar de alta a alguien puede
+ * corregirle la sucursal y cesarlo. El permiso decide si los controles se
+ * ofrecen —la autorización real es la de la API—, porque un botón que
+ * siempre termina en 403 es peor que no tenerlo. */
+const TRABAJADOR_GESTIONAR = "rrhh.trabajador_gestionar";
+
 export function TrabajadoresCliente({
   trabajadores,
   personas,
   sucursales,
+  permisos,
 }: {
   trabajadores: Trabajador[];
   personas: Persona[];
   sucursales: Sucursal[];
+  permisos: string[];
 }) {
+  const puedeGestionar = tienePermiso(permisos, TRABAJADOR_GESTIONAR);
   const nombrePersona = useMemo(
     () => new Map(personas.map((p) => [p.id, `${p.apellidos}, ${p.nombres}`])),
     [personas],
@@ -263,7 +274,7 @@ export function TrabajadoresCliente({
         // Un cesado no se edita ni se vuelve a cesar: ofrecer el control
         // solo invita al 409 (mismo criterio que Producción).
         cell: ({ row }) =>
-          row.original.estado === "cesado" ? null : (
+          row.original.estado === "cesado" || !puedeGestionar ? null : (
             <div className="flex gap-1.5">
               <DialogoEditarTrabajador
                 trabajador={row.original}
@@ -274,14 +285,14 @@ export function TrabajadoresCliente({
           ),
       },
     ],
-    [nombrePersona, nombreSucursal, sucursales],
+    [nombrePersona, nombreSucursal, sucursales, puedeGestionar],
   );
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-xl text-dark">Trabajadores</h1>
-        <DialogoNuevoTrabajador sucursales={sucursales} />
+        {puedeGestionar && <DialogoNuevoTrabajador sucursales={sucursales} />}
       </div>
       <TablaDatos
         columnas={columnas}

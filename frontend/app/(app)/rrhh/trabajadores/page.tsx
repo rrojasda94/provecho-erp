@@ -9,7 +9,7 @@ import {
 } from "./trabajadores-cliente";
 
 export default async function TrabajadoresPage() {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
 
   try {
     // `/personas/buscar`, no `/personas`: la tabla solo necesita nombre,
@@ -29,6 +29,7 @@ export default async function TrabajadoresPage() {
         trabajadores={trabajadores.items}
         personas={personas}
         sucursales={sucursales}
+        permisos={usuario.permisos}
       />
     );
   } catch (e) {

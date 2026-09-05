@@ -9,6 +9,7 @@ import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { Combobox } from "@/components/ui/combobox";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { primeroElDe } from "@/lib/destinos";
+import { tienePermiso } from "@/lib/permisos";
 
 import { anularDevolucionAction, registrarDevolucionAction } from "./actions";
 
@@ -56,14 +57,21 @@ export function DevolucionesCliente({
   resaltado,
   almacenes,
   skus,
+  permisos,
 }: {
   devoluciones: Devolucion[];
   resaltado: string | null;
   almacenes: OpcionAlmacen[];
   skus: OpcionSku[];
+  permisos: string[];
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
+  // Registrar una devolución y anularla mueven stock real: las dos exigen
+  // `inventory.registrar_movimiento` en la API. El permiso decide si el
+  // control se ofrece —autoriza la API—, porque un botón que siempre
+  // termina en 403 es peor que no tenerlo.
+  const puedeRegistrar = tienePermiso(permisos, "inventory.registrar_movimiento");
 
   const anular = async (id: string) => {
     setError("");
@@ -98,7 +106,7 @@ export function DevolucionesCliente({
         id: "acciones",
         header: "",
         cell: ({ row }) =>
-          row.original.estado === "registrada" ? (
+          row.original.estado === "registrada" && puedeRegistrar ? (
             <button
               type="button"
               className="text-xs text-secondary underline"
@@ -112,7 +120,7 @@ export function DevolucionesCliente({
     // `anular` se recrea en cada render y no aporta nada como dependencia:
     // lo que importa es que las columnas no se rearmen por cada tecla.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [puedeRegistrar],
   );
 
   const ordenadas = useMemo(
@@ -132,7 +140,7 @@ export function DevolucionesCliente({
             Mueve stock real y queda auditado.
           </p>
         </div>
-        <FormularioDevolucion almacenes={almacenes} skus={skus} />
+        {puedeRegistrar && <FormularioDevolucion almacenes={almacenes} skus={skus} />}
       </div>
 
       {error && <p className="text-sm text-secondary">{error}</p>}
