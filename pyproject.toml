@@ -3,7 +3,7 @@ name = "provecho"
 # La fuente de verdad de la versión. `settings.app_version` la lee de acá (vía
 # metadata del paquete instalado) y `scripts/cortar_version.py` la mueve al
 # cortar cada release — no se toca a mano.
-version = "0.9.4"
+version = "0.9.5"
 description = "ERP modular para grupo de restaurantes"
 requires-python = ">=3.12"
 dependencies = [

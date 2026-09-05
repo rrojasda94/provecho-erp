@@ -38,14 +38,14 @@ dentro de seis meses.
 
 ## Pendiente de corte
 
-Nada. **0.9.1 se cortó el 2026-08-30** y se lleva los 17 fragmentos que
-quedaban: el BI autoservicio con Superset (fases A–E, ADR-083), las listas
-desplegables con búsqueda de PR #132 y los siete arreglos del tercer turno de
-prueba en staging (PR #140).
+Nada. **0.9.5 se cortó el 2026-09-05** y se lleva los seis fragmentos de la
+Ola 2 de la auditoría del 2026-08-30 (PRs #157 a #162): los tres bloques de
+RBAC en botones que prometían 403, el cuadre contable en centavos, la sesión
+muerta anunciada una vez (ADR-088), el barrido de diálogos al molde común y
+las pantallas de mermas, reservas y traslado directo.
 
-Se cortó 0.9.1 y no se dejó viajar todo como cambios sin versión justamente
-por lo que decía la nota anterior: **0.9.0 se cortó pero nunca llegó a
-staging** —el `Desplegar` posterior al corte se disparó con `0.8.2` como
+Nota del corte anterior, que sigue valiendo: **0.9.0 se cortó pero nunca llegó
+a staging** —el `Desplegar` posterior al corte se disparó con `0.8.2` como
 input, el valor que había quedado del despliegue anterior—, así que staging
 venía de 0.8.2 y se saltea 0.9.0 entero. Todo lo de 0.9.0 viaja igual: el
 despliegue trae la imagen de `main`, no un diff entre versiones.
