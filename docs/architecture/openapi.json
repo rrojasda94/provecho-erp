@@ -2434,6 +2434,54 @@
         "title": "AsientoManualCreate",
         "type": "object"
       },
+      "AsientoOmitidoOut": {
+        "description": "Un asiento automático que no se escribió, y por qué (ADR-089).",
+        "properties": {
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          },
+          "evento": {
+            "title": "Evento",
+            "type": "string"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "motivo": {
+            "title": "Motivo",
+            "type": "string"
+          },
+          "referencia_origen": {
+            "title": "Referencia Origen",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "evento",
+          "referencia_origen",
+          "motivo",
+          "fecha",
+          "detalle"
+        ],
+        "title": "AsientoOmitidoOut",
+        "type": "object"
+      },
       "AsientoOut": {
         "properties": {
           "asiento_reversa_de_id": {
@@ -30621,6 +30669,100 @@
           }
         ],
         "summary": "Crear Asiento Manual",
+        "tags": [
+          "accounting"
+        ]
+      }
+    },
+    "/api/v1/accounting/asientos-omitidos": {
+      "get": {
+        "description": "Los asientos automáticos que el ERP decidió no escribir, y por qué.\n\nExiste porque la omisión correcta —no bloquear la venta porque\ncontabilidad no esté configurada— se estaba comiendo el balance entero\nsin decir nada: el único rastro era un `log.info` con el motivo\nequivocado (ADR-089). Sin paginar: si esta lista es larga hay un problema\nde configuración que se arregla de una vez, no se navega.",
+        "operationId": "listar_asientos_omitidos_api_v1_accounting_asientos_omitidos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AsientoOmitidoOut"
+                  },
+                  "title": "Response Listar Asientos Omitidos Api V1 Accounting Asientos Omitidos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Asientos Omitidos",
         "tags": [
           "accounting"
         ]

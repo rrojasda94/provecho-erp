@@ -51,6 +51,18 @@ class PeriodoContableOut(BaseModel):
     fecha_cierre: datetime | None
 
 
+class AsientoOmitidoOut(BaseModel):
+    """Un asiento automático que no se escribió, y por qué (ADR-089)."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    evento: str
+    referencia_origen: str
+    motivo: str
+    fecha: date
+    detalle: str | None
+
+
 class AsientoLineaIn(BaseModel):
     cuenta_contable_id: uuid.UUID
     tipo: str

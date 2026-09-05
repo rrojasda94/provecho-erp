@@ -29,6 +29,7 @@ from src.core.database import SessionLocal
 from src.core.events import event_bus
 from src.modules.accounting.application import asientos as asientos_uc
 from src.modules.accounting.application import pagos as pagos_uc
+from src.modules.accounting.application import pcge as pcge_uc
 from src.modules.inventory.application.queries_publicas import (
     clasificacion_de_articulos,
 )
@@ -63,7 +64,15 @@ def _generar(
     gravado_igv=None,
     desglose=None,
 ) -> None:
-    asiento = asientos_uc.crear_asiento_automatico_si_hay_regla(
+    # Sin `if asiento is None: log(...)`. Ese aviso decía siempre «sin
+    # regla_asiento configurada» y era mentira en cuatro de los cinco casos
+    # en que el asiento sale `None` — periodo cerrado, plan de cuentas sin
+    # importar, evento sin plantilla, duplicado, monto cero—, así que quien
+    # buscaba por qué el balance estaba vacío encontraba una pista falsa. Los
+    # motivos que importan los anota ahora `asientos._omitir`, con su fila en
+    # `asiento_omitido` y un `warning` que dice cuál es (ADR-089); los otros
+    # dos son omisiones correctas y no ensucian nada.
+    asientos_uc.crear_asiento_automatico_si_hay_regla(
         session,
         empresa_id=empresa_id,
         evento=evento,
@@ -74,11 +83,6 @@ def _generar(
         gravado_igv=gravado_igv,
         desglose=desglose,
     )
-    if asiento is None:
-        log.info(
-            "evento %s: sin regla_asiento configurada para empresa %s, asiento omitido",
-            evento, empresa_id,
-        )
 
 
 def _desglose_de_compra(session, items: list[dict]) -> list[dict]:
@@ -412,6 +416,40 @@ def on_merma_registrada(payload: dict) -> None:
         log.exception("fallo generando asiento de merma de %s", payload.get("sku_id"))
 
 
+def on_empresa_creada(payload: dict) -> None:
+    """Una empresa nueva nace con su plan de cuentas (ADR-089).
+
+    Antes había que apretar «Importar PCGE» a mano, y **nadie sabía que había
+    que hacerlo**: sin las cuentas, cada asiento automático del ERP se
+    descartaba en silencio y el balance quedaba vacío para siempre. El plan
+    contable no es una preferencia de la empresa —es el requisito para que la
+    contabilidad exista—, así que se siembra sola y quien quiera otro lo
+    edita después.
+
+    Va por el bus y no por una llamada directa desde `users`: los módulos se
+    hablan por eventos (`CLAUDE.md`). `importar_pcge` es idempotente, así que
+    reprocesar el evento no duplica nada.
+    """
+    empresa_id = payload.get("empresa_id")
+    if not empresa_id:
+        return
+    try:
+        with session_factory() as session:
+            resultado = pcge_uc.importar_pcge(
+                session, empresa_id=uuid.UUID(empresa_id)
+            )
+            session.commit()
+        log.info(
+            "empresa %s: plan de cuentas sembrado (%s cuentas)",
+            empresa_id, resultado["creadas"],
+        )
+    except Exception:
+        # No bloquea el alta de la empresa —ya está creada y commiteada—,
+        # pero acá sí es `exception`: una empresa sin plan de cuentas no
+        # asienta nada y hay que enterarse el mismo día, no al cierre.
+        log.exception("no se pudo sembrar el plan de cuentas de %s", empresa_id)
+
+
 _registrado = False
 
 
@@ -421,6 +459,7 @@ def register() -> None:
     if _registrado:
         return
     _registrado = True
+    event_bus.subscribe("organizacion.empresa_creada", on_empresa_creada)
     event_bus.subscribe("purchases.oc_emitida", on_oc_emitida)
     event_bus.subscribe("purchases.compra_recibida", on_compra_recibida)
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)

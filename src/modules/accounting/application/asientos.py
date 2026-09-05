@@ -15,8 +15,13 @@ from src.modules.accounting.application import periodos
 from src.modules.accounting.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.accounting.domain import plantillas as plantillas_pcge
 from src.modules.accounting.domain import rules
-from src.modules.accounting.infrastructure.models import Asiento, AsientoLinea
+from src.modules.accounting.infrastructure.models import (
+    Asiento,
+    AsientoLinea,
+    AsientoOmitido,
+)
 from src.modules.accounting.infrastructure.repositories import (
+    AsientoOmitidoRepo,
     AsientoRepo,
     CuentaContableRepo,
     ReglaAsientoRepo,
@@ -28,6 +33,42 @@ from src.modules.users.infrastructure.models import Empresa
 from src.shared import fechas, tributos
 
 log = logging.getLogger(__name__)
+
+
+def _omitir(
+    session: Session,
+    *,
+    empresa_id: uuid.UUID,
+    evento: str,
+    referencia_origen: str,
+    motivo: str,
+    fecha: date,
+    detalle: str | None = None,
+) -> None:
+    """Deja constancia de un asiento que no se escribió.
+
+    El asiento automático nunca bloquea la operación de origen, y eso no se
+    toca. Lo que cambia es que la omisión deja de ser invisible: hasta el
+    2026-09-05 salía por `log.info` **y con el motivo equivocado** —el
+    llamador decía siempre «sin regla_asiento configurada», que era uno de
+    cinco motivos posibles—, así que un balance vacío no tenía cómo
+    explicarse. Ver `models/asiento_omitido.py`.
+    """
+    log.warning(
+        "asiento omitido (%s) evento=%s empresa=%s referencia=%s%s",
+        motivo, evento, empresa_id, referencia_origen,
+        f" detalle={detalle}" if detalle else "",
+    )
+    AsientoOmitidoRepo(session).add(
+        AsientoOmitido(
+            empresa_id=empresa_id,
+            evento=evento,
+            referencia_origen=referencia_origen,
+            motivo=motivo,
+            fecha=fecha,
+            detalle=detalle,
+        )
+    )
 
 
 def _construir_lineas(
@@ -80,9 +121,9 @@ def crear_asiento_manual(
     filas, total_debe, total_haber = _construir_lineas(session, empresa_id, lineas)
     if not rules.cuadra(total_debe, total_haber):
         raise ReglaNegocio(f"asiento descuadrado: debe {total_debe} != haber {total_haber}")
-    periodo = periodos.periodo_de_fecha(session, empresa_id, fecha)
-    if periodo is None or not rules.puede_registrar(periodo.estado):
-        raise Conflicto(f"no hay periodo contable abierto para {fecha.isoformat()}")
+    periodo = periodos.periodo_para_registrar(session, empresa_id, fecha)
+    if periodo is None:
+        raise Conflicto(f"el periodo contable de {fecha.isoformat()} está cerrado")
 
     asiento = AsientoRepo(session).add(
         Asiento(
@@ -116,9 +157,9 @@ def anular_asiento(session: Session, asiento_id: uuid.UUID, *, actor_id: uuid.UU
         raise Conflicto(f"el asiento ya está {original.estado}")
 
     hoy = fechas.hoy()
-    periodo = periodos.periodo_de_fecha(session, original.empresa_id, hoy)
-    if periodo is None or not rules.puede_registrar(periodo.estado):
-        raise Conflicto("no hay periodo contable abierto para registrar la reversión")
+    periodo = periodos.periodo_para_registrar(session, original.empresa_id, hoy)
+    if periodo is None:
+        raise Conflicto("el periodo contable de este mes está cerrado: no se puede revertir acá")
 
     reversa = repo.add(
         Asiento(
@@ -190,8 +231,12 @@ def crear_asiento_automatico(
     repo = AsientoRepo(session)
     if repo.existe_por_origen(empresa_id, evento, referencia_origen):
         return None
-    periodo = periodos.periodo_de_fecha(session, empresa_id, fecha)
-    if periodo is None or not rules.puede_registrar(periodo.estado):
+    periodo = periodos.periodo_para_registrar(session, empresa_id, fecha)
+    if periodo is None:
+        _omitir(
+            session, empresa_id=empresa_id, evento=evento,
+            referencia_origen=referencia_origen, motivo="periodo_cerrado", fecha=fecha,
+        )
         return None
 
     asiento = repo.add(
@@ -249,8 +294,12 @@ def crear_asiento_automatico_multilinea(
     repo = AsientoRepo(session)
     if repo.existe_por_origen(empresa_id, evento, referencia_origen):
         return None
-    periodo = periodos.periodo_de_fecha(session, empresa_id, fecha)
-    if periodo is None or not rules.puede_registrar(periodo.estado):
+    periodo = periodos.periodo_para_registrar(session, empresa_id, fecha)
+    if periodo is None:
+        _omitir(
+            session, empresa_id=empresa_id, evento=evento,
+            referencia_origen=referencia_origen, motivo="periodo_cerrado", fecha=fecha,
+        )
         return None
 
     total_debe = sum((m for _, t, m in lineas if t == "debe"), Decimal(0))
@@ -458,8 +507,17 @@ def crear_asiento_desde_plantilla(
     alguna de sus cuentas: una empresa que todavía no importó el PCGE no
     puede quedarse sin poder vender por eso. Quien llama lo audita en el log.
     """
+    if monto <= 0:
+        return None
     plantilla = plantillas_pcge.PLANTILLAS.get(evento)
-    if plantilla is None or monto <= 0:
+    if plantilla is None:
+        # Deuda del ERP, no de la empresa: alguien publicó un evento con
+        # consecuencia contable y nadie escribió su asiento. Se anota para
+        # que se vea, en vez de esperar a que lo note el cierre del mes.
+        _omitir(
+            session, empresa_id=empresa_id, evento=evento,
+            referencia_origen=referencia_origen, motivo="sin_plantilla", fecha=fecha,
+        )
         return None
     empresa = session.get(Empresa, empresa_id)
     if empresa is None:
@@ -474,7 +532,16 @@ def crear_asiento_desde_plantilla(
     # los dos lados, y al plan de cuentas se le pregunta por código.
     codigos = sorted({codigo for codigo, _ in por_codigo})
     cuentas = CuentaContableRepo(session).get_by_codigos(empresa_id, codigos)
-    if any(codigo not in cuentas for codigo in codigos):
+    faltantes = [codigo for codigo in codigos if codigo not in cuentas]
+    if faltantes:
+        # La empresa no importó su plan de cuentas. Desde ADR-089 nace con
+        # él, así que esto solo aparece en empresas anteriores al cambio —
+        # y el detalle dice exactamente qué códigos faltan.
+        _omitir(
+            session, empresa_id=empresa_id, evento=evento,
+            referencia_origen=referencia_origen, motivo="sin_cuentas", fecha=fecha,
+            detalle=f"faltan en el plan de cuentas: {', '.join(faltantes)}",
+        )
         return None
 
     # Una línea en cero no se escribe: con IGV exonerado, el asiento de venta

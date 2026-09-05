@@ -23,6 +23,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from src.core.events import event_bus
 from src.modules.users.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -189,6 +190,15 @@ def crear_empresa(
     _auditar(
         session, actor_id, "empresa", empresa.id, "crear",
         despues={"razon_social": razon_social, "ruc": ruc},
+    )
+    # Contabilidad lo escucha para sembrarle el plan de cuentas (ADR-089):
+    # una empresa sin PCGE descarta en silencio todos sus asientos
+    # automáticos, y hasta el 2026-09-05 importarlo era un botón que nadie
+    # sabía que tenía que apretar.
+    event_bus.publish(
+        "organizacion.empresa_creada",
+        {"empresa_id": str(empresa.id), "razon_social": razon_social},
+        session=session,
     )
     return empresa
 
