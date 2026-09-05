@@ -568,7 +568,13 @@ export const api = {
    * sesión de abajo sigue viva, con su caja abierta y su borrador — por eso
    * no sirve `login`, que la rotaría. 204 si el PIN es el correcto. */
   verificarPin: (pin: string) =>
-    pedir<void>("/auth/verificar-pin", { metodo: "POST", cuerpo: { pin } }),
+    // `credencial`: un PIN equivocado responde 401 y eso no es la sesión
+    // muerta — es el dígito mal tecleado de quien está desbloqueando.
+    pedir<void>("/auth/verificar-pin", {
+      metodo: "POST",
+      cuerpo: { pin },
+      credencial: true,
+    }),
 
   /** Cómo se sirve el pedido entero (ADR-075): "servir todo junto",
    * "bebidas al final". Se puede cambiar con la orden ya en cocina, que es
@@ -764,9 +770,12 @@ export const api = {
   /** El supervisor teclea su PIN en el terminal del cajero (RN-AUD-005).
    * Devuelve una elevación de minutos acotada a ese permiso. */
   autorizar: (username: string, pin: string, permiso: string) =>
+    // `credencial`, igual que `verificarPin`: el 401 de acá dice que el PIN
+    // del supervisor está mal, no que se cayó la sesión del cajero.
     pedir<Autorizacion>("/auth/autorizar", {
       metodo: "POST",
       cuerpo: { username, pin, permiso },
+      credencial: true,
     }),
 };
 

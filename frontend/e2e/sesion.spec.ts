@@ -230,3 +230,36 @@ test("la sesión se renueva sola cuando vence el token de acceso", async ({
     refrescoAntes,
   );
 });
+
+test("con el refresco vencido, la pantalla lo dice en vez de reintentar en silencio", async ({
+  page,
+  context,
+}) => {
+  // La otra mitad del caso de arriba (auditoría del 2026-08-30 §10). Cuando
+  // la renovación **no** puede salvar la sesión —el refresh venció, lo
+  // revocaron o se reusó— el 401 llega igual al navegador, y hasta hoy nadie
+  // lo escuchaba: el KDS lo mostraba cuatro segundos y seguía refrescando
+  // cada tres con la cola vieja congelada en pantalla, la campana lo tragaba
+  // entero y el PDV dejaba de guardar el borrador sin decir nada.
+  //
+  // Se prueba en el KDS porque es la única pantalla que pregunta sola y
+  // seguido: el resto necesita que alguien toque algo. El aviso, en cambio,
+  // vive en el layout raíz y es el mismo para las tres.
+  await ingresar(page, ADMIN);
+  await page.goto("/kds");
+  await page.getByRole("link", { name: /Cocina E2E/ }).click();
+  await expect(page).toHaveURL(/pantalla=/);
+  // El rótulo de la estación, no "sin pedidos en cola": la cola puede traer
+  // lo que sembraron las pruebas anteriores, y entonces ese texto no existe.
+  await expect(page.getByText("Cocina E2E").first()).toBeVisible({ timeout: 30_000 });
+
+  // Las dos cookies: sin `provecho_refresh` el middleware ya no tiene con qué
+  // renovar, que es lo que distingue este caso del anterior.
+  await context.clearCookies();
+
+  // El KDS refresca cada 3 s, así que el primer 401 llega solo.
+  await expect(page.getByRole("heading", { name: /Tu sesión expiró/ })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByRole("button", { name: /Volver a entrar/ })).toBeVisible();
+});
