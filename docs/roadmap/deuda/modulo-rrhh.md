@@ -3,6 +3,18 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **Registrar una boleta de pago o una liquidación no tiene pantalla**
+  (2026-09-05). El legajo ya las **muestra**, y `POST /boletas-pago` y
+  `POST /liquidaciones-bss` existen, pero `BoletaPagoCreate` pide `ingresos` y
+  `descuentos` como diccionarios libres y el `neto_pagar` ya calculado: el ERP
+  no liquida sueldos, registra lo que el contador liquidó. Eso no entra en un
+  diálogo de cuatro campos — pide una pantalla propia, con el detalle de
+  conceptos y su cuadre contra el neto. Mientras tanto se cargan por API.
+- ⬜ **Actas, socios y pactos de permanencia siguen sin superficie**
+  (2026-09-05). El legajo muestra los pactos; crearlos, y todo lo de `actas` y
+  `socios`, sigue siendo API. Son de los flujos menos frecuentes del módulo y
+  se dejaron fuera del bloque a propósito.
+
 - ✅ 2026-07-25 **Ciclo laboral completo**: `trabajador` (capa de aplicación
   que faltaba desde el slice de venta) + `contrato_laboral`, `postulante`,
   `socio`, `boleta_pago`, `liquidacion_bss`, `memorandum`, `amonestacion`,

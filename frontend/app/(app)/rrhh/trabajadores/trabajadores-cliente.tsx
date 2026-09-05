@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import Link from "next/link";
 import { useMemo } from "react";
 
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
@@ -232,6 +233,16 @@ export function TrabajadoresCliente({
         id: "persona",
         header: "Nombre",
         accessorFn: (t) => nombrePersona.get(t.persona_id) ?? "—",
+        // Se entra al legajo desde el nombre: contratos, permisos,
+        // disciplina y nómina viven ahí y no había cómo llegar.
+        cell: ({ row, getValue }) => (
+          <Link
+            href={`/rrhh/trabajadores/${row.original.id}`}
+            className="font-semibold text-primary hover:underline"
+          >
+            {getValue<string>()}
+          </Link>
+        ),
       },
       { accessorKey: "cargo", header: "Cargo" },
       { accessorKey: "area", header: "Área" },
