@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import { AlertTriangle } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
@@ -19,6 +20,15 @@ export type Asiento = {
   evento_origen: string | null;
   estado: string;
   asiento_reversa_de_id: string | null;
+};
+/** Un asiento que el ERP decidió no escribir, y por qué (ADR-089). */
+export type AsientoOmitido = {
+  id: string;
+  evento: string;
+  referencia_origen: string;
+  motivo: string;
+  fecha: string;
+  detalle: string | null;
 };
 export type Cuenta = {
   id: string;
@@ -200,13 +210,65 @@ function BotonAnular({ asiento }: { asiento: Asiento }) {
   );
 }
 
+/** Qué hacer con cada motivo. El aviso sirve si dice dónde arreglarlo: un
+ * cartel que solo avisa que algo falló manda a abrir un ticket. */
+const QUE_HACER: Record<string, string> = {
+  periodo_cerrado:
+    "el mes ya estaba cerrado cuando llegó la operación: se registra con un asiento manual en el periodo abierto",
+  sin_cuentas:
+    "a la empresa le falta plan de cuentas: importalo en Plan de cuentas y volvé a registrar la operación",
+  sin_plantilla:
+    "ese evento todavía no tiene asiento definido en el ERP: hay que reportarlo",
+};
+
+/** El aviso que faltaba.
+ *
+ * El asiento automático nunca bloquea la operación que lo originó, y eso está
+ * bien. El costo es que el balance puede quedarse vacío sin que nadie se
+ * entere — pasó: durante meses ninguna empresa tenía plan de cuentas ni
+ * periodo abierto y el único rastro era una línea de log que además decía el
+ * motivo equivocado. Acá se ve, con qué hacer al lado. */
+function AvisoOmitidos({ omitidos }: { omitidos: AsientoOmitido[] }) {
+  const porMotivo = new Map<string, number>();
+  for (const o of omitidos) porMotivo.set(o.motivo, (porMotivo.get(o.motivo) ?? 0) + 1);
+
+  return (
+    <div
+      role="alert"
+      className="flex flex-col gap-1.5 rounded-lg border border-status-warning/40 bg-status-warning/10 px-4 py-3"
+    >
+      <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+        <AlertTriangle size={16} strokeWidth={1.75} aria-hidden />
+        {omitidos.length === 1
+          ? "Hay 1 asiento que no se escribió"
+          : `Hay ${omitidos.length} asientos que no se escribieron`}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        La operación se registró igual —contabilidad nunca la bloquea— pero su
+        asiento no entró, así que el balance está incompleto.
+      </p>
+      <ul className="mt-1 flex flex-col gap-1">
+        {[...porMotivo].map(([motivo, n]) => (
+          <li key={motivo} className="text-xs text-foreground">
+            <span className="cifra font-semibold">{n}</span> por{" "}
+            <span className="font-semibold">{motivo.replace("_", " ")}</span> —{" "}
+            {QUE_HACER[motivo] ?? "revisar la configuración contable"}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function AsientosCliente({
   asientos,
   cuentas,
+  omitidos,
   permisos,
 }: {
   asientos: Asiento[];
   cuentas: Cuenta[];
+  omitidos: AsientoOmitido[];
   permisos: string[];
 }) {
   const puedeAsentar = tienePermiso(permisos, ASIENTO_MANUAL);
@@ -265,6 +327,7 @@ export function AsientosCliente({
         El libro. Los asientos automáticos los genera un evento del ERP (venta, compra,
         pago); los manuales se registran acá y siempre cuadran debe contra haber.
       </p>
+      {omitidos.length > 0 && <AvisoOmitidos omitidos={omitidos} />}
       {puedeAsentar && cuentas.length === 0 && (
         <p className="rounded bg-secondary/10 px-3 py-2 text-sm font-semibold text-secondary">
           No hay plan de cuentas todavía: sin cuentas no se puede registrar un asiento.

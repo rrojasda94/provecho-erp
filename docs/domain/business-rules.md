@@ -1837,11 +1837,18 @@ preparación, despacho y entrega en las tres modalidades.
 - **RN-CTB-010** Ningún asiento se registra fuera de un periodo contable
   abierto; un asiento manual sobre un periodo sin abrir o ya cerrado se
   rechaza (409).
-- **RN-CTB-011** La generación automática de asientos usa el mapeo
-  configurable evento→cuentas (`regla_asiento`) por empresa; si la empresa no
-  configuró mapeo para un evento, el asiento se omite (se audita en el log)
+- **RN-CTB-011** La generación automática de asientos usa, en este orden, el
+  mapeo configurable evento→cuentas (`regla_asiento`) de la empresa y, si no
+  lo configuró, la **plantilla de fábrica del PCGE** — la empresa manda sobre
+  el default, pero no configurar nada ya no significa quedarse sin asiento.
+  Cuando aun así no se puede asentar (el mes está cerrado, faltan cuentas del
+  plan, el evento no tiene plantilla) **el asiento se omite y la omisión queda
+  registrada en `asiento_omitido` con su motivo**, consultable en Contabilidad
   — nunca bloquea el proceso operativo que lo originó (mismo criterio de
   módulos operativos con dependencias sin configurar, ej. inventory).
+  Corregida el 2026-09-05 (ADR-089): decía que sin mapeo no había asiento, lo
+  que dejó de ser cierto cuando se agregaron las plantillas de fábrica, y
+  hablaba de auditar «en el log», que en la práctica es no auditar.
 
 ## Emisión y distribución de reportes (módulo reports, ADR-033)
 
