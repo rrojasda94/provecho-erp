@@ -3,16 +3,27 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
-- ⬜ **Leads, encuestas y evaluación de agencias siguen sin pantalla, y el
-  bloque es más grande de lo que parecía** (2026-09-05, Ola 3 de la auditoría
-  del 2026-08-30). Al abrirlo apareció que **faltan los endpoints de
-  listado**: `GET /leads` global no existe —solo por campaña—, `encuestas` no
-  tiene listado, y la evaluación de agencia cuelga de una campaña
-  (`/campanas/{id}/evaluaciones-agencia`) con su propio flujo de opciones →
-  decisión → cierre, que pide una **ficha de campaña** que el frontend
-  tampoco tiene. No es «poner pantalla a lo que ya está»: es backend nuevo
-  más una pantalla nueva por cada uno. Se separó del resto de la ola en vez
-  de entregarlo a medias.
+- ✅ 2026-09-05 **Leads, encuestas y evaluación de agencias tienen pantalla**
+  (Ola 3 de la auditoría del 2026-08-30, migración `c7a1e94b2d38`). El bloque
+  resultó más grande que «ponerle pantalla a lo que ya está»: **faltaban los
+  tres endpoints de listado**. `GET /leads` era solo por campaña, así que la
+  pregunta real —«¿qué pistas quedaron sin trabajar?», que cruza campañas— no
+  se podía hacer; `encuestas` no tenía listado, así que las respuestas
+  quedaban donde nadie las leía; y las evaluaciones se listaban por campaña,
+  cuando quien decide entra por la decisión pendiente.
+  `encuesta_satisfaccion` ganó `empresa_id`: cuelga de una venta que vive en
+  `sales`, así que sin esa columna filtrar por tenant era un join entre
+  módulos — mismo criterio con el que `postulante` ganó el suyo. La migración
+  rellena las filas viejas por el camino largo (venta → sucursal).
+  Lo que deja abierto:
+  - ⬜ **Atribuir un lead a una venta a mano** sigue por API: hace falta un
+    buscador de ventas que el frontend no tiene. La atribución automática por
+    cupón al cobrar no se toca.
+  - ⬜ **Cargar opciones y firmar la decisión de agencia** siguen por API. La
+    decisión la firma Gerencia y el motivo es obligatorio cuando se aparta de
+    la recomendada: es un formulario con reglas propias, no una fila de tabla.
+    La pantalla ya **muestra** las opciones con su puntaje ponderado y cuál
+    ganó, que era lo invisible.
 
 - ✅ 2026-08-01 **Slice core**: `campana` (brief → aprobada → en_curso →
   cerrada, RN-MKT-003), `pieza_contenido` (RN-MKT-001/002),

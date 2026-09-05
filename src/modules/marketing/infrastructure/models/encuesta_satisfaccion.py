@@ -31,6 +31,14 @@ class EncuestaSatisfaccion(Base, UuidPkMixin, TimestampMixin):
     # Una encuesta por venta: reenviar no crea otra fila.
     __table_args__ = (UniqueConstraint("venta_id"),)
 
+    # De qué empresa es. Denormalizado a propósito, como `postulante`: la
+    # encuesta cuelga de una venta y la venta vive en `sales`, así que sin
+    # esta columna filtrar por tenant sería un join entre módulos — y sin
+    # filtro no hay listado posible. Nullable por las filas anteriores a la
+    # columna, que la migración rellena.
+    empresa_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("empresa.id"), nullable=True, index=True
+    )
     venta_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("venta.id"))
     cliente_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cliente.id"))
     canal: Mapped[str] = mapped_column(

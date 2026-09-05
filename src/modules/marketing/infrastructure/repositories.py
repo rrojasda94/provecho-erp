@@ -85,6 +85,38 @@ class LeadRepo:
             .order_by(Lead.created_at.desc())
         )
 
+    def q_listar(
+        self,
+        empresa_id: uuid.UUID | None,
+        *,
+        campana_id: uuid.UUID | None = None,
+        tipo: str | None = None,
+        atribuido: bool | None = None,
+    ):
+        """Los leads de la empresa, sin ejecutar (ADR-026).
+
+        El filtro de tenant pasa por `campana`: `lead` no lleva `empresa_id` y
+        agregárselo duplicaría un dato que ya vive un salto más allá — un lead
+        es de una sola campaña por definición, y la campaña de una sola
+        empresa.
+
+        `atribuido` es la pregunta que hace útil el listado: un lead sin venta
+        es una pista que todavía no se convirtió, y son los que hay que
+        trabajar.
+        """
+        stmt = select(Lead).join(Campana, Campana.id == Lead.campana_id)
+        if empresa_id is not None:
+            stmt = stmt.where(Campana.empresa_id == empresa_id)
+        if campana_id is not None:
+            stmt = stmt.where(Lead.campana_id == campana_id)
+        if tipo is not None:
+            stmt = stmt.where(Lead.tipo == tipo)
+        if atribuido is True:
+            stmt = stmt.where(Lead.venta_id.is_not(None))
+        if atribuido is False:
+            stmt = stmt.where(Lead.venta_id.is_(None))
+        return stmt.order_by(Lead.created_at.desc())
+
     def campana_de_venta(self, venta_id: uuid.UUID) -> uuid.UUID | None:
         """Campaña que se llevó el crédito de esa venta, vía el lead
         atribuido. Es lo que permite acreditarle a la campaña la satisfacción
@@ -190,6 +222,21 @@ class EncuestaRepo:
             .order_by(EncuestaSatisfaccion.fecha_envio.desc())
             .limit(1)
         )
+
+    def q_listar(
+        self, empresa_id: uuid.UUID | None, *, estado: str | None = None
+    ):
+        """Las encuestas de la empresa, sin ejecutar (ADR-026).
+
+        Por `empresa_id` propio y no por la venta: la venta vive en `sales` y
+        el join sería entre módulos (ver la nota de la columna).
+        """
+        stmt = select(EncuestaSatisfaccion)
+        if empresa_id is not None:
+            stmt = stmt.where(EncuestaSatisfaccion.empresa_id == empresa_id)
+        if estado is not None:
+            stmt = stmt.where(EncuestaSatisfaccion.estado == estado)
+        return stmt.order_by(EncuestaSatisfaccion.fecha_envio.desc())
 
     def vencidas(self, ahora: datetime, limite: int = 500) -> list[EncuestaSatisfaccion]:
         return list(
@@ -302,6 +349,18 @@ class EvaluacionAgenciaRepo:
             .where(EvaluacionAgencia.campana_id == campana_id)
             .order_by(EvaluacionAgencia.created_at.desc())
         )
+
+    def q_listar(self, empresa_id: uuid.UUID | None, *, estado: str | None = None):
+        """Las evaluaciones de la empresa, sin ejecutar (ADR-026). Mismo
+        criterio que los leads: el tenant sale de la campaña."""
+        stmt = select(EvaluacionAgencia).join(
+            Campana, Campana.id == EvaluacionAgencia.campana_id
+        )
+        if empresa_id is not None:
+            stmt = stmt.where(Campana.empresa_id == empresa_id)
+        if estado is not None:
+            stmt = stmt.where(EvaluacionAgencia.estado == estado)
+        return stmt.order_by(EvaluacionAgencia.created_at.desc())
 
     def add(self, evaluacion: EvaluacionAgencia) -> EvaluacionAgencia:
         self.s.add(evaluacion)

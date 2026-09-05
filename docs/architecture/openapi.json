@@ -16306,6 +16306,37 @@
         "title": "Pagina[ConteoOut]",
         "type": "object"
       },
+      "Pagina_EncuestaOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EncuestaOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[EncuestaOut]",
+        "type": "object"
+      },
       "Pagina_EscalamientoOut_": {
         "properties": {
           "items": {
@@ -41212,6 +41243,103 @@
       }
     },
     "/api/v1/marketing/encuestas": {
+      "get": {
+        "description": "Qué dijeron los clientes, de la más reciente a la más vieja.\n\nNo había listado: una encuesta solo se podía mirar sabiendo su id o el de\nsu venta, así que las respuestas quedaban donde nadie las leía — y una\nencuesta que nadie lee es una molestia al cliente sin contrapartida.",
+        "operationId": "listar_encuestas_api_v1_marketing_encuestas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_EncuestaOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Encuestas",
+        "tags": [
+          "marketing"
+        ]
+      },
       "post": {
         "description": "Crea la encuesta y la deja en su primer nodo. El envío real sale por\nel listener de `marketing.encuesta_enviada`, ya commiteada (ADR-016).",
         "operationId": "enviar_encuesta_api_v1_marketing_encuestas_post",
@@ -41618,6 +41746,105 @@
         ]
       }
     },
+    "/api/v1/marketing/evaluaciones-agencia": {
+      "get": {
+        "description": "Las evaluaciones de agencia de todas las campañas.\n\nSe listaban solo por campaña, así que revisar «qué hay para decidir»\nobligaba a recorrer campaña por campaña — y quien decide (Gerencia) no\nentra por la campaña, entra por la decisión pendiente.",
+        "operationId": "listar_todas_las_evaluaciones_agencia_api_v1_marketing_evaluaciones_agencia_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_EvaluacionOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Todas Las Evaluaciones Agencia",
+        "tags": [
+          "marketing"
+        ]
+      }
+    },
     "/api/v1/marketing/evaluaciones-agencia/{evaluacion_id}": {
       "get": {
         "operationId": "ver_evaluacion_agencia_api_v1_marketing_evaluaciones_agencia__evaluacion_id__get",
@@ -41832,6 +42059,136 @@
       }
     },
     "/api/v1/marketing/leads": {
+      "get": {
+        "description": "Las pistas de todas las campañas, no de una.\n\n`GET /campanas/{id}/leads` existía y obligaba a saber de antemano qué\ncampaña mirar; la pregunta que se hace de verdad es «¿qué pistas quedaron\nsin trabajar?», que cruza campañas. `atribuido=false` es esa vista.",
+        "operationId": "listar_todos_los_leads_api_v1_marketing_leads_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "campana_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campana Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tipo"
+            }
+          },
+          {
+            "in": "query",
+            "name": "atribuido",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Atribuido"
+            }
+          },
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_LeadOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Todos Los Leads",
+        "tags": [
+          "marketing"
+        ]
+      },
       "post": {
         "operationId": "registrar_lead_api_v1_marketing_leads_post",
         "requestBody": {
