@@ -12,6 +12,190 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.9.5] - 2026-09-05
+
+### Added
+
+- **Mermas: la pantalla que le faltaba a tres endpoints con ADR propio**
+  (2026-09-04, auditoría del 2026-08-30 §13). `POST /inventory/mermas`,
+  `GET /mermas` y `POST /mermas/{id}/resolver` existían desde ADR-028, con
+  pruebas y permisos sembrados, y **ningún llamador**: apartar mercadería
+  inservible solo se podía hacer llamando la API a mano. Ahora
+  `/inventario/mermas` la aparta (almacén, SKU, cantidad, motivo) y muestra
+  la bandeja de resolución con «Desechar» —sale del stock y se asienta como
+  pérdida— y «Reintegrar». Dos pasos y dos permisos distintos porque la
+  segregación es la regla: quien declara que algo no sirve no firma su baja.
+- **Reservas: por fin se ve de quién es el stock apartado, y se puede
+  soltar** (2026-09-04). La columna «Reservado» de Stock decía cuánto y no
+  había forma de saber por qué ni de liberarlo: `GET /inventory/reservas` y
+  `POST /reservas/{id}/liberar` no tenían llamadores, así que
+  `inventory.liberar_reserva` era un permiso sembrado que nadie podía
+  ejercer y una reserva colgada de un requerimiento viejo mantenía stock
+  fuera del disponible para siempre. Las mermas se listan pero no se liberan
+  desde acá: se resuelven en su pantalla, donde la firma es de otro.
+- **Traslados: recepción por línea, entrega parcial y traslado directo**
+  (2026-09-04). La recepción mandaba `{items: [], parcial: false}` clavado,
+  así que el camión que trae la mitad no tenía cómo declararse y quien
+  recibía firmaba sin ver qué traía el envío —`GET /transferencias/{id}` era
+  otro endpoint sin llamadores—. Ahora el diálogo carga el detalle **antes**
+  de abrir, precargado con lo enviado, con casilla de entrega parcial: sin
+  marcarla, lo que falte se registra como diferencia (RN-INV-002). Y se
+  agrega el **traslado lateral**, de un almacén a otro sin requerimiento
+  previo, que el backend admitía desde el slice original y no tenía por dónde
+  crearse: era la sucursal que le presta harina a la de al lado, resuelta sin
+  registrar nada.
+- **Fuera de alcance, anotado como deuda**: la guía de remisión (tres
+  endpoints, permiso propio, 14 pruebas, cero pantalla) es un bloque aparte
+  —un documento con numeración, transportista y validez tributaria—, no un
+  botón más en la tabla de traslados.
+
+### Fixed
+
+- **Un asiento que cuadraba se rechazaba por un centavo que no existe**
+  (2026-09-04, auditoría del 2026-08-30 §16). El debe contra el haber se
+  comparaba con `===` sobre sumas de flotantes, en la pantalla **y** en la
+  Server Action: 0.10 + 0.20 contra 0.30 —tres líneas normales— dejaba
+  «Registrar» apagado mostrando «Diferencia: 0.00», y si igual llegaba al
+  servidor volvía con «el asiento no cuadra». La plata se cuenta ahora en
+  centavos (`lib/cuadre.ts`, con pruebas en `npm test`), que es la unidad
+  indivisible y donde la igualdad es exacta. Techo declarado: el paso a
+  centavos redondea el flotante en vez de parsear el texto decimal, así que
+  un importe de tres decimales a mitad de centavo depende de cómo cayó el
+  binario — hoy no llega, los campos son `step="0.01"`.
+- **«+ Asiento manual» y «Anular» se ofrecían a cualquiera que pudiera leer
+  el libro** (2026-09-04, auditoría §3). Los dos exigen
+  `accounting.asiento_manual` en la API —anular no borra, escribe el asiento
+  inverso (RN-CTB-002)—, y ahora el permiso decide si se dibujan.
+- **Errarle a un dato del asiento borraba las líneas ya cargadas**
+  (2026-09-04, auditoría §4). El diálogo pasa a `DialogoFormulario`; las
+  líneas, que son estado propio de la pantalla, se limpian al abrir y no al
+  enviar, así que un rechazo del servidor deja ver lo que se había cargado.
+  Verificado en el navegador contra el rechazo real por periodo cerrado.
+- **`DialogoFormulario` acepta el ancho del panel** (2026-09-04). Nació con
+  `max-w-md` fijo porque las siete pantallas que lo estrenaron eran
+  formularios de una columna; un asiento contable lleva una tabla de líneas
+  adentro y a ese ancho cada fila se parte en tres renglones.
+- **`EstadoAsiento` es `EstadoFormulario`** (2026-09-04). El alias se queda
+  —catorce firmas del módulo lo nombran— pero el tipo dejó de ser el par
+  `{error, ok}`, que escondía los `campos` rechazados que `estadoDeError` ya
+  venía devolviendo y que el diálogo usa para marcar y enfocar el input
+  equivocado.
+
+- **Un rechazo del servidor dejaba de borrar lo tecleado en quince diálogos
+  más** (2026-09-04, auditoría del 2026-08-30 §4). React 19 resetea los campos
+  no controlados de un `<form>` cuando su acción termina, **también cuando
+  devolvió error**: errarle a un dato de la factura del proveedor borraba
+  serie, número y total ya escritos. `DialogoFormulario` lo resuelve
+  despachando la acción a mano dentro de una transición, y ahora lo usan
+  también Campañas (alta y brief), Contenido, Gerencia → Decisiones, Caja
+  (firma de custodia y alta de terminal), Gerencia → Parámetros (proponer),
+  Producción (orden, consumo y control de calidad), Órdenes de compra (alta,
+  corrección, recepción y factura) y la nota de crédito de la jornada.
+- **El tablero de contratación tenía su propio `DialogoFormulario`, con el
+  mismo nombre** (2026-09-04). Una copia entera del molde, con su propio
+  `EstadoRrhh` en vez de `EstadoFormulario` y sin el arreglo de React 19 ni el
+  marcado de campos del 422 — dos componentes distintos llamados igual en el
+  mismo repositorio. Queda un envoltorio de siete líneas sobre el molde común.
+- **Cinco diálogos con estado propio abrían con los datos del anterior**
+  (2026-09-04). Las líneas de consumo de producción, el veredicto de calidad,
+  el resultado de un acta y las filas de una orden de compra son campos
+  controlados, y `form.reset()` no los toca: la orden siguiente abría con los
+  insumos de la anterior. Ahora se limpian al abrir — al abrir y no al enviar,
+  para que un rechazo del servidor deje ver lo que se había cargado.
+- **Corregir una orden de compra ya no abre un formulario vacío**
+  (2026-09-04). Pedía sus ítems a la API *después* de abrir el diálogo, con
+  un «Cargando...» que se reemplazaba solo un segundo más tarde. El molde
+  acepta ahora un `alAbrir` asíncrono y espera antes de mostrar; lo mismo la
+  nota de crédito, que carga las líneas acreditables.
+- **`DialogoFormulario` acepta el ancho del panel** (2026-09-04). Nació
+  clavado en `max-w-md` para formularios de una columna; una recepción de OC
+  es `max-w-3xl` y a ese ancho cada línea se partía en tres renglones.
+- **Lo que no se migró, y por qué**: `DialogoResolver` de Gerencia →
+  Parámetros no es un diálogo-formulario sino un `<dialog>` con dos `<form>`
+  independientes —aprobar y rechazar— con dos estados y un pie propio.
+  Agrandar el molde para un solo llamador es peor negocio que dejarlo
+  declarado en `docs/roadmap/deuda/frontend.md`. Fuera de alcance también los
+  cinco diálogos de Catálogo y el importador de planilla, que no usan Server
+  Actions sino `fetch` + `useState`: migrarlos es reescribirlos, no moverlos.
+
+- **La cola de pagos a proveedor ofrecía dos botones que terminaban en 403**
+  (2026-09-04, auditoría del 2026-08-30 §3). «Ejecutar» y «Rechazar» se
+  dibujaban para cualquiera que pudiera *ver* la cola; la API exige
+  `accounting.pago_gestionar`. Ahora el permiso decide si la acción se
+  ofrece, con el mismo criterio que la jornada de ventas: la autorización
+  real sigue siendo la de la API, pero un botón que siempre falla es peor que
+  no tenerlo. **`accounting.pago_aprobar` no gatea el botón** a propósito —no
+  gatea la ruta tampoco: decide si un pago *sobre el umbral* sale derecho o
+  queda esperando firma, así que esconder por él le sacaría la cola al
+  contador, que paga todos los días por debajo del umbral.
+- **Errarle a un dato del pago borraba el formulario entero** (2026-09-04,
+  auditoría §4). El diálogo de ejecución pasa a `DialogoFormulario`, que
+  despacha la acción a mano en vez de por el prop `action` del `<form>`:
+  React 19 resetea los campos no controlados cuando la acción termina,
+  también cuando devolvió error. Costo aceptado: el diálogo cambia de aspecto
+  (pasa a los tokens del sistema, con encabezado y pie fijos) — que es el
+  punto de tener un solo molde.
+- **Rechazar un pago no decía si había fallado** (2026-09-04, auditoría §11).
+  `rechazarPagoAction` devolvía su error y la pantalla lo descartaba con
+  `void`: un rechazo que fallaba se veía idéntico a uno que salió —la fila
+  seguía ahí y nadie sabía por qué. El error se muestra bajo el botón, igual
+  que en «Anular» de la jornada.
+- **El roadmap de la auditoría del 2026-08-30 entra al repositorio**
+  (2026-09-04). Vivía sin versionar en un worktree suelto y ADR-087 ya lo
+  citaba como enlace roto: un `git clean` lo borraba para siempre.
+
+- **Los últimos botones que prometían 403** (2026-09-04, auditoría del
+  2026-08-30 §3). Tres pantallas ofrecían acciones a cualquiera que pudiera
+  *ver* la lista, y las tres páginas ya llamaban a `obtenerSesion()` — solo
+  tiraban el `usuario` y se quedaban con el token:
+  - **Trabajadores**: «+ Nuevo trabajador», «Editar» y «Cesar» exigen
+    `rrhh.trabajador_gestionar`.
+  - **Artículos**: «+ Nuevo artículo», «Editar» y el importador de Excel
+    exigen `inventory.gestionar_catalogo`. «Exportar» no se toca: bajar el
+    catálogo que ya se está viendo no pide más permiso que verlo.
+  - **Devoluciones**: «+ Nueva devolución» y «Anular» exigen
+    `inventory.registrar_movimiento` — las dos mueven stock real.
+
+  Con esto queda cerrado el hallazgo §3 completo. Eran **cinco** pantallas y
+  no seis: la ficha de orden de compra ya estaba gateada desde ADR-085 y la
+  auditoría la contó de más.
+
+  Verificado en el navegador con tres roles del seeder: `almacenero` ve
+  Artículos sin ningún control de alta y solo con «Exportar», pero sí puede
+  registrar una devolución; `supervisor` es el inverso —gestiona catálogo, no
+  registra devoluciones—; `admin` sigue viendo todo. La autorización real es
+  la de la API, como siempre: el gate es UX, para que un botón no termine
+  siempre en 403.
+
+- **La sesión se moría y la pantalla no se enteraba** (2026-09-04, auditoría
+  del 2026-08-30 §10, ADR-088). Desde ADR-073 el token se renueva solo, así
+  que un 401 que igual llega al navegador significa que el refresh está
+  vencido, revocado o reusado — la señal más confiable de «volvé a entrar»
+  que tiene el cliente. No la escuchaba nadie:
+  - el **KDS** lo mostraba cuatro segundos y seguía refrescando cada tres, con
+    la cola de cocina congelada en el último dato bueno;
+  - la **campana** lo tragaba entero (`catch {}`) y mostraba el conteo viejo,
+    y al marcar una notificación como leída la sacaba de la lista para
+    siempre;
+  - los **borradores del PDV** lo tragaban también **y borraban su huella de
+    guardado**, así que cada tecla reintentaba un PUT que fallaba. El cajero
+    no veía nada y se enteraba al recargar, con las pestañas vacías: pérdida
+    de datos en silencio.
+
+  Ahora el 401 se detecta en un solo lugar —`lib/cliente-api.ts`, por donde
+  salen todas las llamadas del navegador—, se anuncia **una vez** con un
+  diálogo modal montado en el layout raíz (que es el único ancestro común de
+  `(app)`, `/pdv` y `/kds`) y **corta en seco** las llamadas siguientes sin
+  salir a la red, que es lo que apaga el bucle del KDS y el PUT por tecla del
+  PDV.
+
+  Costo aceptado: el aviso dice que la sesión murió, no rescata el formulario
+  a medio llenar. Guardar eso antes de reintentar es otro alcance.
+- **La suite de sesión probaba solo la mitad del caso** (2026-09-04). El test
+  existente borra la cookie de acceso, que es justo el caso que ADR-073 sí
+  salva. El nuevo borra **las dos** y espera el aviso en el KDS, que es la
+  única pantalla que pregunta sola y seguido.
+
 ## [0.9.4] - 2026-09-04
 
 ### Fixed
