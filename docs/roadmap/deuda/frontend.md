@@ -15,6 +15,28 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   asistencia, login y las rutas públicas, que cuelgan directo del layout
   raíz. Reintenta con `reset()` y muestra `error.digest`, que en producción
   es lo único que ata la pantalla al log.
+- ⬜ **`DialogoResolver` de parámetros se queda con su `<dialog>` a mano**
+  (2026-09-04, auditoría del 2026-08-30 §4). Es el único diálogo que el
+  barrido no migró, y a propósito: no es un diálogo-formulario sino un
+  `<dialog>` con **dos** `<form>` independientes —aprobar y rechazar—, dos
+  `useActionState`, dos avisos de error y un pie con un solo botón «Cerrar».
+  `DialogoFormulario` promete un formulario, un estado y el par
+  Cancelar/Guardar; agrandarlo para un solo llamador es peor negocio que
+  dejar esta copia declarada. **Lo que sí arrastra**: es el último lugar del
+  ERP con el bug de React 19 —la acción va en el prop `action` del `<form>`,
+  así que un rechazo del servidor borra lo tecleado—. El día que aparezca un
+  segundo diálogo de dos acciones, ahí hay un molde que sacar; mientras
+  tanto, despachar sus dos acciones a mano dentro de una transición cierra el
+  agujero sin tocar el molde.
+- ⬜ **La caja pide el PIN con un `<input type="password">`** (2026-09-04,
+  encontrado al migrar el diálogo). `DialogoFirmado` de
+  `contabilidad/caja/caja-cliente.tsx` —lo usan recibir el efectivo y reabrir
+  un cierre— pide usuario y PIN con campos de texto, y ADR-045/ADR-050 dicen
+  que un PIN se pide **siempre** con `Pinpad`, en el PDV y fuera de él, login
+  incluido: si el navegador puede ofrecer guardarlo, alguien lo guarda, y el
+  turno siguiente firma con la cuenta del anterior. Son dos firmas de
+  custodia de efectivo (RN-MDP-002/005), o sea justo donde importa. Fuera del
+  alcance del barrido de diálogos, que no cambiaba qué pide cada formulario.
 - ⬜ **El boundary global es uno solo y se dibuja en claro** (2026-08-30):
   reemplaza la pantalla entera en vez de conservar la `TopBar` (haría falta
   un `error.tsx` por módulo) y no tiene versión con la paleta oscura del PDV.

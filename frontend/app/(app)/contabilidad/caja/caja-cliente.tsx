@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+
+import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 
 import {
   cambiarEstadoPosAction,
@@ -39,8 +41,6 @@ export type Pos = {
 };
 
 export type Sucursal = { id: string; nombre: string };
-
-const ESTADO_INICIAL: EstadoCaja = { error: "", ok: false };
 
 /** La cadena de custodia solo avanza (RN-MDP-002): del cajón al encargado,
  * del encargado a contabilidad, y de ahí a depositado/disponible. El paso
@@ -103,70 +103,33 @@ function DialogoFirmado({
   children?: React.ReactNode;
   destructivo?: boolean;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [estado, formAction, pendiente] = useActionState(accion, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className={`text-xs font-bold hover:underline ${
-          destructivo ? "text-secondary" : "text-primary"
-        }`}
-      >
-        {etiqueta}
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-sm rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          {Object.entries(ocultos).map(([nombre, valor]) => (
-            <input key={nombre} type="hidden" name={nombre} value={valor} />
-          ))}
-          <h2 className="font-heading text-lg italic uppercase text-dark">{titulo}</h2>
-          <p className="text-sm text-gray">{descripcion}</p>
-          {children}
-          <div className="grid grid-cols-2 gap-2">
-            <label className="flex flex-col gap-1 text-sm font-semibold">
-              Usuario
-              <input name="username" autoComplete="off" required />
-            </label>
-            <label className="flex flex-col gap-1 text-sm font-semibold">
-              PIN
-              <input name="pin" type="password" inputMode="numeric" autoComplete="off" required />
-            </label>
-          </div>
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Firmando..." : "Firmar"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo={titulo}
+      disparador={etiqueta}
+      claseDisparador={`text-xs font-bold hover:underline ${
+        destructivo ? "text-status-danger" : "text-primary"
+      }`}
+      etiquetaEnvio="Firmar"
+      etiquetaPendiente="Firmando..."
+      accion={accion}
+      ayuda={descripcion}
+    >
+      {Object.entries(ocultos).map(([nombre, valor]) => (
+        <input key={nombre} type="hidden" name={nombre} value={valor} />
+      ))}
+      {children}
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Usuario
+          <input name="username" autoComplete="off" required />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          PIN
+          <input name="pin" type="password" inputMode="numeric" autoComplete="off" required />
+        </label>
+      </div>
+    </DialogoFormulario>
   );
 }
 
@@ -327,76 +290,35 @@ function TablaTurnos({ turnos }: { turnos: Turno[] }) {
 }
 
 function AltaPos({ sucursales }: { sucursales: Sucursal[] }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const [estado, formAction, pendiente] = useActionState(registrarPosAction, ESTADO_INICIAL);
-
-  useEffect(() => {
-    if (estado.ok) {
-      formRef.current?.reset();
-      dialogRef.current?.close();
-    }
-  }, [estado.ok]);
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => dialogRef.current?.showModal()}
-        className="self-start rounded bg-primary px-3 py-1.5 text-sm font-bold text-white hover:bg-secondary"
-      >
-        Registrar terminal
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-sm rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <h2 className="font-heading text-lg italic uppercase text-dark">
-            Registrar terminal
-          </h2>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Serie
-            <input name="serie" minLength={2} maxLength={50} required />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Código de comercio
-            <input name="codigo_comercio" minLength={2} maxLength={50} required />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Operador
-            <input name="operador" maxLength={50} placeholder="Izipay, Niubiz..." />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Sucursal
-            <Combobox
-              name="sucursal_id"
-              etiqueta="Sucursal"
-              marcador="Emergencia (pool de contabilidad)"
-              opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
-            />
-          </label>
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Guardando..." : "Guardar"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    <DialogoFormulario
+      titulo="Registrar terminal"
+      disparador="Registrar terminal"
+      claseDisparador="self-start inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/85"
+      accion={registrarPosAction}
+    >
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Serie
+        <input name="serie" minLength={2} maxLength={50} required />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Código de comercio
+        <input name="codigo_comercio" minLength={2} maxLength={50} required />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Operador
+        <input name="operador" maxLength={50} placeholder="Izipay, Niubiz..." />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Sucursal
+        <Combobox
+          name="sucursal_id"
+          etiqueta="Sucursal"
+          marcador="Emergencia (pool de contabilidad)"
+          opciones={sucursales.map((s) => ({ valor: s.id, etiqueta: s.nombre }))}
+        />
+      </label>
+    </DialogoFormulario>
   );
 }
 

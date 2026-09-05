@@ -63,8 +63,11 @@ export function DialogoFormulario({
    * asiento contable o una recepción de OC llevan una tabla de líneas
    * adentro y a `max-w-md` cada fila se parte en tres renglones. */
   ancho?: string;
-  /** Reset del estado propio de la pantalla, si el formulario tiene alguno. */
-  alAbrir?: () => void;
+  /** Reset del estado propio de la pantalla, si el formulario tiene alguno.
+   * Puede ser `async`: dos diálogos —editar una OC, acreditar una venta—
+   * **cargan sus líneas antes de abrir**, y abrir primero mostraría un
+   * formulario vacío que se llena solo un segundo después. */
+  alAbrir?: () => void | Promise<void>;
   alCerrar?: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -102,8 +105,8 @@ export function DialogoFormulario({
     <>
       <button
         type="button"
-        onClick={() => {
-          alAbrir?.();
+        onClick={async () => {
+          await alAbrir?.();
           dialogRef.current?.showModal();
         }}
         className={claseDisparador}

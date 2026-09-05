@@ -1,7 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
+
+import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 
 import {
   anularVentaAction,
@@ -122,8 +124,6 @@ function CeldaComprobante({
   );
 }
 
-const ESTADO_INICIAL: EstadoVenta = { error: "", ok: false };
-
 // Catálogo 09 de SUNAT, con los cinco motivos que este negocio produce. Los
 // dos de corrección no dan de baja la venta: arreglan el papel.
 const MOTIVOS_NC = [
@@ -193,24 +193,17 @@ function DialogoNotaCredito({
   venta: Venta;
   comprobante: Comprobante;
 }) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
   const [motivo, setMotivo] = useState("01");
   const [alcance, setAlcance] = useState<"total" | "parcial">("total");
   const [lineas, setLineas] = useState<LineaVenta[]>([]);
   const [errorLineas, setErrorLineas] = useState("");
   const [cargandoLineas, setCargandoLineas] = useState(false);
-  const [estado, formAction, pendiente] = useActionState(
-    emitirNotaCreditoAction,
-    ESTADO_INICIAL,
-  );
 
-  useEffect(() => {
-    if (estado.ok) dialogRef.current?.close();
-  }, [estado.ok]);
-
-  const abrir = async () => {
-    dialogRef.current?.showModal();
+  // Las líneas acreditables se piden **antes** de abrir: el diálogo aparecía
+  // vacío y se llenaba solo un instante después, justo debajo del cursor.
+  const cargar = async () => {
+    setMotivo("01");
+    setAlcance("total");
     if (lineas.length > 0) return;
     setCargandoLineas(true);
     const r = await lineasDeVentaAction(venta.id);
@@ -222,111 +215,82 @@ function DialogoNotaCredito({
   const deCorreccion = MOTIVOS_NC.find((m) => m.codigo === motivo)?.corrige ?? false;
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={abrir}
-        className="text-xs font-bold text-primary hover:underline"
-      >
-        Nota de crédito
-      </button>
-      <dialog ref={dialogRef} className="w-full max-w-lg rounded-lg p-0 backdrop:bg-dark/40">
-        <form ref={formRef} action={formAction} className="flex flex-col gap-4 p-6">
-          <input type="hidden" name="comprobante_id" value={comprobante.id} />
-          <h2 className="font-heading text-lg text-dark">
-            Nota de crédito · {comprobante.serie}-{comprobante.correlativo}
-          </h2>
-          <p className="text-xs text-gray">
-            Una venta cobrada no se anula, se acredita. La nota sale en serie propia y
-            solo puede emitirse una vez por comprobante.
-          </p>
+    <DialogoFormulario
+      titulo={`Nota de crédito · ${comprobante.serie}-${comprobante.correlativo}`}
+      disparador="Nota de crédito"
+      claseDisparador="text-xs font-bold text-primary hover:underline"
+      etiquetaEnvio="Emitir"
+      etiquetaPendiente="Emitiendo..."
+      accion={emitirNotaCreditoAction}
+      ancho="max-w-lg"
+      ayuda="Una venta cobrada no se anula, se acredita. La nota sale en serie propia y solo puede emitirse una vez por comprobante."
+      alAbrir={cargar}
+    >
+      <input type="hidden" name="comprobante_id" value={comprobante.id} />
 
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            Motivo (catálogo 09 de SUNAT)
-            <select name="motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)}>
-              {MOTIVOS_NC.map((m) => (
-                <option key={m.codigo} value={m.codigo}>
-                  {m.codigo} · {m.texto}
-                </option>
-              ))}
-            </select>
-            {deCorreccion && (
-              <span className="text-xs font-normal text-gray">
-                Corrige el documento, no la operación: la venta sigue viva y el
-                comprobante queda liberado para reemitir el corregido.
-              </span>
-            )}
-          </label>
+    <label className="flex flex-col gap-1 text-sm font-semibold">
+      Motivo (catálogo 09 de SUNAT)
+      <select name="motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)}>
+        {MOTIVOS_NC.map((m) => (
+          <option key={m.codigo} value={m.codigo}>
+            {m.codigo} · {m.texto}
+          </option>
+        ))}
+      </select>
+      {deCorreccion && (
+        <span className="text-xs font-normal text-gray">
+          Corrige el documento, no la operación: la venta sigue viva y el
+          comprobante queda liberado para reemitir el corregido.
+        </span>
+      )}
+    </label>
 
-          <fieldset className="flex flex-col gap-2 rounded border border-gray/20 p-3">
-            <legend className="px-1 text-xs font-semibold uppercase text-gray">
-              Qué se acredita
-            </legend>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="alcance"
-                value="total"
-                checked={alcance === "total"}
-                onChange={() => setAlcance("total")}
-              />
-              Todo el comprobante
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="radio"
-                name="alcance"
-                value="parcial"
-                checked={alcance === "parcial"}
-                onChange={() => setAlcance("parcial")}
-              />
-              Solo algunas líneas
-            </label>
-            {alcance === "parcial" && (
-              <LineasAcreditables lineas={lineas} cargando={cargandoLineas} error={errorLineas} />
-            )}
-          </fieldset>
+    <fieldset className="flex flex-col gap-2 rounded border border-gray/20 p-3">
+      <legend className="px-1 text-xs font-semibold uppercase text-gray">
+        Qué se acredita
+      </legend>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="radio"
+          name="alcance"
+          value="total"
+          checked={alcance === "total"}
+          onChange={() => setAlcance("total")}
+        />
+        Todo el comprobante
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="radio"
+          name="alcance"
+          value="parcial"
+          checked={alcance === "parcial"}
+          onChange={() => setAlcance("parcial")}
+        />
+        Solo algunas líneas
+      </label>
+      {alcance === "parcial" && (
+        <LineasAcreditables lineas={lineas} cargando={cargandoLineas} error={errorLineas} />
+      )}
+    </fieldset>
 
-          <label className="flex items-start gap-2 text-sm font-semibold">
-            <input
-              type="checkbox"
-              name="repone_stock"
-              defaultChecked={!deCorreccion}
-              className="mt-1"
-            />
-            <span>
-              Devolver el insumo al stock
-              <span className="block text-xs font-normal text-gray">
-                En cocina el plato devuelto rara vez vuelve al inventario, y corregir un
-                dato del comprobante no lo toca en absoluto.
-              </span>
-            </span>
-          </label>
+    <label className="flex items-start gap-2 text-sm font-semibold">
+      <input
+        type="checkbox"
+        name="repone_stock"
+        defaultChecked={!deCorreccion}
+        className="mt-1"
+      />
+      <span>
+        Devolver el insumo al stock
+        <span className="block text-xs font-normal text-gray">
+          En cocina el plato devuelto rara vez vuelve al inventario, y corregir un
+          dato del comprobante no lo toca en absoluto.
+        </span>
+      </span>
+    </label>
 
-          {estado.error && (
-            <p role="alert" className="text-sm font-semibold text-secondary">
-              {estado.error}
-            </p>
-          )}
-          <div className="mt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => dialogRef.current?.close()}
-              className="rounded border border-gray px-4 py-2 text-sm font-semibold text-dark"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={pendiente}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
-            >
-              {pendiente ? "Emitiendo..." : "Emitir"}
-            </button>
-          </div>
-        </form>
-      </dialog>
-    </>
+    </DialogoFormulario>
   );
 }
 
