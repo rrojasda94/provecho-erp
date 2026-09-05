@@ -746,11 +746,12 @@ que es una decisión de pantalla y no un bug de una línea.
 - 🔶 **Los otros botones que prometen 403** (auditoría §3). «Ejecutar» /
   «Rechazar» pago se cerraron el 2026-09-04 (`fix/contabilidad-pagos-rbac`), y
   «Emitir» OC sobre umbral ya estaba gateado desde ADR-085 — la auditoría lo
-  contó de más. Faltan «+ Asiento manual», «+ Nuevo trabajador» / «Cesar»,
+  contó de más, y «+ Asiento manual» / «Anular» asiento el mismo día
+  (`fix/contabilidad-asientos-rbac`). Faltan «+ Nuevo trabajador» / «Cesar»,
   «+ Nuevo artículo» / «Editar» y «+ Nueva devolución». Mismo arreglo que ya
   se aplicó en la jornada: `permisos` como prop y `tienePermiso` por acción.
-  Viven en otros módulos y van en sus propias ramas
-  (`fix/contabilidad-asientos-rbac`, `fix/rbac-botones-resto`).
+  Viven en otros módulos y van en su propia rama
+  (`fix/rbac-botones-resto`).
 - 🔶 **Los otros dos errores tragados** (auditoría §11).
   `rechazarPagoAction` se cerró el 2026-09-04: descartaba su resultado con
   `void`, así que un rechazo fallido se veía igual que uno que salió. Sigue

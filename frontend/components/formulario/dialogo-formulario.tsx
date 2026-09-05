@@ -42,6 +42,7 @@ export function DialogoFormulario({
   claseDisparador = CLASE_PRIMARIO,
   ayuda,
   envioDeshabilitado = false,
+  ancho = "max-w-md",
   alAbrir,
   alCerrar,
 }: {
@@ -57,6 +58,11 @@ export function DialogoFormulario({
   ayuda?: React.ReactNode;
   /** Para el caso "no se puede crear todavía" (sin unidades de medida, por ej.). */
   envioDeshabilitado?: boolean;
+  /** Clase `max-w-*` del panel. El molde nació con un ancho fijo porque las
+   * siete pantallas que lo estrenaron eran formularios de una columna; un
+   * asiento contable o una recepción de OC llevan una tabla de líneas
+   * adentro y a `max-w-md` cada fila se parte en tres renglones. */
+  ancho?: string;
   /** Reset del estado propio de la pantalla, si el formulario tiene alguno. */
   alAbrir?: () => void;
   alCerrar?: () => void;
@@ -106,7 +112,7 @@ export function DialogoFormulario({
       </button>
       <dialog
         ref={dialogRef}
-        className="dialogo w-full max-w-md rounded-xl border border-border bg-card p-0 text-card-foreground shadow-[var(--sombra-3)]"
+        className={`dialogo w-full ${ancho} rounded-xl border border-border bg-card p-0 text-card-foreground shadow-[var(--sombra-3)]`}
         onClose={() => {
           // El reset va al cerrar, no al enviar (ver `onSubmit`).
           formRef.current?.reset();

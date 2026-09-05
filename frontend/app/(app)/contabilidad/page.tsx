@@ -4,14 +4,20 @@ import { obtenerSesion } from "@/lib/sesion";
 import { AsientosCliente, type Asiento, type Cuenta } from "./asientos-cliente";
 
 export default async function AsientosPage() {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
 
   try {
     const [asientos, cuentas] = await Promise.all([
       apiFetch<Pagina<Asiento>>("/api/v1/accounting/asientos", { token }),
       apiFetch<Cuenta[]>("/api/v1/accounting/cuentas-contables", { token }),
     ]);
-    return <AsientosCliente asientos={asientos.items} cuentas={cuentas} />;
+    return (
+      <AsientosCliente
+        asientos={asientos.items}
+        cuentas={cuentas}
+        permisos={usuario.permisos}
+      />
+    );
   } catch (e) {
     const mensaje =
       e instanceof ApiError && e.status === 403
