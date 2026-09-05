@@ -85,7 +85,9 @@ renumera nada). Este archivo define el orden de lectura recomendado.
   (resume y apunta a `engineering/engineering-guide.md`).
 - [`/ROADMAP.md`](../ROADMAP.md) — bitácora viva de lo construido y pendiente.
   La deuda técnica cuelga de [`roadmap/deuda/`](roadmap/deuda/), un archivo
-  por área.
+  por área, y los planes de varias ramas de
+  [`roadmap/`](roadmap/) — hoy, la
+  [auditoría backend↔frontend del 2026-08-30](roadmap/auditoria-erp-2026-08-30.md).
 - [`/CHANGELOG.md`](../CHANGELOG.md) — historial de cambios (SemVer).
 
 ## Arranque rápido

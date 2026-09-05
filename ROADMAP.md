@@ -197,8 +197,8 @@ parece no tener líneas.
 | # audit | Qué | Estado |
 |---|---|---|
 | 1 | El filtro de estados de la jornada ofrecía `entregada` (no existe) y escondía `facturada`; `estado` viajaba como `str` sin validar | ✅ 2026-08-30 |
-| 3 | «Reintentar emisión», «Nota de crédito» y «Anular» gateados por permiso | 🔶 parcial — faltan los otros 6 botones-403 (pagos, asientos, trabajadores, artículos, devoluciones, OC) |
-| 11 | El fallo al traer las líneas para la NC se distingue de una venta sin líneas | 🔶 parcial — faltan `rechazarPagoAction` y la carta del PDV |
+| 3 | «Reintentar emisión», «Nota de crédito» y «Anular» gateados por permiso | 🔶 parcial — la OC ya estaba gateada y pagos se cerró en la Ola 2; faltan asientos, trabajadores, artículos y devoluciones |
+| 11 | El fallo al traer las líneas para la NC se distingue de una venta sin líneas | 🔶 parcial — `rechazarPagoAction` se cerró en la Ola 2; falta la carta del PDV |
 | + | La alerta de pedido demorado nunca disparaba para un pedido sin cobrar: `ESTADOS_VIVOS` decía `confirmada`, que no es un valor de `estado_venta`, y omitía `orden` | ✅ 2026-08-30 |
 
 La causa raíz de los tres primeros era la misma: los cinco valores de
@@ -256,6 +256,35 @@ pantalla que los llame.
 | 5 | `GET /solicitudes?almacen_abastecedor_id=`: la bandeja del que despacha, que no se podía preguntar | ✅ 2026-09-04 |
 | 6 | El seeder crea `almacen1` y `aprobador1`: sin dos usuarios el circuito no cierra ni para probarlo | ✅ 2026-09-04 |
 | + | El tipo de documento de una persona: «RUC» en el alta devolvía 500 y dejaba la fila ilegible (migración `c9f4a2e70b18`, vocabulario único en `src/shared/documento.py`) | ✅ 2026-08-30 |
+
+## Auditoría del 2026-08-30 — Ola 2 (2026-09-04)
+
+La auditoría backend↔frontend del 2026-08-30 dejó 18 hallazgos repartidos en
+cuatro olas: [`docs/roadmap/auditoria-erp-2026-08-30.md`](docs/roadmap/auditoria-erp-2026-08-30.md).
+La Ola 0 (el inventario no se podía poblar) y las seis ramas de la Ola 1 ya
+están en `main`. Ésta es la **Ola 2**: seis bloques, una rama y un PR cada uno.
+
+Lo que une a los seis no es un error visible —es el patrón que la auditoría
+vino a buscar—: un botón que promete 403, un formulario que se borra solo
+cuando el servidor rechaza, un cuadre que dice «no cuadra» por un centavo que
+no existe, una tablet de cocina que reintenta contra una sesión muerta para
+siempre, y endpoints con ADR y pruebas que ninguna pantalla llama.
+
+| Bloque | Hallazgos | Estado |
+|---|---|---|
+| `fix/contabilidad-pagos-rbac` | #3 ejecutar/rechazar pago sin gate + #4 diálogo con reset-on-error + #11 el rechazo descartaba su resultado | ✅ 2026-09-04 |
+| `fix/contabilidad-asientos-rbac` | #3 «+ asiento manual» y «Anular» sin gate + #4 diálogo + #16 el cuadre se comparaba en `float` | ⬜ |
+| `fix/rbac-botones-resto` | #3 los botones de trabajadores, artículos y devoluciones (la OC ya estaba gateada desde ADR-085) | ⬜ |
+| `fix/sesion-expirada-cliente` | #10 la sesión muere y el cliente no se entera: bucle del KDS, campana muda, borradores del PDV que dejan de guardarse en silencio | ⬜ |
+| `fix/dialogos-migracion-sweep` | #4 los diálogos restantes (10 archivos, 16 diálogos) migran a `DialogoFormulario` | ⬜ |
+| `feat/inventario-transferencias-mermas` | #13 mermas y reservas sin pantalla; recepción parcial y traslado lateral sin entrada (el ciclo pedido lo cerró `fix/inventario-operable`) | ⬜ |
+
+Tres correcciones al roadmap original, verificadas contra el código antes de
+empezar: `fix/rbac-botones-resto` se achica porque
+`compras/ordenes-compra/[id]` **ya está gateado** y es el modelo a copiar;
+`gerencia/delivery` y `gerencia/kds` estaban en la lista del sweep sin tener
+un solo `<dialog>`; y `feat/inventario-transferencias-mermas` está cumplido
+solo en su tercio de transferencias.
 
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)
 
