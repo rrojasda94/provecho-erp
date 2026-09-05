@@ -90,6 +90,9 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Mis reportes", href: "/reportes" },
     { label: "Escalamientos", href: "/reportes/escalamientos" },
     { label: "Distribución", href: "/reportes/distribucion" },
+    // Distribución muestra los huecos; acá se tapan: un área sin miembros
+    // recibe y no se lo pasa a nadie.
+    { label: "Áreas", href: "/reportes/areas" },
     { label: "Emitidos", href: "/reportes/emitidos" },
   ],
   rrhh: [

@@ -77,6 +77,7 @@ const RUTAS = [
   "/produccion",
   "/reportes",
   "/reportes/distribucion",
+  "/reportes/areas",
   "/reportes/emitidos",
   "/reportes/escalamientos",
   "/rrhh",

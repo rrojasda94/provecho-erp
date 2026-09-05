@@ -3,6 +3,14 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **Las reglas de distribución de reportes no se editan por pantalla**
+  (2026-09-05). Áreas y miembros sí (`/reportes/areas`), pero
+  `POST/PATCH/DELETE /reports/reglas` sigue siendo API: una regla lleva
+  código de emisión, nivel, canal, sucursal y una lista de destinatarios de
+  cuatro tipos distintos —área, rol, usuario y dinámico—, así que el
+  formulario es una pantalla propia y no un diálogo. El mapa de distribución
+  ya marca el hueco; taparlo del todo pide esto.
+
 - ✅ 2026-08-30 **Una pantalla que revienta ya no queda en blanco**
   (`frontend/app/error.tsx`, hallazgo #8 de la auditoría del 2026-08-30). No
   había **ningún** error boundary: cero `error.tsx`, cero `componentDidCatch`.
