@@ -61,6 +61,8 @@ const RUTAS = [
   "/contabilidad/pagos",
   "/contabilidad/periodos",
   "/contabilidad/plan-cuentas",
+  "/contabilidad/libro-mayor",
+  "/contabilidad/reglas-asiento",
   "/gerencia",
   "/gerencia/decisiones",
   "/gerencia/divisas",

@@ -2,12 +2,14 @@
 
 import { useState, useTransition } from "react";
 
+import { Insignia } from "@/components/estado/insignia";
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 
 import {
   cambiarEstadoPosAction,
   entregarCustodiaAction,
   reabrirCierreAction,
+  registrarArqueoAction,
   registrarPosAction,
   type EstadoCaja,
 } from "./actions";
@@ -41,6 +43,20 @@ export type Pos = {
 };
 
 export type Sucursal = { id: string; nombre: string };
+
+/** Una caja abierta ahora mismo: es la única sobre la que se puede arquear,
+ * porque el esperado sale del turno vivo. */
+export type CajaAbierta = { punto_venta_id: string; caja: string };
+
+export type Arqueo = {
+  id: string;
+  punto_venta_id: string;
+  tipo: string;
+  monto_esperado: string;
+  monto_contado: string;
+  diferencia: string;
+  created_at: string;
+};
 
 /** La cadena de custodia solo avanza (RN-MDP-002): del cajón al encargado,
  * del encargado a contabilidad, y de ahí a depositado/disponible. El paso
@@ -346,14 +362,117 @@ function EstadoPos({ pos }: { pos: Pos }) {
   );
 }
 
+/** Contar el efectivo del cajón y compararlo contra lo que el sistema espera
+ * (PROC-CTB-005).
+ *
+ * El monto esperado **no se teclea**: lo calcula el servidor con la apertura,
+ * lo cobrado en efectivo y los movimientos del turno. Si lo mandara la
+ * pantalla, el arqueo no probaría nada — sería contar y escribir el número
+ * que uno quiere que dé.
+ *
+ * Solo se ofrecen las cajas abiertas: sobre un turno cerrado no hay cajón que
+ * contar, hay un cierre que recontar, y eso es otra cosa (RN-MDP-005). */
+function DialogoArqueo({ cajas }: { cajas: CajaAbierta[] }) {
+  const [puntoVenta, setPuntoVenta] = useState("");
+  return (
+    <DialogoFormulario
+      titulo="Arquear una caja"
+      disparador="+ Arquear"
+      etiquetaEnvio="Registrar"
+      etiquetaPendiente="Registrando..."
+      accion={registrarArqueoAction}
+      envioDeshabilitado={cajas.length === 0}
+      ayuda="Contá el efectivo del cajón y anotá el total. El esperado lo calcula el sistema: la diferencia es el hallazgo."
+      alAbrir={() => setPuntoVenta("")}
+    >
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Caja
+        <Combobox
+          name="punto_venta_id"
+          etiqueta="Caja"
+          requerido
+          marcador="Elegir caja abierta..."
+          value={puntoVenta}
+          alCambiar={(v) => setPuntoVenta(v ?? "")}
+          opciones={cajas.map((c) => ({ valor: c.punto_venta_id, etiqueta: c.caja }))}
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Tipo
+        <select name="tipo" defaultValue="sorpresa">
+          <option value="sorpresa">Sorpresa</option>
+          <option value="programado">Programado</option>
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Efectivo contado
+        <input name="monto_contado" type="number" step="0.01" min="0" required />
+      </label>
+    </DialogoFormulario>
+  );
+}
+
+function TablaArqueos({ arqueos, cajas }: { arqueos: Arqueo[]; cajas: CajaAbierta[] }) {
+  if (arqueos.length === 0) {
+    return (
+      <p className="rounded bg-cream px-3 py-2 text-sm text-gray">
+        Todavía no se arqueó ninguna caja abierta.
+      </p>
+    );
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[38rem] border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-gray/30 text-left text-xs uppercase text-gray">
+            <th className="py-2 pr-4 font-semibold">Caja</th>
+            <th className="py-2 pr-4 font-semibold">Tipo</th>
+            <th className="py-2 pr-4 font-semibold">Esperado</th>
+            <th className="py-2 pr-4 font-semibold">Contado</th>
+            <th className="py-2 font-semibold">Diferencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          {arqueos.map((a) => {
+            const dif = Number(a.diferencia);
+            return (
+              <tr key={a.id} className="border-b border-gray/15">
+                <td className="py-2 pr-4 font-semibold text-dark">
+                  {cajas.find((c) => c.punto_venta_id === a.punto_venta_id)?.caja ?? "caja"}
+                </td>
+                <td className="py-2 pr-4">{a.tipo}</td>
+                <td className="py-2 pr-4 cifra">S/ {a.monto_esperado}</td>
+                <td className="py-2 pr-4 cifra">S/ {a.monto_contado}</td>
+                <td className="py-2">
+                  {/* Cero es el resultado bueno y se lee como tal; cualquier
+                      otra cosa es un hallazgo, sobre o falte. */}
+                  <Insignia tono={dif === 0 ? "exito" : "alerta"}>
+                    S/ {a.diferencia}
+                  </Insignia>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function CajaCliente({
   turnos,
   pos,
   sucursales,
+  cajasAbiertas,
+  arqueos,
+  puedeArquear,
 }: {
   turnos: Turno[];
   pos: Pos[];
   sucursales: Sucursal[];
+  cajasAbiertas: CajaAbierta[];
+  arqueos: Arqueo[];
+  puedeArquear: boolean;
 }) {
   const [verPos, setVerPos] = useState(false);
 
@@ -369,6 +488,19 @@ export function CajaCliente({
         </p>
       </div>
       <TablaTurnos turnos={turnos} />
+
+      <div className="mt-4 flex flex-col gap-3 border-t border-gray/20 pt-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="font-heading text-lg italic uppercase text-dark">Arqueos</h2>
+          {puedeArquear && <DialogoArqueo cajas={cajasAbiertas} />}
+        </div>
+        <p className="text-sm text-gray">
+          El conteo sorpresa del cajón contra lo que el sistema espera
+          (PROC-CTB-005). Se arquea una caja abierta: sobre un turno cerrado ya
+          no hay cajón que contar.
+        </p>
+        <TablaArqueos arqueos={arqueos} cajas={cajasAbiertas} />
+      </div>
 
       <div className="mt-4 border-t border-gray/20 pt-4">
         <button

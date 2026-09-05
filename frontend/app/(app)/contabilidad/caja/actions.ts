@@ -154,3 +154,41 @@ export async function cambiarEstadoPosAction(
   revalidatePath("/contabilidad/caja");
   return { error: "", ok: true };
 }
+
+/**
+ * Arqueo de una caja abierta: contar el efectivo y compararlo contra lo que
+ * el sistema espera.
+ *
+ * `POST /accounting/arqueos` existía desde el ciclo de caja y no lo llamaba
+ * ninguna pantalla: el arqueo sorpresa —que es el control de Contabilidad
+ * sobre las sucursales, PROC-CTB-005— solo se podía hacer llamando la API a
+ * mano. El monto esperado lo calcula el servidor: si lo mandara la pantalla,
+ * el arqueo dejaría de probar nada.
+ */
+export async function registrarArqueoAction(
+  _previo: EstadoCaja,
+  formData: FormData,
+): Promise<EstadoCaja> {
+  const puntoVentaId = String(formData.get("punto_venta_id") ?? "");
+  const tipo = String(formData.get("tipo") ?? "sorpresa");
+  const montoContado = String(formData.get("monto_contado") ?? "").trim();
+  if (!puntoVentaId) return { error: "Elegí la caja que se está contando.", ok: false };
+  if (!montoContado) return { error: "Falta el monto contado.", ok: false };
+
+  try {
+    await apiFetch("/api/v1/accounting/arqueos", {
+      token: await token(),
+      metodo: "POST",
+      cuerpo: {
+        punto_venta_id: puntoVentaId,
+        tipo,
+        monto_contado: montoContado,
+      },
+    });
+  } catch (e) {
+    return estadoDeError(e, "No se pudo registrar el arqueo.");
+  }
+  revalidatePath("/contabilidad/caja");
+  return { error: "", ok: true };
+}
+

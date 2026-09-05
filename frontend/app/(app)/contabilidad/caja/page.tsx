@@ -2,7 +2,16 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { primeroElDe } from "@/lib/destinos";
 import { obtenerSesion } from "@/lib/sesion";
 
-import { CajaCliente, type Pos, type Sucursal, type Turno } from "./caja-cliente";
+import { tienePermiso } from "@/lib/permisos";
+
+import {
+  CajaCliente,
+  type Arqueo,
+  type CajaAbierta,
+  type Pos,
+  type Sucursal,
+  type Turno,
+} from "./caja-cliente";
 
 type FilaCaja = {
   caja: string;
@@ -25,7 +34,7 @@ export default async function CajaPage({
 }: {
   searchParams: Promise<{ cierre?: string }>;
 }) {
-  const { token } = await obtenerSesion();
+  const { token, usuario } = await obtenerSesion();
   // `?cierre=<id>` es a donde llega `accounting.cierre_caja_irregular`: el
   // turno con el descuadre sube al tope de los cerrados (ADR-036).
   const { cierre } = await searchParams;
@@ -69,6 +78,41 @@ export default async function CajaPage({
           : "No se pudieron cargar los turnos de caja."}
       </p>
     );
+  }
+
+  // Las cajas abiertas se piden por su id —el reporte de arriba trae el
+  // rótulo pero no el `punto_venta_id`— y son las únicas que se pueden
+  // arquear. Los arqueos se piden por caja porque `arqueo` cuelga de
+  // `punto_venta`, que vive en `sales`: listar «los de la empresa» sería un
+  // join entre módulos.
+  let cajasAbiertas: CajaAbierta[] = [];
+  let arqueos: Arqueo[] = [];
+  try {
+    const abiertas = await apiFetch<{ punto_venta_id: string }[]>(
+      "/api/v1/accounting/cajas/abiertas",
+      { token },
+    );
+    const puntos = await apiFetch<{ id: string; nombre: string }[]>(
+      "/api/v1/sales/puntos-venta",
+      { token },
+    );
+    cajasAbiertas = abiertas.map((a) => ({
+      punto_venta_id: a.punto_venta_id,
+      caja: puntos.find((p) => p.id === a.punto_venta_id)?.nombre ?? "Caja",
+    }));
+    arqueos = (
+      await Promise.all(
+        cajasAbiertas.map((c) =>
+          apiFetch<Arqueo[]>(
+            `/api/v1/accounting/arqueos?punto_venta_id=${c.punto_venta_id}`,
+            { token },
+          ),
+        ),
+      )
+    ).flat();
+  } catch {
+    // El arqueo es una sección de esta pantalla, no la pantalla: que no
+    // cargue no puede tapar los turnos ni las terminales.
   }
 
   return (
@@ -144,6 +188,9 @@ export default async function CajaPage({
         turnos={primeroElDe(turnos, cierre ?? null, (t) => t.cierre_id)}
         pos={pos}
         sucursales={sucursales}
+        cajasAbiertas={cajasAbiertas}
+        arqueos={arqueos}
+        puedeArquear={tienePermiso(usuario.permisos, "accounting.arqueo_registrar")}
       />
     </div>
   );

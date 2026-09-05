@@ -35,10 +35,12 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Asientos", href: "/contabilidad" },
     { label: "Periodos", href: "/contabilidad/periodos" },
     { label: "Plan de cuentas", href: "/contabilidad/plan-cuentas" },
+    { label: "Libro mayor", href: "/contabilidad/libro-mayor" },
     { label: "Estados financieros", href: "/contabilidad/estados-financieros" },
     { label: "Comprobantes", href: "/contabilidad/comprobantes" },
     { label: "Pagos a proveedor", href: "/contabilidad/pagos" },
     { label: "Caja", href: "/contabilidad/caja" },
+    { label: "Reglas de asiento", href: "/contabilidad/reglas-asiento" },
   ],
   gerencia: [
     { label: "Parámetros", href: "/gerencia/parametros" },
