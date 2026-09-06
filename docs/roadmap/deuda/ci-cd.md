@@ -3,6 +3,21 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **`uso/responsive.spec.ts` falla intermitente en `/inventario @ movil`**
+  (2026-09-05). Siempre el mismo hallazgo y siempre el mismo número:
+  `desborde-pagina: scrollWidth 448 > clientWidth 390`, en 390×844 y solo en
+  CI. Apareció en los PR #159, #160 y #170; reintentar el job lo pone verde,
+  y la corrida local completa —las tres medidas, todas las rutas— pasa. O sea:
+  no es una regresión de las pantallas que se estaban tocando, y las tres
+  veces se descartó reintentando, que es exactamente cómo un flake se vuelve
+  costumbre.
+  Los 448 px huelen a una medición **antes de que el layout asiente**: la
+  auditoría geométrica mide `scrollingElement` apenas navega, y la portada de
+  un módulo es una grilla de tarjetas. Vale la pena mirarlo con la traza que
+  el propio job sube como artefacto (`uso-playwright`) antes de que alguien
+  empiece a ignorar el job en rojo. `uso` no es check requerido, así que el
+  costo de no mirarlo es justamente ése.
+
 - ✅ 2026-08-24 **El droplet de staging no tenía `scripts/desplegar.sh`**:
   `staging.md` mandaba correr `./scripts/desplegar.sh <version>` en el
   servidor, pero ahí nunca se clonó el repo — solo se habían copiado a mano
