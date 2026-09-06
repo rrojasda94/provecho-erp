@@ -3,6 +3,17 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **El secreto del terminal de marcaje no caduca ni rota** (2026-09-05,
+  hallazgo #18 de la auditoría del 2026-08-30). `terminal_marcaje.secreto_hash`
+  se escribe al enrolar (ADR-079) y vale para siempre; la cookie que lo
+  guarda dura un año. Hoy el único corte es explícito: revocar el terminal
+  desde RRHH → Terminales, que la pantalla **ya ofrece** — «rotar» es revocar
+  y volver a enrolar la tablet, y eso funciona. Lo que falta es que el
+  secreto **caduque solo**: una tablet que dejó de usarse hace meses sigue
+  pudiendo marcar hasta que alguien se acuerde de revocarla, y nadie se
+  acuerda de un dispositivo que no da problemas. La forma barata es una fecha
+  de expiración por terminal y un barrido que avise antes de que venza.
+
 - ✅ 2026-08-30 **La sesión no sobrevive a cerrar el navegador** (ADR-084):
   cookies de sesión más corte por inactividad de 8 h en `auth.refresh`.
 - ⬜ **`refresh_token` no se purga nunca** (2026-08-30): la rotación inserta
