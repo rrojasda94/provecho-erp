@@ -38,11 +38,21 @@ dentro de seis meses.
 
 ## Pendiente de corte
 
-Nada. **0.9.5 se cortó el 2026-09-05** y se lleva los seis fragmentos de la
-Ola 2 de la auditoría del 2026-08-30 (PRs #157 a #162): los tres bloques de
-RBAC en botones que prometían 403, el cuadre contable en centavos, la sesión
-muerta anunciada una vez (ADR-088), el barrido de diálogos al molde común y
-las pantallas de mermas, reservas y traslado directo.
+Nada. **0.10.0 se cortó el 2026-09-06** y se lleva los once fragmentos que
+quedaban (PRs #164 a #174): los dos de contabilidad —la empresa que nace con
+su plan de cuentas y el periodo que se abre solo (ADR-089), y el cobro que
+por fin cancela la cuenta por cobrar—, las cinco pantallas de la Ola 3
+(arqueos y libro mayor, auditoría, legajo y permisos de RRHH, áreas de
+distribución, y leads/encuestas/agencias) y los cuatro de la Ola 4.
+
+Es **minor y no parche**: la Ola 3 son pantallas nuevas sobre endpoints que
+ya existían, no arreglos. Con esto quedan cerradas las cuatro olas de la
+auditoría del 2026-08-30.
+
+Al desplegarla, dos cosas que no se resuelven solas: las empresas creadas
+antes de ADR-089 siguen sin plan de cuentas hasta correr
+`scripts/sembrar_contabilidad.py`, y los asientos que se perdieron mientras
+faltaban las cuentas y el periodo **no se reponen** — está anotado como deuda.
 
 Nota del corte anterior, que sigue valiendo: **0.9.0 se cortó pero nunca llegó
 a staging** —el `Desplegar` posterior al corte se disparó con `0.8.2` como
