@@ -13,6 +13,7 @@ import {
 import NombreDeLinea from "./nombre-linea";
 import { Espera, coloresDe, nivelDelPedido } from "./semaforo";
 import { useCola } from "./use-cola";
+import { RegionDeAviso } from "@/components/estado/region-de-aviso";
 
 /**
  * Pantalla de despacho. No cocina: arma y entrega, así que muestra cosas
@@ -270,7 +271,7 @@ export default function DespachoCliente({
         </section>
       )}
 
-      {aviso && <div className="kds-aviso">{aviso}</div>}
+      <RegionDeAviso texto={aviso} clase="kds-aviso" />
     </main>
   );
 }

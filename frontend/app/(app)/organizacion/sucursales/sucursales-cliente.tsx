@@ -8,6 +8,7 @@ import {
   DialogoFormulario,
   valor,
 } from "@/components/formulario/dialogo-formulario";
+import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
 
@@ -270,15 +271,9 @@ export function SucursalesCliente({
         accessorKey: "estado",
         header: "Estado",
         cell: ({ getValue }) => (
-          <span
-            className={
-              getValue<string>() === "activa"
-                ? "rounded-full bg-accent/30 px-2 py-0.5 text-xs font-semibold text-dark"
-                : "rounded-full bg-gray/20 px-2 py-0.5 text-xs font-semibold text-gray"
-            }
-          >
+          <Insignia tono={getValue<string>() === "activa" ? "exito" : "neutro"}>
             {getValue<string>()}
-          </span>
+          </Insignia>
         ),
       },
       {

@@ -6,6 +6,7 @@ import { useMemo } from "react";
 
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { AvisoRecortado } from "@/components/estado/aviso-recortado";
+import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
 import { RUTA_EXPORTAR_ARTICULOS } from "@/lib/catalogo";
@@ -262,15 +263,9 @@ export function ArticulosCliente({
         accessorKey: "archivado",
         header: "Estado",
         cell: ({ getValue }) => (
-          <span
-            className={
-              getValue<boolean>()
-                ? "rounded-full bg-gray/20 px-2 py-0.5 text-xs font-semibold text-gray"
-                : "rounded-full bg-accent/30 px-2 py-0.5 text-xs font-semibold text-dark"
-            }
-          >
+          <Insignia tono={getValue<boolean>() ? "neutro" : "exito"}>
             {getValue<boolean>() ? "Archivado" : "Activo"}
-          </span>
+          </Insignia>
         ),
       },
       {

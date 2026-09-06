@@ -337,7 +337,7 @@ que una completa**.
 |---|---|---|
 | `fix/paginacion-server-side` | #14 el recorte se avisa en las nueve pantallas que traían 200 filas y paginaban en el navegador; `GET /inventory/lotes` gana tope | ✅ 2026-09-05 |
 | `fix/contrato-tests-y-tipos-duplicados` | #15 una prueba parametrizada compara nueve listas de pantalla contra el enum del modelo —encontró una que ofrecía un valor que la API rechaza— y las formas `{id, nombre}` dejan de estar declaradas diecinueve veces | ✅ 2026-09-05 |
-| `fix/accesibilidad-insignia-aria-live` | #17 píldoras solo-color → `Insignia`, `aria-live` en avisos del KDS y el PDV | ⬜ |
+| `fix/accesibilidad-insignia-aria-live` | #17 ocho píldoras de estado escritas a mano pasan a `Insignia`, y el aviso pasajero del KDS y del PDV se anuncia también por voz | ✅ 2026-09-05 |
 | `chore/limpieza-menor` | #18 `inventory.ajustar` huérfano, campos servidos e ignorados, CDR no descargable, cookie de terminal sin rotación | ⬜ |
 
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)

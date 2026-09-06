@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
+import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
 import { cuadreDe } from "@/lib/cuadre";
@@ -306,15 +307,7 @@ export function AsientosCliente({
         cell: ({ getValue }) => {
           const estado = getValue<string>();
           return (
-            <span
-              className={
-                estado === "anulado"
-                  ? "rounded-full bg-gray/20 px-2 py-0.5 text-xs font-semibold text-gray"
-                  : "rounded-full bg-accent/30 px-2 py-0.5 text-xs font-semibold text-dark"
-              }
-            >
-              {estado}
-            </span>
+            <Insignia tono={estado === "anulado" ? "neutro" : "exito"}>{estado}</Insignia>
           );
         },
       },

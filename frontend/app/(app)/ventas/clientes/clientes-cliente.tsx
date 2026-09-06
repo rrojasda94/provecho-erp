@@ -10,6 +10,7 @@ import { CampoDireccion } from "@/components/direccion/campo-direccion";
 import type { Ubicacion } from "@/components/direccion/ubicacion";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { AvisoRecortado } from "@/components/estado/aviso-recortado";
+import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { RUTA_EXPORTAR_CLIENTES } from "@/lib/clientes";
 import { ETIQUETA_DOCUMENTO, TIPOS_DOCUMENTO_NATURAL } from "@/lib/documento";
@@ -180,15 +181,9 @@ export function ClientesCliente({
         accessorKey: "identificado",
         header: "Identificado",
         cell: ({ getValue }) => (
-          <span
-            className={
-              getValue<boolean>()
-                ? "rounded-full bg-accent/30 px-2 py-0.5 text-xs font-semibold text-dark"
-                : "rounded-full bg-gray/20 px-2 py-0.5 text-xs font-semibold text-gray"
-            }
-          >
+          <Insignia tono={getValue<boolean>() ? "exito" : "neutro"}>
             {getValue<boolean>() ? "Sí" : "No"}
-          </span>
+          </Insignia>
         ),
       },
       {

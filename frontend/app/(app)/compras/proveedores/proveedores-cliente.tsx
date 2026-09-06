@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { BuscarDocumento } from "@/components/consulta/buscar-documento";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { PersonaPicker } from "@/components/persona-picker/persona-picker";
+import { InsigniaActiva } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { crearProveedorAction, editarProveedorAction } from "./actions";
@@ -286,15 +287,7 @@ export function ProveedoresCliente({
         accessorKey: "activo",
         header: "Estado",
         cell: ({ getValue }) => (
-          <span
-            className={
-              getValue<boolean>()
-                ? "rounded-full bg-accent/30 px-2 py-0.5 text-xs font-semibold text-dark"
-                : "rounded-full bg-gray/20 px-2 py-0.5 text-xs font-semibold text-gray"
-            }
-          >
-            {getValue<boolean>() ? "Activo" : "Inactivo"}
-          </span>
+          <InsigniaActiva activa={getValue<boolean>()} />
         ),
       },
       {
