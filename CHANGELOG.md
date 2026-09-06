@@ -12,6 +12,258 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.10.0] - 2026-09-06
+
+### Added
+
+- **El mapa de distribución mostraba los huecos y no había cómo taparlos**
+  (2026-09-05, Ola 3 de la auditoría del 2026-08-30). `/reportes/distribucion`
+  marca en rojo los **huecos** —un hecho que ocurre y no se entera nadie— y
+  las **fugas** —una regla sin destinatarios—, y el CRUD para arreglarlos
+  existía en el backend desde ADR-033 sin que ninguna pantalla lo llamara.
+  Ahora `/reportes/areas` crea áreas, las renombra, las desactiva y les suma
+  o quita miembros. Un miembro es **un rol o una persona, nunca las dos**: el
+  rol es «quien ocupe ese puesto» y sobrevive al cambio de gente, la persona
+  es esa persona, y mezclarlos dejaría sin saber cuál manda cuando el puesto
+  cambia de manos. El código del área no se edita —las reglas lo nombran— y un
+  área sin miembros se dice en la pantalla: recibe y no se lo pasa a nadie,
+  que es la mitad de una fuga.
+  Costo aceptado: **editar las reglas** sigue siendo por API. Una regla lleva
+  código de emisión, nivel, canal, sucursal y destinatarios de cuatro tipos
+  distintos: es una pantalla propia, no un diálogo. Queda anotado como deuda.
+
+- **El libro contable se puede recorrer** (2026-09-05, Ola 3 de la auditoría
+  del 2026-08-30). Tres endpoints entregados y probados que ninguna pantalla
+  llamaba:
+  - **Libro mayor** (`/contabilidad/libro-mayor`): todo lo que movió una
+    cuenta, en orden y con el saldo corriendo. Estados financieros usa el
+    balance de comprobación, que dice **cuánto** tiene cada cuenta y no de
+    dónde salió: con un saldo raro no había forma de abrirlo. Cuenta y rango
+    viajan en la URL, así que el mayor de una cuenta en un periodo es una
+    dirección que se comparte.
+  - **Detalle de asiento** (`/contabilidad/asientos/[id]`): contra qué
+    cuentas se escribió. El listado mostraba fecha, glosa, origen y estado, y
+    nunca las líneas — un asiento automático que salía raro no se podía
+    revisar sin entrar a la base. Se navega en los dos sentidos: del mayor al
+    asiento y de cada línea del asiento al mayor de su cuenta.
+  - **Reglas de asiento** (`/contabilidad/reglas-asiento`): con qué cuentas
+    se asienta cada hecho. Los eventos se eligen de una lista y no se
+    teclean: adivinar el nombre exacto es la forma más fácil de escribir una
+    regla que no se aplica nunca, y la pantalla marca las que apuntan a
+    eventos que el ERP ya no publica. Se ve además cuáles usan la plantilla
+    de fábrica del PCGE, que es lo esperable.
+- **El arqueo de caja vuelve a poder mirarse** (2026-09-05). `POST /arqueos`
+  existía desde el ciclo de caja y **no había `GET`**: el conteo quedaba en la
+  base y en ningún lado más, que es lo mismo que no haberlo hecho — el arqueo
+  sirve por su historia. Ahora se registra y se lista desde Contabilidad →
+  Caja, sobre las cajas abiertas, que son las únicas que tienen cajón que
+  contar. El monto esperado sigue saliendo del servidor: si lo mandara la
+  pantalla, el arqueo dejaría de probar nada (PROC-CTB-005).
+
+- **Marketing dejaba tres cosas sin ver, y no era solo falta de pantalla**
+  (2026-09-05, Ola 3 de la auditoría del 2026-08-30, migración
+  `c7a1e94b2d38`). Faltaban también los **endpoints de listado**:
+  - **Leads** (`/marketing/leads`): se listaban solo por campaña, así que la
+    pregunta que se hace de verdad —«¿qué pistas quedaron sin trabajar?», que
+    cruza campañas— no se podía hacer. Ahora se filtra por campaña y por si el
+    lead se convirtió en venta.
+  - **Encuestas** (`/marketing/encuestas`): no había listado. Una encuesta
+    solo se podía mirar sabiendo su id o el de su venta, así que las
+    respuestas quedaban donde nadie las leía — y una encuesta que nadie lee es
+    una molestia al cliente sin contrapartida. Se ve el puntaje promedio, el
+    comentario y los envíos fallidos, que no son lo mismo que una sin
+    contestar.
+  - **Evaluación de agencias** (`/marketing/agencias`): se listaban por
+    campaña, y quien decide no entra por la campaña sino por la decisión
+    pendiente. Se ven las opciones con su puntaje ponderado y cuál ganó.
+  `encuesta_satisfaccion` gana **`empresa_id`**: cuelga de una venta que vive
+  en `sales`, así que sin esa columna filtrar por tenant era un join entre
+  módulos — mismo criterio con el que `postulante` ganó el suyo. La migración
+  rellena las filas anteriores por el camino largo (venta → sucursal), que a
+  partir de ahora nadie tiene que recorrer.
+  Costo aceptado: atribuir un lead a una venta **a mano** sigue por API
+  (hace falta un buscador de ventas), y cargar opciones y firmar la decisión
+  de agencia también — la decisión la firma Gerencia con motivo obligatorio
+  cuando se aparta de la recomendada, y eso es un formulario con reglas
+  propias.
+
+- **RRHH tenía ocho familias de endpoints y una sola pantalla** (2026-09-05,
+  Ola 3 de la auditoría del 2026-08-30). Contratos, sanciones, memorandos,
+  certificados, permisos, pactos, boletas y liquidaciones estaban entregados,
+  probados y con permisos sembrados, y el módulo mostraba la lista de
+  trabajadores y nada más.
+  - **Legajo del trabajador** (`/rrhh/trabajadores/[id]`): todo el expediente
+    en una lectura. El endpoint ya devolvía las ocho listas juntas y nadie lo
+    llamaba. Se entra desde el nombre en la lista, que antes no llevaba a
+    ningún lado. La nómina se muestra solo con `rrhh.nomina_gestionar`, y
+    cuando no, **se dice** — sin eso, un legajo sin sueldos se lee igual que
+    uno censurado.
+  - **Bandeja de permisos** (`/rrhh/permisos`): abre en las pendientes, porque
+    quien entra ahí entra por «qué tengo que resolver». La consulta de la
+    bandeja estaba escrita en el backend desde el slice del ciclo laboral.
+    Aprobar y rechazar muestran su error debajo: la acción devuelve el motivo
+    —solapamiento, trabajador cesado— y descartarlo dejaba la fila igual que
+    si no hubiera pasado nada.
+  - **Amonestación, memorándum y certificado de trabajo** se emiten desde el
+    legajo. Quién firma sale de la sesión y no del formulario: dejarlo elegir
+    sería poder firmar por otro, que es exactamente lo que un descargo va a
+    discutir (RN-RRHH-002). El tiempo de servicios y el «dentro de plazo» del
+    certificado los calcula el servidor: son la razón de ser del documento.
+  - Costo aceptado: **registrar boletas y liquidaciones sigue siendo por API**.
+    El ERP no liquida sueldos —registra lo que el contador liquidó— y el
+    cuerpo lleva los conceptos como diccionario libre: eso pide una pantalla
+    propia, no un diálogo. Queda anotado como deuda, igual que actas y socios.
+- **`hoyEnZonaDelNegocio()`** en `lib/fechas.ts` (2026-09-05), con su prueba:
+  `toISOString().slice(0, 10)` da el día **en UTC**, así que un formulario
+  abierto a las 19:00 de Lima proponía la fecha de mañana.
+
+- **El rastro de cambios se puede leer** (2026-09-05, Ola 3 de la auditoría
+  del 2026-08-30). `GET /api/v1/auditoria` existía con sus filtros y su
+  alcance por tenant, y **no lo llamaba ninguna pantalla**: el `audit_log`
+  que el ERP viene escribiendo desde ADR-031 —quién tocó qué, cuándo, con qué
+  valor anterior— solo se podía leer con una consulta a la base. Auditar era
+  pedirle a alguien que contara qué hizo.
+  Módulo propio (`/auditoria`) y no una sección de Gerencia, por el mismo
+  criterio que Organización: el permiso real es `auditoria.leer` y colgarlo de
+  otro prefijo se lo escondería justo a quien sí lo tiene — hoy el contador,
+  que audita a Compras, Almacén y las cajas de sucursal (RN-CTB-009).
+  La columna «cambio» muestra **solo lo que cambió**: volcar los dos
+  diccionarios enteros es ilegible, en una fila de doce campos once son
+  iguales y el que importa se pierde. Un cambio sin usuario se lee «el
+  sistema» —un barrido programado, un listener— y no como un dato faltante.
+  Costo aceptado: los nombres de usuario se piden aparte y con `catch`,
+  porque un contador tiene `auditoria.leer` y no `users.gestionar`; sin ellos
+  la pantalla muestra el id y sigue sirviendo.
+
+### Fixed
+
+- **El balance mostraba ingresos y ninguna plata** (2026-09-05).
+  `sales.venta_pagada` se publicaba desde siempre y **no lo escuchaba nadie**:
+  la cuenta por cobrar de cada venta quedaba abierta para siempre y el
+  efectivo cobrado no entraba a ninguna cuenta. Ahora el cobro cancela la
+  `1212` y mete la plata donde entró — `101` Caja si fue efectivo, `1041`
+  Cuentas corrientes si fue tarjeta, billetera, transferencia o cheque. Una
+  venta al crédito (`credito_empresarial`) **no asienta nada**, que es lo
+  correcto: la plata no llegó y la cuenta por cobrar sigue viva.
+  El asiento del cobro no pasa por las plantillas del PCGE ni por
+  `regla_asiento`, a propósito: la cuenta del debe la decide el medio de pago
+  y no el evento, y una venta se cobra con varios a la vez (mitad efectivo,
+  mitad Yape). Ninguna plantilla de líneas fijas puede expresar eso.
+- **Una venta anulada se quedaba con su ingreso asentado** (2026-09-05).
+  `sales.venta_anulada` tampoco tenía suscriptor, así que el estado de
+  resultados contaba una venta que no existió. Se reversa con el asiento
+  inverso, que es como se deshace en contabilidad: nada se borra
+  (RN-CTB-002). **Quitarle algunas líneas a una orden no reversa nada** —
+  borraría el ingreso de las líneas que quedaron—; eso pide un asiento de
+  ajuste por la diferencia y quedó anotado como deuda, igual que el
+  incremento de una orden ya confirmada, que el dedupe del asiento descarta
+  como si fuera un reenvío.
+
+- **El balance estaba vacío y la comida de personal no costaba nada**
+  (2026-09-05, ADR-089). No faltaba cableado: el asiento de la venta se genera
+  al confirmar la orden —del comprobante aceptado por SUNAT cuelga solo el
+  IGV, así que la facturación en pruebas no tiene nada que ver— y el de la
+  comida de personal existe desde ADR-034. Lo que fallaba es que el asiento
+  **se descartaba en silencio** por dos cosas que había que hacer a mano y
+  nadie sabía que existían: importar el plan de cuentas y abrir el periodo del
+  mes. Ahora una empresa **nace con su PCGE** (`accounting` escucha
+  `organizacion.empresa_creada`) y **el periodo se abre al primer asiento del
+  mes** — antes, un mes que nadie abría descartaba todos los asientos
+  automáticos del ERP entero, de todos los módulos, sin bloquear nada y sin
+  avisar. RN-CTB-010 sigue protegiendo lo que protegía: un mes **cerrado**
+  rechaza igual; un mes que nunca se abrió no está cerrado, no existe.
+- **La omisión de un asiento deja rastro** (2026-09-05). El único aviso era un
+  `log.info` que decía siempre «sin regla_asiento configurada», mentira en
+  cuatro de los cinco casos en que el asiento sale vacío, así que quien
+  buscaba por qué el balance no cerraba iba a mirar justo donde no estaba el
+  problema. La tabla `asiento_omitido` guarda empresa, evento, referencia,
+  fecha y motivo —`periodo_cerrado`, `sin_cuentas` con los códigos que faltan,
+  `sin_plantilla`—, con su endpoint y un aviso en Contabilidad que dice qué
+  hacer con cada uno. Misma forma y misma razón que `incidencia_inventario`.
+  Costo aceptado: `duplicado` y `monto_cero` no se anotan —son omisiones
+  correctas— y las empresas anteriores al cambio necesitan
+  `scripts/sembrar_contabilidad.py`.
+- **Cómo registrar la plata que no viene de vender** (2026-09-05): préstamos,
+  premios de concurso y mover efectivo del banco a la caja chica se asientan a
+  mano, y ahora está escrito con qué cuentas exactas
+  (`docs/contabilidad/operaciones-no-operativas.md`). Queda anotado el hueco
+  que eso no cierra: el circuito de custodia de ADR-025 cuelga de una apertura
+  de caja del PDV, así que el efectivo que sale del banco **no tiene
+  responsable nominal** — nadie firma que lo recibió. Es un modelo que falta,
+  no un endpoint.
+
+- **Ocho estados se comunicaban solo por color** (2026-09-05, hallazgo #17 de
+  la auditoría del 2026-08-30). Quedaban píldoras escritas a mano —
+  `bg-accent/30` para lo bueno, `bg-gray/20` para lo apagado — en productos,
+  proveedores, artículos, sucursales, asientos, trabajadores, clientes y
+  requerimientos. Para quien no distingue rojo de verde, las dos son la misma
+  cápsula gris. Pasan a `Insignia`, que ata el ícono al tono para que no sea
+  una prop que la pantalla número treinta y uno se olvide.
+- **El aviso pasajero del KDS y del PDV no lo anunciaba nadie** (2026-09-05,
+  mismo hallazgo). Las dos pantallas avisan con una píldora flotante que
+  aparece y se va sola —«pedido listo», «no se pudo guardar»— y son justo las
+  dos que se usan de pie y mirando otra cosa. Ahora la región vive siempre y
+  lo que cambia es el mensaje de adentro: montar el `role="status"` **junto
+  con** el texto no sirve, porque un lector de pantalla anuncia los cambios de
+  una región viva, no su aparición — es la parte que se hace mal seguido.
+  `role="status"` y no `alert`: son avisos de lo que pasó, no
+  interrupciones, y `alert` corta lo que el lector esté leyendo.
+
+- **El CDR no se podía descargar desde la pantalla** (2026-09-05, hallazgo #18
+  de la auditoría del 2026-08-30). La API lo servía desde siempre
+  —`/comprobantes/{id}/descargar/cdr`— y Comprobantes ofrecía solo PDF y XML.
+  El CDR es la constancia de que SUNAT recibió y aceptó el comprobante: es
+  justo lo que se muestra cuando alguien discute si el documento existe.
+- **`inventory.ajustar` era un permiso que no autorizaba nada** (2026-09-05).
+  Estaba sembrado y otorgado al `almacenero`, y ningún endpoint lo exigía —
+  quien lo miraba en la pantalla de roles creía estar dando o quitando algo.
+  El ajuste real se reparte entre `inventory.solicitar_ajuste` y
+  `inventory.aprobar_ajuste`, que sí existen y están separados a propósito.
+  Sale del seeder; en una base ya sembrada la fila queda y no concede nada.
+
+- **Una lista de la pantalla que se separa del enum no falla: ofrece un valor
+  que la API rechaza recién al guardar** (2026-09-05, hallazgo #15 de la
+  auditoría del 2026-08-30). El repo tenía dos pruebas de coherencia escritas
+  a mano —los motivos de descuento del PDV y los estados de la jornada— y
+  quince listas más con el mismo riesgo y ninguna prueba. Ahora es **una
+  prueba parametrizada** que lee el `Enum` del modelo —no una copia— y lo
+  compara con la lista de la pantalla: sumar una es agregar una fila, que era
+  el punto de extenderla en vez de escribir la prueba número dieciséis.
+  **Encontró una de entrada**: el diálogo de amonestación del legajo ofrecía
+  «suspensión», que no es un valor de `amonestacion.tipo` — elegirla terminaba
+  en un 422 al firmar la sanción.
+- **`{ id, nombre }` estaba declarado diecinueve veces** (2026-09-05, mismo
+  hallazgo): `Sucursal` once, `Categoria` cuatro, `Marca` tres, `Almacen` dos.
+  Con la duplicación vino algo peor — pantallas importando el tipo de **otra
+  pantalla**, que acopla dos vistas por un detalle que no es de ninguna de las
+  dos. Viven ahora en `lib/catalogos.ts`.
+  Costo aceptado: ahí van **solo las formas de referencia**, lo que hace falta
+  para llenar un `<select>`. La ficha completa de una sucursal se sigue
+  declarando donde se administra: un tipo compartido que crece con cada campo
+  que alguna pantalla necesita deja de compartir nada.
+
+- **Una lista recortada se veía igual que una completa** (2026-09-05,
+  hallazgo #14 de la auditoría del 2026-08-30). Nueve pantallas pedían 200
+  filas y paginaban del lado del navegador: funcionaba hasta pasar las 200, y
+  ahí el modo de falla era que alguien buscara un artículo, no lo encontrara y
+  concluyera **que no existe**. Dos pantallas ya avisaban con el mismo párrafo
+  copiado; ahora es un solo componente (`AvisoRecortado`) y está en las nueve:
+  artículos, clientes, personas, órdenes de compra, facturas, stock,
+  producción, contenido y lotes. Cada aviso dice por qué filtro acotar — uno
+  que solo informa no ayuda.
+- **`GET /inventory/lotes` devolvía la tabla entera** (2026-09-05, misma
+  auditoría). Sin página ni tope: un local que lleva meses acumula miles de
+  lotes, y la consulta y el payload crecían sin techo. Ahora tiene tope (500
+  por defecto, configurable hasta 2000) y el orden por vencimiento hace que
+  ese tope signifique algo — lo que queda afuera es lo que vence más tarde, o
+  sea lo que no urge. La pantalla avisa cuando llegó al techo.
+  Costo aceptado: **no es paginación de servidor**, es dejar de mentir. Cuál
+  de estas pantallas merece paginación real se decide viendo cuáles avisan
+  seguido, que es lo que antes no se podía saber. Y los catálogos que llenan
+  un `<select>` siguen topados en silencio: ahí el arreglo no es avisar sino
+  buscar en el servidor, como ya hacen `PersonaPicker` y `ArticuloPicker`.
+  Los dos quedan anotados como deuda.
+
 ## [0.9.5] - 2026-09-05
 
 ### Added
