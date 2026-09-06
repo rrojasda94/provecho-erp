@@ -59,14 +59,20 @@ def test_un_timestamp_con_zona_se_convierte_no_se_ignora(zona_lima):
     assert fechas.a_fecha_local(None) is None
 
 
-# Las tres formas de leer el reloj del proceso en vez del del negocio. La
-# primera es la que causó el desfase original; las otras dos se colaron
-# después porque el barrido solo buscaba la primera.
+# Cuatro formas de que un módulo se olvide de leer `settings.zona_horaria`.
+# Las tres primeras son leer el reloj del proceso en vez del del negocio —la
+# primera causó el desfase original, las otras dos se colaron después porque
+# el barrido solo buscaba la primera—; la cuarta es escribir la zona del
+# negocio a mano en vez de leerla, que el día que el grupo abra en otro país
+# se convierte en el mismo desfase por otra puerta (`rrhh/pad_asistencia.py`
+# y `core/celery_app.py` la tenían así hasta 2026-09-06).
 PROHIBIDO = {
     "date.today": "la fecha local del proceso, en vez de `fechas.hoy()`",
     "datetime.now()": "la hora local del proceso, sin zona: `datetime.now(UTC)` "
     "para un instante, `fechas.ahora()` para una franja horaria",
     "datetime.utcnow": "un naive que miente sobre ser UTC (y está deprecado)",
+    'ZoneInfo("America/': "la zona del negocio escrita a mano, en vez de "
+    "`fechas.zona()` / `settings.zona_horaria`",
 }
 
 

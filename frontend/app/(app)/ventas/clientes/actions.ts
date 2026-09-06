@@ -8,6 +8,7 @@ import type { EstadoFormulario } from "@/components/formulario/dialogo-formulari
 import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
 import { estadoDeError } from "@/lib/errores";
+import { tipoPorLargo } from "@/lib/documento";
 import { ubicacionDe } from "@/lib/ubicacion-form";
 
 export type EstadoCliente = EstadoFormulario;
@@ -38,7 +39,7 @@ export async function editarClienteAction(
   const ruc = texto(formData, "ruc");
   if (!id) return { error: "Falta el cliente a editar.", ok: false };
   if (!razonSocial) return { error: "La razón social es obligatoria.", ok: false };
-  if (ruc.length !== 11) return { error: "El RUC debe tener 11 dígitos.", ok: false };
+  if (tipoPorLargo(ruc) !== "ruc") return { error: "El RUC debe tener 11 dígitos.", ok: false };
 
   try {
     await apiFetch(`/api/v1/sales/clientes/${id}`, {
@@ -72,7 +73,7 @@ export async function completarDocumentoAction(
   const id = texto(formData, "id");
   const documento = texto(formData, "numero_documento");
   if (!id) return { error: "Falta el cliente.", ok: false };
-  if (documento.length !== 8 && documento.length !== 11) {
+  if (tipoPorLargo(documento) === null) {
     return { error: "El documento son 8 dígitos (DNI) u 11 (RUC).", ok: false };
   }
 

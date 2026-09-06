@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import type { EstadoFormulario } from "@/components/formulario/dialogo-formulario";
 import { ApiError, apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
+import { tipoPorLargo } from "@/lib/documento";
 import { ubicacionDe } from "@/lib/ubicacion-form";
 
 export type EstadoProveedor = EstadoFormulario;
@@ -46,7 +47,7 @@ function leerFormulario(formData: FormData): DatosProveedor {
 
 function validarIdentificacion(datos: DatosProveedor): string | null {
   if (!datos.razonSocial || !datos.ruc) return "Razón social y RUC son obligatorios.";
-  if (datos.ruc.length !== 11) return "El RUC debe tener 11 dígitos.";
+  if (tipoPorLargo(datos.ruc) !== "ruc") return "El RUC debe tener 11 dígitos.";
   return null;
 }
 
