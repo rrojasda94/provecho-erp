@@ -38,7 +38,11 @@ from src.core.model_base import JsonB, TimestampMixin, UuidPkMixin
 class ProductoComercial(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "producto_comercial"
 
-    id_interno: Mapped[str] = mapped_column(String(4), unique=True)
+    # Único en TODO el grupo, no por empresa ni por marca — mismo criterio
+    # que `inventory.articulo.id_interno`. 8 y no 4 —el largo original—
+    # por el mismo motivo: el espacio de códigos de 4 caracteres compartido
+    # entre todo el grupo se agotaba rápido.
+    id_interno: Mapped[str] = mapped_column(String(8), unique=True)
     marca_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("marca.id"))
     nombre: Mapped[str] = mapped_column(String(150))
     # Agrupador para ruteo KDS (pizzas → horno, bebidas → barra). Reusa la

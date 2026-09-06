@@ -137,7 +137,7 @@ class UnidadMedidaOut(BaseModel):
 # --- Artículos ---
 class ArticuloCreate(BaseModel):
     empresa_id: uuid.UUID | None = None
-    id_interno: str = Field(min_length=1, max_length=4)
+    id_interno: str = Field(min_length=1, max_length=8)
     nombre: str = Field(min_length=1, max_length=150)
     unidad_medida_id: uuid.UUID
     tipo: str = Field(max_length=30)
@@ -159,7 +159,7 @@ class ArticuloUpdate(BaseModel):
     # Un código de 4 caracteres mal tecleado se arrastra por toda la
     # operación —es lo que el almacenero lee en el estante— y hasta ahora
     # era inmutable.
-    id_interno: str | None = Field(default=None, min_length=1, max_length=4)
+    id_interno: str | None = Field(default=None, min_length=1, max_length=8)
     nombre: str | None = Field(default=None, min_length=1, max_length=150)
     categoria_id: uuid.UUID | None = None
     tipo: str | None = Field(default=None, max_length=30)
@@ -189,6 +189,15 @@ class SkuCreate(BaseModel):
     articulo_id: uuid.UUID
     codigo: str = Field(min_length=1, max_length=50)
     codigo_barras: str | None = None
+
+
+class SkuUpdate(BaseModel):
+    """Campo ausente o `null` = no tocar. `articulo_id` no está: un SKU no
+    cambia de artículo — eso es dar de alta uno nuevo y archivar el viejo."""
+
+    codigo: str | None = Field(default=None, min_length=1, max_length=50)
+    codigo_barras: str | None = None
+    activo: bool | None = None
 
 
 class SkuOut(BaseModel):
@@ -727,7 +736,7 @@ class ArticuloImportadoIn(BaseModel):
 
     id: uuid.UUID | None = None
     accion: Literal["crear", "actualizar", "omitir"] = "crear"
-    codigo: str = Field(min_length=1, max_length=4)
+    codigo: str = Field(min_length=1, max_length=8)
     nombre: str = Field(min_length=1, max_length=150)
     tipo: str = Field(default="insumo", max_length=30)
     unidad_medida_id: uuid.UUID | None = None

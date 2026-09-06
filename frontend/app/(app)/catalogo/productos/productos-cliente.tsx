@@ -144,11 +144,11 @@ function DialogoNuevoProducto({
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-semibold">
-            Código interno (4)
+            Código interno (8)
             <input
               value={idInterno}
-              onChange={(e) => setIdInterno(e.target.value.slice(0, 4))}
-              maxLength={4}
+              onChange={(e) => setIdInterno(e.target.value.slice(0, 8))}
+              maxLength={8}
               placeholder="PZPE"
             />
           </label>

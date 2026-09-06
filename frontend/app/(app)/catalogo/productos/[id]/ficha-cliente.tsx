@@ -604,7 +604,7 @@ function NuevaPresentacion({
         Código
         <input
           value={idInterno}
-          onChange={(e) => setIdInterno(e.target.value.slice(0, 4))}
+          onChange={(e) => setIdInterno(e.target.value.slice(0, 8))}
           placeholder="PZPF"
           className="w-20"
           disabled={deshabilitado}

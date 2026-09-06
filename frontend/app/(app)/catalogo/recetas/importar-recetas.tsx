@@ -329,10 +329,10 @@ function ResolverInsumo({
       {creando && (
         <div className="flex flex-wrap items-end gap-2 rounded bg-fondo p-2">
           <label className="flex flex-col gap-1 text-xs text-gray">
-            Código (4)
+            Código (8)
             <input
               value={codigo}
-              maxLength={4}
+              maxLength={8}
               onChange={(e) => setCodigo(e.target.value)}
               className="w-20 rounded border border-borde px-2 py-1 text-sm uppercase"
             />
