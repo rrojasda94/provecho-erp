@@ -3,6 +3,17 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **Leads, encuestas y evaluación de agencias siguen sin pantalla, y el
+  bloque es más grande de lo que parecía** (2026-09-05, Ola 3 de la auditoría
+  del 2026-08-30). Al abrirlo apareció que **faltan los endpoints de
+  listado**: `GET /leads` global no existe —solo por campaña—, `encuestas` no
+  tiene listado, y la evaluación de agencia cuelga de una campaña
+  (`/campanas/{id}/evaluaciones-agencia`) con su propio flujo de opciones →
+  decisión → cierre, que pide una **ficha de campaña** que el frontend
+  tampoco tiene. No es «poner pantalla a lo que ya está»: es backend nuevo
+  más una pantalla nueva por cada uno. Se separó del resto de la ola en vez
+  de entregarlo a medias.
+
 - ✅ 2026-08-01 **Slice core**: `campana` (brief → aprobada → en_curso →
   cerrada, RN-MKT-003), `pieza_contenido` (RN-MKT-001/002),
   `lead` con atribución a la venta, `implementacion_material_sucursal`
