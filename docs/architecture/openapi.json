@@ -28445,6 +28445,19 @@
             "title": "Categoria Udm Id",
             "type": "string"
           },
+          "codigo_sunat": {
+            "anyOf": [
+              {
+                "maxLength": 3,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Sunat"
+          },
           "decimales": {
             "default": 3,
             "maximum": 6.0,
@@ -28486,6 +28499,17 @@
             "title": "Categoria Udm Id",
             "type": "string"
           },
+          "codigo_sunat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Sunat"
+          },
           "decimales": {
             "title": "Decimales",
             "type": "integer"
@@ -28510,13 +28534,27 @@
           "categoria_udm_id",
           "nombre",
           "ratio",
-          "decimales"
+          "decimales",
+          "codigo_sunat"
         ],
         "title": "UnidadMedidaOut",
         "type": "object"
       },
       "UnidadMedidaUpdate": {
         "properties": {
+          "codigo_sunat": {
+            "anyOf": [
+              {
+                "maxLength": 3,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Sunat"
+          },
           "decimales": {
             "anyOf": [
               {
@@ -36496,6 +36534,52 @@
       }
     },
     "/api/v1/inventory/devoluciones/{devolucion_id}/guia-remision": {
+      "get": {
+        "operationId": "ver_guia_de_devolucion_api_v1_inventory_devoluciones__devolucion_id__guia_remision_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "devolucion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Devolucion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuiaRemisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Guia De Devolucion",
+        "tags": [
+          "inventory"
+        ]
+      },
       "post": {
         "description": "La mercadería que se le devuelve al proveedor viaja por la vía\npública: SUNAT no distingue el motivo para exigir la guía.",
         "operationId": "emitir_guia_de_devolucion_api_v1_inventory_devoluciones__devolucion_id__guia_remision_post",
@@ -36631,6 +36715,62 @@
           }
         ],
         "summary": "Listar Guias",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/guias-remision/{guia_id}/descargar/{formato}": {
+      "get": {
+        "description": "Baja el PDF que se entrega con la carga, o el XML firmado y el CDR\nque son el respaldo ante SUNAT. Mismo criterio que el comprobante\n(`sales/comprobantes.descargar_documento`): se pide a Factiliza en el\nmomento y no se archiva.",
+        "operationId": "descargar_guia_api_v1_inventory_guias_remision__guia_id__descargar__formato__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Guia Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "formato",
+            "required": true,
+            "schema": {
+              "enum": [
+                "pdf",
+                "xml",
+                "cdr"
+              ],
+              "title": "Formato",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descargar Guia",
         "tags": [
           "inventory"
         ]
