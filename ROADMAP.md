@@ -316,7 +316,7 @@ la 0.8.0 — endpoints entregados, probados y sin pantalla que los llame.
 |---|---|---|
 | `feat/contabilidad-arqueos-libro-mayor` | Arqueos (con su `GET`, que faltaba), reglas de asiento, libro mayor navegable y detalle de asiento | ✅ 2026-09-05 |
 | `feat/auditoria-pantalla` | `GET /api/v1/auditoria`: quién hizo qué, cuándo y con qué valor anterior | ✅ 2026-09-05 |
-| `feat/rrhh-nomina-permisos-disciplina` | Solicitudes de permiso, boletas, liquidaciones, disciplina, contratos y legajo | ⬜ |
+| `feat/rrhh-nomina-permisos-disciplina` | Legajo del trabajador (contratos, permisos, disciplina, certificados, pactos, boletas y liquidaciones en una lectura), bandeja de permisos y emisión de sanciones y certificados | ✅ 2026-09-05 — registrar boletas y liquidaciones queda como deuda: la nómina se calcula fuera del ERP |
 | `feat/marketing-leads-encuestas-agencia` | Leads, encuestas y evaluación de agencias | ⬜ |
 | `feat/reports-matriz-edicion` | Edición de áreas, reglas y miembros de distribución | ⬜ |
 

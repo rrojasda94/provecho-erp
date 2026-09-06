@@ -23,3 +23,16 @@ export function fechaHora(iso: string): string {
 export function fecha(iso: string): string {
   return new Date(iso).toLocaleDateString("es-PE", { timeZone: ZONA_NEGOCIO });
 }
+
+/** Hoy en la zona del negocio, como `YYYY-MM-DD`.
+ *
+ * Para el `defaultValue` de un `<input type="date">`, que exige ese formato.
+ * `toISOString().slice(0, 10)` da el día **en UTC**: a las 19:00 de Lima ya es
+ * el día siguiente, así que un formulario abierto de noche proponía mañana.
+ */
+export function hoyEnZonaDelNegocio(ahora: Date = new Date()): string {
+  // `en-CA` porque su formato corto ya es `YYYY-MM-DD`; la zona es la que
+  // importa, el idioma solo elige el orden de los números.
+  return ahora.toLocaleDateString("en-CA", { timeZone: ZONA_NEGOCIO });
+}
+

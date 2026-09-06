@@ -95,6 +95,9 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
   rrhh: [
     { label: "Contratación", href: "/rrhh/contratacion" },
     { label: "Trabajadores", href: "/rrhh/trabajadores" },
+    // La bandeja de quien aprueba: se entra por «qué tengo pendiente», no
+    // por un trabajador (RN-RRHH-005).
+    { label: "Permisos", href: "/rrhh/permisos" },
     { label: "Turnos", href: "/rrhh/turnos" },
     // El dispositivo autorizado a marcar por un local (ADR-073) — separado
     // de Turnos porque lo que se administra acá es la tablet, no el

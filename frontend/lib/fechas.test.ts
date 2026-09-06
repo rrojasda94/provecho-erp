@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { fecha, fechaHora } from "./fechas.ts";
+import { fecha, fechaHora, hoyEnZonaDelNegocio } from "./fechas.ts";
 
 // Las 21:00 del 30 en Lima. En UTC ya es el 31: es exactamente el rango
 // horario en el que el ERP se usa y en el que el día se corría.
@@ -44,3 +44,15 @@ test("un instante con offset explícito se convierte, no se toma literal", () =>
   assert.ok(fechaHora("2026-08-30T12:00:00+02:00").startsWith("30/"));
   assert.ok(fecha("2026-08-30T00:30:00+02:00").startsWith("29/"));
 });
+
+test("hoy en zona del negocio no se adelanta de noche", () => {
+  // 2026-09-05 23:30 en Lima son las 04:30 UTC del 6: `toISOString()` habría
+  // dicho «6» y el formulario habría propuesto mañana.
+  const nocheDeLima = new Date("2026-09-06T04:30:00Z");
+  assert.equal(hoyEnZonaDelNegocio(nocheDeLima), "2026-09-05");
+});
+
+test("de día coincide con el calendario", () => {
+  assert.equal(hoyEnZonaDelNegocio(new Date("2026-09-05T15:00:00Z")), "2026-09-05");
+});
+

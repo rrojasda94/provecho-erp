@@ -82,6 +82,7 @@ const RUTAS = [
   "/rrhh",
   "/rrhh/contratacion",
   "/rrhh/trabajadores",
+  "/rrhh/permisos",
   "/auditoria",
   "/usuarios",
   "/usuarios/personas",
