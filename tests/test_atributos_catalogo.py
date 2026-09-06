@@ -521,6 +521,119 @@ def test_una_receta_que_ningun_producto_usa_no_tiene_ejes(session, base):
     assert atributos_uc.atributos_de_receta(session, suelta.id) == []
 
 
+# --- La condición de una línea se valida contra el producto (ADR-092) -------
+
+
+def test_agregar_item_rechaza_un_valor_que_el_producto_no_ofrece(session, base):
+    """Antes de esto, el único guardarraíl era la lectura conservadora de
+    `aplica_a_variante` — dejaba pasar una receta mal armada sin avisar."""
+    atributo = _tamano(session, base, "Personal", "Familiar")
+    atributos_uc.ofrecer_atributo(
+        session, producto_id=base["producto"].id, atributo_id=atributo.id
+    )
+    session.flush()
+    ptav_ajeno = uuid.uuid4()  # de otro producto, o inventado
+    articulo = _articulo(session, base)
+
+    with pytest.raises(ReglaNegocio, match="ningún producto"):
+        recetas_uc.agregar_item(
+            session,
+            receta_id=base["receta"].id,
+            articulo_id=articulo.id,
+            cantidad=Decimal(1),
+            aplica_valores=[ptav_ajeno],
+        )
+
+
+def test_agregar_item_acepta_un_valor_que_el_producto_ofrece(session, base):
+    atributo = _tamano(session, base, "Personal", "Familiar")
+    linea = atributos_uc.ofrecer_atributo(
+        session, producto_id=base["producto"].id, atributo_id=atributo.id
+    )
+    session.flush()
+    ptav = atributos_uc.ptav_de_linea(session, linea.id)[0]
+    articulo = _articulo(session, base)
+
+    item = recetas_uc.agregar_item(
+        session,
+        receta_id=base["receta"].id,
+        articulo_id=articulo.id,
+        cantidad=Decimal(1),
+        aplica_valores=[ptav.id],
+    )
+    assert item.aplica_valores == [str(ptav.id)]
+
+
+def test_editar_item_rechaza_cambiar_a_un_valor_ajeno(session, base):
+    atributo = _tamano(session, base, "Personal", "Familiar")
+    linea = atributos_uc.ofrecer_atributo(
+        session, producto_id=base["producto"].id, atributo_id=atributo.id
+    )
+    session.flush()
+    ptav = atributos_uc.ptav_de_linea(session, linea.id)[0]
+    articulo = _articulo(session, base)
+    item = recetas_uc.agregar_item(
+        session,
+        receta_id=base["receta"].id,
+        articulo_id=articulo.id,
+        cantidad=Decimal(1),
+        aplica_valores=[ptav.id],
+    )
+    session.flush()
+
+    with pytest.raises(ReglaNegocio, match="ningún producto"):
+        recetas_uc.editar_item(
+            session, item.id, aplica_valores=[uuid.uuid4()],
+        )
+
+
+def test_editar_item_reafirmar_la_misma_condicion_no_revalida(session, base):
+    """Idempotente incluso si el producto ya no ofrece ese valor —quitar un
+    valor no puede tumbar una línea que ya estaba condicionada con él."""
+    atributo = _tamano(session, base, "Personal", "Familiar")
+    linea = atributos_uc.ofrecer_atributo(
+        session, producto_id=base["producto"].id, atributo_id=atributo.id
+    )
+    session.flush()
+    ptav = atributos_uc.ptav_de_linea(session, linea.id)[0]
+    articulo = _articulo(session, base)
+    item = recetas_uc.agregar_item(
+        session,
+        receta_id=base["receta"].id,
+        articulo_id=articulo.id,
+        cantidad=Decimal(1),
+        aplica_valores=[ptav.id],
+    )
+    session.flush()
+
+    item = recetas_uc.editar_item(session, item.id, aplica_valores=[ptav.id])
+    assert item.aplica_valores == [str(ptav.id)]
+
+
+def test_una_receta_que_ningun_producto_usa_acepta_cualquier_condicion(session, base):
+    """Sin producto no hay contra qué validar — el editor ya esconde la
+    columna en ese caso (ADR-063 §4), y el servidor tampoco puede exigir
+    nada que no existe."""
+    suelta = recetas_uc.crear_receta(
+        session,
+        empresa_id=base["empresa"].id,
+        nombre="Masa Madre",
+        rendimiento_cantidad=Decimal(1),
+        rendimiento_unidad_medida_id=_unidad(session).id,
+    )
+    session.flush()
+    articulo = _articulo(session, base)
+
+    item = recetas_uc.agregar_item(
+        session,
+        receta_id=suelta.id,
+        articulo_id=articulo.id,
+        cantidad=Decimal(1),
+        aplica_valores=[uuid.uuid4()],
+    )
+    assert len(item.aplica_valores) == 1
+
+
 def test_la_variante_ve_los_atributos_colgados_del_padre(session, base):
     """Herencia, igual que `valores_ofrecidos` (ADR-042): quien arma el
     producto a mano cuelga el atributo del padre porque todavía no hay

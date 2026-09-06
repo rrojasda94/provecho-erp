@@ -876,7 +876,10 @@ Viaja en los cinco eventos de venta, de forma **aditiva**.
 **Contrato público nuevo**: `atributo_de_valores(session, ids)` →
 `{ptav_id: atributo_id}`. Lo consume `inventory` para evaluar las líneas de
 receta condicionadas (ADR-056); sin él no se puede agrupar la condición por
-atributo.
+atributo. `valores_ofrecidos_de_receta(session, receta_id)` (ADR-092,
+2026-09-06) es el mismo contrato del lado de la escritura: la unión de
+`valores_ofrecidos` de cada producto que usa la receta, para que
+`inventory.recetas` rechace un valor que ningún producto de verdad ofrece.
 
 `valores_ofrecidos(session, producto)` aplica la herencia del padre, misma
 regla que `grupos_efectivos`/`extras_efectivos` (ADR-042).
