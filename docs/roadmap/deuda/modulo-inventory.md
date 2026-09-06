@@ -396,17 +396,21 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `stock_minimo` y `solicitud_item.bajo_minimo_al_pedir` se estampa al
   agregar cada ítem. Suma `GET /conteos` (faltaba) y pantallas
   `/inventario/solicitudes` + `/inventario/conteos`. Deuda que deja abierta:
-  - ⬜ **El borrador no se encadena al cierre de un conteo cíclico**: hoy lee
-    el `stock_minimo` vigente al abrir la pantalla, independiente de
-    ADR-019. El SOP de abastecimiento (`docs/domain/workflows.md`
-    §Abastecimiento de locales, paso 4) describe que el conteo **genera**
-    el borrador; conectar los dos es una decisión de flujo —¿todo cierre de
-    conteo dispara un borrador, o solo el conteo general?— que no se tomó
-    en este slice.
-  - ⬜ **Recortar lo aprobado por SKU sin pantalla**: `SolicitudAprobar.aprobadas`
-    existe desde ADR-020 y la pantalla nueva solo ofrece aprobar tal cual se
-    pidió (`aprobadas: []`). Falta el formulario que deje editar cantidad
-    por ítem al aprobar.
+  - ✅ 2026-09-06 **El borrador se encadena al cierre de un conteo cíclico**
+    (bloque `feat/inventario-solicitudes-y-conteo`, RN-INV-026, ADR-093).
+    **Todo cierre dispara el refresco, no solo el conteo general** —decisión
+    tomada: `borrador_del_almacen` es aditivo, así que dispararlo de más no
+    tiene costo. Llamada directa desde `conteos.cerrar_conteo`, no un
+    evento: emisor y consumidor viven en el mismo módulo, y no hay en el
+    repo un caso de módulo suscrito a su propio evento. Un almacén sin
+    abastecedor (el central) no rompe el cierre — armar el borrador se
+    atrapa y se ignora, es consecuencia del cierre, no condición.
+    `docs/domain/workflows.md` §Abastecimiento, paso 4, actualizado.
+  - ✅ 2026-09-06 **Recorte por SKU al aprobar, con pantalla** (bloque
+    `feat/inventario-solicitudes-y-conteo`). `SolicitudAprobar.aprobadas`
+    existía desde ADR-020 sin llamador; el diálogo «Aprobar» ahora arranca
+    con lo pedido en cada línea y deja bajarlo — en 0 la línea queda fuera y
+    no reserva nada, mismo molde que el `Picking` del despacho.
 - ✅ 2026-08-20 **El importador crea el insumo que falta desde el diálogo**
   (ADR-052). El `<select>` de resolución tiene ahora un botón «Crear» con un
   formulario en línea —código, unidad y tipo, con el nombre prellenado del

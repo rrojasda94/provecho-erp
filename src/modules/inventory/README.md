@@ -346,7 +346,16 @@ que el listado, solo empaquetados. Plantilla, validar e importar piden
   van por almacén y sucursal/marca cuelgan de él.
 - Pantallas nuevas: `/inventario/solicitudes` (la lista de la jornada +
   aprobar/rechazar/cancelar) y `/inventario/conteos` (abrir, contar a
-  ciegas, cerrar viendo los ajustes generados, anular con motivo).
+  ciegas, cerrar viendo los ajustes generados, anular con motivo). **Aprobar
+  recorta por SKU** (2026-09-06): el diálogo arranca con lo pedido en cada
+  línea y deja bajarlo antes de enviar `SolicitudAprobar.aprobadas` —en 0 la
+  línea queda fuera y no reserva nada—, mismo molde que el `Picking` del
+  despacho.
+- **Cerrar un conteo arma o pone al día el borrador del almacén contado**
+  (2026-09-06, RN-INV-026, ADR-093): todo cierre, no solo el general —el
+  refresco es aditivo, así que dispararlo de más no tiene costo. Un almacén
+  sin abastecedor (el central) no rompe el cierre: armar el borrador se
+  atrapa y se ignora, es consecuencia, no condición.
 
 Tests: `tests/test_solicitudes_borrador.py` (10 casos) y los agregados a
 `tests/test_conteos.py`. Recorrido de uso:
