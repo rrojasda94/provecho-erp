@@ -665,16 +665,24 @@ negativa es 409: una salida de un artículo con lote reparte por FEFO
 `application/listeners.py`), consumido por `core.dashboard_router` para el
 dashboard gerencial.
 
-**Guía de remisión** (2026-08-05, ADR-027): cuelga de `transferencia`
-porque lo que declara es un traslado, y el traslado es un hecho de
-inventario (RN-GDR-002: la emite el almacén). Las líneas **se derivan**
-de `transferencia_item` agrupadas por SKU —RN-TRP-002 exige que lo
-transportado coincida con lo declarado, así que no hay formulario de
-ítems— y solo se teclea lo que el sistema no puede saber: chofer,
-vehículo, peso bruto y fecha de inicio del viaje. Un traslado, una guía
-(`transferencia_id` único) y correlativo por `(empresa, serie)`. El envío
-a SUNAT es asíncrono (`POST /despatch/send` vía Celery): la guía impresa
-es la que viaja y un rechazo se corrige y reemite, no detiene el camión.
+**Guía de remisión** (2026-08-05, ADR-027; pantalla y descarga 2026-09-06,
+ADR-090): cuelga de `transferencia` porque lo que declara es un traslado, y
+el traslado es un hecho de inventario (RN-GDR-002: la emite el almacén).
+Las líneas **se derivan** de `transferencia_item` agrupadas por SKU
+—RN-TRP-002 exige que lo transportado coincida con lo declarado, así que
+no hay formulario de ítems— y solo se teclea lo que el sistema no puede
+saber: chofer, vehículo, peso bruto y fecha de inicio del viaje. Un
+traslado, una guía (`transferencia_id` único) y correlativo por
+`(empresa, serie)`. El envío a SUNAT es asíncrono (`POST /despatch/send`
+vía Celery): la guía impresa es la que viaja y un rechazo se corrige y
+reemite, no detiene el camión. Se emite desde la pantalla de su documento
+origen —Traslados o Devoluciones, botón «Guía»— y no desde una pantalla
+propia; `GET /guias-remision/{id}/descargar/{formato}` baja el PDF/XML/CDR
+de una guía aceptada, mismo criterio que `sales.descargar_comprobante`
+(recurso `"despatch"` en vez de `"invoice"` sobre el mismo
+`FactilizaClient.descargar`). `unidad_medida.codigo_sunat` (nullable,
+editable desde Catálogo) manda sobre el diccionario de doce entradas de
+`guias.py` cuando está configurada.
 
 **Diferido (deuda del módulo):** del slice de abastecimiento,
 `reserva_stock` sigue con dos tipos sin productor (`produccion` y

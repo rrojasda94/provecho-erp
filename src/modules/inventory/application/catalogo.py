@@ -189,6 +189,7 @@ def crear_unidad_medida(
     nombre: str,
     ratio: Decimal,
     decimales: int,
+    codigo_sunat: str | None = None,
 ) -> UnidadMedida:
     _existe(session, CategoriaUdm, categoria_udm_id, "categoría de unidad de medida")
     repo = UnidadMedidaRepo(session)
@@ -200,6 +201,7 @@ def crear_unidad_medida(
             nombre=nombre,
             ratio=ratio,
             decimales=decimales,
+            codigo_sunat=codigo_sunat,
         )
     )
 
@@ -208,7 +210,7 @@ def editar_unidad_medida(session: Session, unidad_medida_id: uuid.UUID, **campos
     unidad = UnidadMedidaRepo(session).get(unidad_medida_id)
     if unidad is None:
         raise NoEncontrado("unidad de medida no encontrada")
-    for campo in ("nombre", "ratio", "decimales"):
+    for campo in ("nombre", "ratio", "decimales", "codigo_sunat"):
         if campo in campos and campos[campo] is not None:
             setattr(unidad, campo, campos[campo])
     return unidad

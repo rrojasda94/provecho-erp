@@ -27,3 +27,8 @@ class UnidadMedida(Base, UuidPkMixin, TimestampMixin):
     nombre: Mapped[str] = mapped_column(String(50))
     ratio: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=Decimal(1))
     decimales: Mapped[int] = mapped_column(Integer, default=3)
+    # Código de unidad de medida SUNAT (catálogo 03) para la guía de
+    # remisión, ej. "KGM", "NIU", "LTR". Nullable: mientras no lo llene
+    # nadie, `factiliza/guias.py::codigo_unidad` sigue traduciendo con su
+    # diccionario de doce unidades y cae en "NIU" si no reconoce el nombre.
+    codigo_sunat: Mapped[str | None] = mapped_column(String(3), nullable=True)

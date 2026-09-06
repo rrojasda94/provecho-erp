@@ -355,6 +355,49 @@ def test_la_devolucion_a_proveedor_emite_su_guia(env):
     ).status_code == 409
 
 
+def test_leer_la_guia_de_devolucion_antes_de_emitirla_404(env):
+    client, ids, _ = env
+    h_alm = _token(client, "almacenero1", "654321")
+    lote = _ingresar(client, h_alm, ids, ids["sku_queso"], 10)
+    devolucion = client.post("/api/v1/inventory/devoluciones", headers=h_alm, json={
+        "almacen_id": ids["central_id"], "origen": "proveedor",
+        "referencia_id": ids["proveedor_id"], "motivo": "dañado",
+        "items": [{"sku_id": ids["sku_queso"], "cantidad": "4", "lote_id": lote}],
+    }).json()
+
+    r = client.get(
+        f"/api/v1/inventory/devoluciones/{devolucion['id']}/guia-remision", headers=h_alm
+    )
+    assert r.status_code == 404
+
+
+def test_leer_la_guia_de_devolucion_ya_emitida(env):
+    client, ids, _ = env
+    h_alm = _token(client, "almacenero1", "654321")
+    lote = _ingresar(client, h_alm, ids, ids["sku_queso"], 10)
+    devolucion = client.post("/api/v1/inventory/devoluciones", headers=h_alm, json={
+        "almacen_id": ids["central_id"], "origen": "proveedor",
+        "referencia_id": ids["proveedor_id"], "motivo": "dañado",
+        "items": [{"sku_id": ids["sku_queso"], "cantidad": "4", "lote_id": lote}],
+    }).json()
+    emitida = client.post(
+        f"/api/v1/inventory/devoluciones/{devolucion['id']}/guia-remision",
+        headers=h_alm,
+        json={
+            "lugar_destino": "Av. Industrial 500 - Lima",
+            "chofer_nombres": "Luis", "chofer_apellidos": "Pérez",
+            "chofer_num_doc": "44556677", "chofer_licencia": "Q44556677",
+            "vehiculo_placa": "ABC-123", "peso_bruto_kg": "12.5",
+        },
+    ).json()
+
+    r = client.get(
+        f"/api/v1/inventory/devoluciones/{devolucion['id']}/guia-remision", headers=h_alm
+    )
+    assert r.status_code == 200
+    assert r.json()["id"] == emitida["id"]
+
+
 # --- Devolución de cliente ----------------------------------------------------
 def test_lo_que_devuelve_un_cliente_para_reintegro_vuelve_al_estante(env):
     client, ids, _ = env

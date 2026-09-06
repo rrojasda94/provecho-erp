@@ -97,3 +97,40 @@ export async function anularDevolucionAction(
   revalidatePath(RUTA);
   return { error: "", ok: true };
 }
+
+/**
+ * Emite la guía de la devolución a proveedor.
+ *
+ * Solo la devolución `a proveedor` sale del almacén por la vía pública; la
+ * de cliente entra y no la necesita. Idempotente por devolución, igual que
+ * la del traslado: pedirla dos veces devuelve la misma.
+ */
+export async function emitirGuiaDevolucionAction(
+  _previo: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const devolucionId = texto(formData, "devolucion_id");
+  if (!devolucionId) return { error: "Falta la devolución.", ok: false };
+
+  try {
+    await apiFetch(`/api/v1/inventory/devoluciones/${devolucionId}/guia-remision`, {
+      token: await token(),
+      metodo: "POST",
+      cuerpo: {
+        lugar_destino: texto(formData, "lugar_destino"),
+        chofer_nombres: texto(formData, "chofer_nombres"),
+        chofer_apellidos: texto(formData, "chofer_apellidos"),
+        chofer_num_doc: texto(formData, "chofer_num_doc"),
+        chofer_licencia: texto(formData, "chofer_licencia"),
+        vehiculo_placa: texto(formData, "vehiculo_placa"),
+        peso_bruto_kg: texto(formData, "peso_bruto_kg"),
+        fecha_inicio_traslado: texto(formData, "fecha_inicio_traslado") || null,
+        observacion: texto(formData, "observacion") || null,
+      },
+    });
+  } catch (e) {
+    return estadoDeError(e, "No se pudo emitir la guía.");
+  }
+  revalidatePath(RUTA);
+  return { error: "", ok: true };
+}

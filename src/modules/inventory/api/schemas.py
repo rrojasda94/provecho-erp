@@ -109,12 +109,17 @@ class UnidadMedidaCreate(BaseModel):
     # no hay un default universal correcto; el default del modelo (3) es
     # solo el más común, quien crea la unidad decide el suyo.
     decimales: int = Field(ge=0, le=6, default=3)
+    # Catálogo 03 de SUNAT (ej. "KGM", "NIU", "LTR"), para la guía de
+    # remisión. Sin esto, `codigo_unidad()` traduce con su diccionario y
+    # cae en "NIU" si no reconoce el nombre.
+    codigo_sunat: str | None = Field(default=None, min_length=1, max_length=3)
 
 
 class UnidadMedidaUpdate(BaseModel):
     nombre: str | None = None
     ratio: Decimal | None = None
     decimales: int | None = Field(default=None, ge=0, le=6)
+    codigo_sunat: str | None = Field(default=None, min_length=1, max_length=3)
 
 
 class UnidadMedidaOut(BaseModel):
@@ -126,6 +131,7 @@ class UnidadMedidaOut(BaseModel):
     # Con cuántos decimales se teclea una cantidad en esta unidad
     # (RN-GER-010): 3 para kilos, 0 para unidades sueltas.
     decimales: int
+    codigo_sunat: str | None
 
 
 # --- Artículos ---

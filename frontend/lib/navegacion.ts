@@ -59,6 +59,10 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     // Al lado del requerimiento porque es su continuación: lo que se aprueba
     // se despacha, y sale de acá hasta que el destino lo recibe.
     { label: "Traslados", href: "/inventario/transferencias" },
+    // El documento que declara el traslado ante SUNAT — se emite desde la
+    // ficha del traslado o de la devolución a proveedor; esta entrada es
+    // solo para revisar lo ya emitido.
+    { label: "Guías de remisión", href: "/inventario/guias-remision" },
     { label: "Conteos", href: "/inventario/conteos" },
     { label: "Artículos", href: "/inventario/articulos" },
     { label: "Categorías", href: "/inventario/categorias" },

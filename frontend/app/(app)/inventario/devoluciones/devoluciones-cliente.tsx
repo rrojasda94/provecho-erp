@@ -5,13 +5,19 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { Insignia } from "@/components/estado/insignia";
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { Combobox } from "@/components/ui/combobox";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { ErrorApi, pedir } from "@/lib/cliente-api";
 import { primeroElDe } from "@/lib/destinos";
 import { tienePermiso } from "@/lib/permisos";
 
-import { anularDevolucionAction, registrarDevolucionAction } from "./actions";
+import {
+  anularDevolucionAction,
+  emitirGuiaDevolucionAction,
+  registrarDevolucionAction,
+} from "./actions";
 
 export type Devolucion = {
   id: string;
@@ -27,6 +33,21 @@ export type Devolucion = {
 
 export type OpcionAlmacen = { id: string; nombre: string };
 export type OpcionSku = { id: string; etiqueta: string };
+
+type GuiaRemision = {
+  id: string;
+  serie: string;
+  correlativo: number;
+  estado_emision: string;
+  detalle_emision: string | null;
+};
+
+const TONO_GUIA: Record<string, "exito" | "alerta" | "peligro" | "info" | "neutro"> = {
+  pendiente: "info",
+  aceptado: "exito",
+  rechazado: "peligro",
+  error: "alerta",
+};
 
 /** Los mismos valores que el enum del servidor (`devoluciones.MOTIVOS`). */
 const MOTIVOS = [
@@ -72,6 +93,7 @@ export function DevolucionesCliente({
   // control se ofrece —autoriza la API—, porque un botón que siempre
   // termina en 403 es peor que no tenerlo.
   const puedeRegistrar = tienePermiso(permisos, "inventory.registrar_movimiento");
+  const puedeEmitirGuia = tienePermiso(permisos, "inventory.emitir_guia");
 
   const anular = async (id: string) => {
     setError("");
@@ -105,22 +127,28 @@ export function DevolucionesCliente({
       {
         id: "acciones",
         header: "",
-        cell: ({ row }) =>
-          row.original.estado === "registrada" && puedeRegistrar ? (
-            <button
-              type="button"
-              className="text-xs text-secondary underline"
-              onClick={() => anular(row.original.id)}
-            >
-              Anular
-            </button>
-          ) : null,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-3">
+            {row.original.estado === "registrada" && puedeRegistrar && (
+              <button
+                type="button"
+                className="text-xs text-secondary underline"
+                onClick={() => anular(row.original.id)}
+              >
+                Anular
+              </button>
+            )}
+            {row.original.origen === "proveedor" &&
+              row.original.estado === "registrada" &&
+              puedeEmitirGuia && <DialogoGuia devolucion={row.original} />}
+          </div>
+        ),
       },
     ],
     // `anular` se recrea en cada render y no aporta nada como dependencia:
     // lo que importa es que las columnas no se rearmen por cada tecla.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [puedeRegistrar],
+    [puedeRegistrar, puedeEmitirGuia],
   );
 
   const ordenadas = useMemo(
@@ -238,6 +266,116 @@ function FormularioDevolucion({
         Observación
         <input name="observacion" maxLength={255} placeholder="Opcional" />
       </label>
+    </DialogoFormulario>
+  );
+}
+
+/**
+ * Guía de remisión de la devolución a proveedor.
+ *
+ * La mercadería que se le devuelve al proveedor viaja por la vía pública:
+ * SUNAT no distingue el motivo para exigir la guía. Igual que la del
+ * traslado, se pregunta al abrir si ya existe una — reenviar el formulario
+ * no numera una segunda (RN-GDR-001..003).
+ */
+function DialogoGuia({ devolucion }: { devolucion: Devolucion }) {
+  const [guia, setGuia] = useState<GuiaRemision | null | undefined>(undefined);
+  const [errorCarga, setErrorCarga] = useState("");
+
+  async function cargar() {
+    setErrorCarga("");
+    setGuia(undefined);
+    try {
+      const detalle = await pedir<GuiaRemision>(
+        `/inventory/devoluciones/${devolucion.id}/guia-remision`,
+      );
+      setGuia(detalle);
+    } catch (e) {
+      if (e instanceof ErrorApi && e.status === 404) {
+        setGuia(null);
+        return;
+      }
+      setGuia(null);
+      setErrorCarga("No se pudo consultar si la devolución ya tiene guía.");
+    }
+  }
+
+  const yaEmitida = guia != null;
+
+  return (
+    <DialogoFormulario
+      titulo="Guía de remisión"
+      disparador="Guía"
+      claseDisparador="text-xs font-semibold text-primary hover:underline"
+      etiquetaEnvio="Emitir"
+      etiquetaPendiente="Emitiendo..."
+      accion={emitirGuiaDevolucionAction}
+      ancho="max-w-lg"
+      ayuda="Lo que se devuelve sale del almacén por la vía pública. Lo que se teclea es lo que el sistema no puede saber: a dónde va, quién maneja y en qué vehículo."
+      alAbrir={cargar}
+      envioDeshabilitado={yaEmitida || guia === undefined}
+    >
+      <input type="hidden" name="devolucion_id" value={devolucion.id} />
+      {errorCarga && (
+        <p role="alert" className="text-sm font-semibold text-status-danger">
+          {errorCarga}
+        </p>
+      )}
+      {guia === undefined && !errorCarga && (
+        <p className="text-sm text-muted-foreground">Consultando...</p>
+      )}
+      {yaEmitida && guia && (
+        <div className="flex items-center gap-2 text-sm">
+          <span className="font-semibold">
+            {guia.serie}-{String(guia.correlativo).padStart(8, "0")}
+          </span>
+          <Insignia tono={TONO_GUIA[guia.estado_emision] ?? "neutro"}>
+            {guia.estado_emision}
+          </Insignia>
+        </div>
+      )}
+      {guia === null && !errorCarga && (
+        <>
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Lugar de destino
+            <input name="lugar_destino" required minLength={3} maxLength={255} />
+          </label>
+          <div className="grid grid-cols-2 gap-4">
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              Chofer — nombres
+              <input name="chofer_nombres" required minLength={2} maxLength={120} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              Chofer — apellidos
+              <input name="chofer_apellidos" required minLength={2} maxLength={120} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              Documento
+              <input name="chofer_num_doc" required minLength={8} maxLength={15} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              Licencia
+              <input name="chofer_licencia" required minLength={6} maxLength={20} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              Placa del vehículo
+              <input name="vehiculo_placa" required minLength={6} maxLength={10} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              Peso bruto (kg)
+              <input name="peso_bruto_kg" type="number" min="0.001" step="0.001" required />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold">
+              Inicio del traslado
+              <input name="fecha_inicio_traslado" type="date" />
+            </label>
+          </div>
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            Observación
+            <input name="observacion" maxLength={500} />
+          </label>
+        </>
+      )}
     </DialogoFormulario>
   );
 }
