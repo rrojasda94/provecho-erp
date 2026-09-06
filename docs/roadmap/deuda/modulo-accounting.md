@@ -3,6 +3,34 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-09-05 **La contabilidad deja de vaciarse en silencio** (ADR-089,
+  migración `b5e7d1a3c92f`): la empresa nace con su PCGE —`accounting` escucha
+  `organizacion.empresa_creada`—, el periodo se abre al primer asiento del mes
+  y la omisión queda en `asiento_omitido` con su motivo. Cierra la causa real
+  de que el balance estuviera vacío: importar el plan de cuentas y abrir el
+  mes eran dos cosas manuales que nadie sabía que había que hacer, y sin
+  cualquiera de las dos **ningún** asiento automático del ERP entraba.
+  Lo que deja abierto:
+  - ⬜ **El efectivo que no nace en una caja de PDV no tiene dónde colgarse.**
+    `movimiento_caja` y `custodia_efectivo` llevan `apertura_caja_id`, así que
+    la plata que sale del banco para caja chica (o que entra por un préstamo o
+    un premio) queda **sin responsable nominal**: nadie firma que la recibió,
+    no se cuenta al cierre y no aparece en ningún arqueo. Es un hueco de
+    modelo, no un endpoint que falte — el circuito que construyó ADR-025 está
+    anclado al turno. Mientras tanto se registra con asiento manual, ver
+    [`docs/contabilidad/operaciones-no-operativas.md`](../../contabilidad/operaciones-no-operativas.md).
+  - ⬜ **`MovimientoDinero.tipo="ingreso"` es inalcanzable por API**: el enum
+    lo admite, pero `PagoProveedorCreate` no expone `tipo` ni `concepto` y
+    `registrar_pago` fija `"pago_proveedor"`. Un ingreso de tesorería no tiene
+    cómo entrar a la cola.
+  - ⬜ **RN-EMP-006 no tiene implementación**: «todo préstamo requiere estudio
+    de viabilidad previo del área contable, aprobado por Gerencia». Hoy es una
+    regla escrita que nada verifica, ni siquiera como recordatorio.
+  - ⬜ **Los asientos perdidos no se reponen.** Este cambio arregla de acá en
+    adelante; las ventas y consumos que ocurrieron mientras faltaban las
+    cuentas y el periodo siguen sin asiento. Reprocesarlos es otro trabajo —
+    hay que saber qué eventos hubo, no solo qué falta.
+
 - ✅ 2026-08-30 **La cuenta contable se configura en la categoría y se hereda**
   (ADR-086, sin migración): las líneas de plantilla llevan rol, el asiento
   reparte el monto del evento por categoría y `articulo.tipo="servicio"` manda

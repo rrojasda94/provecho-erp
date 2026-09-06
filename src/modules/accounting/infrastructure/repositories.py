@@ -20,6 +20,7 @@ from src.modules.accounting.infrastructure.models import (
     Arqueo,
     Asiento,
     AsientoLinea,
+    AsientoOmitido,
     CierreCaja,
     CuentaContable,
     CustodiaEfectivo,
@@ -172,6 +173,43 @@ class AsientoRepo:
         self.s.add(asiento)
         self.s.flush()
         return asiento
+
+
+class AsientoOmitidoRepo:
+    """Los asientos que no se escribieron y por qué (`models/asiento_omitido`)."""
+
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def add(self, omitido: AsientoOmitido) -> AsientoOmitido:
+        self.s.add(omitido)
+        self.s.flush()
+        return omitido
+
+    def list(
+        self,
+        empresa_id: uuid.UUID,
+        *,
+        desde: date | None = None,
+        hasta: date | None = None,
+        limite: int = 200,
+    ) -> list[AsientoOmitido]:
+        q = select(AsientoOmitido).where(AsientoOmitido.empresa_id == empresa_id)
+        if desde is not None:
+            q = q.where(AsientoOmitido.fecha >= desde)
+        if hasta is not None:
+            q = q.where(AsientoOmitido.fecha <= hasta)
+        return list(
+            self.s.scalars(q.order_by(AsientoOmitido.fecha.desc()).limit(limite))
+        )
+
+    def contar(self, empresa_id: uuid.UUID, *, desde: date | None = None) -> int:
+        q = select(func.count(AsientoOmitido.id)).where(
+            AsientoOmitido.empresa_id == empresa_id
+        )
+        if desde is not None:
+            q = q.where(AsientoOmitido.fecha >= desde)
+        return self.s.scalar(q) or 0
 
 
 class ReglaAsientoRepo:

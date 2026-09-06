@@ -286,6 +286,47 @@ empezar: `fix/rbac-botones-resto` se achica porque
 un solo `<dialog>`; y `feat/inventario-transferencias-mermas` está cumplido
 solo en su tercio de transferencias.
 
+## La contabilidad que no registraba, y la Ola 3 (2026-09-05)
+
+Reportado operando en staging: **las ventas cerradas no aparecían en el
+balance y la comida de personal no costaba nada**. La hipótesis era que
+faltaba cablear algo, o que la facturación en pruebas solo reconoce
+comprobantes oficiales.
+
+No era eso, y vale escribirlo porque es el patrón que se repite: **el
+cableado estaba completo y probado**. El asiento de la venta se genera al
+confirmar la orden —del comprobante aceptado cuelga solo el IGV— y el de la
+comida de personal existe desde ADR-034. Lo que fallaba es que el asiento
+**se descartaba en silencio** por dos cosas que había que hacer a mano y
+nadie sabía: importar el plan de cuentas y abrir el periodo del mes. Un mes
+que nadie abría descartaba todos los asientos automáticos del ERP entero, y
+el único aviso era un `log.info` que además decía el motivo equivocado.
+
+| Bloque | Qué | Estado |
+|---|---|---|
+| `fix/contabilidad-no-asienta` | La empresa nace con su PCGE, el periodo se abre al primer asiento del mes, y la omisión queda en `asiento_omitido` con su motivo (ADR-089) | ✅ 2026-09-05 |
+| `fix/contabilidad-cobro-y-anulacion` | El cobro cancela la `1212` y mueve caja/bancos; la venta anulada revierte su ingreso; el incremento de una orden ya confirmada se asienta; el asiento lleva la fecha de la operación | ⬜ |
+
+Y la **Ola 3** de la auditoría del 2026-08-30
+([`docs/roadmap/auditoria-erp-2026-08-30.md`](docs/roadmap/auditoria-erp-2026-08-30.md)):
+cinco bloques, todos del mismo patrón que esta bitácora viene anotando desde
+la 0.8.0 — endpoints entregados, probados y sin pantalla que los llame.
+
+| Bloque | Qué | Estado |
+|---|---|---|
+| `feat/contabilidad-arqueos-libro-mayor` | Arqueos, reglas de asiento, libro mayor navegable y detalle de asiento | ⬜ |
+| `feat/auditoria-pantalla` | `GET /api/v1/auditoria`: quién hizo qué, cuándo y con qué valor anterior | ⬜ |
+| `feat/rrhh-nomina-permisos-disciplina` | Solicitudes de permiso, boletas, liquidaciones, disciplina, contratos y legajo | ⬜ |
+| `feat/marketing-leads-encuestas-agencia` | Leads, encuestas y evaluación de agencias | ⬜ |
+| `feat/reports-matriz-edicion` | Edición de áreas, reglas y miembros de distribución | ⬜ |
+
+Fuera de alcance y anotado como deuda: préstamos, premios de concurso y
+mover efectivo del banco a caja chica se registran por ahora con el asiento
+manual —el cómo está en
+[`docs/contabilidad/operaciones-no-operativas.md`](docs/contabilidad/operaciones-no-operativas.md)—
+porque el circuito de custodia de ADR-025 cuelga de una apertura de caja del
+PDV y el efectivo que viene del banco no tiene dónde colgarse.
+
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)
 
 Rama `feat/catalogo-odoo`, sobre v0.6.0. El catálogo pasa al modelo de

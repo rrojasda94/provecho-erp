@@ -33,6 +33,7 @@ from src.modules.accounting.application.scope import (
     exigir_punto_venta,
 )
 from src.modules.accounting.infrastructure.repositories import (
+    AsientoOmitidoRepo,
     AsientoRepo,
     CustodiaEfectivoRepo,
     MovimientoCajaRepo,
@@ -694,6 +695,29 @@ def importar_pcge(
     resumen = pcge_uc.importar_pcge(session, empresa_id=tenant.empresa(empresa_id))
     session.commit()
     return resumen
+
+
+# --- Asientos omitidos --------------------------------------------------------
+@router.get("/asientos-omitidos", response_model=list[schemas.AsientoOmitidoOut])
+def listar_asientos_omitidos(
+    desde: date | None = None,
+    hasta: date | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Los asientos automáticos que el ERP decidió no escribir, y por qué.
+
+    Existe porque la omisión correcta —no bloquear la venta porque
+    contabilidad no esté configurada— se estaba comiendo el balance entero
+    sin decir nada: el único rastro era un `log.info` con el motivo
+    equivocado (ADR-089). Sin paginar: si esta lista es larga hay un problema
+    de configuración que se arregla de una vez, no se navega.
+    """
+    return AsientoOmitidoRepo(session).list(
+        tenant.empresa(empresa_id), desde=desde, hasta=hasta
+    )
 
 
 # --- Estados financieros ------------------------------------------------------

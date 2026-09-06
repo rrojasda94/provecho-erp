@@ -6,6 +6,9 @@ from src.modules.accounting.infrastructure.models.apertura_caja import AperturaC
 from src.modules.accounting.infrastructure.models.arqueo import Arqueo
 from src.modules.accounting.infrastructure.models.asiento import Asiento
 from src.modules.accounting.infrastructure.models.asiento_linea import AsientoLinea
+from src.modules.accounting.infrastructure.models.asiento_omitido import (
+    AsientoOmitido,
+)
 from src.modules.accounting.infrastructure.models.cierre_caja import CierreCaja
 from src.modules.accounting.infrastructure.models.cuenta_contable import CuentaContable
 from src.modules.accounting.infrastructure.models.custodia_efectivo import (
@@ -28,6 +31,7 @@ __all__ = [
     "Arqueo",
     "Asiento",
     "AsientoLinea",
+    "AsientoOmitido",
     "CierreCaja",
     "CuentaContable",
     "CustodiaEfectivo",

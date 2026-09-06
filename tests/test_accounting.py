@@ -138,10 +138,17 @@ def _cuentas_debe_haber(client, h, ids):
     return caja["id"], ventas["id"]
 
 
-def test_crear_asiento_manual_sin_periodo_abierto_409(env):
+def test_un_mes_que_nadie_abrio_se_abre_solo_al_primer_asiento(env):
+    """ADR-089. Antes esto era un 409: el periodo había que abrirlo a mano,
+    todos los meses, y nadie lo sabía — así que el mes que se olvidaba
+    descartaba **todos** los asientos automáticos del ERP en silencio. Un mes
+    que nadie abrió no está cerrado, no existe; el control real sigue siendo
+    cerrarlo, que es un acto explícito (ver el test de acá abajo)."""
     client, ids, _ = env
     h = _token(client)
     caja_id, ventas_id = _cuentas_debe_haber(client, h, ids)
+    assert client.get("/api/v1/accounting/periodos", headers=h).json() == []
+
     r = client.post(
         "/api/v1/accounting/asientos",
         headers=h,
@@ -155,7 +162,10 @@ def test_crear_asiento_manual_sin_periodo_abierto_409(env):
             ],
         },
     )
-    assert r.status_code == 409
+    assert r.status_code == 201
+    periodos = client.get("/api/v1/accounting/periodos", headers=h).json()
+    assert len(periodos) == 1
+    assert periodos[0]["estado"] == "abierto"
 
 
 def test_crear_asiento_manual_cuadrado_y_descuadrado(env):
@@ -765,3 +775,115 @@ def test_dar_conformidad_sin_permiso_403(env):
 
     r = _dar_conformidad(client, h_cocinero, oc["id"])
     assert r.status_code == 403
+
+
+# --- ADR-089: la contabilidad deja de fallar en silencio -------------------
+
+
+def test_una_empresa_nueva_nace_con_su_plan_de_cuentas(env):
+    """Importar el PCGE era un botón que nadie sabía que había que apretar, y
+    sin sus cuentas **todo** asiento automático se descartaba callado. Ahora
+    lo siembra `accounting` al escuchar `organizacion.empresa_creada`."""
+    client, ids, TestSession = env
+    h = _token(client)
+    r = client.post(
+        "/api/v1/empresas",
+        headers=h,
+        json={
+            "grupo_id": _grupo_id(TestSession),
+            "razon_social": "Empresa Nacida Contable SAC",
+            "ruc": "20999888777",
+            "domicilio_fiscal": "Av. Siempre Viva 742",
+            "tipo": "operativa",
+        },
+    )
+    assert r.status_code == 201
+    nueva = uuid.UUID(r.json()["id"])
+
+    # Se lee de la base y no por la API: las cuentas de otra empresa quedan
+    # fuera del alcance del token (ADR-004), que es justo lo que se quiere.
+    from src.modules.accounting.infrastructure.models import CuentaContable
+
+    with TestSession() as s:
+        codigos = set(
+            s.scalars(
+                select(CuentaContable.codigo).where(
+                    CuentaContable.empresa_id == nueva
+                )
+            )
+        )
+    assert len(codigos) > 300
+    # Las dos que necesita el asiento de una venta.
+    assert {"1212", "7011"} <= codigos
+
+
+def _grupo_id(TestSession):
+    from src.modules.users.infrastructure.models import Grupo
+
+    with TestSession() as s:
+        return str(s.scalar(select(Grupo)).id)
+
+
+def test_un_asiento_omitido_por_periodo_cerrado_deja_rastro(env):
+    """El asiento automático no bloquea la operación —eso no cambia— pero
+    tampoco puede desaparecer sin dejar nada: con el mes cerrado, la venta se
+    registra igual y la omisión queda consultable, con su motivo."""
+    client, ids, TestSession = env
+    h = _token(client)
+    # Con el plan de cuentas puesto, el único motivo posible es el mes
+    # cerrado: `sin_cuentas` se evalúa antes, porque arreglarlo es lo
+    # primero que hay que hacer.
+    client.post(
+        "/api/v1/accounting/cuentas-contables/pcge",
+        headers=h,
+        json={"empresa_id": ids["empresa_id"]},
+    )
+    periodo = _abrir_periodo_actual(client, h, ids).json()
+    client.post(f"/api/v1/accounting/periodos/{periodo['id']}/cerrar", headers=h)
+
+    from src.core.events import event_bus
+
+    referencia = str(uuid.uuid4())
+    event_bus.publish(
+        "sales.venta_confirmada",
+        {
+            "venta_id": referencia,
+            "sucursal_id": ids["sucursal_id"],
+            "cliente_id": None,
+            "items": [],
+            "total": "150.00",
+        },
+    )
+
+    omitidos = client.get("/api/v1/accounting/asientos-omitidos", headers=h).json()
+    assert len(omitidos) == 1
+    assert omitidos[0]["motivo"] == "periodo_cerrado"
+    assert omitidos[0]["evento"] == "sales.venta_confirmada"
+    assert omitidos[0]["referencia_origen"] == referencia
+
+
+def test_sin_plan_de_cuentas_la_omision_dice_que_cuentas_faltan(env):
+    """`sin_cuentas` con el detalle: antes el log decía «sin regla_asiento
+    configurada», que mandaba a mirar justo donde no estaba el problema."""
+    client, ids, TestSession = env
+    h = _token(client)
+
+    from src.core.events import event_bus
+
+    referencia = str(uuid.uuid4())
+    event_bus.publish(
+        "sales.venta_confirmada",
+        {
+            "venta_id": referencia,
+            "sucursal_id": ids["sucursal_id"],
+            "cliente_id": None,
+            "items": [],
+            "total": "150.00",
+        },
+    )
+
+    omitidos = client.get("/api/v1/accounting/asientos-omitidos", headers=h).json()
+    assert len(omitidos) == 1
+    assert omitidos[0]["motivo"] == "sin_cuentas"
+    assert "1212" in omitidos[0]["detalle"]
+

@@ -91,6 +91,7 @@ usuario (mismo criterio que las demás áreas: primero lo que ya opera).
 |---|---|
 | [politica-contabilidad.md](politica-contabilidad.md) | Principios, segregación de funciones/supervisión de Gerencia, riesgo aceptado y ruta de upgrade |
 | [marco-legal-contabilidad.md](marco-legal-contabilidad.md) | Comprobantes, IGV/Régimen Amazonía, detracciones, libros electrónicos, plazos SUNAT, contador externo, activo fijo/depreciación |
+| [operaciones-no-operativas.md](operaciones-no-operativas.md) | Préstamos, premios de concurso, subvenciones y banco↔caja chica: con qué asiento manual se registran mientras el ERP no los modele |
 | [perfiles/](perfiles/) | Perfil del contador/tesorero |
 | [../templates/contabilidad/](../templates/contabilidad/) | Conciliación bancaria, arqueo de caja, flujo de caja semanal, orden de pago |
 
