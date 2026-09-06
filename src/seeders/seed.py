@@ -126,7 +126,6 @@ PERMISOS = [
     ("inventory.solicitar_insumos", "Crear y cancelar solicitudes de insumos"),
     ("inventory.aprobar_solicitud", "Aprobar o rechazar solicitudes de insumos"),
     ("inventory.liberar_reserva", "Liberar a mano una reserva de stock"),
-    ("inventory.ajustar", "Ajustar inventario"),
     ("inventory.leer", "Consultar stock y catálogo"),
     ("inventory.gestionar_catalogo", "CRUD de artículos, categorías y SKUs"),
     ("inventory.registrar_movimiento", "Registrar movimiento de stock"),
@@ -417,7 +416,6 @@ ROLES = {
         "inventory.recepcion",
         # La guía la emite el almacén (RN-GDR-002).
         "inventory.emitir_guia",
-        "inventory.ajustar",
         "inventory.leer",
         "inventory.registrar_movimiento",
         "inventory.solicitar_ajuste",

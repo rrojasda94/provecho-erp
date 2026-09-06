@@ -166,6 +166,17 @@ export function ComprobantesCliente({
             >
               XML
             </a>
+            {/* El CDR es la constancia de que SUNAT lo recibió y lo aceptó:
+                es lo que se muestra cuando alguien discute si el comprobante
+                existe. La API lo servía desde siempre y la pantalla ofrecía
+                solo PDF y XML. */}
+            <a
+              href={`/api/proxy/api/v1/sales/comprobantes/${row.original.id}/descargar/cdr`}
+              title="Constancia de recepción de SUNAT"
+              className="text-xs font-semibold hover:underline"
+            >
+              CDR
+            </a>
           </div>
         ),
       },

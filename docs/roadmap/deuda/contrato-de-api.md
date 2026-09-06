@@ -3,6 +3,13 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **Campos que la API sirve y nadie lee** (2026-09-05, lo que queda del
+  hallazgo #18). El informe de la auditoría los enumeraba; el roadmap
+  resumido no, y adivinar cuáles son mirando el código es exactamente cómo se
+  borra un campo que sí usaba alguien. Hace falta cruzarlo contra el informe
+  —o repetir el barrido— antes de tocar nada: un campo servido de más cuesta
+  poco, y quitarlo mal cuesta una pantalla rota.
+
 - ✅ 2026-08-04 **Paginación real** (`{items, total, page, page_size}`,
   ADR-026): `src/shared/paginacion.py` (sobre `Pagina[T]`, dependencia de
   query params con `page_size` máximo 200, y `paginar()` que cuenta y corta
