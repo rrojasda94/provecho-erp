@@ -105,6 +105,34 @@ def _h(codigo: str, importe: str = "total", rol: str | None = None) -> LineaPlan
 #: «Energía eléctrica» apunta a `6361` y «Mantenimiento» a `6343`.
 CODIGO_SERVICIO_DE_FABRICA = "6399"
 
+#: Dónde entra la plata según con qué se cobró. No es una plantilla porque la
+#: cuenta no depende del evento sino del medio de pago, y una venta se cobra
+#: con varios a la vez (mitad efectivo, mitad Yape): el asiento del cobro se
+#: arma línea por línea con esto.
+#:
+#: `1041` para todo lo que no es efectivo —tarjeta, billetera, transferencia,
+#: cheque— porque el dinero termina en la cuenta corriente. El detalle de
+#: **qué banco** no existe en el ERP (ver deuda de accounting); el día que
+#: exista, esto pasa a leer la cuenta bancaria del POS o del medio.
+CODIGO_COBRO_POR_TIPO_DE_MEDIO: dict[str, str] = {
+    "efectivo": "101",
+    "tarjeta_credito": "1041",
+    "tarjeta_debito": "1041",
+    "billetera_digital": "1041",
+    "transferencia": "1041",
+    "cheque": "1041",
+}
+
+#: La cuenta por cobrar del cliente, que el cobro cancela.
+CODIGO_COBRAR_A_CLIENTES = "1212"
+
+
+def codigo_de_cobro(tipo_de_medio: str) -> str | None:
+    """`None` cuando el cobro no trae plata: `credito_empresarial` es una
+    venta al crédito y la cuenta por cobrar **sigue viva**. Marcarla como
+    cobrada sería inventar un ingreso de caja que no ocurrió."""
+    return CODIGO_COBRO_POR_TIPO_DE_MEDIO.get(tipo_de_medio)
+
 PLANTILLAS: dict[str, Plantilla] = {
     # Venta: nace la cuenta por cobrar del cliente. El cobro la cancela
     # contra caja o bancos — hoy `sales.pago_registrado` todavía no se

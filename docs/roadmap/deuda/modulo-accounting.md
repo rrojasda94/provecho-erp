@@ -3,6 +3,41 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ✅ 2026-09-05 **El cobro entra al balance y la venta anulada sale de él**
+  (sin migración): `sales.venta_pagada` y `sales.venta_anulada` no tenían
+  suscriptor. El cobro cancela ahora la `1212` y mete la plata donde entró
+  —`101` si fue efectivo, `1041` si fue tarjeta, billetera, transferencia o
+  cheque— y una venta al crédito no asienta nada, porque la cuenta por cobrar
+  sigue viva. La anulación entera reversa su asiento de ingreso.
+  El asiento del cobro **no pasa por las plantillas ni por `regla_asiento`**:
+  la cuenta del debe la decide el medio de pago, no el evento, y una venta se
+  cobra con varios a la vez.
+  Lo que deja abierto:
+  - ⬜ **Quitar líneas de una orden deja el ingreso sobrevaluado.** La
+    anulación parcial (`lineas_anuladas` con `venta_anulada: false`) no se
+    asienta: reversar el asiento entero borraría el ingreso de las líneas que
+    quedaron, y lo correcto es un asiento de ajuste por la diferencia. Hace
+    falta que el payload traiga el importe de lo quitado, que hoy no trae.
+  - ⬜ **El incremento de una orden ya confirmada no se asienta.** Agregar
+    líneas republica `sales.venta_confirmada` con el mismo `venta_id`
+    (`ventas.py`), y el dedupe por `(empresa, evento, referencia_origen)` lo
+    descarta como si fuera un reenvío —`asientos.py`—, así que el ingreso
+    queda corto por lo agregado. El comentario del publicador asume lo
+    contrario. Las dos salidas: que la publicación lleve un identificador
+    propio y el dedupe use ese (resuelve la clase entera, pero la reversión
+    por origen pasa a tener que buscar todos los asientos de la venta), o un
+    sufijo por número de confirmación en `referencia_origen`. Va en su rama.
+  - ⬜ **El asiento se fecha con el día en que se procesa, no con el de la
+    operación** (`listeners.py`, `fechas.hoy()`). Coinciden casi siempre —el
+    listener corre justo después del commit— pero no cuando el evento llega
+    tarde: el replay del hub offline o una venta de fin de mes procesada al
+    día siguiente caen en el periodo equivocado, y el rango por defecto de
+    Estados financieros (1° del mes → hoy) las esconde. Arreglarlo es que
+    cada evento lleve la fecha de su operación.
+  - ⬜ **De qué banco entró la plata no se sabe**: todo lo que no es efectivo
+    va a `1041`. El ERP no modela cuentas bancarias (ver más abajo), así que
+    hoy no hay nada más fino que elegir.
+
 - ✅ 2026-09-05 **La contabilidad deja de vaciarse en silencio** (ADR-089,
   migración `b5e7d1a3c92f`): la empresa nace con su PCGE —`accounting` escucha
   `organizacion.empresa_creada`—, el periodo se abre al primer asiento del mes

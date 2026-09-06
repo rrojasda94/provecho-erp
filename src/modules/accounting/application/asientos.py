@@ -564,6 +564,52 @@ def crear_asiento_desde_plantilla(
     )
 
 
+def crear_asiento_de_cobro(
+    session: Session,
+    *,
+    empresa_id: uuid.UUID,
+    referencia_origen: str,
+    glosa: str,
+    por_codigo: dict[str, Decimal],
+    cobrado: Decimal,
+) -> Asiento | None:
+    """El asiento del cobro: entra la plata donde entró, se cancela la 1212.
+
+    Aparte de las plantillas porque la cuenta del debe la decide el **medio de
+    pago**, no el evento, y una venta se cobra con varios a la vez. Ninguna
+    plantilla de dos o cuatro líneas fijas puede expresar eso.
+    """
+    evento = "sales.venta_pagada"
+    codigos = sorted({*por_codigo, plantillas_pcge.CODIGO_COBRAR_A_CLIENTES})
+    cuentas = CuentaContableRepo(session).get_by_codigos(empresa_id, codigos)
+    faltantes = [codigo for codigo in codigos if codigo not in cuentas]
+    if faltantes:
+        _omitir(
+            session, empresa_id=empresa_id, evento=evento,
+            referencia_origen=referencia_origen, motivo="sin_cuentas",
+            fecha=fechas.hoy(),
+            detalle=f"faltan en el plan de cuentas: {', '.join(faltantes)}",
+        )
+        return None
+
+    lineas = [
+        (cuentas[codigo].id, "debe", monto)
+        for codigo, monto in sorted(por_codigo.items())
+    ]
+    lineas.append(
+        (cuentas[plantillas_pcge.CODIGO_COBRAR_A_CLIENTES].id, "haber", cobrado)
+    )
+    return crear_asiento_automatico_multilinea(
+        session,
+        empresa_id=empresa_id,
+        evento=evento,
+        fecha=fechas.hoy(),
+        glosa=glosa,
+        referencia_origen=referencia_origen,
+        lineas=lineas,
+    )
+
+
 def crear_asiento_automatico_si_hay_regla(
     session: Session,
     *,

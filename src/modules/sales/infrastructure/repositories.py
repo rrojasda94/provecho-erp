@@ -187,6 +187,23 @@ class PagoRepo:
             q = q.where(Pago.grupo_cobro == grupo_cobro)
         return list(self.s.scalars(q))
 
+    def cobrado_por_tipo_de_medio(self, venta_id: uuid.UUID) -> dict[str, Decimal]:
+        """Cuánto entró con cada tipo de medio de pago.
+
+        Contabilidad lo necesita para saber **dónde** entró la plata: el
+        efectivo va a caja y una transferencia al banco, y son cuentas
+        distintas del plan (ADR-089 §cobro). Se agrupa por `medio_pago.tipo` y
+        no por el medio: «Yape» y «Plin» son dos filas de `medio_pago` y la
+        misma cuenta contable.
+        """
+        filas = self.s.execute(
+            select(MedioPago.tipo, func.sum(Pago.monto))
+            .join(MedioPago, MedioPago.id == Pago.medio_pago_id)
+            .where(Pago.venta_id == venta_id, Pago.estado == "confirmado")
+            .group_by(MedioPago.tipo)
+        )
+        return {tipo: monto for tipo, monto in filas}
+
 
 class ProductoComercialRepo:
     def __init__(self, session: Session) -> None:

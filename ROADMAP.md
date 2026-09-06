@@ -305,7 +305,7 @@ el único aviso era un `log.info` que además decía el motivo equivocado.
 | Bloque | Qué | Estado |
 |---|---|---|
 | `fix/contabilidad-no-asienta` | La empresa nace con su PCGE, el periodo se abre al primer asiento del mes, y la omisión queda en `asiento_omitido` con su motivo (ADR-089) | ✅ 2026-09-05 |
-| `fix/contabilidad-cobro-y-anulacion` | El cobro cancela la `1212` y mueve caja/bancos; la venta anulada revierte su ingreso; el incremento de una orden ya confirmada se asienta; el asiento lleva la fecha de la operación | ⬜ |
+| `fix/contabilidad-cobro-y-anulacion` | El cobro cancela la `1212` y mueve caja/bancos según con qué se cobró; la venta anulada revierte su ingreso | ✅ 2026-09-05 — el incremento de una orden ya confirmada y la fecha del asiento quedan como deuda, ver `deuda/modulo-accounting.md` |
 
 Y la **Ola 3** de la auditoría del 2026-08-30
 ([`docs/roadmap/auditoria-erp-2026-08-30.md`](docs/roadmap/auditoria-erp-2026-08-30.md)):
