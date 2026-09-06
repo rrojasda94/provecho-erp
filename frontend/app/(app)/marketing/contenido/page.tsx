@@ -20,6 +20,7 @@ export default async function ContenidoPage() {
     return (
       <ContenidoCliente
         piezas={piezas.items}
+        total={piezas.total}
         campanas={campanas.items}
         marcas={marcas}
       />

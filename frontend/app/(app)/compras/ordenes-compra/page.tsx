@@ -54,6 +54,7 @@ export default async function OrdenesCompraPage() {
   return (
     <OrdenesCompraCliente
       ordenes={ordenes.items}
+      total={ordenes.total}
       proveedores={proveedores.items}
       almacenes={almacenes}
       articulos={articulos}

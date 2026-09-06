@@ -397,3 +397,25 @@ def test_movimientos_quedan_trazados_por_lote(env):
         movs = list(s.scalars(select(MovimientoInventario)))
     assert len(movs) == 4  # 2 ingresos + 2 salidas (una por lote)
     assert all(m.lote_id is not None for m in movs)
+
+
+def test_el_listado_de_lotes_tiene_tope_y_devuelve_los_que_vencen_antes(env):
+    """Hallazgo #14 de la auditoría del 2026-08-30: `GET /lotes` devolvía la
+    tabla entera. Un local que lleva meses acumula miles, y la consulta y el
+    payload crecían sin techo mientras la pantalla paginaba en el navegador.
+
+    El tope solo sirve si el orden manda: lo que queda afuera tiene que ser lo
+    que vence más tarde, no "lo que la base devolvió"."""
+    client, ids, _ = env
+    h = _token(client)
+    for dias in (30, 10, 20):
+        lote_id = _crear_lote(client, h, ids, f"L-tope-{dias}", dias)
+        _ingresar(client, h, ids, lote_id, 5)
+
+    todos = client.get("/api/v1/inventory/lotes", headers=h).json()
+    assert len(todos) == 3
+
+    dos = client.get("/api/v1/inventory/lotes?limite=2", headers=h).json()
+    assert len(dos) == 2
+    assert [f["codigo"] for f in dos] == ["L-tope-10", "L-tope-20"]
+

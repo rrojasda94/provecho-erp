@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo } from "react";
 
+import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
 
@@ -41,13 +42,11 @@ function soles(valor: string | null): string {
 export function FacturasCliente({
   facturas,
   total,
-  recortado,
   proveedores,
   filtros,
 }: {
   facturas: ComprobanteRecibido[];
   total: number;
-  recortado: boolean;
   proveedores: Proveedor[];
   filtros: { proveedor: string; desde: string; hasta: string };
 }) {
@@ -158,12 +157,11 @@ export function FacturasCliente({
         </label>
       </div>
 
-      {recortado && (
-        <p className="rounded-lg bg-status-warning-surface px-3 py-2 text-sm text-status-warning">
-          Se muestran {facturas.length} de {total}. Acota por proveedor o por
-          fecha para ver el resto.
-        </p>
-      )}
+      <AvisoRecortado
+        mostrados={facturas.length}
+        total={total}
+        sugerencia="Acota por proveedor o por fecha para ver el resto."
+      />
 
       <TablaDatos
         columnas={columnas}

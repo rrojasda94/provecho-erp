@@ -76,7 +76,6 @@ export default async function StockPage({ searchParams }: { searchParams: Params
     <StockCliente
       filas={pagina.items}
       total={pagina.total}
-      recortado={pagina.total > pagina.items.length}
       almacenes={almacenes}
       sucursales={sucursales}
       categorias={categorias}

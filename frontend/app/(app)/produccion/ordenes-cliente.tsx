@@ -4,6 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
+import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { ArticuloPicker } from "@/components/articulo-picker/articulo-picker";
 
@@ -275,10 +276,13 @@ function DialogoCompletar({ orden }: { orden: Orden }) {
 
 export function OrdenesCliente({
   ordenes,
+  total,
   articulos,
   almacenes,
 }: {
   ordenes: Orden[];
+  /** Cuántos hay en total: la página viene recortada. */
+  total: number;
   articulos: Articulo[];
   almacenes: Almacen[];
 }) {
@@ -361,6 +365,11 @@ export function OrdenesCliente({
         la cocina consumió de verdad y se cierra con el control de calidad. Recién ahí
         entra el resultado al stock, con su costo real.
       </p>
+      <AvisoRecortado
+        mostrados={ordenes.length}
+        total={total}
+        sugerencia="Acota por estado o por fecha para ver el resto."
+      />
       <TablaDatos columnas={columnas} datos={ordenes} placeholderBusqueda="Buscar orden..." />
     </div>
   );

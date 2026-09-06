@@ -6,13 +6,12 @@ import { ClientesCliente, type Cliente } from "./clientes-cliente";
 export default async function ClientesPage() {
   const { token, usuario } = await obtenerSesion();
 
-  let clientes: Cliente[];
+  let pagina: Pagina<Cliente>;
   try {
-    clientes = (
-      await apiFetch<Pagina<Cliente>>("/api/v1/sales/clientes/listado?page_size=200", {
-        token,
-      })
-    ).items;
+    pagina = await apiFetch<Pagina<Cliente>>(
+      "/api/v1/sales/clientes/listado?page_size=200",
+      { token },
+    );
   } catch (e) {
     const mensaje =
       e instanceof ApiError && e.status === 403
@@ -21,5 +20,11 @@ export default async function ClientesPage() {
     return <p className="text-secondary">{mensaje}</p>;
   }
 
-  return <ClientesCliente clientes={clientes} permisos={usuario.permisos} />;
+  return (
+    <ClientesCliente
+      clientes={pagina.items}
+      total={pagina.total}
+      permisos={usuario.permisos}
+    />
+  );
 }

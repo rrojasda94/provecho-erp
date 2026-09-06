@@ -327,6 +327,19 @@ manual —el cómo está en
 porque el circuito de custodia de ADR-025 cuelga de una apertura de caja del
 PDV y el efectivo que viene del banco no tiene dónde colgarse.
 
+## Auditoría del 2026-08-30 — Ola 4, calidad (2026-09-05)
+
+Cuatro bloques de baja urgencia y alto ruido acumulado. El primero ataca el
+modo de falla más silencioso que quedaba: **una lista recortada se ve igual
+que una completa**.
+
+| Bloque | Qué | Estado |
+|---|---|---|
+| `fix/paginacion-server-side` | #14 el recorte se avisa en las nueve pantallas que traían 200 filas y paginaban en el navegador; `GET /inventory/lotes` gana tope | ✅ 2026-09-05 |
+| `fix/contrato-tests-y-tipos-duplicados` | #15 extender `test_repo_coherencia` a las listas de enums + consolidar tipos TS duplicados | ⬜ |
+| `fix/accesibilidad-insignia-aria-live` | #17 píldoras solo-color → `Insignia`, `aria-live` en avisos del KDS y el PDV | ⬜ |
+| `chore/limpieza-menor` | #18 `inventory.ajustar` huérfano, campos servidos e ignorados, CDR no descargable, cookie de terminal sin rotación | ⬜ |
+
 ## Catálogo modelo Odoo (0.7.0, en curso desde 2026-08-23)
 
 Rama `feat/catalogo-odoo`, sobre v0.6.0. El catálogo pasa al modelo de

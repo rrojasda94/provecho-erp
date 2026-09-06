@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
+import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
 import { RUTA_EXPORTAR_ARTICULOS } from "@/lib/catalogo";
@@ -212,11 +213,14 @@ const GESTIONAR_CATALOGO = "inventory.gestionar_catalogo";
 
 export function ArticulosCliente({
   articulos,
+  total,
   categorias,
   unidadesMedida,
   permisos,
 }: {
   articulos: Articulo[];
+  /** Cuántos hay en total: la página trae 200 y el resto no se ve. */
+  total: number;
   categorias: Categoria[];
   unidadesMedida: UnidadMedida[];
   permisos: string[];
@@ -303,6 +307,11 @@ export function ArticulosCliente({
           )}
         </div>
       </div>
+      <AvisoRecortado
+        mostrados={articulos.length}
+        total={total}
+        sugerencia="Usá el buscador del listado o exportá a Excel para ver el resto."
+      />
       <TablaDatos columnas={columnas} datos={articulos} placeholderBusqueda="Buscar artículo..." />
     </div>
   );
