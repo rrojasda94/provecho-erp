@@ -83,9 +83,12 @@ renumera nada). Este archivo define el orden de lectura recomendado.
 
 - [`/CLAUDE.md`](../CLAUDE.md) — contrato operativo que la IA carga cada sesión
   (resume y apunta a `engineering/engineering-guide.md`).
-- [`/ROADMAP.md`](../ROADMAP.md) — bitácora viva de lo construido y pendiente.
-  La deuda técnica cuelga de [`roadmap/deuda/`](roadmap/deuda/), un archivo
-  por área, y los planes de varias ramas de
+- [`/ROADMAP.md`](../ROADMAP.md) — tablero de estado por módulo, decisiones
+  pendientes transversales e índice de deuda técnica. El historial narrativo
+  completo de cada módulo cuelga de
+  [`roadmap/historial/`](roadmap/historial/), un archivo por módulo; la deuda
+  técnica cuelga de [`roadmap/deuda/`](roadmap/deuda/), un archivo por área;
+  y los planes de varias ramas de
   [`roadmap/`](roadmap/) — hoy, la
   [auditoría backend↔frontend del 2026-08-30](roadmap/auditoria-erp-2026-08-30.md).
 - [`/CHANGELOG.md`](../CHANGELOG.md) — historial de cambios (SemVer).
