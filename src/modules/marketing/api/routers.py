@@ -39,6 +39,7 @@ from src.modules.marketing.application.scope import (
 from src.modules.marketing.infrastructure.repositories import (
     CampanaRepo,
     EncuestaPlantillaRepo,
+    EncuestaRepo,
     EvaluacionAgenciaRepo,
     LeadRepo,
     PiezaContenidoRepo,
@@ -586,6 +587,37 @@ def listar_leads(
     return paginar(session, LeadRepo(session).q_de_campana(campana_id), p)
 
 
+@router.get("/leads", response_model=Pagina[schemas.LeadOut])
+def listar_todos_los_leads(
+    campana_id: uuid.UUID | None = None,
+    tipo: str | None = None,
+    atribuido: bool | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Las pistas de todas las campañas, no de una.
+
+    `GET /campanas/{id}/leads` existía y obligaba a saber de antemano qué
+    campaña mirar; la pregunta que se hace de verdad es «¿qué pistas quedaron
+    sin trabajar?», que cruza campañas. `atribuido=false` es esa vista.
+    """
+    if campana_id is not None:
+        exigir_campana(session, campana_id, tenant)
+    return paginar(
+        session,
+        LeadRepo(session).q_listar(
+            tenant.filtro_empresa(empresa_id),
+            campana_id=campana_id,
+            tipo=tipo,
+            atribuido=atribuido,
+        ),
+        p,
+    )
+
+
 @router.post("/leads/{lead_id}/atribucion", response_model=schemas.LeadOut)
 def atribuir_lead(
     lead_id: uuid.UUID,
@@ -602,6 +634,30 @@ def atribuir_lead(
     lead = leads.atribuir_venta(session, lead_id, venta_id=body.venta_id)
     session.commit()
     return lead
+
+
+@router.get("/evaluaciones-agencia", response_model=Pagina[schemas.EvaluacionOut])
+def listar_todas_las_evaluaciones_agencia(
+    estado: str | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Las evaluaciones de agencia de todas las campañas.
+
+    Se listaban solo por campaña, así que revisar «qué hay para decidir»
+    obligaba a recorrer campaña por campaña — y quien decide (Gerencia) no
+    entra por la campaña, entra por la decisión pendiente.
+    """
+    return paginar(
+        session,
+        EvaluacionAgenciaRepo(session).q_listar(
+            tenant.filtro_empresa(empresa_id), estado=estado
+        ),
+        p,
+    )
 
 
 # --- Plantilla de encuesta (el guion) ---------------------------------------
@@ -676,6 +732,28 @@ def activar_plantilla(
 # --- Encuesta de satisfacción ----------------------------------------------
 
 
+@router.get("/encuestas", response_model=Pagina[schemas.EncuestaOut])
+def listar_encuestas(
+    estado: str | None = None,
+    empresa_id: uuid.UUID | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    """Qué dijeron los clientes, de la más reciente a la más vieja.
+
+    No había listado: una encuesta solo se podía mirar sabiendo su id o el de
+    su venta, así que las respuestas quedaban donde nadie las leía — y una
+    encuesta que nadie lee es una molestia al cliente sin contrapartida.
+    """
+    return paginar(
+        session,
+        EncuestaRepo(session).q_listar(tenant.filtro_empresa(empresa_id), estado=estado),
+        p,
+    )
+
+
 @router.post("/encuestas", response_model=schemas.EncuestaConNodoOut, status_code=201)
 def enviar_encuesta(
     body: schemas.EncuestaCreate,
@@ -694,6 +772,7 @@ def enviar_encuesta(
         venta_id=body.venta_id,
         canal=body.canal,
         enviada_por=actor.id,
+        empresa_id=tenant.empresa(None),
         plantilla_id=body.plantilla_id,
     )
     session.commit()

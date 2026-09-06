@@ -327,3 +327,22 @@ def test_una_pieza_publicada_suma_a_su_campana(env):  # noqa: F811
         f"/api/v1/marketing/campanas/{campana_id}/metricas", headers=h
     ).json()
     assert datos["piezas_publicadas"] == 1
+
+
+def test_las_evaluaciones_se_listan_sin_saber_la_campana(campana):
+    """Se listaban solo por campaña, así que revisar «qué hay para decidir»
+    obligaba a recorrer campaña por campaña — y quien decide entra por la
+    decisión pendiente, no por la campaña."""
+    client, h, ids, TestSession, campana_id = campana
+    evaluacion_id = _evaluacion(client, h, campana_id)
+
+    listado = client.get("/api/v1/marketing/evaluaciones-agencia", headers=h).json()
+    assert listado["total"] == 1
+    assert listado["items"][0]["id"] == evaluacion_id
+    assert listado["items"][0]["estado"] == "borrador"
+
+    # El filtro por estado es la bandeja: lo que está para decidir.
+    assert client.get(
+        "/api/v1/marketing/evaluaciones-agencia?estado=decidida", headers=h
+    ).json()["total"] == 0
+

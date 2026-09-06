@@ -435,3 +435,43 @@ def test_el_handshake_devuelve_el_desafio_solo_con_el_token_correcto(wa):
         },
     )
     assert mal.status_code == 403
+
+
+def test_las_encuestas_se_listan(env):  # noqa: F811
+    """No había listado: una encuesta solo se podía mirar sabiendo su id o el
+    de su venta, así que las respuestas quedaban donde nadie las leía — y una
+    encuesta que nadie lee es una molestia al cliente sin contrapartida."""
+    client, ids, TestSession = env
+    h = _token(client)
+    client.post(
+        "/api/v1/marketing/encuestas/plantillas",
+        headers=h,
+        json={
+            "nombre": "NPS del listado",
+            "saludo": "¿Nos ayudas?",
+            "activa": True,
+            "preguntas": [
+                {
+                    "codigo": "puntaje",
+                    "texto": "Del 1 al 5",
+                    "tipo": "escala",
+                    "es_puntaje": True,
+                }
+            ],
+        },
+    )
+    enviada = _enviar_encuesta(client, h, TestSession, ids, numero=140)
+
+    listado = client.get("/api/v1/marketing/encuestas", headers=h).json()
+    assert listado["total"] == 1
+    assert listado["items"][0]["id"] == enviada["encuesta"]["id"]
+
+    # El filtro por estado es la vista útil: qué se mandó y sigue sin
+    # contestar.
+    assert client.get(
+        "/api/v1/marketing/encuestas?estado=enviada", headers=h
+    ).json()["total"] == 1
+    assert client.get(
+        "/api/v1/marketing/encuestas?estado=respondida", headers=h
+    ).json()["total"] == 0
+

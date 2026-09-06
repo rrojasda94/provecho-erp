@@ -75,6 +75,11 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
   marketing: [
     { label: "Campañas", href: "/marketing" },
     { label: "Contenido", href: "/marketing/contenido" },
+    // Lo que la campaña dejó: las pistas primero, porque son las que se
+    // trabajan; después lo que el cliente contestó y con quién se contrató.
+    { label: "Leads", href: "/marketing/leads" },
+    { label: "Encuestas", href: "/marketing/encuestas" },
+    { label: "Agencias", href: "/marketing/agencias" },
   ],
   organizacion: [
     { label: "Empresas", href: "/organizacion/empresas" },

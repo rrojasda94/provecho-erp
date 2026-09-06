@@ -51,6 +51,7 @@ def enviar_encuesta(
     venta_id: uuid.UUID,
     canal: str,
     enviada_por: uuid.UUID,
+    empresa_id: uuid.UUID | None = None,
     plantilla_id: uuid.UUID | None = None,
 ) -> EncuestaSatisfaccion:
     repo = EncuestaRepo(session)
@@ -78,6 +79,7 @@ def enviar_encuesta(
     ahora = datetime.now(UTC)
     encuesta = repo.add(
         EncuestaSatisfaccion(
+            empresa_id=empresa_id,
             venta_id=venta_id,
             cliente_id=venta["cliente_id"],
             canal=canal,

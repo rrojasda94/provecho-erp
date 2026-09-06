@@ -548,3 +548,48 @@ def test_listar_piezas_del_tenant_y_por_estado(env):
     assert client.get(
         "/api/v1/marketing/piezas?estado=publicada", headers=h
     ).json()["total"] == 0
+
+
+def test_los_leads_se_listan_cruzando_campanas_y_por_si_se_trabajaron(env):
+    """`GET /campanas/{id}/leads` obligaba a saber de antemano qué campaña
+    mirar. La pregunta real es «¿qué pistas quedaron sin trabajar?», que
+    cruza campañas: eso es `GET /leads?atribuido=false`."""
+    client, ids, TestSession = env
+    h = _token(client)
+    campana_id = _crear_campana(client, h, ids).json()["id"]
+    _lanzar(client, h, campana_id)
+
+    for n, key in enumerate(("lead-list-1", "lead-list-2")):
+        assert (
+            client.post(
+                "/api/v1/marketing/leads",
+                headers=h,
+                json={
+                    "campana_id": campana_id,
+                    "canal": "instagram",
+                    "tipo": "cupon",
+                    "cliente_id": ids["cliente_id"],
+                    "idempotency_key": key,
+                },
+            ).status_code
+            == 201
+        ), n
+
+    todos = client.get("/api/v1/marketing/leads", headers=h).json()
+    assert todos["total"] == 2
+
+    # Uno se convierte: deja de estar sin trabajar.
+    venta_id = _venta(TestSession, ids, entregada=False, numero=41)
+    primero = todos["items"][0]["id"]
+    client.post(
+        f"/api/v1/marketing/leads/{primero}/atribucion",
+        headers=h,
+        json={"venta_id": venta_id},
+    )
+
+    sin_trabajar = client.get(
+        "/api/v1/marketing/leads?atribuido=false", headers=h
+    ).json()
+    assert sin_trabajar["total"] == 1
+    assert sin_trabajar["items"][0]["id"] != primero
+

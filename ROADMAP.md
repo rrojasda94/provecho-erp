@@ -317,7 +317,7 @@ la 0.8.0 — endpoints entregados, probados y sin pantalla que los llame.
 | `feat/contabilidad-arqueos-libro-mayor` | Arqueos (con su `GET`, que faltaba), reglas de asiento, libro mayor navegable y detalle de asiento | ✅ 2026-09-05 |
 | `feat/auditoria-pantalla` | `GET /api/v1/auditoria`: quién hizo qué, cuándo y con qué valor anterior | ✅ 2026-09-05 |
 | `feat/rrhh-nomina-permisos-disciplina` | Legajo del trabajador (contratos, permisos, disciplina, certificados, pactos, boletas y liquidaciones en una lectura), bandeja de permisos y emisión de sanciones y certificados | ✅ 2026-09-05 — registrar boletas y liquidaciones queda como deuda: la nómina se calcula fuera del ERP |
-| `feat/marketing-leads-encuestas-agencia` | Leads, encuestas y evaluación de agencias | ⬜ — más grande de lo que decía el roadmap: los tres necesitan endpoints de listado que no existen, y la evaluación de agencia pide una ficha de campaña que tampoco |
+| `feat/marketing-leads-encuestas-agencia` | Leads, encuestas y evaluación de agencias — con los tres endpoints de listado que faltaban y `encuesta_satisfaccion.empresa_id`, sin el cual no había filtro de tenant posible | ✅ 2026-09-05 — cargar opciones y firmar la decisión de agencia siguen por API |
 | `feat/reports-matriz-edicion` | Áreas y miembros de distribución editables: el mapa mostraba los huecos y no había cómo taparlos | ✅ 2026-09-05 — editar reglas de distribución queda como deuda |
 
 Fuera de alcance y anotado como deuda: préstamos, premios de concurso y
