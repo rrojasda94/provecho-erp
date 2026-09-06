@@ -16,6 +16,11 @@ import {
   editarTrabajadorAction,
 } from "./actions";
 
+import type { Sucursal } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Sucursal };
+
 export type Trabajador = {
   id: string;
   persona_id: string;
@@ -29,7 +34,6 @@ export type Trabajador = {
   remuneracion_base: string | null;
   estado: string;
 };
-export type Sucursal = { id: string; nombre: string };
 export type Persona = {
   id: string;
   nombres: string;

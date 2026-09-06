@@ -14,7 +14,11 @@ import { Combobox } from "@/components/ui/combobox";
 import { guardarSucursalAction } from "../actions";
 import { CampoDireccion } from "@/components/direccion/campo-direccion";
 
-export type Marca = { id: string; nombre: string };
+import type { Marca } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Marca };
+
 export type Almacen = {
   id: string;
   sucursal_id: string | null;

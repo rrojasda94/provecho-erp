@@ -15,6 +15,11 @@ import {
 } from "./actions";
 import { Combobox } from "@/components/ui/combobox";
 
+import type { Almacen } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Almacen };
+
 export type Orden = {
   id: string;
   articulo_id: string;
@@ -41,7 +46,6 @@ function comoOpciones(articulos: Articulo[]) {
   }));
 }
 
-export type Almacen = { id: string; nombre: string };
 
 const ETIQUETA_ESTADO: Record<string, string> = {
   borrador: "Borrador",

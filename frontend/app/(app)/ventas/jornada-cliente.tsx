@@ -16,6 +16,11 @@ import {
 import { Combobox } from "@/components/ui/combobox";
 import { tienePermiso } from "@/lib/permisos";
 
+import type { Sucursal } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Sucursal };
+
 export type Venta = {
   id: string;
   fecha_orden: string;
@@ -37,7 +42,6 @@ export type Comprobante = {
   // Presente = ya fue acreditado por una nota total y no admite otra.
   anulado_por_nc_id: string | null;
 };
-export type Sucursal = { id: string; nombre: string };
 
 // Los cinco valores de `estado_venta`, en el orden en que una venta los
 // recorre. Salen de `sales.domain.rules.ESTADOS_VENTA` y un test de

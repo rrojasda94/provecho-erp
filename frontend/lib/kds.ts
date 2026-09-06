@@ -10,6 +10,11 @@ import { pedir } from "./cliente-api";
 import { pasosHastaListo, type EstadoItem } from "./kds-avance";
 import type { Semaforo } from "./kds-semaforo";
 
+import type { Categoria } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Categoria };
+
 export { ETIQUETA_ESTADO, siguienteToque } from "./kds-avance";
 export type { EstadoItem } from "./kds-avance";
 export { minutosDesde, nivelDe, reloj } from "./kds-semaforo";
@@ -94,7 +99,6 @@ export type PedidoCola = {
 /** Categoría de producto comercial — el filtro que rutea cada ítem a su
  * estación (pizzas → horno, bebidas → barra). Vive en `inventory`, que es
  * dueño del catálogo; `sales` la reusa. */
-export type Categoria = { id: string; nombre: string };
 
 export type PantallaEnvio = {
   nombre: string;

@@ -12,11 +12,16 @@ import {
 const DISCIPLINA = "rrhh.disciplina_gestionar";
 const GESTIONAR = "rrhh.trabajador_gestionar";
 
-/** La escala disciplinaria, de menor a mayor (RN-RRHH-002). Cerrada porque el
- * tipo decide el peso de la sanción en un despido posterior: «llamada» y
- * «llamado de atención» tecleados a mano son dos historiales distintos del
- * mismo trabajador. */
-const TIPOS_AMONESTACION = ["verbal", "escrita", "suspension"];
+/** La escala disciplinaria (RN-RRHH-002). Cerrada porque el tipo decide el
+ * peso de la sanción en un despido posterior: «llamada» y «llamado de
+ * atención» tecleados a mano son dos historiales distintos del mismo
+ * trabajador.
+ *
+ * Son **estos dos y no tres**: la suspensión no es un valor de
+ * `amonestacion.tipo` en la base, así que ofrecerla terminaba en un 422 al
+ * guardar. Lo encontró `test_repo_coherencia`, que es exactamente para lo que
+ * se extendió. */
+const TIPOS_AMONESTACION = ["verbal", "escrita"];
 
 export function AccionesLegajo({
   trabajadorId,

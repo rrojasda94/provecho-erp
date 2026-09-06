@@ -17,6 +17,11 @@ import {
 import { Combobox } from "@/components/ui/combobox";
 import { ETIQUETA_DOCUMENTO, TIPOS_DOCUMENTO } from "@/lib/documento";
 
+import type { Sucursal } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Sucursal };
+
 export type Convocatoria = {
   id: string;
   sucursal_id: string | null;
@@ -32,7 +37,6 @@ export type Convocatoria = {
   token_publico: string | null;
   estado: string;
 };
-export type Sucursal = { id: string; nombre: string };
 
 export type Postulante = {
   id: string;

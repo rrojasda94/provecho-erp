@@ -336,7 +336,7 @@ que una completa**.
 | Bloque | Qué | Estado |
 |---|---|---|
 | `fix/paginacion-server-side` | #14 el recorte se avisa en las nueve pantallas que traían 200 filas y paginaban en el navegador; `GET /inventory/lotes` gana tope | ✅ 2026-09-05 |
-| `fix/contrato-tests-y-tipos-duplicados` | #15 extender `test_repo_coherencia` a las listas de enums + consolidar tipos TS duplicados | ⬜ |
+| `fix/contrato-tests-y-tipos-duplicados` | #15 una prueba parametrizada compara nueve listas de pantalla contra el enum del modelo —encontró una que ofrecía un valor que la API rechaza— y las formas `{id, nombre}` dejan de estar declaradas diecinueve veces | ✅ 2026-09-05 |
 | `fix/accesibilidad-insignia-aria-live` | #17 píldoras solo-color → `Insignia`, `aria-live` en avisos del KDS y el PDV | ⬜ |
 | `chore/limpieza-menor` | #18 `inventory.ajustar` huérfano, campos servidos e ignorados, CDR no descargable, cookie de terminal sin rotación | ⬜ |
 

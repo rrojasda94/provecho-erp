@@ -14,6 +14,11 @@ import type { CeldaAGuardar, Grilla } from "./matriz";
 import { type Pagina } from "@/lib/api";
 import { pedir, subir } from "@/lib/cliente-api";
 
+import type { Categoria } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Categoria };
+
 // --- Tipos del contrato -----------------------------------------------------
 export type UnidadMedida = {
   id: string;
@@ -57,7 +62,6 @@ export type RecetaItem = {
 /** Categoría del artículo que una receta produce — el filtro del listado
  * solo alcanza a las subrecetas, porque un producto de venta no produce
  * artículo del que sacar categoría (RN-COM-030). */
-export type Categoria = { id: string; nombre: string };
 
 // --- Carga masiva de recetas (RN-COM-031) ---
 export type IngredienteRevisado = {
