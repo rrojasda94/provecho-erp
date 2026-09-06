@@ -2,6 +2,7 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { AlertTriangle } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
@@ -18,6 +19,9 @@ export type Asiento = {
   glosa: string;
   origen: string;
   evento_origen: string | null;
+  /** El documento que lo originó: la venta, la orden de compra, el traslado.
+   * Es lo que permite volver del asiento al hecho. */
+  referencia_origen: string | null;
   estado: string;
   asiento_reversa_de_id: string | null;
 };
@@ -276,7 +280,21 @@ export function AsientosCliente({
   const columnas: ColumnDef<Asiento>[] = useMemo(
     () => [
       { accessorKey: "fecha", header: "Fecha" },
-      { accessorKey: "glosa", header: "Glosa" },
+      {
+        accessorKey: "glosa",
+        header: "Glosa",
+        // Se entra al asiento desde acá: el listado nunca decía contra qué
+        // cuentas se escribió, así que un asiento automático raro no se podía
+        // revisar sin entrar a la base.
+        cell: ({ row, getValue }) => (
+          <Link
+            href={`/contabilidad/asientos/${row.original.id}`}
+            className="font-semibold text-primary hover:underline"
+          >
+            {getValue<string>()}
+          </Link>
+        ),
+      },
       {
         id: "origen",
         header: "Origen",

@@ -30503,6 +30503,57 @@
   "openapi": "3.1.0",
   "paths": {
     "/api/v1/accounting/arqueos": {
+      "get": {
+        "description": "Los arqueos de una caja, del más reciente al más viejo.\n\n`POST /arqueos` existía desde el ciclo de caja y **el conteo no se podía\nvolver a ver**: quedaba en la base y en ningún lado más, que es lo mismo\nque no haberlo hecho — el arqueo sirve por su historia, no por el momento.\n\nPor punto de venta y obligatorio: `arqueo` cuelga de `punto_venta`, que\nvive en `sales`, así que listar «los de la empresa» pediría un join entre\nmódulos. La pantalla ya sabe de qué caja está hablando.",
+        "operationId": "listar_arqueos_api_v1_accounting_arqueos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "punto_venta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Punto Venta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ArqueoOut"
+                  },
+                  "title": "Response Listar Arqueos Api V1 Accounting Arqueos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Arqueos",
+        "tags": [
+          "accounting"
+        ]
+      },
       "post": {
         "operationId": "registrar_arqueo_api_v1_accounting_arqueos_post",
         "requestBody": {

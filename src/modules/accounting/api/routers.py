@@ -33,6 +33,7 @@ from src.modules.accounting.application.scope import (
     exigir_punto_venta,
 )
 from src.modules.accounting.infrastructure.repositories import (
+    ArqueoRepo,
     AsientoOmitidoRepo,
     AsientoRepo,
     CustodiaEfectivoRepo,
@@ -675,6 +676,27 @@ def registrar_arqueo(
     arqueo = caja.registrar_arqueo(session, realizado_por=actor.id, **body.model_dump())
     session.commit()
     return arqueo
+
+
+@router.get("/arqueos", response_model=list[schemas.ArqueoOut])
+def listar_arqueos(
+    punto_venta_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Los arqueos de una caja, del más reciente al más viejo.
+
+    `POST /arqueos` existía desde el ciclo de caja y **el conteo no se podía
+    volver a ver**: quedaba en la base y en ningún lado más, que es lo mismo
+    que no haberlo hecho — el arqueo sirve por su historia, no por el momento.
+
+    Por punto de venta y obligatorio: `arqueo` cuelga de `punto_venta`, que
+    vive en `sales`, así que listar «los de la empresa» pediría un join entre
+    módulos. La pantalla ya sabe de qué caja está hablando.
+    """
+    exigir_punto_venta(session, punto_venta_id, tenant)
+    return ArqueoRepo(session).list(punto_venta_id)
 
 
 # --- Plan Contable General Empresarial ----------------------------------------
