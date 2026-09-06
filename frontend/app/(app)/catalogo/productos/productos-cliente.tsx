@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
+import { InsigniaActiva } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { catalogoApi, type Marca, type Producto } from "@/lib/catalogo";
 import { ErrorApi } from "@/lib/cliente-api";
@@ -56,15 +57,7 @@ export function ProductosCliente({
         accessorKey: "activo",
         header: "Estado",
         cell: ({ getValue }) => (
-          <span
-            className={
-              getValue<boolean>()
-                ? "rounded-full bg-accent/30 px-2 py-0.5 text-xs font-semibold text-dark"
-                : "rounded-full bg-gray/20 px-2 py-0.5 text-xs font-semibold text-gray"
-            }
-          >
-            {getValue<boolean>() ? "Activo" : "Inactivo"}
-          </span>
+          <InsigniaActiva activa={getValue<boolean>()} />
         ),
       },
     ],

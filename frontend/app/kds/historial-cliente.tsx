@@ -8,6 +8,7 @@ import { ErrorApi } from "@/lib/cliente-api";
 import { apiKds, type PedidoHistorial } from "@/lib/kds";
 
 import NombreDeLinea from "./nombre-linea";
+import { RegionDeAviso } from "@/components/estado/region-de-aviso";
 
 /**
  * Lo que esta pantalla ya despachó, del día de negocio.
@@ -143,7 +144,7 @@ export default function HistorialCliente({ pantalla, sucursalId, puedeEntregar }
         </section>
       )}
 
-      {aviso && <div className="kds-aviso">{aviso}</div>}
+      <RegionDeAviso texto={aviso} clase="kds-aviso" />
     </main>
   );
 }

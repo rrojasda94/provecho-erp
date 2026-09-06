@@ -58,6 +58,7 @@ import {
   type Ubicacion,
 } from "@/components/direccion/ubicacion";
 import { Combobox } from "@/components/ui/combobox";
+import { RegionDeAviso } from "@/components/estado/region-de-aviso";
 
 /**
  * El servidor rechazó un aumento por falta de firma del encargado
@@ -1268,7 +1269,7 @@ export default function PdvCliente({
         />
       </div>
 
-      {aviso && <p className="pdv-aviso">{aviso}</p>}
+      <RegionDeAviso texto={aviso} clase="pdv-aviso" />
 
       <DialogoApertura
         abierto={!datos.caja}

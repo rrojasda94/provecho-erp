@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { Insignia } from "@/components/estado/insignia";
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { Combobox } from "@/components/ui/combobox";
 import { tienePermiso } from "@/lib/permisos";
@@ -425,14 +426,10 @@ function Fila({
 
 /** La respuesta a "¿esto es urgente?" en una palabra. */
 function Etiqueta({ urgente }: { urgente: boolean }) {
-  return urgente ? (
-    <span className="rounded-full bg-secondary/15 px-2 py-0.5 text-xs font-semibold text-secondary">
-      Bajo mínimo
-    </span>
-  ) : (
-    <span className="rounded-full bg-black/5 px-2 py-0.5 text-xs font-semibold text-gray">
-      Pedido del local
-    </span>
+  return (
+    <Insignia tono={urgente ? "alerta" : "neutro"}>
+      {urgente ? "Bajo mínimo" : "Pedido del local"}
+    </Insignia>
   );
 }
 

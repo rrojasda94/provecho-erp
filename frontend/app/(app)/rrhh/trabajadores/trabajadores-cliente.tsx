@@ -6,6 +6,7 @@ import { useMemo } from "react";
 
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { PersonaPicker } from "@/components/persona-picker/persona-picker";
+import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
 import { tienePermiso } from "@/lib/permisos";
@@ -272,15 +273,9 @@ export function TrabajadoresCliente({
         accessorKey: "estado",
         header: "Estado",
         cell: ({ getValue }) => (
-          <span
-            className={
-              getValue<string>() === "activo"
-                ? "rounded-full bg-accent/30 px-2 py-0.5 text-xs font-semibold text-dark"
-                : "rounded-full bg-gray/20 px-2 py-0.5 text-xs font-semibold text-gray"
-            }
-          >
+          <Insignia tono={getValue<string>() === "activo" ? "exito" : "neutro"}>
             {getValue<string>()}
-          </span>
+          </Insignia>
         ),
       },
       {
