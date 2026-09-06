@@ -986,6 +986,10 @@ class DevolucionOut(BaseModel):
 
 class DevolucionDetalleOut(DevolucionOut):
     items: list[DevolucionItemOut]
+    # Resueltos por el router vía el contrato público de `users`
+    # (`nombres_de_usuarios`): la ficha muestra un nombre, no un UUID.
+    registrado_por_nombre: str | None = None
+    anulado_por_nombre: str | None = None
 
 
 # --- Merma ------------------------------------------------------------------
@@ -1014,6 +1018,12 @@ class MermaOut(BaseModel):
     motivo: str | None
     estado: str
     referencia_id: uuid.UUID | None
+    # Quién la registró: la pantalla necesita esconderle los botones de
+    # resolver (RN-INV-019 — quien registra no firma su propia baja) en vez
+    # de dejar que se los coma como un 409. `liberado_por` es el otro lado
+    # del mismo rastro: quién sí resolvió.
+    creado_por: uuid.UUID
+    liberado_por: uuid.UUID | None
 
 
 class GuiaRemisionOut(BaseModel):
