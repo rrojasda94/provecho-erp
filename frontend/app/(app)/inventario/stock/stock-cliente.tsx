@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { Insignia } from "@/components/estado/insignia";
+import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox, ComboboxMultiple } from "@/components/ui/combobox";
 
@@ -108,7 +109,6 @@ function Articulo({ id, nombre, codigo }: { id: string; nombre: string | null; c
 export function StockCliente({
   filas,
   total,
-  recortado,
   almacenes,
   sucursales,
   categorias,
@@ -118,7 +118,6 @@ export function StockCliente({
 }: {
   filas: FilaStock[];
   total: number;
-  recortado: boolean;
   almacenes: Opcion[];
   sucursales: Opcion[];
   categorias: Opcion[];
@@ -339,13 +338,11 @@ export function StockCliente({
         </label>
       </div>
 
-      {recortado && (
-        <p className="rounded-lg bg-status-warning-surface px-3 py-2 text-sm text-status-warning">
-          Se muestran {filas.length} de {total} filas. Filtra por almacén o
-          categoría para ver el resto — la tabla todavía pagina del lado del
-          navegador.
-        </p>
-      )}
+      <AvisoRecortado
+        mostrados={filas.length}
+        total={total}
+        sugerencia="Filtra por almacén o categoría para ver el resto."
+      />
 
       {consolidado ? (
         <TablaDatos

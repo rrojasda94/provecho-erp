@@ -4,6 +4,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo, useTransition } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
+import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
 
@@ -150,10 +151,13 @@ function AccionesPieza({ pieza }: { pieza: Pieza }) {
 
 export function ContenidoCliente({
   piezas,
+  total,
   campanas,
   marcas,
 }: {
   piezas: Pieza[];
+  /** Cuántos hay en total: la página viene recortada. */
+  total: number;
   campanas: Campana[];
   marcas: Marca[];
 }) {
@@ -221,6 +225,11 @@ export function ContenidoCliente({
         pertinente a la marca y su uso de marca está validado (RN-MKT-001/002) — las dos
         etiquetas se tocan para marcarlas.
       </p>
+      <AvisoRecortado
+        mostrados={piezas.length}
+        total={total}
+        sugerencia="Acota por campaña o por estado para ver el resto."
+      />
       <TablaDatos columnas={columnas} datos={piezas} placeholderBusqueda="Buscar pieza..." />
     </div>
   );

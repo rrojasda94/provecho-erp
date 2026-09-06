@@ -33,6 +33,7 @@ export default async function ProduccionPage({
     return (
       <OrdenesCliente
         ordenes={primeroElDe(ordenes.items, orden ?? null, (o) => o.id)}
+        total={ordenes.total}
         articulos={articulos.items}
         almacenes={almacenes}
       />

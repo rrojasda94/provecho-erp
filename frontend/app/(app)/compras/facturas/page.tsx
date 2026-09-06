@@ -56,7 +56,6 @@ export default async function FacturasPage({ searchParams }: { searchParams: Par
     <FacturasCliente
       facturas={pagina.items}
       total={pagina.total}
-      recortado={pagina.total > pagina.items.length}
       proveedores={proveedores}
       filtros={{
         proveedor: filtros.proveedor ?? "",

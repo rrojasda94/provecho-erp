@@ -27,9 +27,13 @@ export type SaldoLote = {
 export function LotesCliente({
   saldos,
   resaltado,
+  enElTope,
 }: {
   saldos: SaldoLote[];
   resaltado: string | null;
+  /** La lista llegó al tope del listado: hay más lotes, y son los que
+   * vencen más tarde. */
+  enElTope: boolean;
 }) {
   const columnas = useMemo<ColumnDef<SaldoLote>[]>(
     () => [
@@ -76,6 +80,15 @@ export function LotesCliente({
       {resaltado && !saldos.some((s) => s.lote_id === resaltado) && (
         <p className="text-sm text-secondary">
           Ese lote ya no tiene saldo en ningún almacén.
+        </p>
+      )}
+      {enElTope && (
+        <p
+          role="status"
+          className="rounded-lg bg-status-warning-surface px-3 py-2 text-sm text-status-warning"
+        >
+          Se muestran los <span className="cifra">{saldos.length}</span> lotes que
+          vencen primero. Hay más: filtrá por almacén o por SKU para verlos.
         </p>
       )}
       <TablaDatos

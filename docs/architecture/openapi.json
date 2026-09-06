@@ -36638,7 +36638,7 @@
     },
     "/api/v1/inventory/lotes": {
       "get": {
-        "description": "Saldo por lote en orden de vencimiento. `por_vencer_dias` acota a los\nque vencen dentro de esa ventana (incluye los ya vencidos).",
+        "description": "Saldo por lote en orden de vencimiento. `por_vencer_dias` acota a los\nque vencen dentro de esa ventana (incluye los ya vencidos).\n\n**Con tope** (hallazgo #14 de la auditoría del 2026-08-30): devolvía la\ntabla entera, y un local que lleva meses acumula miles de lotes — la\nconsulta y el payload crecían sin techo mientras la pantalla paginaba en\nel navegador. El orden por vencimiento hace que el tope signifique algo:\nlo que queda afuera es lo que vence más tarde.",
         "operationId": "listar_lotes_api_v1_inventory_lotes_get",
         "parameters": [
           {
@@ -36689,6 +36689,18 @@
                 }
               ],
               "title": "Por Vencer Dias"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 2000,
+              "minimum": 1,
+              "title": "Limite",
+              "type": "integer"
             }
           }
         ],

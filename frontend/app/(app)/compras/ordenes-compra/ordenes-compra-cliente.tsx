@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
+import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { pedir } from "@/lib/cliente-api";
 
@@ -269,12 +270,15 @@ function BotonEditarOC({ orden, articulos }: { orden: OrdenCompra; articulos: Ar
 
 export function OrdenesCompraCliente({
   ordenes,
+  total,
   proveedores,
   almacenes,
   articulos,
   avisoArticulos,
 }: {
   ordenes: OrdenCompra[];
+  /** Cuántos hay en total: la página viene recortada. */
+  total: number;
   proveedores: Proveedor[];
   almacenes: Almacen[];
   articulos: Articulo[];
@@ -380,6 +384,11 @@ export function OrdenesCompraCliente({
           <option value="directa">Compras directas</option>
         </select>
       </label>
+      <AvisoRecortado
+        mostrados={ordenes.length}
+        total={total}
+        sugerencia="Acota por estado o proveedor para ver el resto."
+      />
       <TablaDatos columnas={columnas} datos={visibles} placeholderBusqueda="Buscar orden..." />
     </div>
   );

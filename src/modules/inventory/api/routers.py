@@ -506,6 +506,10 @@ def registrar_movimiento(
 
 
 # --- Lotes / FEFO -----------------------------------------------------------
+#: Cuántos lotes devuelve el listado si nadie pide otra cosa. No es una
+#: página —no hay `total`— es un techo: lo que queda afuera es lo que vence
+#: más tarde, que es exactamente lo que no urge.
+LOTES_TOPE = 500
 @router.post("/lotes", response_model=schemas.LoteOut, status_code=201)
 def crear_lote(
     body: schemas.LoteCreate,
@@ -524,12 +528,20 @@ def listar_lotes(
     almacen_id: uuid.UUID | None = None,
     sku_id: uuid.UUID | None = None,
     por_vencer_dias: int | None = None,
+    limite: int = Query(LOTES_TOPE, ge=1, le=2000),
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     """Saldo por lote en orden de vencimiento. `por_vencer_dias` acota a los
-    que vencen dentro de esa ventana (incluye los ya vencidos)."""
+    que vencen dentro de esa ventana (incluye los ya vencidos).
+
+    **Con tope** (hallazgo #14 de la auditoría del 2026-08-30): devolvía la
+    tabla entera, y un local que lleva meses acumula miles de lotes — la
+    consulta y el payload crecían sin techo mientras la pantalla paginaba en
+    el navegador. El orden por vencimiento hace que el tope signifique algo:
+    lo que queda afuera es lo que vence más tarde.
+    """
     if almacen_id is not None:
         exigir_almacen(session, almacen_id, tenant)
     return lotes_uc.listar(
@@ -538,6 +550,7 @@ def listar_lotes(
         sku_id=sku_id,
         empresa_id=tenant.filtro_empresa(),
         por_vencer_dias=por_vencer_dias,
+        limite=limite,
     )
 
 

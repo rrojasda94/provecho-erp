@@ -22,6 +22,7 @@ export default async function ArticulosPage() {
     return (
       <ArticulosCliente
         articulos={articulos.items}
+        total={articulos.total}
         categorias={categorias}
         unidadesMedida={unidadesMedida}
         permisos={usuario.permisos}

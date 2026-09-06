@@ -3,6 +3,20 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **Los catálogos de referencia que llenan un `<select>` siguen topados en
+  200, y en silencio** (2026-09-05, lo que el hallazgo #14 deja abierto). El
+  aviso de recorte cubre los **listados que el usuario recorre**; no sirve
+  para un combo: en un desplegable, la opción que falta no se nota — se
+  concluye que el artículo, el proveedor o la sucursal no existen. Ahí el
+  arreglo no es avisar sino buscar en el servidor, que es lo que ya hacen
+  `PersonaPicker` y `ArticuloPicker`. Alcanza a categorías, unidades de
+  medida, proveedores, cuentas contables y sucursales en los diálogos de alta.
+- ⬜ **Ninguna de las listas grandes pagina de verdad todavía** (2026-09-05).
+  El aviso de recorte reemplaza al silencio, no a la paginación de servidor:
+  quien llega al tope tiene que acotar por un filtro. Cuál de las pantallas
+  merece paginación real se decide viendo cuáles avisan seguido — que es
+  justamente lo que antes no se podía saber.
+
 - ⬜ **Las reglas de distribución de reportes no se editan por pantalla**
   (2026-09-05). Áreas y miembros sí (`/reportes/areas`), pero
   `POST/PATCH/DELETE /reports/reglas` sigue siendo API: una regla lleva

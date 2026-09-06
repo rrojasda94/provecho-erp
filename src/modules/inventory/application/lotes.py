@@ -221,10 +221,22 @@ def listar(
     sku_id: uuid.UUID | None = None,
     empresa_id: uuid.UUID | None = None,
     por_vencer_dias: int | None = None,
+    limite: int | None = None,
     hoy: date | None = None,
 ) -> list[dict]:
+    """Saldo por lote, del que vence antes al que vence después.
+
+    `limite` es un **tope**, no una página: no hay `total` que devolver
+    porque la consulta no lo cuenta. Es lo que evita que una empresa con
+    miles de lotes se traiga todos en cada carga de la pantalla.
+
+    ponytail: `por_vencer_dias` se aplica **después** del tope, en Python,
+    como venía. Techo conocido: con un tope chico y una ventana angosta se
+    pueden perder lotes que sí calificaban. Hoy no pasa —el tope es varias
+    veces la ventana típica—; el día que moleste, la fecha se compara en SQL.
+    """
     hoy = hoy or fechas.hoy()
-    filas = StockLoteRepo(session).list(almacen_id, sku_id, empresa_id)
+    filas = StockLoteRepo(session).list(almacen_id, sku_id, empresa_id, limite)
     if por_vencer_dias is not None:
         filas = [
             (sl, lote)

@@ -509,6 +509,7 @@ class StockLoteRepo:
         almacen_id: uuid.UUID | None = None,
         sku_id: uuid.UUID | None = None,
         empresa_id: uuid.UUID | None = None,
+        limite: int | None = None,
     ) -> list[tuple[StockLote, Lote]]:
         q = select(StockLote, Lote).join(Lote, Lote.id == StockLote.lote_id)
         if almacen_id is not None:
@@ -520,14 +521,13 @@ class StockLoteRepo:
             q = q.join(Almacen, Almacen.id == StockLote.almacen_id).where(
                 Almacen.empresa_id == empresa_id
             )
-        return [
-            (sl, lote)
-            for sl, lote in self.s.execute(
-                q.order_by(
-                    Lote.fecha_vencimiento.is_(None), Lote.fecha_vencimiento
-                )
-            )
-        ]
+        # El orden es el que hace que un tope signifique algo: primero lo que
+        # vence antes, así que los `limite` primeros son los urgentes y no
+        # "los que la base devolvió".
+        q = q.order_by(Lote.fecha_vencimiento.is_(None), Lote.fecha_vencimiento)
+        if limite is not None:
+            q = q.limit(limite)
+        return [(sl, lote) for sl, lote in self.s.execute(q)]
 
     def add(self, stock_lote: StockLote) -> StockLote:
         self.s.add(stock_lote)
