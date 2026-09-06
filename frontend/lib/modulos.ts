@@ -12,6 +12,7 @@ import {
   Megaphone,
   Package,
   Receipt,
+  ScrollText,
   SlidersHorizontal,
   Users,
   type LucideIcon,
@@ -231,5 +232,18 @@ export const MODULOS: Modulo[] = [
     permiso: "bi.acceder",
     area: "administracion",
     Icono: BarChart3,
+  },
+  {
+    clave: "auditoria",
+    nombre: "Auditoría",
+    // Módulo propio y no una sección de Gerencia, por el mismo criterio que
+    // Organización: el permiso real es `auditoria.leer` y colgarlo de otro
+    // prefijo se lo escondería a quien sí lo tiene — hoy, el contador, que
+    // audita a Compras, Almacén y las cajas de sucursal (RN-CTB-009).
+    descripcion: "Quién tocó qué, cuándo y con qué valor anterior",
+    href: "/auditoria",
+    prefijoPermiso: "auditoria.",
+    area: "administracion",
+    Icono: ScrollText,
   },
 ];
