@@ -158,10 +158,15 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   opcional por artículo, reparto FEFO al registrar la salida, bloqueo de
   vencidos + `inventory.lote_vencido_detectado`, lote generado por
   recepción de compra y por producción. Deuda que deja abierta:
-  - ⬜ **La reposición por venta anulada entra al lote del día**, no al
-    lote del que salió: `sales.venta_anulada` no transporta los
-    movimientos originales. Con volumen bajo la diferencia es contable,
-    no física; si importa, el evento tiene que llevar el detalle.
+  - ✅ 2026-09-06 **La reposición por venta anulada vuelve al lote del que
+    salió** (bloque `fix/inventario-reposicion-al-lote-original`, ADR-094).
+    No hizo falta que el evento transportara nada nuevo:
+    `movimiento_inventario.referencia` ya guardaba el `venta_id`, y cada
+    lote que FEFO tomó al vender dejó su propio movimiento (ADR-015). Se
+    reparte en orden de vencimiento —no de `ts`, que puede empatar dentro
+    de la misma transacción— y una reposición parcial prioriza el lote que
+    salió primero, sin pasarse de lo que entregó. Sin rastro, cae al
+    comportamiento de siempre (lote del día). No se tocó `sales`.
   - ✅ 2026-08-06 **Ventana de alerta por artículo**
     (`articulo.dias_alerta_vencimiento`, RN-VNC-004 nueva). `GET /lotes`
     marca `por_vencer` con la ventana del artículo; `por_vencer_dias` en la
