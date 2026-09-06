@@ -15,7 +15,11 @@ import { TablaDatos } from "@/components/tabla/tabla-datos";
 
 import { crearTerminalAction, type EstadoTerminal, revocarTerminalAction } from "./actions";
 
-export type Sucursal = { id: string; nombre: string };
+import type { Sucursal } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Sucursal };
+
 export type Terminal = {
   id: string;
   sucursal_id: string;

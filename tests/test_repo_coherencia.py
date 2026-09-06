@@ -269,3 +269,125 @@ def test_los_estados_del_filtro_de_la_jornada_son_los_del_enum_de_venta():
         "los estados del filtro de la jornada y los de la API no coinciden: "
         f"pantalla={sorted(de_la_pantalla)} API={sorted(ESTADOS_VENTA)}"
     )
+
+
+# --- Listas del frontend que copian un enum del backend ----------------------
+#
+# Hallazgo #15 de la auditoría del 2026-08-30: el repo tenía **dos** pruebas
+# de coherencia escritas a mano —los motivos de descuento del PDV y los
+# estados de la jornada— y ~15 listas más con el mismo riesgo y ninguna
+# prueba. El riesgo no es que falle: es que **no falle**. Una lista que se
+# separa del enum ofrece un valor que el servidor rechaza con un 422 recién
+# al guardar, o esconde uno entero y nadie lo nota nunca.
+#
+# Sumar una lista es agregar una fila acá, que era el punto de extenderlo en
+# vez de escribir la prueba número dieciséis.
+
+
+def _valores_de_lista_ts(fuente: str, nombre: str, forma: str) -> set[str]:
+    """Los valores de un `const NOMBRE = [...]` de TypeScript.
+
+    `forma` se declara y no se adivina: las tres que usa el repo se parecen
+    lo suficiente como para que un parseo "inteligente" se trague la etiqueta
+    en vez del valor, y una prueba que compara etiquetas contra un enum pasa
+    en verde sin proteger nada.
+    """
+    bloque = re.search(rf"const {nombre} = \[(.*?)\][;\s]", fuente, re.S)
+    assert bloque, f"No encontré la lista {nombre}"
+    cuerpo = bloque.group(1)
+    if forma == "strings":
+        return set(re.findall(r'"([^"]+)"', cuerpo))
+    if forma == "pares":
+        # [["valor", "Etiqueta"], ...] — solo el primero de cada par.
+        return set(re.findall(r'\[\s*"([^"]+)"\s*,', cuerpo))
+    if forma == "objetos":
+        # [{ valor: "x", etiqueta: "..." }, ...]
+        return set(re.findall(r'valor:\s*"([^"]+)"', cuerpo))
+    raise AssertionError(f"forma desconocida: {forma}")
+
+
+def _enum_de_columna(ruta_modelo: str, columna: str) -> set[str]:
+    """Los valores que la columna admite, leídos del modelo — no de una copia.
+
+    Es la única fuente que no se puede desincronizar: si mañana se agrega un
+    valor al `Enum`, la prueba de la pantalla que lo ofrece empieza a fallar
+    sola.
+    """
+    import importlib
+
+    modulo, clase = ruta_modelo.rsplit(".", 1)
+    modelo = getattr(importlib.import_module(modulo), clase)
+    return set(modelo.__table__.columns[columna].type.enums)
+
+
+#: (archivo, constante, forma, modelo, columna)
+LISTAS_ESPEJO = [
+    (
+        "frontend/app/(app)/contabilidad/plan-cuentas/plan-cuentas-cliente.tsx",
+        "TIPOS", "strings",
+        "src.modules.accounting.infrastructure.models.CuentaContable", "tipo",
+    ),
+    (
+        "frontend/app/(app)/inventario/devoluciones/devoluciones-cliente.tsx",
+        "MOTIVOS", "pares",
+        "src.modules.inventory.infrastructure.models.Devolucion", "motivo",
+    ),
+    (
+        "frontend/app/(app)/inventario/devoluciones/devoluciones-cliente.tsx",
+        "DESTINOS", "pares",
+        "src.modules.inventory.infrastructure.models.Devolucion", "destino",
+    ),
+    (
+        "frontend/app/(app)/catalogo/medios-pago/medios-pago-cliente.tsx",
+        "TIPOS", "objetos",
+        "src.modules.sales.infrastructure.models.MedioPago", "tipo",
+    ),
+    (
+        "frontend/app/(app)/catalogo/medios-pago/medios-pago-cliente.tsx",
+        "DIRECCIONES", "objetos",
+        "src.modules.sales.infrastructure.models.MedioPago", "direccion",
+    ),
+    (
+        "frontend/app/(app)/rrhh/trabajadores/trabajadores-cliente.tsx",
+        "TIPOS_VINCULO", "strings",
+        "src.modules.rrhh.infrastructure.models.Trabajador", "tipo_vinculo",
+    ),
+    (
+        "frontend/app/(app)/rrhh/trabajadores/[id]/legajo-cliente.tsx",
+        "TIPOS_AMONESTACION", "strings",
+        "src.modules.rrhh.infrastructure.models.Amonestacion", "tipo",
+    ),
+    (
+        "frontend/app/(app)/compras/proveedores/proveedores-cliente.tsx",
+        "CLASIFICACIONES", "strings",
+        "src.modules.purchases.infrastructure.models.Proveedor", "clasificacion",
+    ),
+    (
+        "frontend/app/(app)/catalogo/productos/[id]/ficha-cliente.tsx",
+        "MODALIDADES", "strings",
+        "src.modules.sales.infrastructure.models.Venta", "modalidad",
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    ("archivo", "constante", "forma", "modelo", "columna"),
+    LISTAS_ESPEJO,
+    ids=[f"{c[1]}@{c[0].rsplit('/', 1)[-1]}" for c in LISTAS_ESPEJO],
+)
+def test_la_lista_de_la_pantalla_es_la_del_enum(
+    archivo, constante, forma, modelo, columna
+):
+    import src.core.models_registry  # noqa: F401  (registra los modelos)
+
+    ruta = RAIZ / archivo
+    assert ruta.exists(), f"{archivo} ya no existe: actualizá LISTAS_ESPEJO"
+    de_la_pantalla = _valores_de_lista_ts(
+        ruta.read_text(encoding="utf-8"), constante, forma
+    )
+    del_backend = _enum_de_columna(modelo, columna)
+    assert de_la_pantalla <= del_backend, (
+        f"{constante} de {archivo} ofrece valores que la API rechaza: "
+        f"{sorted(de_la_pantalla - del_backend)}"
+    )
+

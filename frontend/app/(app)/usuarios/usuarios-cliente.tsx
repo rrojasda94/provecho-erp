@@ -26,6 +26,11 @@ import {
 } from "./actions";
 import { Combobox } from "@/components/ui/combobox";
 
+import type { Sucursal } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Sucursal };
+
 export type Usuario = {
   id: string;
   username: string;
@@ -40,7 +45,6 @@ export type Usuario = {
   activo: boolean;
 };
 export type Rol = { id: string; nombre: string; descripcion: string | null };
-export type Sucursal = { id: string; nombre: string };
 
 function DialogoNuevaCuenta() {
   return (

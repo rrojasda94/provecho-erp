@@ -68,7 +68,6 @@ export type Tablero = {
 
 export type Sucursal = { id: string; nombre: string; estado: string };
 
-export type Marca = { id: string; nombre: string };
 
 export type Rol = { id: string; nombre: string };
 
@@ -188,6 +187,11 @@ export {
   type TipoColumna,
   type Visual,
 } from "./reportes-datos";
+
+import type { Marca } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Marca };
 
 function descargarBlob(nombre: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);

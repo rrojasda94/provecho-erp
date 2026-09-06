@@ -14,6 +14,11 @@ import { tienePermiso } from "@/lib/permisos";
 import { crearArticuloAction, editarArticuloAction } from "./actions";
 import { ImportarArticulos } from "./importar-articulos";
 
+import type { Categoria } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Categoria };
+
 export type Articulo = {
   id: string;
   id_interno: string;
@@ -27,7 +32,6 @@ export type Articulo = {
   dias_alerta_vencimiento: number | null;
 };
 
-export type Categoria = { id: string; nombre: string };
 export type UnidadMedida = { id: string; nombre: string; decimales: number };
 
 // README del módulo: enum extensible, hoy estos 6 valores.

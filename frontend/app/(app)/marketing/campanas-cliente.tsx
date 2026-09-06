@@ -13,6 +13,11 @@ import {
 } from "./actions";
 import { Combobox } from "@/components/ui/combobox";
 
+import type { Marca } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Marca };
+
 export type Campana = {
   id: string;
   marca_id: string;
@@ -26,7 +31,6 @@ export type Campana = {
   estado: string;
   aprobada_por: string | null;
 };
-export type Marca = { id: string; nombre: string };
 
 const TIPOS = ["notoriedad", "impulso_venta", "lanzamiento", "medios", "evento"];
 

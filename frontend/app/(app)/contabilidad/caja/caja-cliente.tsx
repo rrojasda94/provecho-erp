@@ -15,6 +15,11 @@ import {
 } from "./actions";
 import { Combobox } from "@/components/ui/combobox";
 
+import type { Sucursal } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Sucursal };
+
 export type Turno = {
   cierre_id: string;
   apertura_caja_id: string;
@@ -42,7 +47,6 @@ export type Pos = {
   sucursal_id: string | null;
 };
 
-export type Sucursal = { id: string; nombre: string };
 
 /** Una caja abierta ahora mismo: es la única sobre la que se puede arquear,
  * porque el esperado sale del turno vivo. */

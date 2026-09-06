@@ -8,6 +8,11 @@ import { Combobox, ComboboxMultiple, type Opcion } from "@/components/ui/combobo
 
 import { crearPromocionAction, terminarPromocionAction } from "../actions";
 
+import type { Categoria, Sucursal } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Categoria, Sucursal };
+
 export type Promocion = {
   id: string;
   nombre: string;
@@ -26,8 +31,6 @@ export type Promocion = {
   activa: boolean;
 };
 
-export type Sucursal = { id: string; nombre: string };
-export type Categoria = { id: string; nombre: string };
 export type Producto = {
   id: string;
   nombre: string;

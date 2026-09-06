@@ -13,7 +13,11 @@ import { Combobox } from "@/components/ui/combobox";
 
 import { guardarTurnoAction } from "./actions";
 
-export type Sucursal = { id: string; nombre: string };
+import type { Sucursal } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Sucursal };
+
 export type Turno = {
   id: string;
   sucursal_id: string;

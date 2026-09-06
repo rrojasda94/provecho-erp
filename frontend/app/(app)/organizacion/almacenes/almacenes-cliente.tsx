@@ -18,7 +18,11 @@ import {
 } from "../actions";
 import { CampoDireccion } from "@/components/direccion/campo-direccion";
 
-export type Sucursal = { id: string; nombre: string };
+import type { Sucursal } from "@/lib/catalogos";
+
+// Se reexportan porque varias pantallas los importan desde acá.
+export type { Sucursal };
+
 export type Almacen = {
   id: string;
   empresa_id: string;
