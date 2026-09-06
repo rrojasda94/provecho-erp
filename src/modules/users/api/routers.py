@@ -1195,8 +1195,11 @@ def editar_empresa(
     session: Session = Depends(get_db),
 ):
     _exigir_empresa(tenant, organizacion.obtener_empresa(session, empresa_id).id)
+    # exclude_unset: campo ausente = no tocar; explícito en `null` vacía los
+    # de BORRABLES_EMPRESA (ver organizacion.py). Con model_dump() a secas
+    # todo ausente llegaba None y no había forma de distinguir uno de otro.
     empresa = organizacion.editar_empresa(
-        session, empresa_id, actor_id=actor.id, **body.model_dump()
+        session, empresa_id, actor_id=actor.id, **body.model_dump(exclude_unset=True)
     )
     session.commit()
     return empresa
@@ -1273,7 +1276,7 @@ def editar_marca(
 ):
     _exigir_grupo(session, tenant, organizacion.obtener_marca(session, marca_id).grupo_id)
     marca = organizacion.editar_marca(
-        session, marca_id, actor_id=actor.id, **body.model_dump()
+        session, marca_id, actor_id=actor.id, **body.model_dump(exclude_unset=True)
     )
     session.commit()
     return marca
@@ -1404,7 +1407,7 @@ def editar_sucursal(
     actual = organizacion.obtener_sucursal(session, sucursal_id)
     _exigir_empresa(tenant, actual.empresa_id)
     sucursal = organizacion.editar_sucursal(
-        session, sucursal_id, actor_id=actor.id, **body.model_dump()
+        session, sucursal_id, actor_id=actor.id, **body.model_dump(exclude_unset=True)
     )
     session.commit()
     return sucursal
@@ -1457,7 +1460,7 @@ def editar_almacen(
 ):
     _exigir_empresa(tenant, organizacion.obtener_almacen(session, almacen_id).empresa_id)
     almacen = organizacion.editar_almacen(
-        session, almacen_id, actor_id=actor.id, **body.model_dump()
+        session, almacen_id, actor_id=actor.id, **body.model_dump(exclude_unset=True)
     )
     session.commit()
     return almacen

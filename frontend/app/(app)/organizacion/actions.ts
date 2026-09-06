@@ -178,9 +178,12 @@ async function guardarAbastecimiento(
       token: await token(),
       metodo: "PATCH",
       cuerpo: {
-        almacen_abastecedor_id: texto(formData, "almacen_abastecedor_id") || undefined,
+        // `null` explícito, no `undefined`: el PATCH ahora distingue "no lo
+        // mandé" de "lo vacío a propósito" (T2), y elegir "Ninguno" es lo
+        // segundo.
+        almacen_abastecedor_id: texto(formData, "almacen_abastecedor_id") || null,
         almacen_abastecedor_respaldo_id:
-          texto(formData, "almacen_abastecedor_respaldo_id") || undefined,
+          texto(formData, "almacen_abastecedor_respaldo_id") || null,
       },
     });
   } catch (e) {
@@ -209,9 +212,11 @@ export async function guardarAlmacenAction(
       tipo,
       direccion: texto(formData, "direccion") || undefined,
       sucursal_id: texto(formData, "sucursal_id") || undefined,
-      almacen_abastecedor_id: texto(formData, "almacen_abastecedor_id") || undefined,
+      // `null` explícito, no `undefined`: "Ninguno" es vaciar a propósito,
+      // no omitir el campo (T2).
+      almacen_abastecedor_id: texto(formData, "almacen_abastecedor_id") || null,
       almacen_abastecedor_respaldo_id:
-        texto(formData, "almacen_abastecedor_respaldo_id") || undefined,
+        texto(formData, "almacen_abastecedor_respaldo_id") || null,
       ...ubicacionDe(formData),
     },
     "el almacén",

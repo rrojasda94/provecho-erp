@@ -80,12 +80,21 @@ def desanclar_si_cambio_el_texto(
     reparto iría a otra, cobrando la distancia equivocada. Ante la duda se
     pierde el pin, que se vuelve a poner en dos clicks, y no la verdad.
 
-    No alcanza con `_aplicar` ignorando los `None` (la convención de PATCH de
-    este ERP, donde ausente = no tocar): justamente por esa convención un
-    formulario que corrige el texto sin ancla nueva no puede pedir el borrado.
+    Sigue haciendo falta con el centinela de PATCH que distingue "ausente" de
+    "`null` explícito" (ver `organizacion._aplicar`): esto cubre al que
+    **no** pide nada sobre el ancla y solo corrige el texto, que es la
+    inmensa mayoría de las ediciones.
+
+    Se llama **después** de `_aplicar`: lee el valor ya aplicado a la
+    entidad, no el crudo de `campos`. Leer `campos` directo confundía dos
+    casos que la unicidad de `_aplicar` ya resuelve — un `direccion: null`
+    en `almacen` (borrable, sí cambia) y el mismo `null` en `sucursal`
+    (no borrable, `_aplicar` lo ignora y el texto sigue siendo el de
+    antes) — con la entidad ya actualizada, comparar contra lo que **de
+    verdad** quedó es lo único que hace falta.
     """
-    texto_nuevo = campos.get(campo_texto)
-    if texto_nuevo is None or texto_nuevo == texto_anterior:
+    texto_nuevo = getattr(entidad, campo_texto)
+    if texto_nuevo == texto_anterior:
         return {}
     if campos.get("ubicacion_place_id"):
         return {}

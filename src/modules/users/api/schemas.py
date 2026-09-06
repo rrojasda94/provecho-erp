@@ -173,6 +173,7 @@ class MarcaOut(BaseModel):
     grupo_id: uuid.UUID
     nombre: str
     tipo: str
+    skins: dict | None = None
 
 
 class SucursalOut(UbicacionMixin):
@@ -184,6 +185,7 @@ class SucursalOut(UbicacionMixin):
     estado: str
     direccion: str | None = None
     tenencia: str | None = None
+    horario_atencion: dict | None = None
     radio_marcaje_m: int | None = None
 
 
