@@ -180,10 +180,10 @@ RUC de la empresa.
 | POST/GET | `/api/v1/empresas` | Crear (superusuario) / listar. El listado muestra solo la empresa del token salvo superusuario |
 | GET/PATCH/DELETE | `/api/v1/empresas/{id}` | Ver / editar / **baja lógica** (409 con sucursales o almacenes activos). `grupo_id` no es editable |
 | POST | `/api/v1/marcas` | Crear marca en el grupo del tenant (la marca es del grupo, no de la empresa) |
-| GET/PATCH/DELETE | `/api/v1/marcas/{id}` | Ver / editar / baja (409 si tiene sucursales activas o sigue licenciada) |
+| GET/PATCH/DELETE | `/api/v1/marcas/{id}` | Ver / editar / baja (409 si tiene sucursales activas o sigue licenciada). `skins` (branding de PDV) viaja en la lectura |
 | POST/GET/DELETE | `/api/v1/empresas/{id}/marcas[/{marca_id}]` | Otorgar (idempotente) / listar / revocar la licencia de marca. Revocar es 409 si la empresa opera sucursales activas de esa marca |
 | POST | `/api/v1/sucursales` | Abrir un local; `empresa_id` sale del token (ADR-004) |
-| GET/PATCH | `/api/v1/sucursales/{id}` | Ver / editar. **Cerrar es `estado="inactiva"`, no hay DELETE**: la sucursal sigue siendo el ancla de sus ventas, cajas y trabajadores |
+| GET/PATCH | `/api/v1/sucursales/{id}` | Ver / editar. **Cerrar es `estado="inactiva"`, no hay DELETE**: la sucursal sigue siendo el ancla de sus ventas, cajas y trabajadores. `horario_atencion` viaja en la lectura |
 | POST | `/api/v1/almacenes` | Crear almacén |
 | GET/PATCH/DELETE | `/api/v1/almacenes/{id}` | Ver / editar / baja lógica (409 si otros almacenes se abastecen de este) |
 | POST | `/api/v1/almacenes/{id}/reactivar` | Deshace la baja. Idempotente |
@@ -208,8 +208,14 @@ valida la API:
   `POST /almacenes/{id}/reactivar` (2026-08-26), idempotente. Sin ella
   equivocarse era definitivo —los repos filtran `deleted_at`, así que el
   almacén desaparecía de toda la interfaz—.
-- En los `PATCH`, un campo ausente o `null` significa "no tocar": no hay
-  forma de vaciar un opcional desde el PATCH.
+- En los `PATCH` de organización, un campo **ausente** significa "no tocar"
+  (`exclude_unset`, ADR-096). Un campo en `null` **explícito** lo vacía si
+  está en la lista de borrables de esa entidad: `contacto`/`config_fiscal`/
+  `ubicacion_*` de empresa, `skins` de marca, `horario_atencion`/
+  `radio_marcaje_m`/`ubicacion_*` de sucursal, `direccion`/`sucursal_id`/
+  `almacen_abastecedor_id`/`almacen_abastecedor_respaldo_id`/`ubicacion_*` de
+  almacén. El resto de los campos (`nombre`, `ruc`, `tipo`, ...) ignora un
+  `null` igual que antes — vaciarlos dejaría la entidad inválida.
 
 Alcance por tenant (ADR-004): el superusuario (permiso `*`) opera sobre toda
 la organización aunque tenga sucursales asignadas — el recurso administrado

@@ -688,3 +688,140 @@ def test_asignar_sucursal_inexistente_404(env):
         json={"sucursal_id": "00000000-0000-0000-0000-000000000001"},
     )
     assert r.status_code == 404
+
+
+# --- Vaciar un opcional por PATCH (campo ausente ≠ `null` explícito) --------
+def test_omitir_un_campo_no_lo_toca(env):
+    client, headers, ids, _ = env
+    client.patch(
+        f"/api/v1/empresas/{ids['empresa_id']}",
+        headers=headers,
+        json={"contacto": "gerencia@majambo.pe"},
+    )
+    r = client.patch(
+        f"/api/v1/empresas/{ids['empresa_id']}",
+        headers=headers,
+        json={"razon_social": "Majambo Renombrada SAC"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["contacto"] == "gerencia@majambo.pe"
+
+
+def test_vaciar_contacto_y_config_fiscal_de_empresa_con_null_explicito(env):
+    client, headers, ids, _ = env
+    client.patch(
+        f"/api/v1/empresas/{ids['empresa_id']}",
+        headers=headers,
+        json={"contacto": "gerencia@majambo.pe", "config_fiscal": {"igv_por_defecto": "afecta"}},
+    )
+
+    r = client.patch(
+        f"/api/v1/empresas/{ids['empresa_id']}",
+        headers=headers,
+        json={"contacto": None, "config_fiscal": None},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["contacto"] is None
+    assert r.json()["config_fiscal"] is None
+
+
+def test_vaciar_skins_de_marca(env):
+    client, headers, ids, _ = env
+    marca = client.get("/api/v1/marcas", headers=headers).json()[0]
+    client.patch(
+        f"/api/v1/marcas/{marca['id']}", headers=headers,
+        json={"skins": {"color_primario": "#ff0000"}},
+    )
+
+    r = client.patch(f"/api/v1/marcas/{marca['id']}", headers=headers, json={"skins": None})
+    assert r.status_code == 200, r.text
+    assert r.json()["skins"] is None
+
+
+def test_vaciar_horario_y_radio_de_marcaje_de_sucursal(env):
+    """`radio_marcaje_m` en `None` es "no evalúa distancia" (RN-RRHH-024):
+    antes de esto solo se podía cambiar por otro número, nunca apagar."""
+    client, headers, ids, _ = env
+    client.patch(
+        f"/api/v1/sucursales/{ids['sucursal_id']}", headers=headers,
+        json={"horario_atencion": {"lunes": "08:00-20:00"}, "radio_marcaje_m": 100},
+    )
+
+    r = client.patch(
+        f"/api/v1/sucursales/{ids['sucursal_id']}", headers=headers,
+        json={"horario_atencion": None, "radio_marcaje_m": None},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["horario_atencion"] is None
+    assert r.json()["radio_marcaje_m"] is None
+
+
+def test_quitar_el_abastecedor_de_un_almacen_con_null_explicito(env):
+    """El caso real que dejó esto anotado: el selector ofrecía «Ninguno» y
+    no pasaba nada — `null` se perdía igual que si no se hubiera mandado."""
+    client, headers, ids, _ = env
+    central = client.get("/api/v1/almacenes", headers=headers).json()[0]
+    otro = client.post(
+        "/api/v1/almacenes", headers=headers,
+        json={"empresa_id": ids["empresa_id"], "nombre": "Depósito 2", "tipo": "central"},
+    ).json()
+    client.patch(
+        f"/api/v1/almacenes/{otro['id']}", headers=headers,
+        json={"almacen_abastecedor_id": central["id"]},
+    )
+    assert client.get(f"/api/v1/almacenes/{otro['id']}", headers=headers).json()[
+        "almacen_abastecedor_id"
+    ] == central["id"]
+
+    r = client.patch(
+        f"/api/v1/almacenes/{otro['id']}", headers=headers,
+        json={"almacen_abastecedor_id": None},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["almacen_abastecedor_id"] is None
+
+
+def test_quitar_la_sucursal_de_un_almacen_de_tipo_sucursal_sigue_validando(env):
+    """La validación tiene que mirar el valor que se está pidiendo, no el
+    vigente: con `campos.get(k) or actual` esto validaba contra el
+    almacén ya guardado y dejaba pasar un `sucursal_id: null` inválido."""
+    client, headers, ids, _ = env
+    almacen = client.post(
+        "/api/v1/almacenes", headers=headers,
+        json={
+            "empresa_id": ids["empresa_id"], "sucursal_id": ids["sucursal_id"],
+            "nombre": "Almacén de local", "tipo": "sucursal",
+        },
+    ).json()
+
+    r = client.patch(
+        f"/api/v1/almacenes/{almacen['id']}", headers=headers,
+        json={"sucursal_id": None},
+    )
+    assert r.status_code == 409
+    assert "sucursal_id" in r.json()["detail"]
+
+
+def test_vaciar_direccion_de_almacen_desancla_su_ubicacion(env):
+    """`direccion` de almacén es borrable desde este cambio; el pin viejo no
+    puede seguir apuntando a una dirección que ya no existe."""
+    client, headers, ids, _ = env
+    almacen = client.post(
+        "/api/v1/almacenes", headers=headers,
+        json={
+            "empresa_id": ids["empresa_id"], "nombre": "Depósito ancla", "tipo": "central",
+            "direccion": "Jr. Ramón Castilla 248",
+            "ubicacion_place_id": "ChIJ_ancla_test",
+            "ubicacion_lat": "-6.488430", "ubicacion_lng": "-76.365280",
+        },
+    ).json()
+    assert almacen["ubicacion_place_id"] == "ChIJ_ancla_test"
+
+    r = client.patch(
+        f"/api/v1/almacenes/{almacen['id']}", headers=headers,
+        json={"direccion": None},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["direccion"] is None
+    assert r.json()["ubicacion_place_id"] is None
+    assert r.json()["ubicacion_lat"] is None
