@@ -69,6 +69,96 @@ def test_consultar_dni_no_encontrado_404_vacio_no_es_error(monkeypatch):
     assert r.encontrado is False
 
 
+# --- Caché de consulta (TTL, ver factiliza/cache.py) -------------------------
+def test_consultar_dni_repetido_no_vuelve_a_salir_a_la_red(monkeypatch):
+    """El botón «Buscar» y la revalidación al guardar (ADR-041) consultan el
+    mismo documento dos veces; con la caché, solo la primera paga al
+    proveedor."""
+    cuerpo = {
+        "success": True,
+        "data": {
+            "numero": "73632127", "nombres": "CARLOS RENATO",
+            "apellido_paterno": "ROJAS", "apellido_materno": "DEL AGUILA",
+        },
+    }
+    llamadas = []
+
+    def _get(*a, **k):
+        llamadas.append(1)
+        return _RespuestaFalsa(200, "x", cuerpo)
+
+    monkeypatch.setattr(httpx, "get", _get)
+    client = FactilizaClient(token="t")
+
+    primera = client.consultar_dni("73632127")
+    segunda = client.consultar_dni("73632127")
+
+    assert primera == segunda
+    assert len(llamadas) == 1
+
+
+def test_consultar_ruc_repetido_no_vuelve_a_salir_a_la_red(monkeypatch):
+    cuerpo = {
+        "success": True,
+        "data": {
+            "numero": "20610077782",
+            "nombre_o_razon_social": "SERVICIOS RENTAURANT S.A.C",
+            "estado": "ACTIVO", "condicion": "HABIDO",
+        },
+    }
+    llamadas = []
+
+    def _get(*a, **k):
+        llamadas.append(1)
+        return _RespuestaFalsa(200, "x", cuerpo)
+
+    monkeypatch.setattr(httpx, "get", _get)
+    client = FactilizaClient(token="t")
+
+    primera = client.consultar_ruc("20610077782")
+    segunda = client.consultar_ruc("20610077782")
+
+    assert primera == segunda
+    assert len(llamadas) == 1
+
+
+def test_dni_no_encontrado_tambien_se_cachea(monkeypatch):
+    """"No encontrado" es una respuesta válida del proveedor (RENIEC no lo
+    tiene), no un fallo — se cachea igual que un documento que sí existe."""
+    llamadas = []
+
+    def _get(*a, **k):
+        llamadas.append(1)
+        return _RespuestaFalsa(404, "")
+
+    monkeypatch.setattr(httpx, "get", _get)
+    client = FactilizaClient(token="t")
+
+    assert client.consultar_dni("00000000").encontrado is False
+    assert client.consultar_dni("00000000").encontrado is False
+    assert len(llamadas) == 1
+
+
+def test_un_fallo_del_proveedor_no_se_cachea(monkeypatch):
+    """Un `FactilizaError` no llega a `cache.guardar`: el siguiente intento
+    tiene que volver a salir a la red, no repetir el mismo error durante
+    todo el TTL."""
+    llamadas = []
+
+    def _falla(*a, **k):
+        llamadas.append(1)
+        return _RespuestaFalsa(500, "boom")
+
+    monkeypatch.setattr(httpx, "get", _falla)
+    client = FactilizaClient(token="t")
+
+    with pytest.raises(FactilizaError):
+        client.consultar_dni("73632127")
+    with pytest.raises(FactilizaError):
+        client.consultar_dni("73632127")
+    assert len(llamadas) == 2
+
+
 def test_consultar_sin_token_configurado_lanza_factiliza_error():
     with pytest.raises(FactilizaError):
         FactilizaClient(token="").consultar_dni("73632127")
@@ -174,16 +264,21 @@ def test_el_dni_trae_la_fecha_de_nacimiento_cuando_el_plan_la_incluye(monkeypatc
     """RENIEC la devuelve según el plan contratado. Se acepta el formato que
     manda Factiliza (`dd/mm/aaaa`) y también ISO, porque son los dos que se
     han visto y ninguno está en el contrato escrito."""
-    for crudo, esperada in (
+    for i, (crudo, esperada) in enumerate((
         ("12/05/1994", date(1994, 5, 12)),
         ("1994-05-12", date(1994, 5, 12)),
         ("", None),
         ("no es una fecha", None),
-    ):
+    )):
+        # Un DNI distinto por vuelta: con la caché de consulta (ver
+        # `cache.py`), reusar el mismo número haría que la segunda vuelta en
+        # adelante leyera la respuesta cacheada de la primera y nunca tocara
+        # el mock nuevo.
+        dni = f"7363212{i}"
         cuerpo = {
             "success": True,
             "data": {
-                "numero": "73632127",
+                "numero": dni,
                 "nombres": "CARLOS RENATO",
                 "apellido_paterno": "ROJAS",
                 "apellido_materno": "DEL AGUILA",
@@ -193,7 +288,7 @@ def test_el_dni_trae_la_fecha_de_nacimiento_cuando_el_plan_la_incluye(monkeypatc
         # `c=cuerpo`: la lambda se evalúa después del bucle, y sin fijarlo
         # las cuatro corridas leerían el último valor.
         monkeypatch.setattr(httpx, "get", lambda *a, c=cuerpo, **k: _RespuestaFalsa(200, "x", c))
-        assert FactilizaClient(token="t").consultar_dni("73632127").fecha_nacimiento == esperada
+        assert FactilizaClient(token="t").consultar_dni(dni).fecha_nacimiento == esperada
 
 
 def test_el_ruc_trae_el_domicilio_fiscal_partido(monkeypatch):
@@ -489,13 +584,19 @@ def test_la_consulta_corta_al_pasarse_de_cuota(api, monkeypatch):
     gastó la llamada no habría servido de nada.
 
     La ventana es 45 y no 60 para que el `Retry-After` no pueda coincidir por
-    casualidad con el del login, que es el otro límite del ERP.
+    casualidad con el del login, que es el otro límite del ERP. Un DNI
+    distinto por llamada: con la caché de consulta, repetir el mismo número
+    serviría la segunda desde la caché y `len(llamadas)` dejaría de probar
+    que el corte pasa **antes** de tocar al proveedor.
     """
     _cuota(monkeypatch, usuario=2, ip=100, ventana=45)
     llamadas = _contar_llamadas(monkeypatch)
     h = _tok(api, "compras1", "654321")
 
-    codigos = [api.get(DNI, headers=h).status_code for _ in range(3)]
+    codigos = [
+        api.get(f"/api/v1/consulta/dni/7363212{i}", headers=h).status_code
+        for i in range(3)
+    ]
 
     assert codigos == [200, 200, 429]
     assert len(llamadas) == 2

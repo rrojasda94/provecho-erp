@@ -904,6 +904,40 @@ def test_el_registro_de_compras_filtra_y_trae_el_proveedor(env):
     assert solo_uno["items"][0]["proveedor"] == "Molinera SAC"
 
 
+def test_el_registro_de_compras_filtra_por_fecha_de_negocio_no_utc(env):
+    """`func.date(created_at)` trunca el timestamp UTC crudo: un comprobante
+    registrado el lunes a las 20:00 hora Perú es martes en UTC, y filtrar por
+    la fecha cruda lo dejaba del lado equivocado del rango."""
+    from src.shared.models import Comprobante
+
+    client, ids, TestSession = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    comprobante_id = _facturar(
+        client, h, _hasta_recibida(client, h, ids, proveedor_id)
+    ).json()["id"]
+
+    # Lunes 20:00 hora Perú = martes 01:00 UTC. Sin fecha_emision, el filtro
+    # cae a created_at (ver docstring de q_comprobantes_recibidos).
+    lunes = fechas.hoy() - timedelta(days=7)
+    veinte_lima = fechas.inicio_dia_utc(lunes) + timedelta(hours=20)
+    with TestSession() as s:
+        comprobante = s.get(Comprobante, uuid.UUID(comprobante_id))
+        comprobante.created_at = veinte_lima
+        s.commit()
+
+    del_lunes = client.get(
+        f"/api/v1/purchases/comprobantes?desde={lunes}&hasta={lunes}", headers=h
+    ).json()
+    assert del_lunes["total"] == 1
+
+    martes = lunes + timedelta(days=1)
+    del_martes = client.get(
+        f"/api/v1/purchases/comprobantes?desde={martes}&hasta={martes}", headers=h
+    ).json()
+    assert del_martes["total"] == 0
+
+
 def test_el_registro_de_compras_lo_ve_el_contador(env):
     """El contador necesita el documento fuente del asiento sin que haya que
     darle el módulo de compras entero, que además lo dejaría emitir OC."""

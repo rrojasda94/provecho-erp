@@ -273,6 +273,17 @@ def _rate_limit_en_memoria(monkeypatch):
     monkeypatch.setattr(rate_limit, "_reintentar_desde", 0.0)
 
 
+@pytest.fixture(autouse=True)
+def _cache_de_consulta_en_memoria(monkeypatch):
+    """Mismo criterio que el limiter: la caché de `consultar_dni`/
+    `consultar_ruc` no habla con un Redis real, y arranca vacía en cada
+    test — si no, el resultado de un test contaminaría el siguiente que
+    consulte el mismo número."""
+    from src.shared.integrations.factiliza import cache
+
+    monkeypatch.setattr(cache, "_client", RedisFalso())
+
+
 #: Todo módulo que abre su propia sesión fuera del request: los listeners
 #: reaccionan a un evento **después** del commit, cuando la sesión del request
 #: ya se cerró, y los barridos de Celery ni siquiera corren en un request.

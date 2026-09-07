@@ -111,8 +111,8 @@ NOMBRE_DESPACHO = "Despacho E2E"
 PRODUCTO_PRECIO = Decimal("25.00")
 
 # --- Carta armada (variantes + grupo obligatorio + extras) -------------------
-# `articulo.id_interno` y `producto_comercial.id_interno` son `String(4)`:
-# todos los códigos de acá entran en cuatro caracteres a propósito. SQLite no
+# `articulo.id_interno` y `producto_comercial.id_interno` son `String(8)`:
+# todos los códigos de acá entran en el largo a propósito. SQLite no
 # valida el largo y Postgres sí, así que un código más largo pasaría las
 # pruebas y reventaría recién al sembrar de verdad.
 MENU_NOMBRE = "Menú E2E"
@@ -438,10 +438,11 @@ def _crear_producto_vendible(session, empresa, marca) -> ProductoComercial:
 
     harina = Articulo(
         empresa_id=empresa.id,
-        # `articulo.id_interno` es `String(4)`. Decía "E2E-H001" y entraba
-        # igual porque SQLite no aplica el largo de un VARCHAR; contra
-        # Postgres la siembra habría reventado, y en la pantalla el código no
-        # se podía ni reenviar sin recibir un 422 de su propio valor.
+        # `articulo.id_interno` es `String(8)`. Decía "E2E-H001" (8) y
+        # entraba igual porque SQLite no aplica el largo de un VARCHAR;
+        # contra Postgres la siembra habría reventado, y en la pantalla el
+        # código no se podía ni reenviar sin recibir un 422 de su propio
+        # valor.
         id_interno="EH01",
         nombre="Harina E2E",
         unidad_medida_id=udm.id,
@@ -469,7 +470,7 @@ def _crear_producto_vendible(session, empresa, marca) -> ProductoComercial:
     _stock(session, sku, Decimal(1000))
 
     producto = ProductoComercial(
-        # Mismo caso que `harina`: la columna es `String(4)`.
+        # Mismo caso que `harina`: la columna es `String(8)`.
         id_interno="EP01",
         marca_id=marca.id,
         nombre=PRODUCTO_NOMBRE,

@@ -8,6 +8,7 @@ import type { EstadoFormulario } from "@/components/formulario/dialogo-formulari
 import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
 import { estadoDeError } from "@/lib/errores";
+import { tipoPorLargo } from "@/lib/documento";
 import { ubicacionDe } from "@/lib/ubicacion-form";
 
 export type EstadoOrganizacion = EstadoFormulario;
@@ -73,7 +74,7 @@ export async function guardarEmpresaAction(
   if (!razonSocial || !domicilio) {
     return { error: "Razón social y domicilio fiscal son obligatorios.", ok: false };
   }
-  if (!/^\d{11}$/.test(ruc)) return { error: "El RUC son 11 dígitos.", ok: false };
+  if (tipoPorLargo(ruc) !== "ruc") return { error: "El RUC son 11 dígitos.", ok: false };
 
   const grupoId = texto(formData, "grupo_id");
   const igvPorDefecto = texto(formData, "igv_por_defecto");
@@ -178,9 +179,12 @@ async function guardarAbastecimiento(
       token: await token(),
       metodo: "PATCH",
       cuerpo: {
-        almacen_abastecedor_id: texto(formData, "almacen_abastecedor_id") || undefined,
+        // `null` explícito, no `undefined`: el PATCH ahora distingue "no lo
+        // mandé" de "lo vacío a propósito" (T2), y elegir "Ninguno" es lo
+        // segundo.
+        almacen_abastecedor_id: texto(formData, "almacen_abastecedor_id") || null,
         almacen_abastecedor_respaldo_id:
-          texto(formData, "almacen_abastecedor_respaldo_id") || undefined,
+          texto(formData, "almacen_abastecedor_respaldo_id") || null,
       },
     });
   } catch (e) {
@@ -209,9 +213,11 @@ export async function guardarAlmacenAction(
       tipo,
       direccion: texto(formData, "direccion") || undefined,
       sucursal_id: texto(formData, "sucursal_id") || undefined,
-      almacen_abastecedor_id: texto(formData, "almacen_abastecedor_id") || undefined,
+      // `null` explícito, no `undefined`: "Ninguno" es vaciar a propósito,
+      // no omitir el campo (T2).
+      almacen_abastecedor_id: texto(formData, "almacen_abastecedor_id") || null,
       almacen_abastecedor_respaldo_id:
-        texto(formData, "almacen_abastecedor_respaldo_id") || undefined,
+        texto(formData, "almacen_abastecedor_respaldo_id") || null,
       ...ubicacionDe(formData),
     },
     "el almacén",

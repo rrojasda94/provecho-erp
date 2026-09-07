@@ -4,6 +4,7 @@ import Link from "next/link";
 import { startTransition, useActionState, useRef, useState } from "react";
 
 import { CampoDireccion } from "@/components/direccion/campo-direccion";
+import { tipoPorLargo } from "@/lib/documento";
 
 import { buscarNombreAction, registrarAction } from "./actions";
 import { ESTADO_INICIAL, type Cupon } from "./estado";
@@ -69,7 +70,7 @@ export default function ReconocerteCliente({
   const formulario = useRef<HTMLFormElement>(null);
 
   const completarNombre = async (dni: string) => {
-    if (!/^\d{8}$/.test(dni) || nombre.trim()) return;
+    if (tipoPorLargo(dni) !== "dni" || nombre.trim()) return;
     setBuscando(true);
     const { nombres, apellidos } = await buscarNombreAction(dni);
     setBuscando(false);

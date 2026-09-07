@@ -14,20 +14,22 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   llamaba nadie: quien recibía firmaba a ciegas y no podía declarar que llegó
   la mitad. Y el traslado lateral —sucursal a sucursal, sin requerimiento—
   que el backend admite desde el slice original no tenía por dónde crearse.
-- ⬜ **La guía de remisión no tiene pantalla** (2026-09-04). Tres endpoints
-  (`POST /transferencias/{id}/guia`, `GET /transferencias/{id}/guia`,
-  `GET /guias-remision`), permiso propio `inventory.emitir_guia` y 14
-  pruebas, sin un solo llamador desde el frontend. Es el mismo patrón que
-  este bloque vino a cortar, pero es un bloque aparte y no la cola de éste:
-  la guía es un documento con numeración, transportista y validez tributaria,
-  no un botón más en la tabla de traslados.
-- ⬜ **La bandeja de mermas ofrece resolver al que la registró** (2026-09-04).
-  La segregación es del dominio y está bien puesta —quien declara que algo no
-  sirve no firma su baja— pero `MermaOut` no expone `creado_por`, así que la
-  pantalla no puede esconder los botones y quien la registró se come el error
-  al apretarlos. Es la misma familia que el hallazgo §3 de la auditoría (un
-  botón que promete un rechazo); cerrarlo pide un campo más en el esquema de
-  salida, no un cambio de pantalla.
+- ✅ 2026-09-06 **La guía de remisión ya tiene pantalla** (bloque
+  `feat/inventario-guia-remision`). Botón «Guía» en Traslados y en
+  Devoluciones (solo `origen=proveedor`, `estado=registrada`): al abrir
+  pregunta si ya existe una (`GET .../guia`, idempotente por transferencia
+  o devolución) y muestra su estado, o el formulario de emisión si no hay
+  ninguna. Lista `/inventario/guias-remision` de solo lectura —la guía se
+  emite desde su origen, no desde acá— y entrada de navegación. Sumó el `GET
+  /devoluciones/{id}/guia-remision` que faltaba, simétrico al de
+  transferencia. Con esto, los tres endpoints y las 14 pruebas de ADR-027
+  tienen al fin un llamador.
+- ✅ 2026-09-06 **La bandeja de mermas deja de ofrecer resolver al que la
+  registró** (bloque `feat/inventario-mermas-y-devoluciones`). `MermaOut`
+  suma `creado_por`/`liberado_por`; la pantalla esconde Desechar/Reintegrar
+  cuando `merma.creado_por === usuario.id`, en vez de dejar que se los coma
+  como un 409 (RN-INV-019). De paso, el selector de almacén que el endpoint
+  ya aceptaba (`?almacen_id=`) y la pantalla nunca ofrecía.
 - ✅ 2026-08-30 **Pantalla de stock y kardex**: `GET /inventory/stock` existía
   desde el primer slice y no lo consumía nadie; `MovimientoRepo.q_list`
   existía sin un solo llamador y no había `GET /inventory/movimientos`. Ahora
@@ -40,12 +42,13 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ✅ 2026-08-12 **Abastecedor de respaldo** (ADR-040, RN-INV-022,
   migración `a7c04e3b91d5`): dar de baja el central dejaba a la sucursal sin
   poder pedir nada.
-- ⬜ **No se puede vaciar un abastecedor ya elegido** (2026-08-12): los
-  `PATCH` de organización tratan `null` como "no tocar" (convención de
-  `users/api/schemas.py`), así que elegir "Ninguno" en el selector no lo
-  limpia — solo lo deja como estaba. Es previo a este cambio y ahora tiene un
-  campo más. Se arregla con un centinela explícito en el `Update`, que es un
-  cambio de contrato para las cinco entidades de organización.
+- ✅ 2026-09-06 **Ya se puede vaciar un abastecedor ya elegido** (declarado
+  2026-08-12, resuelto en `docs/roadmap/deuda/transversal.md` → "El PATCH de
+  organización no tenía forma de vaciar un opcional", ADR-096, bloque
+  `fix/transversal-patch-vaciar-un-opcional`). Era la misma deuda anotada
+  dos veces en dos documentos — el centinela explícito que pedía esta
+  entrada es exactamente el que entró ahí, para las cinco entidades de
+  organización.
 
 - ✅ 2026-08-03 **Recetas editables** (ADR-023, migración `b6d1e83f47ac`):
   CRUD de receta e ítems, duplicar con "(copy)", escalar por factor y
@@ -156,10 +159,15 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   opcional por artículo, reparto FEFO al registrar la salida, bloqueo de
   vencidos + `inventory.lote_vencido_detectado`, lote generado por
   recepción de compra y por producción. Deuda que deja abierta:
-  - ⬜ **La reposición por venta anulada entra al lote del día**, no al
-    lote del que salió: `sales.venta_anulada` no transporta los
-    movimientos originales. Con volumen bajo la diferencia es contable,
-    no física; si importa, el evento tiene que llevar el detalle.
+  - ✅ 2026-09-06 **La reposición por venta anulada vuelve al lote del que
+    salió** (bloque `fix/inventario-reposicion-al-lote-original`, ADR-094).
+    No hizo falta que el evento transportara nada nuevo:
+    `movimiento_inventario.referencia` ya guardaba el `venta_id`, y cada
+    lote que FEFO tomó al vender dejó su propio movimiento (ADR-015). Se
+    reparte en orden de vencimiento —no de `ts`, que puede empatar dentro
+    de la misma transacción— y una reposición parcial prioriza el lote que
+    salió primero, sin pasarse de lo que entregó. Sin rastro, cae al
+    comportamiento de siempre (lote del día). No se tocó `sales`.
   - ✅ 2026-08-06 **Ventana de alerta por artículo**
     (`articulo.dias_alerta_vencimiento`, RN-VNC-004 nueva). `GET /lotes`
     marca `por_vencer` con la ventana del artículo; `por_vencer_dias` en la
@@ -287,16 +295,30 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   segundo emisor y forzó el cambio, tal como este punto anticipaba—, así
   que el reparto propio solo tendría que sumar su `venta_id`. Sigue abierto
   porque no hay reparto propio todavía.
-- ⬜ **Descarga de PDF/XML/CDR de la guía y anulación por comunicación de
-  baja**: `FactilizaClient.descargar` apunta a `/invoice/...`; la guía
-  necesita su ruta `/despatch/...`, y el payload de `/despatch/send` sigue
-  **pendiente de verificación contra el sandbox real** de Factiliza — igual
-  que estuvo la boleta antes de su primera emisión.
-- ⬜ **`codigo_sunat` por unidad de medida**: hoy el mapper traduce con un
-  diccionario de doce unidades y cae en `NIU` lo que no reconoce. El lugar
-  correcto es una columna en `unidad_medida` editable desde Catálogo;
-  mientras solo la guía lo necesite, una columna que alguien tiene que
-  llenar a mano es más trabajo que el diccionario.
+- ✅ 2026-09-06 **Descarga de PDF/XML/CDR de la guía** (bloque
+  `feat/inventario-guia-remision`). `FactilizaClient.descargar` ganó
+  `recurso: "invoice" | "despatch"` —mismo verbo, mismo formato de
+  respuesta en Factiliza, solo cambia el prefijo de la ruta— y
+  `GET /guias-remision/{id}/descargar/{formato}` en inventory, igual
+  criterio que `sales.comprobantes.descargar_documento`: se pide al
+  proveedor en el momento, solo de una guía `aceptada`, sin archivar.
+- ⬜ **Anulación de la guía por comunicación de baja — sin verificar contra
+  el sandbox real** (2026-09-06). El payload de `/despatch/send` sigue sin
+  probarse contra el sandbox de QA de Factiliza —la sesión que construyó la
+  descarga y la pantalla no tenía `FACTILIZA_TOKEN` ni acceso de red al
+  proveedor para hacerlo con criterio—, así que la anulación no se
+  implementó a ciegas: sin ver un rechazo real no hay forma de saber si el
+  contrato que hoy solo `enviar_guia_remision` ejercita (`guias.py:209`)
+  aplica igual a una comunicación de baja. Queda igual que estuvo la
+  descarga antes de este bloque: pendiente de alguien con el token de QA
+  puesto, emitiendo una guía real y probando el rechazo contra la API.
+- ✅ 2026-09-06 **`codigo_sunat` por unidad de medida** (bloque
+  `feat/inventario-guia-remision`, migración `4466bd44b238`). Columna
+  nullable en `unidad_medida`, editable desde
+  `POST/PATCH /inventory/unidades-medida[/{id}]` (ya existían). El
+  diccionario de doce entradas de `guias.py` sigue de fallback —para lo que
+  nadie configuró todavía— y de valor de siembra; `codigo_unidad()` ahora
+  recibe el código configurado y lo usa primero si está.
 - ✅ 2026-08-07 **La guía no se emite offline — decisión, no deuda**
   (decidido con el usuario). El correlativo es único por `(empresa, serie)`
   y dos hubs numerando a la vez colisionarían **con la guía ya impresa y
@@ -340,14 +362,20 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   devolución solo se podía llamando al endpoint a mano. Formulario, anular,
   ficha de detalle y `audit_log` en registrar/anular. Suma
   `GET /inventory/skus`, que no existía.
-- ⬜ **La devolución se registra de a una línea** (2026-08-13): la API acepta
-  varias desde el primer día y el formulario manda una sola. Es el caso real
-  —vuelve un producto, se decide qué hacer con él— así que ampliarlo es solo
-  pantalla, cuando alguien lo pida.
-- ⬜ **La ficha de devolución muestra el UUID de quien la registró**, no su
-  nombre (2026-08-13). `inventory` no puede leer `usuario`; hace falta un
-  contrato público de `users` tipo `nombres_de_usuarios`, igual que el que
-  `sales` usa para los nombres de artículo en el KDS.
+- ✅ 2026-09-06 **La devolución se registra con varias líneas** (bloque
+  `feat/inventario-mermas-y-devoluciones`). El formulario pasa a filas
+  paralelas (`sku_id[]`/`cantidad[]`), mismo patrón que el traslado directo
+  — la API los aceptaba desde el primer día. `lote_id` sigue sin selector
+  propio (no lo pedía tampoco el formulario de una línea): una devolución a
+  proveedor de un artículo con lote sigue exigiendo la API a mano.
+- ✅ 2026-09-06 **La ficha de devolución muestra nombres, no UUID** (bloque
+  `feat/inventario-mermas-y-devoluciones`). Nuevo
+  `users.application.queries_publicas::nombres_de_usuarios` —mismo patrón
+  que `inventory.nombres_de_articulos`, que `sales` usa en el KDS—, batch,
+  `usuario_id → nombre_display or username`. `GET /devoluciones/{id}`
+  resuelve `registrado_por`/`anulado_por` y los suma a
+  `DevolucionDetalleOut` como `_nombre`; no se tocó el listado, que no los
+  necesita y evitaría una resolución N+1 por fila.
 - ⬜ **La nota de crédito sigue sin pantalla** (`sales/application/notas_credito.py`):
   es la devolución de una **venta**, no de mercadería, y por eso no entró
   con esto. Sin ella, deshacer algo ya cobrado no tiene camino por UI.
@@ -374,17 +402,21 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `stock_minimo` y `solicitud_item.bajo_minimo_al_pedir` se estampa al
   agregar cada ítem. Suma `GET /conteos` (faltaba) y pantallas
   `/inventario/solicitudes` + `/inventario/conteos`. Deuda que deja abierta:
-  - ⬜ **El borrador no se encadena al cierre de un conteo cíclico**: hoy lee
-    el `stock_minimo` vigente al abrir la pantalla, independiente de
-    ADR-019. El SOP de abastecimiento (`docs/domain/workflows.md`
-    §Abastecimiento de locales, paso 4) describe que el conteo **genera**
-    el borrador; conectar los dos es una decisión de flujo —¿todo cierre de
-    conteo dispara un borrador, o solo el conteo general?— que no se tomó
-    en este slice.
-  - ⬜ **Recortar lo aprobado por SKU sin pantalla**: `SolicitudAprobar.aprobadas`
-    existe desde ADR-020 y la pantalla nueva solo ofrece aprobar tal cual se
-    pidió (`aprobadas: []`). Falta el formulario que deje editar cantidad
-    por ítem al aprobar.
+  - ✅ 2026-09-06 **El borrador se encadena al cierre de un conteo cíclico**
+    (bloque `feat/inventario-solicitudes-y-conteo`, RN-INV-026, ADR-093).
+    **Todo cierre dispara el refresco, no solo el conteo general** —decisión
+    tomada: `borrador_del_almacen` es aditivo, así que dispararlo de más no
+    tiene costo. Llamada directa desde `conteos.cerrar_conteo`, no un
+    evento: emisor y consumidor viven en el mismo módulo, y no hay en el
+    repo un caso de módulo suscrito a su propio evento. Un almacén sin
+    abastecedor (el central) no rompe el cierre — armar el borrador se
+    atrapa y se ignora, es consecuencia del cierre, no condición.
+    `docs/domain/workflows.md` §Abastecimiento, paso 4, actualizado.
+  - ✅ 2026-09-06 **Recorte por SKU al aprobar, con pantalla** (bloque
+    `feat/inventario-solicitudes-y-conteo`). `SolicitudAprobar.aprobadas`
+    existía desde ADR-020 sin llamador; el diálogo «Aprobar» ahora arranca
+    con lo pedido en cada línea y deja bajarlo — en 0 la línea queda fuera y
+    no reserva nada, mismo molde que el `Picking` del despacho.
 - ✅ 2026-08-20 **El importador crea el insumo que falta desde el diálogo**
   (ADR-052). El `<select>` de resolución tiene ahora un botón «Crear» con un
   formulario en línea —código, unidad y tipo, con el nombre prellenado del
@@ -403,26 +435,30 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   falla es asimétrico: subir la hoja equivocada no puede vaciar una receta sin
   que nadie vea el número. La identidad es la columna `ID` que escribe el
   export, no el nombre — el nombre es justamente lo que se edita.
-- ⬜ **Los SKU solo se crean por planilla, no se editan** (2026-08-20,
-  ADR-052): no existe `editar_sku` en `catalogo.py`, así que un SKU cuyo
-  código ya existe se informa como omitido y no se toca. Tocarlo a medias sería
-  peor que informarlo, pero corregir un código de barras mal tecleado sigue
-  exigiendo la pantalla de a uno. Se cierra agregando `editar_sku` con las
-  mismas reglas de unicidad que `crear_sku`.
-- ⬜ **`articulo.id_interno` son 4 caracteres únicos en TODO el grupo**
-  (2026-08-20): no por empresa —`UniqueConstraint("id_interno")` sin
-  `empresa_id`—, así que un catálogo de trescientos artículos exige trescientos
-  códigos distintos de cuatro caracteres compartidos entre todas las empresas.
-  El importador lo exige y **valida el largo por fila** en vez de
-  autogenerarlo, porque un código inventado termina tecleado en una orden de
-  compra. Ensancharlo es una migración con datos existentes y no entró acá.
+- ✅ 2026-09-06 **`editar_sku` existe** (bloque
+  `feat/inventario-catalogo-editable`, ADR-091). `PATCH /inventory/skus/{id}`
+  con las mismas reglas de unicidad que `crear_sku` — `codigo`,
+  `codigo_barras`, `activo`; `articulo_id` no está, un SKU no cambia de
+  artículo. **El importador no cambia**: sigue informando un código
+  repetido como omitido y no lo toca — corregirlo por planilla en silencio
+  es el mismo riesgo que ADR-046 evitó con el nombre y la unidad del
+  artículo; corregirlo sigue siendo la pantalla de a uno, que ahora existe.
+- ✅ 2026-09-06 **`articulo.id_interno` pasa de 4 a 8 caracteres** (bloque
+  `feat/inventario-catalogo-editable`, ADR-091, migración `fab77826b2c9`).
+  **Sigue único en todo el grupo, no por empresa** — decisión explícita:
+  hoy opera una sola empresa y el significado de "un código que cualquiera
+  del grupo escribe sin ambigüedad" no cambia hasta que haga falta de
+  verdad. Mismo ensanche en `sales.producto_comercial.id_interno`, que
+  comparte el problema. Los códigos ya asignados de 4 caracteres no se
+  tocan. De paso, RN-GEN-005 dejó de decir que `id_interno` es
+  **inmutable** — ya era falso desde ADR-052 (2026-08-20).
 - ✅ 2026-09-06 **Los importadores ya tienen carril de pruebas contra
   Postgres** (declarado 2026-08-20). `pytest` corría sólo sobre SQLite con
   `create_all`, y el job `migraciones` corría Alembic contra Postgres pero
   **no la suite** (`.github/workflows/ci.yml`) — SQLite no aplica el largo
   de un `VARCHAR`, así que una fila con el código demasiado largo pasaba en
   verde y daba `StringDataRightTruncation` en producción. Nuevo job
-  `backend-postgres` (ADR-090) corre la suite completa —incluidos
+  `backend-postgres` (ADR-097) corre la suite completa —incluidos
   `test_importacion_articulos.py` y el resto— contra un Postgres real, con
   cada test en su propio schema. La defensa por importador (validar el
   largo antes de insertar, el test que ata la constante a la columna) sigue
@@ -456,24 +492,29 @@ cumple nunca. Las 52 líneas del archivo resultaron ser **todas simétricas**, y
 `scripts/odoo/` las parte en una por mitad con la mitad del gramaje. Ver la
 enmienda de ADR-056.
 
-## La condición de una línea no se valida contra el producto (2026-08-23)
+## ~~La condición de una línea no se valida contra el producto~~ — SALDADA 2026-09-06 (ADR-092)
 
-`receta_item.aplica_valores` guarda PTAV de `sales`, y `inventory` no puede
-verificar contra su ORM que esos valores pertenezcan al producto que usa la
-receta. Hoy el único guardarraíl es la lectura conservadora: un valor que
+`receta_item.aplica_valores` guarda PTAV de `sales`, y `inventory` no podía
+verificar contra su ORM que esos valores pertenecieran al producto que usa la
+receta. El único guardarraíl era la lectura conservadora: un valor que
 `atributo_de_valores` no reconoce forma su propio grupo y la línea no aplica.
+Alcanzaba para no descontar de más, que es el lado caro, pero dejaba pasar
+una receta mal armada sin avisar. El editor (hoy
+`components/catalogo/receta-editor.tsx`) ya reducía el caso malo a un
+cliente que llame la API a mano o a una carga masiva, pero el servidor
+seguía sin verificar nada.
 
-Alcanza para no descontar de más, que es el lado caro, pero deja pasar una
-receta mal armada sin avisar. Cuando se construya el editor de la condición
-(F4/F5) conviene validarla ahí, donde `sales` sí está a mano, y no en el
-camino del descuento.
-
-**Sigue abierta** (2026-08-24, ADR-063). El editor de receta —hoy
-`components/catalogo/receta-editor.tsx`, antes el lienzo— solo ofrece las
-casillas de los valores del producto abierto, con lo que el caso malo se
-reduce a un cliente que llame la API a mano o a una carga masiva. Pero el
-servidor sigue sin verificar nada: la validación tiene que vivir en
-`inventory/api`, contra el contrato público de `sales`.
+**Cómo se saldó**: nuevo `sales.queries_publicas::valores_ofrecidos_de_receta`
+(bloque `feat/inventario-condicion-validada`), la unión de
+`catalogo.valores_ofrecidos` de cada producto que usa la receta.
+`agregar_item`/`editar_item` lo consultan al escribir y rechazan con 409 un
+valor que ningún producto de la receta ofrece. **No retroactivo**: lo ya
+guardado sigue leyéndose por `rules.aplica_a_variante`, que es conservador
+— revalidar en la lectura volvería ilegible una receta que hoy funciona por
+un cambio de catálogo que no tiene nada que ver con ella. Una receta que
+ningún producto usa sigue aceptando cualquier valor: sin producto no hay
+contra qué comparar, mismo criterio que ya usa el editor para esconder la
+columna.
 
 ## ~~`fusionar()` sumaba las líneas condicionadas como si aplicaran siempre~~ — VOID 2026-08-24 (ADR-063)
 

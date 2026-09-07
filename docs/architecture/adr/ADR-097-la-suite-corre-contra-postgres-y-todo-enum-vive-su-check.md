@@ -1,4 +1,4 @@
-# ADR-090: La suite corre contra Postgres y todo `Enum` vive con su CHECK
+# ADR-097: La suite corre contra Postgres y todo `Enum` vive con su CHECK
 
 ## Estado
 
@@ -143,9 +143,8 @@ mano; si reaparece, necesita el mismo cuidado.
 
 ## Nota de coordinación
 
-Esta rama (`chore/transversal-suite-contra-postgres`) corre en paralelo con
-`fix/transversal-relojes-documento-y-cache` (T1) y
-`fix/transversal-patch-vaciar-un-opcional` (T2), las tres sobre el mismo
-`main` (última ADR en `main`: 089). Las tres reclaman ADR-090. Quien mergee
-último debe renumerar su ADR al siguiente hueco libre y actualizar
-`docs/00_PROJECT.md`.
+Esta rama (`chore/transversal-suite-contra-postgres`) se escribió en
+paralelo con `fix/transversal-relojes-documento-y-cache` (T1, mergeada como
+ADR-095), `fix/transversal-patch-vaciar-un-opcional` (T2, ADR-096) y el
+bloque de `inventory` (ADR-090 a 094), sobre el mismo `main` que entonces
+terminaba en 089. Renumerada a 097 al mergear.

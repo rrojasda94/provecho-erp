@@ -1691,7 +1691,7 @@
             "title": "Empresa Id"
           },
           "id_interno": {
-            "maxLength": 4,
+            "maxLength": 8,
             "minLength": 1,
             "title": "Id Interno",
             "type": "string"
@@ -1828,7 +1828,7 @@
             "title": "Categoria Id"
           },
           "codigo": {
-            "maxLength": 4,
+            "maxLength": 8,
             "minLength": 1,
             "title": "Codigo",
             "type": "string"
@@ -2197,7 +2197,7 @@
           "id_interno": {
             "anyOf": [
               {
-                "maxLength": 4,
+                "maxLength": 8,
                 "minLength": 1,
                 "type": "string"
               },
@@ -8490,6 +8490,17 @@
             ],
             "title": "Anulado Por"
           },
+          "anulado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulado Por Nombre"
+          },
           "destino": {
             "anyOf": [
               {
@@ -8559,6 +8570,17 @@
               }
             ],
             "title": "Registrado Por"
+          },
+          "registrado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registrado Por Nombre"
           },
           "reporte_dirigido_a": {
             "title": "Reporte Dirigido A",
@@ -13780,6 +13802,11 @@
             "title": "Cantidad",
             "type": "string"
           },
+          "creado_por": {
+            "format": "uuid",
+            "title": "Creado Por",
+            "type": "string"
+          },
           "estado": {
             "title": "Estado",
             "type": "string"
@@ -13788,6 +13815,18 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "liberado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liberado Por"
           },
           "lote_id": {
             "anyOf": [
@@ -13838,7 +13877,9 @@
           "cantidad",
           "motivo",
           "estado",
-          "referencia_id"
+          "referencia_id",
+          "creado_por",
+          "liberado_por"
         ],
         "title": "MermaOut",
         "type": "object"
@@ -20411,7 +20452,7 @@
             "type": "boolean"
           },
           "id_interno": {
-            "maxLength": 4,
+            "maxLength": 8,
             "minLength": 1,
             "title": "Id Interno",
             "type": "string"
@@ -25161,6 +25202,48 @@
         "title": "SkuRevisadoOut",
         "type": "object"
       },
+      "SkuUpdate": {
+        "description": "Campo ausente o `null` = no tocar. `articulo_id` no está: un SKU no\ncambia de artículo — eso es dar de alta uno nuevo y archivar el viejo.",
+        "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
+          "codigo": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo"
+          },
+          "codigo_barras": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Barras"
+          }
+        },
+        "title": "SkuUpdate",
+        "type": "object"
+      },
       "SocioCreate": {
         "properties": {
           "empresa_id": {
@@ -26368,6 +26451,18 @@
           "estado": {
             "title": "Estado",
             "type": "string"
+          },
+          "horario_atencion": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horario Atencion"
           },
           "id": {
             "format": "uuid",
@@ -28445,6 +28540,19 @@
             "title": "Categoria Udm Id",
             "type": "string"
           },
+          "codigo_sunat": {
+            "anyOf": [
+              {
+                "maxLength": 3,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Sunat"
+          },
           "decimales": {
             "default": 3,
             "maximum": 6.0,
@@ -28486,6 +28594,17 @@
             "title": "Categoria Udm Id",
             "type": "string"
           },
+          "codigo_sunat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Sunat"
+          },
           "decimales": {
             "title": "Decimales",
             "type": "integer"
@@ -28510,13 +28629,27 @@
           "categoria_udm_id",
           "nombre",
           "ratio",
-          "decimales"
+          "decimales",
+          "codigo_sunat"
         ],
         "title": "UnidadMedidaOut",
         "type": "object"
       },
       "UnidadMedidaUpdate": {
         "properties": {
+          "codigo_sunat": {
+            "anyOf": [
+              {
+                "maxLength": 3,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codigo Sunat"
+          },
           "decimales": {
             "anyOf": [
               {
@@ -30472,6 +30605,18 @@
           "nombre": {
             "title": "Nombre",
             "type": "string"
+          },
+          "skins": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skins"
           },
           "tipo": {
             "title": "Tipo",
@@ -36496,6 +36641,52 @@
       }
     },
     "/api/v1/inventory/devoluciones/{devolucion_id}/guia-remision": {
+      "get": {
+        "operationId": "ver_guia_de_devolucion_api_v1_inventory_devoluciones__devolucion_id__guia_remision_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "devolucion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Devolucion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuiaRemisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Guia De Devolucion",
+        "tags": [
+          "inventory"
+        ]
+      },
       "post": {
         "description": "La mercadería que se le devuelve al proveedor viaja por la vía\npública: SUNAT no distingue el motivo para exigir la guía.",
         "operationId": "emitir_guia_de_devolucion_api_v1_inventory_devoluciones__devolucion_id__guia_remision_post",
@@ -36631,6 +36822,62 @@
           }
         ],
         "summary": "Listar Guias",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/guias-remision/{guia_id}/descargar/{formato}": {
+      "get": {
+        "description": "Baja el PDF que se entrega con la carga, o el XML firmado y el CDR\nque son el respaldo ante SUNAT. Mismo criterio que el comprobante\n(`sales/comprobantes.descargar_documento`): se pide a Factiliza en el\nmomento y no se archiva.",
+        "operationId": "descargar_guia_api_v1_inventory_guias_remision__guia_id__descargar__formato__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "guia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Guia Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "formato",
+            "required": true,
+            "schema": {
+              "enum": [
+                "pdf",
+                "xml",
+                "cdr"
+              ],
+              "title": "Formato",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Descargar Guia",
         "tags": [
           "inventory"
         ]
@@ -38280,6 +38527,62 @@
           }
         ],
         "summary": "Obtener Sku",
+        "tags": [
+          "inventory"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_sku_api_v1_inventory_skus__sku_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "sku_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sku Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SkuUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkuOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Sku",
         "tags": [
           "inventory"
         ]

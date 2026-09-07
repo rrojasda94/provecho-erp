@@ -705,7 +705,7 @@ class LoteSyncIn(BaseModel):
 
 
 class ProductoCreate(BaseModel):
-    id_interno: str = Field(min_length=1, max_length=4)
+    id_interno: str = Field(min_length=1, max_length=8)
     # En una variante se ignora: hereda la marca del padre.
     marca_id: uuid.UUID
     nombre: str = Field(min_length=1, max_length=150)

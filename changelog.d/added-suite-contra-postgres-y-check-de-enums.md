@@ -1,4 +1,4 @@
-- La suite de tests puede correr contra Postgres, no sólo SQLite (ADR-090):
+- La suite de tests puede correr contra Postgres, no sólo SQLite (ADR-097):
   `TEST_DATABASE_URL` hace que cada test reciba su propio schema en un
   Postgres real, con el mismo aislamiento que el SQLite en memoria de
   siempre. Nuevo job `backend-postgres` en CI (no forma parte de los seis

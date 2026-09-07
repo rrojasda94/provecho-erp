@@ -284,7 +284,7 @@ La diferencia no es teórica: ya dejó pasar bugs.
   producción — `test_importacion_articulos.py` ata la constante a
   `Articulo.__table__.c.id_interno.type.length`, así que ensanchar la
   columna sin mover la constante se pone rojo. Cubre las columnas que
-  alguien se acordó de atar, no todas. Desde **2026-09-06** (ADR-090) hay
+  alguien se acordó de atar, no todas. Desde **2026-09-06** (ADR-097) hay
   una tercera red que no depende de acordarse de nada por columna: la suite
   **completa** puede correr contra un Postgres real seteando
   `TEST_DATABASE_URL` (job `backend-postgres` en CI, no obligatorio) — cada
@@ -295,7 +295,7 @@ La diferencia no es teórica: ya dejó pasar bugs.
   vocabulario entraba sin ruido y reventaba recién en la lectura
   (`LookupError` → 500). Las 113 columnas que le faltaba el `CHECK`
   (`persona.tipo_documento` fue la primera, `c9f4a2e70b18`) lo tienen desde
-  ADR-090 — y como SQLite **sí** hace cumplir un `CHECK` una vez que existe,
+  ADR-097 — y como SQLite **sí** hace cumplir un `CHECK` una vez que existe,
   esto ya se prueba en cualquier corrida, sin necesidad de Postgres. Guardia
   en `tests/test_arquitectura.py` para que la lista no vuelva a crecer.
 - **`statement_timeout`** — no existe en SQLite. La configuración de los dos
@@ -313,5 +313,5 @@ latencia baja al orden del milisegundo.
 Las pruebas automatizadas siguen usando SQLite en memoria por default: no
 dependen de que Postgres esté levantado. El cambio le pega sobre todo a e2e
 y al trabajo manual contra la API. La excepción es correr la suite con
-`TEST_DATABASE_URL` seteada (ver arriba, ADR-090), que sí necesita el
+`TEST_DATABASE_URL` seteada (ver arriba, ADR-097), que sí necesita el
 `db` del docker-compose arriba.

@@ -99,6 +99,7 @@ def env(_app_compartida, _engine_de_prueba):
             empresa_id=str(empresa.id), central_id=str(central.id),
             sku_queso=str(sku_q.id), sku_servilleta=str(sku_s.id),
             queso_id=str(queso.id), proveedor_id=str(proveedor.id),
+            almacenero_id=str(almacenero.id),
         )
         s.commit()
 
@@ -166,6 +167,12 @@ def test_quien_registra_la_merma_no_firma_su_baja(env):
         "cantidad": "30", "motivo": "auditoria",
     }).json()
 
+    # `creado_por` viaja en la salida: sin esto la pantalla no puede
+    # esconder el botón a quien registró y este mismo 403 es lo que se
+    # comería al apretarlo.
+    assert merma["creado_por"] == ids["almacenero_id"]
+    assert merma["liberado_por"] is None
+
     # El almacenero no tiene `aprobar_ajuste`: 403 por permiso.
     assert client.post(
         f"/api/v1/inventory/mermas/{merma['id']}/resolver", headers=h_alm,
@@ -191,6 +198,10 @@ def test_desechar_saca_el_stock_y_avisa_a_contabilidad(env):
     )
     assert r.status_code == 200, r.text
     assert r.json()["estado"] == "consumida"
+    # Quien resolvió no es quien la registró (RN-INV-019 ya se lo impidió a
+    # `h_alm` en el test de arriba; acá se confirma que `liberado_por` queda
+    # anotado con quien sí pudo).
+    assert r.json()["liberado_por"] not in (None, ids["almacenero_id"])
 
     fila = _stock(client, h_admin, ids, ids["sku_servilleta"])
     # Recién ahora baja el físico, y la reserva se cierra con él: el
@@ -349,6 +360,75 @@ def test_la_devolucion_a_proveedor_emite_su_guia(env):
     assert client.post(
         f"/api/v1/inventory/devoluciones/{devolucion['id']}/anular", headers=h_alm
     ).status_code == 409
+
+
+def test_leer_la_guia_de_devolucion_antes_de_emitirla_404(env):
+    client, ids, _ = env
+    h_alm = _token(client, "almacenero1", "654321")
+    lote = _ingresar(client, h_alm, ids, ids["sku_queso"], 10)
+    devolucion = client.post("/api/v1/inventory/devoluciones", headers=h_alm, json={
+        "almacen_id": ids["central_id"], "origen": "proveedor",
+        "referencia_id": ids["proveedor_id"], "motivo": "dañado",
+        "items": [{"sku_id": ids["sku_queso"], "cantidad": "4", "lote_id": lote}],
+    }).json()
+
+    r = client.get(
+        f"/api/v1/inventory/devoluciones/{devolucion['id']}/guia-remision", headers=h_alm
+    )
+    assert r.status_code == 404
+
+
+def test_leer_la_guia_de_devolucion_ya_emitida(env):
+    client, ids, _ = env
+    h_alm = _token(client, "almacenero1", "654321")
+    lote = _ingresar(client, h_alm, ids, ids["sku_queso"], 10)
+    devolucion = client.post("/api/v1/inventory/devoluciones", headers=h_alm, json={
+        "almacen_id": ids["central_id"], "origen": "proveedor",
+        "referencia_id": ids["proveedor_id"], "motivo": "dañado",
+        "items": [{"sku_id": ids["sku_queso"], "cantidad": "4", "lote_id": lote}],
+    }).json()
+    emitida = client.post(
+        f"/api/v1/inventory/devoluciones/{devolucion['id']}/guia-remision",
+        headers=h_alm,
+        json={
+            "lugar_destino": "Av. Industrial 500 - Lima",
+            "chofer_nombres": "Luis", "chofer_apellidos": "Pérez",
+            "chofer_num_doc": "44556677", "chofer_licencia": "Q44556677",
+            "vehiculo_placa": "ABC-123", "peso_bruto_kg": "12.5",
+        },
+    ).json()
+
+    r = client.get(
+        f"/api/v1/inventory/devoluciones/{devolucion['id']}/guia-remision", headers=h_alm
+    )
+    assert r.status_code == 200
+    assert r.json()["id"] == emitida["id"]
+
+
+def test_la_ficha_de_devolucion_muestra_nombres_no_uuid(env):
+    client, ids, _ = env
+    h_alm = _token(client, "almacenero1", "654321")
+    h_admin = _token(client)
+    lote = _ingresar(client, h_alm, ids, ids["sku_queso"], 10)
+    devolucion = client.post("/api/v1/inventory/devoluciones", headers=h_alm, json={
+        "almacen_id": ids["central_id"], "origen": "proveedor",
+        "referencia_id": ids["proveedor_id"], "motivo": "dañado",
+        "items": [{"sku_id": ids["sku_queso"], "cantidad": "4", "lote_id": lote}],
+    }).json()
+
+    ficha = client.get(
+        f"/api/v1/inventory/devoluciones/{devolucion['id']}", headers=h_alm
+    ).json()
+    assert ficha["registrado_por_nombre"] == "almacenero1"
+    assert ficha["anulado_por_nombre"] is None
+
+    client.post(
+        f"/api/v1/inventory/devoluciones/{devolucion['id']}/anular", headers=h_admin
+    )
+    ficha = client.get(
+        f"/api/v1/inventory/devoluciones/{devolucion['id']}", headers=h_alm
+    ).json()
+    assert ficha["anulado_por_nombre"] == "admin"
 
 
 # --- Devolución de cliente ----------------------------------------------------

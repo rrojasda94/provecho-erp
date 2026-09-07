@@ -285,3 +285,104 @@ def test_el_payload_no_lleva_aritmetica_tributaria():
     assert payload["detalle"][0]["cantidad"] == 10.0
     for campo in ("monto_Igv", "valor_Venta", "forma_pago", "monto_Imp_Venta"):
         assert campo not in payload
+
+
+# --- codigo_sunat configurado en la UdM --------------------------------------
+def test_codigo_sunat_configurado_manda_sobre_el_diccionario():
+    """Una UdM con `codigo_sunat` propio no pasa por el diccionario de doce
+    entradas ni por su fallback a NIU."""
+    assert guias_mapper.codigo_unidad("Doypack 2kg", "KGM") == "KGM"
+    assert guias_mapper.codigo_unidad("Kilo", "ZZZ") == "ZZZ"
+    assert guias_mapper.codigo_unidad("Bandeja de tres", None) == "NIU"
+
+
+def test_la_udm_con_codigo_propio_viaja_en_la_guia(env):  # noqa: F811
+    """La UdM del artículo de la transferencia tiene `codigo_sunat` propio:
+    la línea de la guía lo usa en vez de traducir por nombre."""
+    from src.modules.inventory.application import catalogo
+    from src.modules.inventory.infrastructure.models import Articulo, Sku
+
+    client, ids, TestSession = env
+    h = _token(client)
+    with TestSession() as s:
+        sku = s.get(Sku, uuid.UUID(ids["sku_servilleta"]))
+        articulo = s.get(Articulo, sku.articulo_id)
+        catalogo.editar_unidad_medida(s, articulo.unidad_medida_id, codigo_sunat="XBX")
+        s.commit()
+
+    _ingresar(client, h, ids["central_id"], ids["sku_servilleta"], 100)
+    transferencia = _despachar(
+        client, h, ids, [{"sku_id": ids["sku_servilleta"], "cantidad": "10"}]
+    )
+    guia = _emitir(client, h, transferencia["id"]).json()
+    assert guia["items"][0]["unidad"] == "XBX"
+
+
+# --- Descarga de PDF/XML/CDR --------------------------------------------------
+def test_no_se_descarga_una_guia_sin_aceptar(traslado):
+    """Sin aceptación de SUNAT no hay XML firmado ni CDR que bajar, y el PDF
+    sería de un documento que SUNAT no reconoce."""
+    client, _, _, h, transferencia = traslado
+    guia = _emitir(client, h, transferencia["id"]).json()
+
+    r = client.get(
+        f"/api/v1/inventory/guias-remision/{guia['id']}/descargar/pdf", headers=h
+    )
+    assert r.status_code == 409
+
+
+def test_descargar_formato_invalido_422(traslado):
+    client, _, _, h, transferencia = traslado
+    guia = _emitir(client, h, transferencia["id"]).json()
+
+    r = client.get(
+        f"/api/v1/inventory/guias-remision/{guia['id']}/descargar/docx", headers=h
+    )
+    assert r.status_code == 422
+
+
+def test_descargar_guia_inexistente_404(env):  # noqa: F811
+    client, _, _ = env
+    h = _token(client)
+    r = client.get(
+        f"/api/v1/inventory/guias-remision/{uuid.uuid4()}/descargar/pdf", headers=h
+    )
+    assert r.status_code == 404
+
+
+def test_descargar_documento_pide_el_recurso_despatch(traslado):
+    """`descargar_documento` usa el prefijo `/despatch`, no `/invoice`
+    (donde vive el comprobante) — es lo único que distingue una guía de una
+    factura para Factiliza."""
+    from src.modules.inventory.application import guias as guias_uc
+    from src.shared.integrations.factiliza import DocumentoDescargado
+
+    client, _, TestSession, h, transferencia = traslado
+    guia = _emitir(client, h, transferencia["id"]).json()
+
+    class _ClienteFalso:
+        def __init__(self):
+            self.llamadas = []
+
+        def descargar(self, formato, tipo_doc, serie, correlativo, *, recurso):
+            self.llamadas.append((formato, tipo_doc, serie, correlativo, recurso))
+            return DocumentoDescargado(
+                formato=formato,
+                contenido=b"%PDF-1.4",
+                content_type="application/pdf",
+                nombre_archivo=f"{serie}-{correlativo:08d}.{formato}",
+            )
+
+    with TestSession() as s:
+        from src.modules.inventory.infrastructure.models import GuiaRemision as _G
+
+        fila = s.get(_G, uuid.UUID(guia["id"]))
+        fila.estado_emision = "aceptado"
+        s.commit()
+
+    with TestSession() as s:
+        falso = _ClienteFalso()
+        documento = guias_uc.descargar_documento(s, uuid.UUID(guia["id"]), "pdf", falso)
+        assert documento.contenido == b"%PDF-1.4"
+        assert falso.llamadas[0][1] == guias_mapper.TIPO_DOC_GUIA_REMITENTE
+        assert falso.llamadas[0][4] == "despatch"

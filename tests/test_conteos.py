@@ -751,3 +751,111 @@ def test_el_conteo_abierto_encabeza_el_listado(env):
 
     listado = client.get("/api/v1/inventory/conteos", headers=h).json()["items"]
     assert [c["id"] for c in listado] == [abierto["id"], cerrado["id"]]
+
+
+# --- El cierre arma o pone al día el borrador del almacén (RN-INV-026) ------
+def _con_abastecedor(TestSession, ids):
+    """Le pone al almacén de la fixture un abastecedor propio: sin él,
+    `borrador_del_almacen` rechaza con `ReglaNegocio` (es la situación real
+    del almacén central) y no hay nada que verificar."""
+    with TestSession() as s:
+        abastecedor = Almacen(
+            empresa_id=uuid.UUID(ids["empresa_id"]), nombre="Proveedor Externo",
+            tipo="central",
+        )
+        s.add(abastecedor)
+        s.flush()
+        almacen = s.get(Almacen, uuid.UUID(ids["almacen_id"]))
+        almacen.almacen_abastecedor_id = abastecedor.id
+        s.commit()
+
+
+def test_cerrar_conteo_arma_el_borrador_si_no_existia(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    _con_abastecedor(TestSession, ids)
+    _ingresar(client, h, ids, ids["sku_queso"], 10)
+    conteo = _abrir(client, h, ids, ids["perecibles_id"]).json()
+    client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cantidades", headers=h,
+        json={"items": [{"sku_id": ids["sku_queso"], "cantidad": "10"}]},
+    )
+
+    r = client.post(f"/api/v1/inventory/conteos/{conteo['id']}/cerrar", headers=h)
+    assert r.status_code == 200, r.text
+
+    borrador = client.get(
+        f"/api/v1/inventory/solicitudes/borrador?almacen_id={ids['almacen_id']}",
+        headers=h,
+    ).json()
+    assert borrador["estado"] == "borrador"
+    assert borrador["almacen_solicitante_id"] == ids["almacen_id"]
+
+
+def test_cerrar_conteo_pone_al_dia_un_borrador_ya_abierto_sin_pisarlo(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    _con_abastecedor(TestSession, ids)
+    # El turno ya abrió su borrador y agregó algo a mano.
+    client.get(
+        f"/api/v1/inventory/solicitudes/borrador?almacen_id={ids['almacen_id']}",
+        headers=h,
+    )
+    borrador = client.get(
+        f"/api/v1/inventory/solicitudes/borrador?almacen_id={ids['almacen_id']}",
+        headers=h,
+    ).json()
+    client.post(
+        f"/api/v1/inventory/solicitudes/{borrador['id']}/items", headers=h,
+        json={"sku_id": ids["sku_harina"], "cantidad": "5"},
+    )
+
+    conteo = _abrir(client, h, ids, ids["perecibles_id"]).json()
+    client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cantidades", headers=h,
+        json={"items": [{"sku_id": ids["sku_queso"], "cantidad": "0"}]},
+    )
+    assert client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cerrar", headers=h
+    ).status_code == 200
+
+    despues = client.get(
+        f"/api/v1/inventory/solicitudes/borrador?almacen_id={ids['almacen_id']}",
+        headers=h,
+    ).json()
+    assert despues["id"] == borrador["id"]
+    # Lo que el turno ya tecleó sigue ahí — el refresco es aditivo.
+    cantidades = {i["sku_id"]: i["cantidad_solicitada"] for i in despues["items"]}
+    assert cantidades[ids["sku_harina"]] == "5.0000"
+
+
+def test_cerrar_conteo_del_almacen_sin_abastecedor_no_falla(env):
+    """El almacén central no tiene abastecedor propio: armar su borrador
+    rechaza con `ReglaNegocio`, y el cierre del conteo no puede depender de
+    eso — es una consecuencia, no una condición."""
+    client, ids, _ = env
+    h = _token(client)
+    conteo = _abrir(client, h, ids, ids["perecibles_id"]).json()
+
+    r = client.post(f"/api/v1/inventory/conteos/{conteo['id']}/cerrar", headers=h)
+    assert r.status_code == 200, r.text
+    assert r.json()["conteo"]["estado"] == "cerrado"
+
+
+def test_cerrar_conteo_por_categoria_tambien_arma_el_borrador(env):
+    """Decisión explícita: todo cierre, no solo el conteo general — un
+    conteo de una sola categoría también dispara el refresco."""
+    client, ids, TestSession = env
+    h = _token(client)
+    _con_abastecedor(TestSession, ids)
+    conteo = _abrir(client, h, ids, ids["abarrotes_id"]).json()
+
+    assert client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cerrar", headers=h
+    ).status_code == 200
+
+    r = client.get(
+        f"/api/v1/inventory/solicitudes/borrador?almacen_id={ids['almacen_id']}",
+        headers=h,
+    )
+    assert r.status_code == 200

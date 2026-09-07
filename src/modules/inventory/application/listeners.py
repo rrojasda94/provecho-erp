@@ -30,6 +30,8 @@ from src.modules.inventory.domain import rules
 from src.modules.inventory.infrastructure.models import (
     Articulo,
     IncidenciaInventario,
+    Lote,
+    MovimientoInventario,
     RecetaItem,
     Sku,
     UnidadMedida,
@@ -247,6 +249,88 @@ def _consumos_de_items(session: Session, items: list[dict]) -> list[tuple[uuid.U
     return consumos
 
 
+def _lotes_de_la_salida(
+    session: Session, *, almacen_id: uuid.UUID, sku_id: uuid.UUID, venta_id: str
+) -> list[tuple[uuid.UUID | None, Decimal]]:
+    """`(lote_id, cantidad tomada)` de la salida original de esta venta, en
+    el orden en que se tomó (primero lo que salió primero).
+
+    `referencia` guarda el `venta_id` desde el primer día y cada lote tomado
+    por FEFO deja su propio movimiento (ADR-015: "una salida que abarca
+    varios lotes genera un movimiento por lote") — el dato para reponer al
+    lote correcto siempre estuvo ahí, solo faltaba leerlo. Lista vacía =
+    venta anterior a este listener, o el SKU no dejó rastro por otro motivo;
+    el llamador cae al comportamiento de antes.
+    """
+    # Por vencimiento del lote y no por `ts`: dos movimientos del mismo
+    # reparto FEFO pueden compartir el mismo instante (misma transacción,
+    # `func.now()` a nivel de segundo en SQLite) y el orden de `ts` deja de
+    # ser confiable. El vencimiento no tiene ese problema y es, por
+    # construcción, el mismo orden en que FEFO los tomó.
+    filas = session.execute(
+        select(MovimientoInventario.lote_id, MovimientoInventario.cantidad)
+        .join(Lote, Lote.id == MovimientoInventario.lote_id, isouter=True)
+        .where(
+            MovimientoInventario.almacen_id == almacen_id,
+            MovimientoInventario.sku_id == sku_id,
+            MovimientoInventario.referencia == venta_id,
+            MovimientoInventario.cantidad < 0,
+        )
+        .order_by(Lote.fecha_vencimiento.asc().nulls_last(), MovimientoInventario.ts)
+    )
+    return [(lote_id, -cantidad) for lote_id, cantidad in filas]
+
+
+def _reponer(
+    session: Session,
+    *,
+    almacen_id: uuid.UUID,
+    sku_id: uuid.UUID,
+    cantidad: Decimal,
+    tipo: str,
+    venta_id: str,
+) -> None:
+    """Repone al lote del que salió, no al lote del día.
+
+    Reparte entre los lotes de los que de verdad salió, en el mismo orden en
+    que salieron. Una anulación parcial —una nota de crédito por menos de lo
+    vendido— no dice de cuál lote físico vuelve la mercadería, así que se
+    asume lo más simple y lo más conservador: entra primero a donde salió
+    primero, sin pasarse de lo que ese lote entregó. Sin rastro —venta
+    anterior a este cambio, o el SKU no dejó uno por otro motivo— cae al
+    comportamiento de siempre: entra al lote del día.
+    """
+    restante = cantidad
+    for lote_id, tomado in _lotes_de_la_salida(
+        session, almacen_id=almacen_id, sku_id=sku_id, venta_id=venta_id
+    ):
+        if restante <= 0:
+            break
+        a_reponer = min(tomado, restante)
+        stock_uc.registrar_movimiento(
+            session,
+            almacen_id=almacen_id,
+            sku_id=sku_id,
+            cantidad=a_reponer,
+            tipo=tipo,
+            referencia=venta_id,
+            lote_id=lote_id,
+        )
+        restante -= a_reponer
+    if restante > 0:
+        # Sin rastro, o se pide reponer más de lo que el rastro dice que
+        # salió (no debería pasar con una anulación o nota de crédito
+        # válida) — el resto entra al lote del día en vez de perderse.
+        stock_uc.registrar_movimiento(
+            session,
+            almacen_id=almacen_id,
+            sku_id=sku_id,
+            cantidad=restante,
+            tipo=tipo,
+            referencia=venta_id,
+        )
+
+
 def _mover(payload: dict, tipo: str, signo: int, valorizar: bool = False) -> None:
     """Descuenta (o repone) el insumo de una venta.
 
@@ -303,16 +387,17 @@ def _mover(payload: dict, tipo: str, signo: int, valorizar: bool = False) -> Non
                             referencia=payload["venta_id"],
                         )
                     else:
-                        # ponytail: la reposición por anulación entra al lote
-                        # del día, no al lote del que salió — el movimiento
-                        # original no viaja en el evento. Ver deuda del módulo.
-                        stock_uc.registrar_movimiento(
+                        # `referencia` ya guardaba el `venta_id` en cada
+                        # movimiento de salida, y con eso `_reponer`
+                        # reconstruye de cuáles lotes salió sin que el
+                        # evento tenga que transportar nada nuevo.
+                        _reponer(
                             session,
                             almacen_id=almacen_id,
                             sku_id=sku_id,
                             cantidad=cantidad,
                             tipo=tipo,
-                            referencia=payload["venta_id"],
+                            venta_id=payload["venta_id"],
                         )
                     movio = True
                     if valorizar:

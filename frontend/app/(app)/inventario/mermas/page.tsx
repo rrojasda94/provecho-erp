@@ -42,6 +42,7 @@ export default async function MermasPage() {
         (s): OpcionSku => ({ id: s.id, etiqueta: `${s.articulo_nombre} (${s.codigo})` }),
       )}
       permisos={usuario.permisos}
+      usuarioId={usuario.id}
     />
   );
 }

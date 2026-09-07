@@ -165,17 +165,24 @@ export async function cancelarSolicitudAction(
   );
 }
 
+/**
+ * Aprueba, con la cantidad que quedó en el diálogo de picking.
+ *
+ * `aprobadas` recorta por SKU: lo pedido no siempre es lo que corresponde,
+ * y el servidor lo soporta desde el slice 4 — solo faltaba el formulario
+ * que edite la cantidad por línea. Una línea en 0 queda fuera y no reserva
+ * nada; lo que no se manda se aprueba tal cual se pidió.
+ */
 export async function aprobarSolicitudAction(
   solicitudId: string,
+  aprobadas: { sku_id: string; cantidad: string }[],
 ): Promise<EstadoFormulario> {
   return ejecutar(
     async () =>
       apiFetch(`/api/v1/inventory/solicitudes/${solicitudId}/aprobar`, {
         token: await token(),
         metodo: "POST",
-        // Sin recortes: se aprueba lo pedido tal cual. Recortar por SKU lo
-        // soporta la API desde el slice 4 y todavía no tiene pantalla.
-        cuerpo: { aprobadas: [] },
+        cuerpo: { aprobadas },
       }),
     "No se pudo aprobar.",
     `${RUTA}/${solicitudId}`,
