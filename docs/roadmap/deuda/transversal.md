@@ -66,22 +66,23 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   la sesión y un rastro de cada `UPDATE` no lo lee nadie (ADR-031 → punto 2).
   `rrhh` salió de `_EXCEPCIONES_CRUZADAS`: la lista encogió, que es la única
   dirección permitida.
-- **Un módulo se activa a mano en siete lugares** (2026-08-03). La estructura
-  interna es replicable —los 8 módulos tienen la misma forma— pero no hay
-  manifiesto por módulo ni autodescubrimiento: router y tag OpenAPI y
-  `register()` de listeners en `src/core/app.py`, import en
-  `models_registry.py`, migración, `PERMISOS`/`ROLES` en `src/seeders/seed.py`
-  y entrada en `frontend/lib/modulos.ts`. Consecuencia: **borrar la carpeta de
-  un módulo deja `core` sin compilar** — la promesa de "removible" es hoy del
-  dominio, no del ensamblado. Mitigado, no resuelto:
+- ✅ 2026-09-06 **Un módulo se activa a mano en siete lugares — cerrado por
+  decisión** (declarado 2026-08-03). La estructura interna es replicable
+  —los 8 módulos tienen la misma forma— pero no hay manifiesto por módulo ni
+  autodescubrimiento: router y tag OpenAPI y `register()` de listeners en
+  `src/core/app.py`, import en `models_registry.py`, migración,
+  `PERMISOS`/`ROLES` en `src/seeders/seed.py` y entrada en
+  `frontend/lib/modulos.ts`. Consecuencia: **borrar la carpeta de un módulo
+  deja `core` sin compilar** — la promesa de "removible" es hoy del dominio,
+  no del ensamblado. **Decisión**: el propio texto ya cerraba su caso —
+  `MODULOS_ACTIVOS` en settings + carga por convención (`importlib`) y
+  `PERMISOS` declarados en el módulo no se construyen antes de tener un caso
+  real de módulo instalable/desinstalable, y hoy los 8 están siempre
+  encendidos. Queda mitigado, no resuelto, y documentado como tal:
   `docs/engineering/module-guide.md` documenta los siete pasos y
   `tests/test_arquitectura.py` exige tres de ellos (modelos en el registro,
-  router montado, permisos de la API sembrados). Pendiente si algún día hay
-  módulos opcionales de verdad: `MODULOS_ACTIVOS` en settings + carga por
-  convención (`importlib`), que colapsa 1-4 en una línea; y `PERMISOS`
-  declarados en el módulo en vez del seeder. No hacerlo antes de tener un
-  caso real de módulo instalable/desinstalable — hoy los 8 están siempre
-  encendidos.
+  router montado, permisos de la API sembrados). Vuelve a abrirse el día que
+  aparezca ese caso real.
 - ✅ 2026-08-02 **`GET /personas` exigía `users.gestionar`, demasiado
   amplio para un lookup**: nuevo endpoint minimizado
   `GET /personas/buscar?q=` (permiso `personas.leer`, nuevo) que responde
@@ -150,18 +151,26 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   tocar un solo test**, que es la prueba de que el error no estaba ahí.
   `tests/test_fechas_negocio.py` congela la regla, incluido un caso que falla
   si algún módulo vuelve a usar `date.today()`.
-- ⬜ **Las direcciones ya cargadas no tienen ancla** (2026-08-22, ADR-053):
-  las cinco tablas ganaron sus columnas nullable y nadie las llenó. No hay
-  backfill porque geocodificar en masa se cobra por registro y el dato viejo no
-  urge: cada ficha queda anclada la próxima vez que alguien la edite. Si algún
-  día hace falta de golpe, es un comando que recorra las filas sin
-  `ubicacion_place_id` con la clave del servidor y un tope de gasto.
+- ✅ 2026-09-06 **Las direcciones ya cargadas no tienen ancla — cerrado por
+  decisión** (declarado 2026-08-22, ADR-053): las cinco tablas ganaron sus
+  columnas nullable y nadie las llenó. **Decisión**: no hay backfill porque
+  geocodificar en masa se cobra por registro y el dato viejo no urge — cada
+  ficha queda anclada la próxima vez que alguien la edite, que es el flujo
+  normal. Queda escrito el camino para el día que urja de golpe: un comando
+  que recorra las filas sin `ubicacion_place_id` con la clave del servidor y
+  un tope de gasto.
 - ⬜ **La CSP no se probó contra el mapa real** (2026-08-22, ADR-053): la lista
   de hosts de Google salió de su guía oficial recortada a lo que este ERP usa,
   **sin `'unsafe-eval'`**, que Google recomienda por las dudas. Falta la
   verificación en el navegador con clave puesta: si un mapa muere con un error
   de `eval` en consola, esa es la línea que falta y la decisión hay que volver a
-  tomarla a conciencia, no agregarla de reflejo.
+  tomarla a conciencia, no agregarla de reflejo. **Sigue abierto** (2026-09-06):
+  no es código, es una verificación en el navegador contra staging con la
+  clave de Google puesta — depende de las claves pendientes y de la rama de
+  staging de Google sin mergear (ver memoria del proyecto). No se cierra por
+  decisión porque la decisión real (¿alcanza la CSP sin `'unsafe-eval'`?)
+  todavía no se puede tomar sin mirar la consola del navegador con el mapa
+  cargado de verdad.
 - ✅ 2026-08-30 **Cinco escrituras seguían leyendo el reloj del proceso**, que
   el barrido de `tests/test_fechas_negocio.py` no veía porque buscaba el
   literal `date.today()` y nada más. Tres `datetime.now()` a secas sobre
@@ -200,12 +209,21 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `monto_maximo` por rol, validado antes de aplicar el descuento. 15 tests
   nuevos (`tests/test_restricciones_permiso.py` + 3 casos HTTP en
   `test_sales.py`).
-- ⬜ `users`: auth de **`agente_ia` por token** (hoy exige PIN como humano).
-- ⬜ **Theming multi-marca + accesibilidad** (frontend, spec en
-  `docs/product/ui-ux.md`): resolver de tema por marca/sucursal para
-  PDV/Kiosk, preferencias de accesibilidad (paleta daltonismo, tamaño de
-  fuente) persistidas en el perfil de `usuario`. Catálogo de paletas y
-  niveles ya definido (2026-07-27) — sin implementar.
+- ✅ 2026-08-08 **`users`: auth de `agente_ia` por token** (ADR-032, corrección
+  2026-09-06: esta entrada seguía en ⬜ y el doc mentía — la deuda que
+  describía llevaba resuelta desde el propio ADR-032). `api/deps.py:70` ya
+  no exige PIN para una cuenta `tipo=agente_ia`: distingue por prefijo
+  `prv_` y verifica por firma (`token_agente`, modelo dedicado). Ver
+  `docs/roadmap/deuda/transversal.md` en su sección de arriba y el contrato
+  en `src/modules/users/README.md` → «Autenticación de agentes».
+- ✅ 2026-08-12 **Accesibilidad, la mitad que faltaba de "Theming
+  multi-marca + accesibilidad"** (ADR-037, corrección 2026-09-06: esta
+  entrada seguía en ⬜ y ya estaba hecha). Paleta daltonismo y tamaño de
+  fuente, persistidas en el perfil de `usuario` — implementado con el
+  sistema visual y modo oscuro. Lo que sigue sin hacer es la otra mitad:
+  **theming por marca/sucursal** (resolver de tema por marca para PDV/Kiosk)
+  — cerrado por decisión más abajo, "Transversal: theming multi-marca (la
+  mitad que queda)".
 - ✅ 2026-08-02 **`parametro_empresa` con aprobación de Gerencia**
   (ADR-014 + Addendum, RN-GER-008/009): entidad transversal implementada
   (`src/shared/models/parametro_empresa.py`, migración `a71c9f4b2e60`).

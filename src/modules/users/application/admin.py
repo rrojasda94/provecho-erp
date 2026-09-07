@@ -56,7 +56,10 @@ def crear_usuario(
     repo = UsuarioRepo(session)
     if repo.get_by_username(username):
         raise Conflicto(f"username '{username}' ya existe")
-    # ponytail: PIN obligatorio también para agente_ia; su auth por token es a futuro.
+    # ponytail: PIN obligatorio también para agente_ia aunque ya tenga su
+    # propia auth por token (ADR-032) — el PIN nunca la autentica, es un
+    # campo de más, no un agujero. Sacarlo es tocar la validación de alta
+    # para un caso que no urge.
     if not rules.pin_valido(pin):
         raise PinInvalido(f"El PIN debe ser {rules.PIN_LENGTH} dígitos")
     if persona_id is not None:
