@@ -11,7 +11,9 @@ siendo posible tecleando — mismo criterio que ADR-005 y que los helpers
 `nombres_desde_dni` / `razon_social_desde_ruc`, que ya aplican el dato en el
 servidor al momento de crear.
 
-Solo lectura: acá no se guarda nada.
+Solo lectura: acá no se persiste nada (la respuesta se cachea en Redis
+con TTL corto, ver `shared/integrations/factiliza/cache.py`, pero no es
+un registro).
 """
 
 import logging

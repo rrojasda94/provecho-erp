@@ -7,7 +7,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
@@ -68,11 +68,34 @@ def q_comprobantes_recibidos(
         q = q.join(OrdenCompra, OrdenCompra.id == Comprobante.compra_id).where(
             OrdenCompra.proveedor_id == proveedor_id
         )
-    fecha = func.coalesce(Comprobante.fecha_emision, func.date(Comprobante.created_at))
+    # `func.date(created_at)` trunca el timestamp UTC crudo: un comprobante
+    # registrado el lunes a las 20:00 hora Perú (martes en UTC) caía del
+    # lado equivocado del filtro. `fecha_emision` es `date` y se compara
+    # directo; `created_at` es un instante UTC y se compara contra el borde
+    # del día del negocio (`fechas.inicio_dia_utc`/`fin_dia_utc`), no contra
+    # la fecha cruda.
     if desde is not None:
-        q = q.where(fecha >= desde)
+        desde_utc = fechas.inicio_dia_utc(desde)
+        q = q.where(
+            or_(
+                Comprobante.fecha_emision >= desde,
+                and_(
+                    Comprobante.fecha_emision.is_(None),
+                    Comprobante.created_at >= desde_utc,
+                ),
+            )
+        )
     if hasta is not None:
-        q = q.where(fecha <= hasta)
+        hasta_utc = fechas.fin_dia_utc(hasta)
+        q = q.where(
+            or_(
+                Comprobante.fecha_emision <= hasta,
+                and_(
+                    Comprobante.fecha_emision.is_(None),
+                    Comprobante.created_at <= hasta_utc,
+                ),
+            )
+        )
     # Lo más reciente primero: un registro de compras se lee por el último
     # documento que entró, no por el primero.
     return q.order_by(Comprobante.created_at.desc(), Comprobante.id.desc())

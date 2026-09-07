@@ -24,7 +24,6 @@ import uuid
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -36,10 +35,13 @@ from src.modules.rrhh.infrastructure.models import Asistencia, TerminalMarcaje, 
 from src.modules.rrhh.infrastructure.repositories import AsistenciaRepo, TrabajadorRepo
 from src.modules.users.application.queries_publicas import obtener_usuario
 from src.modules.users.infrastructure.models import Persona
+from src.shared import fechas
 
 # El día laboral es el del local, no el del servidor: un turno noche que
 # termina a las 02:00 tiene que caer en el día que empezó (ver `fecha_laboral`).
-LIMA = ZoneInfo("America/Lima")
+# `fechas.zona()` y no una zona propia escrita a mano: el día que el
+# grupo abra en otro país, este archivo tiene que enterarse solo.
+LIMA = fechas.zona()
 
 # Antes de esta hora, la marcación pertenece al día anterior. Cubre la
 # salida del turno noche sin necesidad de preguntarle a nadie de qué día
