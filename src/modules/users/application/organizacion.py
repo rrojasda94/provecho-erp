@@ -76,15 +76,33 @@ def _auditar(
     )
 
 
-def _aplicar(obj, campos: dict, permitidos: tuple[str, ...]) -> dict:
+def _aplicar(
+    obj,
+    campos: dict,
+    permitidos: tuple[str, ...],
+    borrables: frozenset[str] = frozenset(),
+) -> dict:
     """Asigna los campos presentes y devuelve el estado anterior de los que
-    realmente cambiaron (lo que la auditoría guarda como `datos_antes`)."""
+    realmente cambiaron (lo que la auditoría guarda como `datos_antes`).
+
+    El router manda `exclude_unset=True`: un campo **ausente** de `campos`
+    es "no tocar", igual que siempre. Uno **presente con `None`** también se
+    ignora, salvo que esté en `borrables` — ahí `None` vacía el campo de
+    verdad. Antes de esto no había diferencia entre las dos formas de
+    `None`, así que no existía manera de vaciar un opcional desde el PATCH
+    (ver ADR-070, mismo mecanismo para `usuario.persona_id`).
+    """
     antes = {}
     for campo in permitidos:
-        nuevo = campos.get(campo)
-        if nuevo is None or getattr(obj, campo) == nuevo:
+        if campo not in campos:
             continue
-        antes[campo] = str(getattr(obj, campo))
+        nuevo = campos[campo]
+        if nuevo is None and campo not in borrables:
+            continue
+        actual = getattr(obj, campo)
+        if actual == nuevo:
+            continue
+        antes[campo] = str(actual) if actual is not None else None
         setattr(obj, campo, nuevo)
     return antes
 
@@ -223,6 +241,11 @@ EDITABLES_EMPRESA = (
     "config_fiscal",
     *CAMPOS_UBICACION,
 )
+# `contacto` y `config_fiscal` son texto libre y JSON: una empresa que ya
+# tuvo uno puede querer quedarse sin. `ubicacion_*` viaja acá también —
+# `desanclar_si_cambio_el_texto` sigue siendo el que actúa cuando nadie lo
+# pide explícito, esto es para cuando sí se pide.
+BORRABLES_EMPRESA = frozenset({"contacto", "config_fiscal", *CAMPOS_UBICACION})
 
 
 def editar_empresa(
@@ -245,7 +268,7 @@ def editar_empresa(
         if otra is not None and otra.id != empresa_id:
             raise Conflicto(f"RUC '{ruc_nuevo}' ya existe")
     domicilio_previo = empresa.domicilio_fiscal
-    antes = _aplicar(empresa, campos, EDITABLES_EMPRESA)
+    antes = _aplicar(empresa, campos, EDITABLES_EMPRESA, BORRABLES_EMPRESA)
     antes |= desanclar_si_cambio_el_texto(
         empresa, campos, domicilio_previo, "domicilio_fiscal"
     )
@@ -312,7 +335,9 @@ def editar_marca(
         otra = repo.get_by_nombre(marca.grupo_id, nombre_nuevo)
         if otra is not None and otra.id != marca_id:
             raise Conflicto(f"marca '{nombre_nuevo}' ya existe en el grupo")
-    antes = _aplicar(marca, campos, ("nombre", "tipo", "skins"))
+    # `skins` es la única que se puede vaciar: sin él, la marca vuelve al
+    # tema de Provecho por defecto — nombre y tipo no son opcionales.
+    antes = _aplicar(marca, campos, ("nombre", "tipo", "skins"), frozenset({"skins"}))
     if antes:
         _auditar(session, actor_id, "marca", marca.id, "editar", antes)
     return marca
@@ -463,6 +488,11 @@ def editar_sucursal(
             "radio_marcaje_m",
             *CAMPOS_UBICACION,
         ),
+        # `radio_marcaje_m` en None es "no evalúa distancia" (RN-RRHH-024):
+        # sin esto no había forma de desactivarlo, solo de cambiarlo por otro
+        # número. `horario_atencion` puede vaciarse igual que `contacto` de
+        # empresa.
+        frozenset({"horario_atencion", "radio_marcaje_m", *CAMPOS_UBICACION}),
     )
     antes |= desanclar_si_cambio_el_texto(
         sucursal, campos, direccion_previa, "direccion"
@@ -548,18 +578,24 @@ def editar_almacen(
     **campos,
 ) -> Almacen:
     almacen = _get(AlmacenRepo(session).get(almacen_id), "almacen")
-    # `None` = "no tocar" (ver schemas), así que el valor a validar es el
-    # nuevo si vino y el vigente si no. Con `campos.get(k, actual)` un PATCH
-    # que no menciona `sucursal_id` validaría contra None y rechazaría
-    # cualquier edición de un almacén de sucursal.
-    tipo = campos.get("tipo") or almacen.tipo
-    sucursal_id = campos.get("sucursal_id") or almacen.sucursal_id
+    # Un campo **ausente** de `campos` (exclude_unset) es "no tocar": el
+    # valor a validar es el vigente. Uno **presente** —así sea `None`, para
+    # vaciar `sucursal_id`/los dos abastecedores— es el que manda: con
+    # `campos.get(k) or actual` un `None` explícito se perdía contra el
+    # vigente y una limpieza real terminaba validando el valor viejo.
+    tipo = campos["tipo"] if "tipo" in campos else almacen.tipo
+    sucursal_id = (
+        campos["sucursal_id"] if "sucursal_id" in campos else almacen.sucursal_id
+    )
     abastecedor_id = (
-        campos.get("almacen_abastecedor_id") or almacen.almacen_abastecedor_id
+        campos["almacen_abastecedor_id"]
+        if "almacen_abastecedor_id" in campos
+        else almacen.almacen_abastecedor_id
     )
     respaldo_id = (
-        campos.get("almacen_abastecedor_respaldo_id")
-        or almacen.almacen_abastecedor_respaldo_id
+        campos["almacen_abastecedor_respaldo_id"]
+        if "almacen_abastecedor_respaldo_id" in campos
+        else almacen.almacen_abastecedor_respaldo_id
     )
     if almacen_id in (abastecedor_id, respaldo_id):
         raise ReglaNegocio("un almacén no puede abastecerse a sí mismo")
@@ -579,6 +615,15 @@ def editar_almacen(
             "almacen_abastecedor_respaldo_id",
             *CAMPOS_UBICACION,
         ),
+        # Elegir "Ninguno" en el abastecedor tiene que poder vaciarlo de
+        # verdad — es el caso que dejó anotada esta deuda.
+        frozenset({
+            "direccion",
+            "sucursal_id",
+            "almacen_abastecedor_id",
+            "almacen_abastecedor_respaldo_id",
+            *CAMPOS_UBICACION,
+        }),
     )
     antes |= desanclar_si_cambio_el_texto(
         almacen, campos, direccion_previa, "direccion"

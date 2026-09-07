@@ -26452,6 +26452,18 @@
             "title": "Estado",
             "type": "string"
           },
+          "horario_atencion": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horario Atencion"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -30593,6 +30605,18 @@
           "nombre": {
             "title": "Nombre",
             "type": "string"
+          },
+          "skins": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skins"
           },
           "tipo": {
             "title": "Tipo",

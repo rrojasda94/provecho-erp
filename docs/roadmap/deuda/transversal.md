@@ -335,3 +335,24 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   **`src/core/consulta_router.py:120,144` queda igual, a propósito**: ahí el
   8/11 es el contrato del proveedor (RENIEC/SUNAT), no la regla del ERP —
   la nota que ya estaba acá seguía valiendo y no había que "arreglarlo".
+
+- ✅ 2026-09-06 **El PATCH de organización no tenía forma de vaciar un
+  opcional** (ADR-096): la convención "campo ausente o `null` = no tocar"
+  (`users/api/schemas.py`) no dejaba camino para vaciar `null` a propósito —
+  no se podía quitar el almacén abastecedor de un almacén, ni su respaldo, ni
+  desactivar el `radio_marcaje_m` de una sucursal una vez puesto, aunque el
+  selector del frontend ya ofrecía "Ninguno". Mismo mecanismo que
+  `admin.editar_usuario` (ADR-070): los cuatro routers PATCH de organización
+  pasan a `model_dump(exclude_unset=True)` y `organizacion._aplicar` gana un
+  `borrables: frozenset[str]` por entidad. Habilita vaciar
+  `almacen_abastecedor_id`, `almacen_abastecedor_respaldo_id`, `direccion` y
+  `sucursal_id` de almacén, `radio_marcaje_m`/`horario_atencion` de sucursal,
+  `contacto`/`config_fiscal` de empresa, `skins` de marca y los cinco
+  `ubicacion_*`. De paso salieron dos bugs del mismo origen:
+  `editar_almacen` derivaba sus validaciones con `campos.get(x) or actual`,
+  que descartaba un `None` intencional igual que uno ausente; y
+  `ubicacion.desanclar_si_cambio_el_texto` decidía con el texto crudo de la
+  request en vez del ya aplicado a la entidad, así que un campo no-borrable
+  en `null` explícito desanclaba por error. `MarcaOut`/`SucursalOut` también
+  ganaron `skins`/`horario_atencion`, que eran escribibles y no se podían
+  leer de vuelta.
