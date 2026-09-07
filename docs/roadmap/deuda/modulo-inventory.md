@@ -14,13 +14,16 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   llamaba nadie: quien recibía firmaba a ciegas y no podía declarar que llegó
   la mitad. Y el traslado lateral —sucursal a sucursal, sin requerimiento—
   que el backend admite desde el slice original no tenía por dónde crearse.
-- ⬜ **La guía de remisión no tiene pantalla** (2026-09-04). Tres endpoints
-  (`POST /transferencias/{id}/guia`, `GET /transferencias/{id}/guia`,
-  `GET /guias-remision`), permiso propio `inventory.emitir_guia` y 14
-  pruebas, sin un solo llamador desde el frontend. Es el mismo patrón que
-  este bloque vino a cortar, pero es un bloque aparte y no la cola de éste:
-  la guía es un documento con numeración, transportista y validez tributaria,
-  no un botón más en la tabla de traslados.
+- ✅ 2026-09-06 **La guía de remisión ya tiene pantalla** (bloque
+  `feat/inventario-guia-remision`). Botón «Guía» en Traslados y en
+  Devoluciones (solo `origen=proveedor`, `estado=registrada`): al abrir
+  pregunta si ya existe una (`GET .../guia`, idempotente por transferencia
+  o devolución) y muestra su estado, o el formulario de emisión si no hay
+  ninguna. Lista `/inventario/guias-remision` de solo lectura —la guía se
+  emite desde su origen, no desde acá— y entrada de navegación. Sumó el `GET
+  /devoluciones/{id}/guia-remision` que faltaba, simétrico al de
+  transferencia. Con esto, los tres endpoints y las 14 pruebas de ADR-027
+  tienen al fin un llamador.
 - ⬜ **La bandeja de mermas ofrece resolver al que la registró** (2026-09-04).
   La segregación es del dominio y está bien puesta —quien declara que algo no
   sirve no firma su baja— pero `MermaOut` no expone `creado_por`, así que la
@@ -287,16 +290,30 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   segundo emisor y forzó el cambio, tal como este punto anticipaba—, así
   que el reparto propio solo tendría que sumar su `venta_id`. Sigue abierto
   porque no hay reparto propio todavía.
-- ⬜ **Descarga de PDF/XML/CDR de la guía y anulación por comunicación de
-  baja**: `FactilizaClient.descargar` apunta a `/invoice/...`; la guía
-  necesita su ruta `/despatch/...`, y el payload de `/despatch/send` sigue
-  **pendiente de verificación contra el sandbox real** de Factiliza — igual
-  que estuvo la boleta antes de su primera emisión.
-- ⬜ **`codigo_sunat` por unidad de medida**: hoy el mapper traduce con un
-  diccionario de doce unidades y cae en `NIU` lo que no reconoce. El lugar
-  correcto es una columna en `unidad_medida` editable desde Catálogo;
-  mientras solo la guía lo necesite, una columna que alguien tiene que
-  llenar a mano es más trabajo que el diccionario.
+- ✅ 2026-09-06 **Descarga de PDF/XML/CDR de la guía** (bloque
+  `feat/inventario-guia-remision`). `FactilizaClient.descargar` ganó
+  `recurso: "invoice" | "despatch"` —mismo verbo, mismo formato de
+  respuesta en Factiliza, solo cambia el prefijo de la ruta— y
+  `GET /guias-remision/{id}/descargar/{formato}` en inventory, igual
+  criterio que `sales.comprobantes.descargar_documento`: se pide al
+  proveedor en el momento, solo de una guía `aceptada`, sin archivar.
+- ⬜ **Anulación de la guía por comunicación de baja — sin verificar contra
+  el sandbox real** (2026-09-06). El payload de `/despatch/send` sigue sin
+  probarse contra el sandbox de QA de Factiliza —la sesión que construyó la
+  descarga y la pantalla no tenía `FACTILIZA_TOKEN` ni acceso de red al
+  proveedor para hacerlo con criterio—, así que la anulación no se
+  implementó a ciegas: sin ver un rechazo real no hay forma de saber si el
+  contrato que hoy solo `enviar_guia_remision` ejercita (`guias.py:209`)
+  aplica igual a una comunicación de baja. Queda igual que estuvo la
+  descarga antes de este bloque: pendiente de alguien con el token de QA
+  puesto, emitiendo una guía real y probando el rechazo contra la API.
+- ✅ 2026-09-06 **`codigo_sunat` por unidad de medida** (bloque
+  `feat/inventario-guia-remision`, migración `4466bd44b238`). Columna
+  nullable en `unidad_medida`, editable desde
+  `POST/PATCH /inventory/unidades-medida[/{id}]` (ya existían). El
+  diccionario de doce entradas de `guias.py` sigue de fallback —para lo que
+  nadie configuró todavía— y de valor de siembra; `codigo_unidad()` ahora
+  recibe el código configurado y lo usa primero si está.
 - ✅ 2026-08-07 **La guía no se emite offline — decisión, no deuda**
   (decidido con el usuario). El correlativo es único por `(empresa, serie)`
   y dos hubs numerando a la vez colisionarían **con la guía ya impresa y

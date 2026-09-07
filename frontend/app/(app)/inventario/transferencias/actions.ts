@@ -107,3 +107,42 @@ export async function trasladoDirectoAction(
   revalidatePath(RUTA);
   return { error: "", ok: true };
 }
+
+/**
+ * Emite la guía de remisión de un traslado ya despachado.
+ *
+ * Idempotente por transferencia (RN-TRP-002): si ya existe una, el
+ * servidor la devuelve tal cual y no numera una segunda — el formulario
+ * puede reenviarse sin miedo a duplicar la guía. Los bienes no se teclean:
+ * salen de la transferencia. Lo que sí se teclea es lo que el sistema no
+ * puede saber — quién maneja, en qué vehículo, cuánto pesa y qué día
+ * arranca el viaje.
+ */
+export async function emitirGuiaAction(
+  _previo: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const transferenciaId = texto(formData, "transferencia_id");
+  if (!transferenciaId) return { error: "Falta la transferencia.", ok: false };
+
+  try {
+    await apiFetch(`/api/v1/inventory/transferencias/${transferenciaId}/guia`, {
+      token: await token(),
+      metodo: "POST",
+      cuerpo: {
+        chofer_nombres: texto(formData, "chofer_nombres"),
+        chofer_apellidos: texto(formData, "chofer_apellidos"),
+        chofer_num_doc: texto(formData, "chofer_num_doc"),
+        chofer_licencia: texto(formData, "chofer_licencia"),
+        vehiculo_placa: texto(formData, "vehiculo_placa"),
+        peso_bruto_kg: texto(formData, "peso_bruto_kg"),
+        fecha_inicio_traslado: texto(formData, "fecha_inicio_traslado") || null,
+        observacion: texto(formData, "observacion") || null,
+      },
+    });
+  } catch (e) {
+    return estadoDeError(e, "No se pudo emitir la guía.");
+  }
+  revalidatePath(RUTA);
+  return { error: "", ok: true };
+}

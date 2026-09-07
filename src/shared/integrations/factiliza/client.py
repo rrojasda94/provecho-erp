@@ -291,9 +291,21 @@ class FactilizaClient:
         return _interpretar_ruc(ruc, cuerpo)
 
     def descargar(
-        self, formato: str, tipo_doc: str, serie: str, correlativo: int
+        self,
+        formato: str,
+        tipo_doc: str,
+        serie: str,
+        correlativo: int,
+        *,
+        recurso: str = "invoice",
     ) -> DocumentoDescargado:
-        """`GET /invoice/{pdf|xml|cdr}/{tipo}/{serie}/{correlativo}`.
+        """`GET /{recurso}/{pdf|xml|cdr}/{tipo}/{serie}/{correlativo}`.
+
+        `recurso` es `invoice` (comprobantes: boleta, factura, nota de
+        crédito) o `despatch` (guía de remisión) — mismo verbo y misma forma
+        de respuesta en Factiliza, solo cambia el prefijo del path. El
+        default es `invoice` porque es el único llamador hasta que la guía
+        sumó el suyo.
 
         El PDF es lo que se le entrega al cliente; el **XML firmado** y el
         **CDR** son el respaldo ante SUNAT y hay que poder recuperarlos años
@@ -308,7 +320,7 @@ class FactilizaClient:
             raise ValueError(f"formato no descargable: {formato}")
         if not self.token:
             raise FactilizaError("FACTILIZA_TOKEN no configurado")
-        url = f"{self.base_url}/invoice/{formato}/{tipo_doc}/{serie}/{correlativo}"
+        url = f"{self.base_url}/{recurso}/{formato}/{tipo_doc}/{serie}/{correlativo}"
         try:
             respuesta = httpx.get(
                 url,
