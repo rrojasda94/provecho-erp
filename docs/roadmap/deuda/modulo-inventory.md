@@ -24,13 +24,12 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   /devoluciones/{id}/guia-remision` que faltaba, simétrico al de
   transferencia. Con esto, los tres endpoints y las 14 pruebas de ADR-027
   tienen al fin un llamador.
-- ⬜ **La bandeja de mermas ofrece resolver al que la registró** (2026-09-04).
-  La segregación es del dominio y está bien puesta —quien declara que algo no
-  sirve no firma su baja— pero `MermaOut` no expone `creado_por`, así que la
-  pantalla no puede esconder los botones y quien la registró se come el error
-  al apretarlos. Es la misma familia que el hallazgo §3 de la auditoría (un
-  botón que promete un rechazo); cerrarlo pide un campo más en el esquema de
-  salida, no un cambio de pantalla.
+- ✅ 2026-09-06 **La bandeja de mermas deja de ofrecer resolver al que la
+  registró** (bloque `feat/inventario-mermas-y-devoluciones`). `MermaOut`
+  suma `creado_por`/`liberado_por`; la pantalla esconde Desechar/Reintegrar
+  cuando `merma.creado_por === usuario.id`, en vez de dejar que se los coma
+  como un 409 (RN-INV-019). De paso, el selector de almacén que el endpoint
+  ya aceptaba (`?almacen_id=`) y la pantalla nunca ofrecía.
 - ✅ 2026-08-30 **Pantalla de stock y kardex**: `GET /inventory/stock` existía
   desde el primer slice y no lo consumía nadie; `MovimientoRepo.q_list`
   existía sin un solo llamador y no había `GET /inventory/movimientos`. Ahora
@@ -357,14 +356,20 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   devolución solo se podía llamando al endpoint a mano. Formulario, anular,
   ficha de detalle y `audit_log` en registrar/anular. Suma
   `GET /inventory/skus`, que no existía.
-- ⬜ **La devolución se registra de a una línea** (2026-08-13): la API acepta
-  varias desde el primer día y el formulario manda una sola. Es el caso real
-  —vuelve un producto, se decide qué hacer con él— así que ampliarlo es solo
-  pantalla, cuando alguien lo pida.
-- ⬜ **La ficha de devolución muestra el UUID de quien la registró**, no su
-  nombre (2026-08-13). `inventory` no puede leer `usuario`; hace falta un
-  contrato público de `users` tipo `nombres_de_usuarios`, igual que el que
-  `sales` usa para los nombres de artículo en el KDS.
+- ✅ 2026-09-06 **La devolución se registra con varias líneas** (bloque
+  `feat/inventario-mermas-y-devoluciones`). El formulario pasa a filas
+  paralelas (`sku_id[]`/`cantidad[]`), mismo patrón que el traslado directo
+  — la API los aceptaba desde el primer día. `lote_id` sigue sin selector
+  propio (no lo pedía tampoco el formulario de una línea): una devolución a
+  proveedor de un artículo con lote sigue exigiendo la API a mano.
+- ✅ 2026-09-06 **La ficha de devolución muestra nombres, no UUID** (bloque
+  `feat/inventario-mermas-y-devoluciones`). Nuevo
+  `users.application.queries_publicas::nombres_de_usuarios` —mismo patrón
+  que `inventory.nombres_de_articulos`, que `sales` usa en el KDS—, batch,
+  `usuario_id → nombre_display or username`. `GET /devoluciones/{id}`
+  resuelve `registrado_por`/`anulado_por` y los suma a
+  `DevolucionDetalleOut` como `_nombre`; no se tocó el listado, que no los
+  necesita y evitaría una resolución N+1 por fila.
 - ⬜ **La nota de crédito sigue sin pantalla** (`sales/application/notas_credito.py`):
   es la devolución de una **venta**, no de mercadería, y por eso no entró
   con esto. Sin ella, deshacer algo ya cobrado no tiene camino por UI.

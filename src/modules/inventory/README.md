@@ -793,7 +793,7 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
   como "gratis" en lugar de "desconocido".
 
 
-## Merma y devolución (2026-08-06, ADR-028)
+## Merma y devolución (2026-08-06, ADR-028; pantalla al día 2026-09-06)
 
 | Método | Ruta | Permiso |
 |--------|------|---------|
@@ -804,11 +804,21 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
 | GET | `/devoluciones?almacen_id&origen` | `leer` |
 | GET | `/devoluciones/{id}` | `leer` |
 | POST | `/devoluciones/{id}/anular` | `registrar_movimiento` |
-| POST | `/devoluciones/{id}/guia-remision` | `emitir_guia` |
+| GET/POST | `/devoluciones/{id}/guia-remision` | `leer` / `emitir_guia` |
 
 Sin permisos nuevos: la merma reusa los del ajuste porque la segregación es
 la misma —quien declara que algo no sirve no firma su baja— y un permiso
-nuevo para la misma idea sería una segunda matriz que mantener.
+nuevo para la misma idea sería una segunda matriz que mantener. Esa misma
+regla es la razón por la que `MermaOut` expone `creado_por`/`liberado_por`:
+la pantalla necesita el dato para esconderle el botón a quien registró en
+vez de dejar que se coma el 409 al apretarlo.
+
+`GET /devoluciones/{id}` resuelve `registrado_por`/`anulado_por` contra el
+contrato público de `users` (`nombres_de_usuarios`, mismo patrón que
+`nombres_de_articulos` en el KDS) y los suma como
+`registrado_por_nombre`/`anulado_por_nombre` — la ficha no muestra UUID. El
+formulario de alta acepta varias líneas (`sku_id[]`/`cantidad[]`), aunque
+la API las aceptaba desde el primer día.
 
 **La recepción de transferencia admite parcial** desde el mismo día:
 `{"parcial": true}` ingresa lo declarado y deja el resto **en tránsito**.
@@ -818,7 +828,7 @@ viene en camino. El evento `inventory.transferencia_recibida` sale **una
 sola vez**, al cerrar — si no, `accounting` asentaría el faltante de cada
 entrega por separado.
 
-Tests: `tests/test_merma_devolucion.py` (12 casos).
+Tests: `tests/test_merma_devolucion.py` (15 casos).
 
 ## Offline: el ciclo de abastecimiento en el hub (2026-08-07, ADR-009 fase 3)
 

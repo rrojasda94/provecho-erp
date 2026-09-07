@@ -51,6 +51,7 @@ from src.modules.users.api.deps import (
     require_permission,
     tiene_permiso,
 )
+from src.modules.users.application.queries_publicas import nombres_de_usuarios
 from src.modules.users.infrastructure.models import Usuario
 from src.shared import planilla
 from src.shared.integrations.factiliza import FactilizaError
@@ -1748,9 +1749,13 @@ def ver_devolucion(
 ):
     exigir_devolucion(session, devolucion_id, tenant)
     devolucion, items = devoluciones_uc.detalle(session, devolucion_id)
+    ids = [i for i in (devolucion.registrado_por, devolucion.anulado_por) if i]
+    nombres = nombres_de_usuarios(session, ids)
     return schemas.DevolucionDetalleOut(
         **schemas.DevolucionOut.model_validate(devolucion).model_dump(),
         items=[schemas.DevolucionItemOut.model_validate(i) for i in items],
+        registrado_por_nombre=nombres.get(devolucion.registrado_por),
+        anulado_por_nombre=nombres.get(devolucion.anulado_por),
     )
 
 

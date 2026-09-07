@@ -22,15 +22,27 @@ function texto(formData: FormData, campo: string): string {
   return String(formData.get(campo) ?? "").trim();
 }
 
+type ItemDevolucionForm = { sku_id: string; cantidad: string };
+
+/** Filas paralelas (`sku_id[]`, `cantidad[]`), mismo patrón que el traslado
+ * directo: una línea con SKU vacío o cantidad ≤ 0 se descarta en vez de
+ * rechazar el envío entero — es la fila que alguien agregó y no llegó a
+ * llenar. */
+function items(formData: FormData): ItemDevolucionForm[] {
+  const skus = formData.getAll("sku_id").map(String);
+  const cantidades = formData.getAll("cantidad").map(String);
+  return skus
+    .map((sku_id, i) => ({ sku_id, cantidad: cantidades[i] ?? "" }))
+    .filter((it) => it.sku_id && Number(it.cantidad) > 0);
+}
+
 /** Qué falta antes de mandar. El servidor valida igual; acá se evita el
  * viaje y un 409 que el usuario lee como "algo salió mal" en vez de "te
  * falta elegir". */
 function faltante(formData: FormData): string {
-  const cantidad = texto(formData, "cantidad");
   if (!texto(formData, "almacen_id")) return "Elige el almacén.";
-  if (!texto(formData, "sku_id")) return "Elige qué se devuelve.";
-  if (!cantidad || Number(cantidad) <= 0) {
-    return "La cantidad debe ser mayor que cero.";
+  if (items(formData).length === 0) {
+    return "Agrega al menos un artículo con cantidad.";
   }
   if (texto(formData, "origen") === "cliente" && !texto(formData, "destino")) {
     return "Una devolución de cliente necesita destino: qué se hace con lo que volvió.";
@@ -41,10 +53,9 @@ function faltante(formData: FormData): string {
 /**
  * Registra una devolución (RN-INV-019/020).
  *
- * Una sola línea por ahora: es el caso real —vuelve un producto, se decide
- * qué hacer con él— y un formulario multilínea sin necesidad probada sería
- * complejidad por adelantado. La API acepta varias desde el primer día, así
- * que ampliarlo es solo pantalla.
+ * Vuelven varios artículos juntos —lo típico cuando se rechaza un pedido
+ * completo— y la API los acepta desde el primer día; el formulario mandaba
+ * uno solo.
  */
 export async function registrarDevolucionAction(
   _previo: EstadoFormulario,
@@ -65,13 +76,7 @@ export async function registrarDevolucionAction(
         // Una devolución a proveedor NO lleva destino: la mercadería se va.
         destino: origen === "cliente" ? texto(formData, "destino") : null,
         observacion: texto(formData, "observacion") || null,
-        items: [
-          {
-            sku_id: texto(formData, "sku_id"),
-            cantidad: texto(formData, "cantidad"),
-            lote_id: texto(formData, "lote_id") || null,
-          },
-        ],
+        items: items(formData),
       },
     });
   } catch (e) {

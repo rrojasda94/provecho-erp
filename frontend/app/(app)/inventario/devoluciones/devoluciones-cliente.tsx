@@ -183,6 +183,10 @@ export function DevolucionesCliente({
   );
 }
 
+type LineaDevolucion = { clave: number; sku: string; cantidad: string };
+
+const LINEAS_INICIALES: LineaDevolucion[] = [{ clave: 1, sku: "", cantidad: "1" }];
+
 function FormularioDevolucion({
   almacenes,
   skus,
@@ -191,6 +195,10 @@ function FormularioDevolucion({
   skus: OpcionSku[];
 }) {
   const [origen, setOrigen] = useState("proveedor");
+  const [lineas, setLineas] = useState<LineaDevolucion[]>(LINEAS_INICIALES);
+
+  const editar = (clave: number, campo: keyof LineaDevolucion, valor: string) =>
+    setLineas((prev) => prev.map((l) => (l.clave === clave ? { ...l, [campo]: valor } : l)));
 
   return (
     <DialogoFormulario
@@ -200,6 +208,7 @@ function FormularioDevolucion({
       etiquetaEnvio="Registrar"
       ayuda="A proveedor la mercadería sale del almacén; de cliente entra, y el destino decide si vuelve al estante o se aparta."
       envioDeshabilitado={almacenes.length === 0 || skus.length === 0}
+      alAbrir={() => setLineas(LINEAS_INICIALES)}
     >
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Origen
@@ -220,21 +229,57 @@ function FormularioDevolucion({
         />
       </label>
 
-      <label className="flex flex-col gap-1 text-sm font-semibold">
-        Qué se devuelve
-        <Combobox
-          name="sku_id"
-          etiqueta="Qué se devuelve"
-          requerido
-          marcador="Elegir…"
-          opciones={skus.map((s) => ({ valor: s.id, etiqueta: s.etiqueta }))}
-        />
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm font-semibold">
-        Cantidad
-        <input name="cantidad" inputMode="decimal" defaultValue="1" />
-      </label>
+      <div className="flex flex-col gap-2">
+        {lineas.map((linea) => (
+          <div key={linea.clave} className="flex items-end gap-2">
+            <label className="flex flex-1 flex-col gap-1 text-xs font-semibold">
+              Qué se devuelve
+              <Combobox
+                name="sku_id"
+                etiqueta="Qué se devuelve"
+                requerido
+                marcador="Elegir…"
+                value={linea.sku}
+                alCambiar={(v) => editar(linea.clave, "sku", v ?? "")}
+                opciones={skus.map((s) => ({ valor: s.id, etiqueta: s.etiqueta }))}
+              />
+            </label>
+            <label className="flex w-28 flex-col gap-1 text-xs font-semibold">
+              Cantidad
+              <input
+                name="cantidad"
+                type="number"
+                min="0.0001"
+                step="0.0001"
+                required
+                value={linea.cantidad}
+                onChange={(e) => editar(linea.clave, "cantidad", e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              aria-label="Quitar línea"
+              disabled={lineas.length <= 1}
+              onClick={() => setLineas((prev) => prev.filter((l) => l.clave !== linea.clave))}
+              className="pb-1.5 text-muted-foreground hover:text-status-danger disabled:opacity-30"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() =>
+            setLineas((prev) => [
+              ...prev,
+              { clave: Math.max(...prev.map((l) => l.clave)) + 1, sku: "", cantidad: "1" },
+            ])
+          }
+          className="self-start text-sm font-semibold text-primary hover:underline"
+        >
+          + Agregar artículo
+        </button>
+      </div>
 
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Motivo

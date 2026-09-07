@@ -8490,6 +8490,17 @@
             ],
             "title": "Anulado Por"
           },
+          "anulado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Anulado Por Nombre"
+          },
           "destino": {
             "anyOf": [
               {
@@ -8559,6 +8570,17 @@
               }
             ],
             "title": "Registrado Por"
+          },
+          "registrado_por_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registrado Por Nombre"
           },
           "reporte_dirigido_a": {
             "title": "Reporte Dirigido A",
@@ -13780,6 +13802,11 @@
             "title": "Cantidad",
             "type": "string"
           },
+          "creado_por": {
+            "format": "uuid",
+            "title": "Creado Por",
+            "type": "string"
+          },
           "estado": {
             "title": "Estado",
             "type": "string"
@@ -13788,6 +13815,18 @@
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "liberado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Liberado Por"
           },
           "lote_id": {
             "anyOf": [
@@ -13838,7 +13877,9 @@
           "cantidad",
           "motivo",
           "estado",
-          "referencia_id"
+          "referencia_id",
+          "creado_por",
+          "liberado_por"
         ],
         "title": "MermaOut",
         "type": "object"

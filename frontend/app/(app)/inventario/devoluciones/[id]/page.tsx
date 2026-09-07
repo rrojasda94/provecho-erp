@@ -30,6 +30,8 @@ type DevolucionDetalle = {
   observacion: string | null;
   registrado_por: string | null;
   anulado_por: string | null;
+  registrado_por_nombre: string | null;
+  anulado_por_nombre: string | null;
   anulada_at: string | null;
   items: ItemDevolucion[];
 };
@@ -88,12 +90,15 @@ export default async function DevolucionPage({
         <Dato etiqueta="Motivo" valor={devolucion.motivo} />
         <Dato etiqueta="Destino" valor={devolucion.destino ?? "—"} />
         <Dato etiqueta="Reporte dirigido a" valor={devolucion.reporte_dirigido_a} />
-        <Dato etiqueta="Registrada por" valor={devolucion.registrado_por ?? "—"} />
+        <Dato
+          etiqueta="Registrada por"
+          valor={devolucion.registrado_por_nombre ?? "—"}
+        />
         <Dato
           etiqueta="Anulada"
           valor={
             devolucion.anulada_at
-              ? fechaHora(devolucion.anulada_at)
+              ? `${fechaHora(devolucion.anulada_at)} · ${devolucion.anulado_por_nombre ?? "—"}`
               : "—"
           }
         />
