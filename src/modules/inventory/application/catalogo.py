@@ -189,6 +189,7 @@ def crear_unidad_medida(
     nombre: str,
     ratio: Decimal,
     decimales: int,
+    codigo_sunat: str | None = None,
 ) -> UnidadMedida:
     _existe(session, CategoriaUdm, categoria_udm_id, "categoría de unidad de medida")
     repo = UnidadMedidaRepo(session)
@@ -200,6 +201,7 @@ def crear_unidad_medida(
             nombre=nombre,
             ratio=ratio,
             decimales=decimales,
+            codigo_sunat=codigo_sunat,
         )
     )
 
@@ -208,7 +210,7 @@ def editar_unidad_medida(session: Session, unidad_medida_id: uuid.UUID, **campos
     unidad = UnidadMedidaRepo(session).get(unidad_medida_id)
     if unidad is None:
         raise NoEncontrado("unidad de medida no encontrada")
-    for campo in ("nombre", "ratio", "decimales"):
+    for campo in ("nombre", "ratio", "decimales", "codigo_sunat"):
         if campo in campos and campos[campo] is not None:
             setattr(unidad, campo, campos[campo])
     return unidad
@@ -373,3 +375,23 @@ def crear_sku(
     return repo.add(
         Sku(articulo_id=articulo_id, codigo=codigo, codigo_barras=codigo_barras)
     )
+
+
+def editar_sku(session: Session, sku_id: uuid.UUID, **campos) -> Sku:
+    """Campo `None` = no tocar. Mismas reglas de unicidad que `crear_sku`:
+    un código de barras mal tecleado dejaba de tener corrección posible sin
+    llamar a la API a mano — el importador lo informaba como omitido en vez
+    de actualizarlo (ver ROADMAP → Deuda técnica)."""
+    repo = SkuRepo(session)
+    sku = repo.get(sku_id)
+    if sku is None:
+        raise NoEncontrado("SKU no encontrado")
+    if campos.get("codigo") is not None:
+        otro = repo.get_by_codigo(campos["codigo"])
+        if otro is not None and otro.id != sku_id:
+            raise Conflicto(f"código de SKU '{campos['codigo']}' ya existe")
+        sku.codigo = campos["codigo"]
+    for campo in ("codigo_barras", "activo"):
+        if campo in campos and campos[campo] is not None:
+            setattr(sku, campo, campos[campo])
+    return sku

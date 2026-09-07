@@ -209,7 +209,7 @@ valida la API:
   equivocarse era definitivo —los repos filtran `deleted_at`, así que el
   almacén desaparecía de toda la interfaz—.
 - En los `PATCH` de organización, un campo **ausente** significa "no tocar"
-  (`exclude_unset`, ADR-090). Un campo en `null` **explícito** lo vacía si
+  (`exclude_unset`, ADR-096). Un campo en `null` **explícito** lo vacía si
   está en la lista de borrables de esa entidad: `contacto`/`config_fiscal`/
   `ubicacion_*` de empresa, `skins` de marca, `horario_atencion`/
   `radio_marcaje_m`/`ubicacion_*` de sucursal, `direccion`/`sucursal_id`/

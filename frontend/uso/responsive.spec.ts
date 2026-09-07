@@ -48,6 +48,7 @@ const RUTAS = [
   "/inventario/mermas",
   "/inventario/reservas",
   "/inventario/transferencias",
+  "/inventario/guias-remision",
   "/catalogo",
   "/catalogo/productos",
   "/catalogo/recetas",

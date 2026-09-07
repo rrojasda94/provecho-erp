@@ -166,15 +166,22 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   (seeder, replay del hub, escritura directa del repo) fechaba en día UTC.
   El guard ahora barre las tres formas —`date.today` con y sin paréntesis,
   `datetime.now()` y `datetime.utcnow`— y nombra cuál usar en su lugar.
-- ⬜ **Dos sitios hardcodean `"America/Lima"`** en vez de leer
-  `settings.zona_horaria` (2026-08-30): `rrhh/application/pad_asistencia.py`
-  (y de ahí `avisos_asistencia.py`) y `core/celery_app.py`, que fija la zona
-  de todos los `crontab()`. Hoy dan lo mismo; el día que el grupo abra en
-  otro país son dos relojes que no se enteran.
-- ⬜ **`purchases/comprobantes.py` trunca sobre UTC crudo** (2026-08-30):
-  `func.date(Comprobante.created_at)` compara contra fechas que el usuario
-  piensa en hora Perú, que es exactamente el borde de cinco horas que
-  `fechas.inicio_dia_utc`/`fin_dia_utc` existen para no correr.
+- ✅ 2026-09-06 **Los dos sitios que hardcodeaban `"America/Lima"` pasan a
+  leer `settings.zona_horaria`** (bloque
+  `fix/transversal-relojes-documento-y-cache`):
+  `rrhh/application/pad_asistencia.py` (`LIMA = fechas.zona()`, de donde lo
+  hereda `avisos_asistencia.py`) y `core/celery_app.py`
+  (`timezone=settings.zona_horaria`, la zona de todos los `crontab()`). El
+  guard de `tests/test_fechas_negocio.py` gana un cuarto patrón prohibido —
+  `ZoneInfo("America/` — para que no vuelva a colarse.
+- ✅ 2026-09-06 **`purchases/comprobantes.py` deja de truncar sobre UTC
+  crudo** (bloque `fix/transversal-relojes-documento-y-cache`).
+  `func.date(Comprobante.created_at)` comparaba contra fechas que el
+  usuario piensa en hora Perú — exactamente el borde de cinco horas que
+  `fechas.inicio_dia_utc`/`fin_dia_utc` existen para no correr. El filtro
+  se parte en dos ramas (`fecha_emision` cuando existe,
+  `inicio_dia_utc`/`fin_dia_utc` contra `created_at` cuando no) en vez de
+  meter las dos cosas en un solo `coalesce`.
 - ✅ 2026-08-02 `users`: aplicar **restricciones JSONB** por permiso
   (ADR-022). `rules.ContextoPermiso`/`cumple_restricciones` (monto/estado/
   horario) + `UsuarioRepo.restricciones` + `check_permission(...,
@@ -285,17 +292,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   Mitigado en paralelo: `next dev --turbopack` (2026-08-05) saca la
   recompilación por ruta, que era el otro sumando.
 
-- ⬜ **La consulta de documento se paga dos veces por cada alta** (declarado
-  2026-08-26): no hay caché de ningún tipo sobre `consultar_dni` /
-  `consultar_ruc`. El botón «Buscar» del formulario consulta una vez, y al
-  guardar `nombres_desde_dni` / `razon_social_desde_ruc` vuelven a consultar
-  el mismo documento desde el servidor para no confiar en lo que llegó del
-  cliente. Son dos llamadas a un proveedor pago por cada persona que se da de
-  alta, y con el proveedor caído son dos timeouts seguidos. Un `lru_cache` con
-  TTL corto —o Redis, que ya está— resuelve ambos; la razón por la que no se
-  hizo ahora es que la doble validación es deliberada (ADR-041) y quitar la
-  segunda llamada sin caché sería confiar en el cliente. Contraste: la tarifa
-  de delivery sí cachea su geometría (`_distancia_cacheada`).
+- ✅ 2026-09-06 **La consulta de documento se cachea, con TTL** (bloque
+  `fix/transversal-relojes-documento-y-cache`, ADR-095, declarado
+  2026-08-26). Nuevo
+  `shared/integrations/factiliza/cache.py`: `consultar_dni`/`consultar_ruc`
+  cachean la respuesta **de negocio** (`ConsultaPersona`/`ConsultaEmpresa`
+  ya interpretadas), 5 minutos — alcanza para las dos consultas del alta
+  (botón «Buscar» + revalidación al guardar, ADR-041, que sigue intacta) sin
+  volver a pagarle al proveedor la segunda. **Con TTL y no como
+  `_distancia_cacheada`** (`lru_cache` sin vencer): la distancia entre dos
+  puntos fijos no cambia nunca, un documento sí. Un `FactilizaError` nunca
+  se cachea. Redis, con el mismo fail-open de `core/rate_limit.py` — un
+  Redis caído pierde la caché, no bloquea el alta.
 
 - ⬜ **112 columnas `Enum(native_enum=False)` sin CHECK** (113 en total, una arreglada) (encontrado 2026-08-30
   arreglando `persona.tipo_documento`). `create_constraint` vale `False` por
@@ -313,21 +321,23 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   **sí** hace cumplir los CHECK, así que ponerlos también cierra el hueco de
   que la suite pase en verde sobre algo que Postgres rechaza.
 
-- ⬜ **El 8/11 del documento está escrito a mano en cuatro sitios más**
-  (2026-08-30). El vocabulario y los largos por tipo ya viven en
-  `src/shared/documento.py` y `frontend/lib/documento.ts`, pero siguen
-  reescritos como literales en `src/core/consulta_router.py:120,144`,
-  `frontend/app/(app)/ventas/clientes/actions.ts:78` y las tres regex
-  `/^\d{8}$/` de `frontend/app/(publico)/reconocerte/`. Y
-  `frontend/app/pdv/dialogos.tsx:1554` declara un `documentoValido` local que
-  **sombrea** el importado en `:9` y se saltea el chequeo de dígitos. No se
-  tocaron acá porque el PDV está en manos de otra rama y el conflicto costaría
-  más que la deuda. Ojo con `consulta_router`: ahí el 8/11 puede ser el
-  contrato del proveedor (RENIEC/SUNAT) y no la regla del ERP — mirarlo antes
-  de "arreglarlo".
+- ✅ 2026-09-06 **El 8/11 del documento ya no está escrito a mano** (bloque
+  `fix/transversal-relojes-documento-y-cache`, declarado 2026-08-30). Los
+  sitios anotados —`ventas/clientes/actions.ts`, las tres regex `/^\d{8}$/`
+  de `reconocerte/`— pasan a `tipoPorLargo`/`documentoValido` de
+  `frontend/lib/documento.ts`. `pdv/dialogos.tsx:1554` ya no declara un
+  `documentoValido` local que sombreaba el importado —se renombró a
+  `docCompleto`—, y de paso aparecieron tres sitios más con el mismo patrón
+  que la exploración original no había listado:
+  `compras/proveedores/actions.ts`, una segunda validación en
+  `ventas/clientes/actions.ts` y el texto de notificación de
+  `pdv/pdv-cliente.tsx`. Los nueve, al mismo helper.
+  **`src/core/consulta_router.py:120,144` queda igual, a propósito**: ahí el
+  8/11 es el contrato del proveedor (RENIEC/SUNAT), no la regla del ERP —
+  la nota que ya estaba acá seguía valiendo y no había que "arreglarlo".
 
 - ✅ 2026-09-06 **El PATCH de organización no tenía forma de vaciar un
-  opcional** (ADR-090): la convención "campo ausente o `null` = no tocar"
+  opcional** (ADR-096): la convención "campo ausente o `null` = no tocar"
   (`users/api/schemas.py`) no dejaba camino para vaciar `null` a propósito —
   no se podía quitar el almacén abastecedor de un almacén, ni su respaldo, ni
   desactivar el `radio_marcaje_m` de una sucursal una vez puesto, aunque el

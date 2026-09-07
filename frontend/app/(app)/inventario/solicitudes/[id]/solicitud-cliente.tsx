@@ -195,12 +195,11 @@ function Acciones({
   if (solicitud.estado === "pendiente" && puedeAprobar) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <Boton
-          onClick={() => correr(() => aprobarSolicitudAction(solicitud.id))}
-          deshabilitado={pendiente}
-        >
-          Aprobar
-        </Boton>
+        <DialogoAprobar
+          solicitud={solicitud}
+          nombreDeSku={nombreDeSku}
+          pendiente={pendiente}
+        />
         <BotonSecundario
           onClick={() => correr(() => rechazarSolicitudAction(solicitud.id))}
           deshabilitado={pendiente}
@@ -224,6 +223,76 @@ function Acciones({
   }
 
   return null;
+}
+
+/**
+ * Aprobar, con lo que corresponde de verdad — no siempre es lo pedido.
+ *
+ * Arranca con la cantidad solicitada en cada línea porque es el caso
+ * normal —lo que no se toca se aprueba tal cual (RN por defecto del
+ * servidor)—; bajarla a 0 la deja fuera y no reserva nada. No se puede
+ * aprobar más de lo pedido: el servidor lo rechaza igual, pero acá se
+ * evita el viaje.
+ */
+function DialogoAprobar({
+  solicitud,
+  nombreDeSku,
+  pendiente,
+}: {
+  solicitud: SolicitudDetalle;
+  nombreDeSku: Record<string, string>;
+  pendiente: boolean;
+}) {
+  const [cantidades, setCantidades] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      solicitud.items.map((i) => [i.sku_id, i.cantidad_solicitada]),
+    ),
+  );
+
+  const aprobadas = solicitud.items.map((i) => ({
+    sku_id: i.sku_id,
+    cantidad: cantidades[i.sku_id] ?? "0",
+  }));
+  const excedeLoPedido = solicitud.items.some(
+    (i) => Number(cantidades[i.sku_id] ?? "0") > Number(i.cantidad_solicitada),
+  );
+
+  return (
+    <DialogoFormulario
+      titulo="Aprobar el requerimiento"
+      disparador="Aprobar"
+      accion={async () => aprobarSolicitudAction(solicitud.id, aprobadas)}
+      etiquetaEnvio="Aprobar"
+      ayuda="Arranca con lo pedido. Baja la cantidad si no corresponde todo — en 0 la línea queda fuera y no reserva nada."
+      envioDeshabilitado={pendiente || excedeLoPedido}
+    >
+      {solicitud.items.map((item) => (
+        <label
+          key={item.sku_id}
+          className="flex items-center justify-between gap-3 text-sm font-semibold"
+        >
+          <span className="min-w-0 flex-1 truncate">
+            {nombreDeSku[item.sku_id] ?? item.sku_id}
+            <span className="block text-xs font-normal text-gray">
+              pedido: {item.cantidad_solicitada}
+            </span>
+          </span>
+          <input
+            aria-label={`Aprobado de ${nombreDeSku[item.sku_id] ?? item.sku_id}`}
+            inputMode="decimal"
+            className="w-24 shrink-0"
+            value={cantidades[item.sku_id] ?? ""}
+            onChange={(e) =>
+              setCantidades((previas) => ({
+                ...previas,
+                [item.sku_id]: e.target.value,
+              }))
+            }
+          />
+        </label>
+      ))}
+    </DialogoFormulario>
+  );
 }
 
 /**

@@ -136,7 +136,7 @@ def _udm(session: Session, nombre: str, ratio: str) -> UnidadMedida:
 
 
 def _id_interno_libre(session: Session) -> str:
-    """`articulo.id_interno` es VARCHAR(4): un hash no entra.
+    """`articulo.id_interno` es VARCHAR(8): un hash no entra.
 
     SQLite no valida el largo y Postgres sí, así que un código de más
     caracteres pasa en las pruebas y revienta recién al sembrar de verdad.

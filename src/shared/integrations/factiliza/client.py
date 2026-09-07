@@ -4,12 +4,13 @@
 recibe el resultado ya traducido a `RespuestaEmision`.
 """
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date, datetime
 
 import httpx
 
 from src.config.settings import settings
+from src.shared.integrations.factiliza import cache
 
 
 class FactilizaError(RuntimeError):
@@ -127,6 +128,13 @@ def _interpretar_dni(numero: str, cuerpo: dict) -> ConsultaPersona:
         crudo=cuerpo,
         fecha_nacimiento=_fecha(datos.get("fecha_nacimiento")),
     )
+
+
+def _persona_desde_cache(datos: dict) -> ConsultaPersona:
+    """`ConsultaPersona` guarda `fecha_nacimiento` como `date`; en JSON viaja
+    como texto ISO (`json.dumps(..., default=str)`) y hay que volver a
+    parsearla — `_fecha` ya sabe leer ese formato."""
+    return ConsultaPersona(**{**datos, "fecha_nacimiento": _fecha(datos.get("fecha_nacimiento"))})
 
 
 def _interpretar_ruc(numero: str, cuerpo: dict) -> ConsultaEmpresa:
@@ -277,23 +285,55 @@ class FactilizaClient:
         return cuerpo
 
     def consultar_dni(self, dni: str) -> ConsultaPersona:
-        """GET /dni/info/{dni} — RENIEC vía Factiliza."""
+        """GET /dni/info/{dni} — RENIEC vía Factiliza.
+
+        Cacheada con TTL (`cache.py`): el alta consulta el mismo documento
+        dos veces —el botón «Buscar» y la revalidación al guardar
+        (ADR-041)— y no hace falta pagarle al proveedor las dos.
+        """
+        cacheado = cache.obtener("dni", dni)
+        if cacheado is not None:
+            return _persona_desde_cache(cacheado)
         cuerpo = self._consultar("dni", dni)
-        if cuerpo is None:
-            return ConsultaPersona(False, dni, "", "", {})
-        return _interpretar_dni(dni, cuerpo)
+        resultado = (
+            ConsultaPersona(False, dni, "", "", {})
+            if cuerpo is None
+            else _interpretar_dni(dni, cuerpo)
+        )
+        cache.guardar("dni", dni, asdict(resultado))
+        return resultado
 
     def consultar_ruc(self, ruc: str) -> ConsultaEmpresa:
-        """GET /ruc/info/{ruc} — SUNAT vía Factiliza."""
+        """GET /ruc/info/{ruc} — SUNAT vía Factiliza. Cacheada, mismo
+        criterio que `consultar_dni`."""
+        cacheado = cache.obtener("ruc", ruc)
+        if cacheado is not None:
+            return ConsultaEmpresa(**cacheado)
         cuerpo = self._consultar("ruc", ruc)
-        if cuerpo is None:
-            return ConsultaEmpresa(False, ruc, "", "", "", {})
-        return _interpretar_ruc(ruc, cuerpo)
+        resultado = (
+            ConsultaEmpresa(False, ruc, "", "", "", {})
+            if cuerpo is None
+            else _interpretar_ruc(ruc, cuerpo)
+        )
+        cache.guardar("ruc", ruc, asdict(resultado))
+        return resultado
 
     def descargar(
-        self, formato: str, tipo_doc: str, serie: str, correlativo: int
+        self,
+        formato: str,
+        tipo_doc: str,
+        serie: str,
+        correlativo: int,
+        *,
+        recurso: str = "invoice",
     ) -> DocumentoDescargado:
-        """`GET /invoice/{pdf|xml|cdr}/{tipo}/{serie}/{correlativo}`.
+        """`GET /{recurso}/{pdf|xml|cdr}/{tipo}/{serie}/{correlativo}`.
+
+        `recurso` es `invoice` (comprobantes: boleta, factura, nota de
+        crédito) o `despatch` (guía de remisión) — mismo verbo y misma forma
+        de respuesta en Factiliza, solo cambia el prefijo del path. El
+        default es `invoice` porque es el único llamador hasta que la guía
+        sumó el suyo.
 
         El PDF es lo que se le entrega al cliente; el **XML firmado** y el
         **CDR** son el respaldo ante SUNAT y hay que poder recuperarlos años
@@ -308,7 +348,7 @@ class FactilizaClient:
             raise ValueError(f"formato no descargable: {formato}")
         if not self.token:
             raise FactilizaError("FACTILIZA_TOKEN no configurado")
-        url = f"{self.base_url}/invoice/{formato}/{tipo_doc}/{serie}/{correlativo}"
+        url = f"{self.base_url}/{recurso}/{formato}/{tipo_doc}/{serie}/{correlativo}"
         try:
             respuesta = httpx.get(
                 url,

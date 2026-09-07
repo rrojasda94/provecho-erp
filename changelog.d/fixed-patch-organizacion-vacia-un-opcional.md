@@ -1,6 +1,6 @@
 - El PATCH de las cinco entidades de organización (Grupo, Empresa, Marca,
   Sucursal, Almacén) ahora distingue "campo ausente" de "`null` explícito"
-  (ADR-090), como ya hacía `editar_usuario` (ADR-070). Antes, un opcional
+  (ADR-096), como ya hacía `editar_usuario` (ADR-070). Antes, un opcional
   puesto en `null` no se vaciaba — así que no se podía quitar el almacén
   abastecedor de un almacén, ni su respaldo, ni desactivar el
   `radio_marcaje_m` de una sucursal, aunque el selector del frontend ya

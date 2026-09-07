@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
 from src.modules.inventory.application import margenes
+from src.modules.inventory.application import solicitudes as solicitudes_uc
 from src.modules.inventory.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -202,6 +203,9 @@ def cerrar_conteo(
     Los ítems que nadie contó se ignoran: un conteo parcial no puede
     declarar faltante lo que no se miró. Cada ajuste nace `pendiente` — el
     que contó no lo aprueba (RN-INV-006).
+
+    Arma o pone al día el borrador del requerimiento del almacén contado
+    (RN-INV-026): el conteo es cuando alguien tiene el estante a la vista.
     """
     repo = ConteoRepo(session)
     conteo = repo.get(conteo_id)
@@ -245,6 +249,22 @@ def cerrar_conteo(
     conteo.estado = "cerrado"
     conteo.cerrado_por = cerrado_por
     conteo.cerrado_at = datetime.datetime.now(datetime.UTC)
+
+    # RN-INV-026: todo cierre arma o pone al día el borrador del almacén —
+    # el conteo es exactamente cuando alguien está mirando el estante y sabe
+    # qué falta. `borrador_del_almacen` es aditivo (`refrescar_sugerencias`
+    # no pisa lo ya tecleado), así que dispararlo en cada cierre es seguro:
+    # no genera una lista que nadie pidió, la actualiza si ya existía.
+    try:
+        solicitudes_uc.borrador_del_almacen(
+            session, almacen_id=conteo.almacen_id, usuario_id=cerrado_por
+        )
+    except (ReglaNegocio, NoEncontrado):
+        # El almacén central no tiene abastecedor propio (es el principio de
+        # la cadena) y el conteo tiene que poder cerrarse igual: armar el
+        # borrador es una consecuencia del cierre, no una condición.
+        pass
+
     return conteo, generados
 
 

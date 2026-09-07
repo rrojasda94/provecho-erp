@@ -8,6 +8,7 @@ import type { EstadoFormulario } from "@/components/formulario/dialogo-formulari
 import { apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
 import { estadoDeError } from "@/lib/errores";
+import { tipoPorLargo } from "@/lib/documento";
 import { ubicacionDe } from "@/lib/ubicacion-form";
 
 export type EstadoOrganizacion = EstadoFormulario;
@@ -73,7 +74,7 @@ export async function guardarEmpresaAction(
   if (!razonSocial || !domicilio) {
     return { error: "Razón social y domicilio fiscal son obligatorios.", ok: false };
   }
-  if (!/^\d{11}$/.test(ruc)) return { error: "El RUC son 11 dígitos.", ok: false };
+  if (tipoPorLargo(ruc) !== "ruc") return { error: "El RUC son 11 dígitos.", ok: false };
 
   const grupoId = texto(formData, "grupo_id");
   const igvPorDefecto = texto(formData, "igv_por_defecto");

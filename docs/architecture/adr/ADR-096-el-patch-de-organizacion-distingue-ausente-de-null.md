@@ -1,4 +1,4 @@
-# ADR-090: El PATCH de organización distingue "ausente" de "`null` explícito"
+# ADR-096: El PATCH de organización distingue "ausente" de "`null` explícito"
 
 ## Estado
 
@@ -91,8 +91,7 @@ Las cinco entidades de organización adoptan el mismo mecanismo:
 
 ## Nota de coordinación
 
-Esta rama (`fix/transversal-patch-vaciar-un-opcional`) corre en paralelo con
-`fix/transversal-relojes-documento-y-cache`, que también reclama ADR-090
-sobre el mismo `main` (última ADR en `main` es 089). Quien mergee segundo
-debe renumerar su ADR al siguiente hueco libre y actualizar
-`docs/00_PROJECT.md`.
+Esta rama (`fix/transversal-patch-vaciar-un-opcional`) se escribió en
+paralelo con `fix/transversal-relojes-documento-y-cache` (mergeada como
+ADR-095) y el bloque de `inventory` (ADR-090 a 094), sobre el mismo `main`
+que entonces terminaba en 089. Renumerada a 096 al mergear.
