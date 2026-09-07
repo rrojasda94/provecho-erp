@@ -11,7 +11,7 @@ descontado del origen y aún no ingresado al destino (RN-INV-003).
 import datetime
 import uuid
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -27,6 +27,13 @@ ESTADO_TRANSFERENCIA = Enum(
 
 class Transferencia(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "transferencia"
+
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('en_transito', 'recibida')",
+            name="estado_transferencia",
+        ),
+    )
 
     origen_almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))
     destino_almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))

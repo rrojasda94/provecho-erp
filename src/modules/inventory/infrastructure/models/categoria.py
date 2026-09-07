@@ -10,7 +10,7 @@ abarrote se cuenta al mes y el perecible a diario.
 
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -26,7 +26,15 @@ FRECUENCIA_CONTEO = Enum(
 
 class Categoria(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "categoria"
-    __table_args__ = (UniqueConstraint("empresa_id", "nombre"),)
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "nombre"),
+        CheckConstraint(
+            "frecuencia_conteo IN ({})".format(
+                ", ".join(f"'{v}'" for v in FRECUENCIAS_CONTEO)
+            ),
+            name="frecuencia_conteo",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     nombre: Mapped[str] = mapped_column(String(100))

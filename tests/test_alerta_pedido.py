@@ -11,7 +11,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
@@ -38,8 +38,8 @@ AHORA = datetime.datetime(2026, 8, 4, 15, 0, tzinfo=datetime.UTC)
 
 
 @pytest.fixture()
-def env():
-    engine = create_engine("sqlite://")
+def env(_engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         grupo = Grupo(nombre="Grupo Majambo")

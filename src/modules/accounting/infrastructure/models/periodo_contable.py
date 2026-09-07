@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -12,7 +12,13 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class PeriodoContable(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "periodo_contable"
-    __table_args__ = (UniqueConstraint("empresa_id", "anio", "mes"),)
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "anio", "mes"),
+        CheckConstraint(
+            "estado IN ('abierto', 'cerrado')",
+            name="estado_periodo_contable",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     anio: Mapped[int] = mapped_column(Integer)

@@ -7,7 +7,7 @@ dominio, no en el esquema).
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -16,6 +16,12 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class Pago(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "pago"
+
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('pendiente', 'confirmado', 'rechazado')", name="estado_pago"
+        ),
+    )
 
     venta_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("venta.id"))
     medio_pago_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("medio_pago.id"))

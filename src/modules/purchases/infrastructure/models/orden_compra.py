@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -17,6 +17,22 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class OrdenCompra(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "orden_compra"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('insumo', 'activo')",
+            name="tipo_orden_compra",
+        ),
+        CheckConstraint(
+            "origen IN ('oc', 'directa')",
+            name="origen_orden_compra",
+        ),
+        CheckConstraint(
+            "estado IN ('borrador', 'emitida', 'recibida_parcial', "
+            "'recibida', 'anulada')",
+            name="estado_orden_compra",
+        ),
+    )
 
     proveedor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("proveedor.id"))
     tipo: Mapped[str] = mapped_column(

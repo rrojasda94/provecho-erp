@@ -9,7 +9,7 @@ Caso concreto del concepto marco Solicitud (RN-DOC-005).
 
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -33,6 +33,14 @@ ESTADO_SOLICITUD = Enum(
 
 class SolicitudInsumos(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "solicitud_insumos"
+
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('borrador', 'pendiente', 'aprobada', 'rechazada', "
+            "'cancelada', 'despachada', 'recibida')",
+            name="estado_solicitud",
+        ),
+    )
 
     almacen_solicitante_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("almacen.id")

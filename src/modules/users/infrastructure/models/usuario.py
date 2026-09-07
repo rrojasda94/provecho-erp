@@ -9,7 +9,17 @@ slice dedicado de auth (data-model.md §2).
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, Integer, String, text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
@@ -30,6 +40,19 @@ class Usuario(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
             unique=True,
             sqlite_where=text("deleted_at IS NULL"),
             postgresql_where=text("deleted_at IS NULL"),
+        ),
+        CheckConstraint("tipo IN ('humano', 'agente_ia')", name="tipo_usuario"),
+        CheckConstraint(
+            "preferencia_paleta IN ('estandar', 'alto_contraste')",
+            name="preferencia_paleta",
+        ),
+        CheckConstraint(
+            "preferencia_tamano_fuente IN ('estandar', 'grande', 'muy_grande', "
+            "'maximo')",
+            name="preferencia_tamano_fuente",
+        ),
+        CheckConstraint(
+            "preferencia_tema IN ('claro', 'oscuro')", name="preferencia_tema"
         ),
     )
 

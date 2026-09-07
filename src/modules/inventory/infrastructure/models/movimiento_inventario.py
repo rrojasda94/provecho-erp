@@ -8,7 +8,16 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, String, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Numeric,
+    String,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -49,6 +58,17 @@ class MovimientoInventario(Base, UuidPkMixin):
         # `vw_bi_inventario_movimientos` (ADR-083) agrupa por almacén y
         # rango de fecha; sin índice, un año de movimientos es table scan.
         Index("ix_movimiento_inventario_ts_almacen", "ts", "almacen_id"),
+        CheckConstraint(
+            "tipo IN ('recepcion_compra', 'transferencia_salida', "
+            "'transferencia_entrada', 'consumo_venta', 'consumo_produccion', "
+            "'consumo_interno', 'produccion_entrada', 'ajuste', 'devolucion', "
+            "'carga_inicial')",
+            name="tipo_movimiento",
+        ),
+        CheckConstraint(
+            "motivo_ajuste IN ('sobrante', 'faltante', 'merma', 'error_registro')",
+            name="motivo_ajuste",
+        ),
     )
 
     almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))

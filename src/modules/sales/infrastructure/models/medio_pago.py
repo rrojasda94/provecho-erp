@@ -5,7 +5,7 @@ empresa del grupo pacta su propia pasarela/comisión, no es global).
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -14,6 +14,18 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class MedioPago(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "medio_pago"
+
+    __table_args__ = (
+        CheckConstraint(
+            "direccion IN ('cobro', 'pago', 'ambos')", name="direccion_medio_pago"
+        ),
+        CheckConstraint(
+            "tipo IN ('efectivo', 'tarjeta_credito', 'tarjeta_debito', "
+            "'billetera_digital', 'transferencia', 'cheque', "
+            "'credito_empresarial')",
+            name="tipo_medio_pago",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     nombre: Mapped[str] = mapped_column(String(50))

@@ -10,12 +10,10 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 import src.core.models_registry  # noqa: F401
-from src.core.app import create_app
 from src.core.database import Base
 from src.modules.reports.infrastructure.models import (
     Area,
@@ -39,10 +37,8 @@ from src.shared.models import AuditLog
 
 
 @pytest.fixture()
-def api():
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+def api(_app_compartida, _engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     Sesion = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
@@ -79,7 +75,7 @@ def api():
         def _override():
             yield s
 
-        app = create_app()
+        app = _app_compartida
         app.dependency_overrides[get_db] = _override
         app.dependency_overrides[get_db_reportes] = _override
         with TestClient(app) as c:

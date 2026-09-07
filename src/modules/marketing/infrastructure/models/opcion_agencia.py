@@ -8,7 +8,7 @@ responde la pregunta que RN-MKT-006 hace, que es si hace falta una agencia.
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String, Uuid
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Integer, Numeric, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
@@ -17,6 +17,13 @@ from src.core.model_base import JsonB, TimestampMixin, UuidPkMixin
 
 class OpcionAgencia(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "opcion_agencia"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('agencia', 'interna')",
+            name="tipo_opcion_agencia",
+        ),
+    )
 
     evaluacion_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("evaluacion_agencia.id"))
     tipo: Mapped[str] = mapped_column(

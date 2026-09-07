@@ -8,7 +8,7 @@ disponibles/bloqueados cuadra con ella (ADR-015).
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Numeric, UniqueConstraint
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -25,7 +25,13 @@ ESTADO_STOCK_LOTE = Enum(
 
 class StockLote(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "stock_lote"
-    __table_args__ = (UniqueConstraint("almacen_id", "sku_id", "lote_id"),)
+    __table_args__ = (
+        UniqueConstraint("almacen_id", "sku_id", "lote_id"),
+        CheckConstraint(
+            "estado IN ('disponible', 'bloqueado', 'agotado')",
+            name="estado_stock_lote",
+        ),
+    )
 
     almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))
     sku_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sku.id"))

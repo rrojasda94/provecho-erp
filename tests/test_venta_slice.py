@@ -8,7 +8,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -42,8 +42,8 @@ from src.modules.users.infrastructure.models import (
 
 
 @pytest.fixture
-def session():
-    engine = create_engine("sqlite://")
+def session(_engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         yield s

@@ -19,7 +19,16 @@ es donde cae la línea cuando ya no queda estación por delante.
 
 import uuid
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Index, Integer, String, text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -40,6 +49,9 @@ class KdsPantalla(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
             unique=True,
             sqlite_where=text("deleted_at IS NULL"),
             postgresql_where=text("deleted_at IS NULL"),
+        ),
+        CheckConstraint(
+            "tipo IN ('preparacion', 'despacho')", name="tipo_kds_pantalla"
         ),
     )
 

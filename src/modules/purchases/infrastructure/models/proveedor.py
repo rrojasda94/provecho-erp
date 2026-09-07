@@ -10,7 +10,7 @@ modelar — deuda técnica, ver ROADMAP).
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Numeric, String
+from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -26,6 +26,21 @@ class Proveedor(
     Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, UbicacionMixin
 ):
     __tablename__ = "proveedor"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('natural', 'juridico')",
+            name="tipo_proveedor",
+        ),
+        CheckConstraint(
+            "clasificacion IN ('regular', 'preferente')",
+            name="clasificacion_proveedor",
+        ),
+        CheckConstraint(
+            "condicion_pago IN ('contado', 'credito')",
+            name="condicion_pago_proveedor",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     tipo: Mapped[str] = mapped_column(

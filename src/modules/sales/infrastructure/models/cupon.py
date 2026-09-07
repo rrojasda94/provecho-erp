@@ -17,7 +17,15 @@ lo deriva de `vigente_hasta` y siempre dice la verdad.
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -33,6 +41,7 @@ class Cupon(Base, UuidPkMixin, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("promocion_id", "cliente_id", name="uq_cupon_promocion_cliente"),
         UniqueConstraint("promocion_id", "codigo", name="uq_cupon_promocion_codigo"),
+        CheckConstraint("estado IN ('activo', 'canjeado')", name="estado_cupon"),
     )
 
     promocion_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("promocion_cupon.id"))

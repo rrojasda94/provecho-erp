@@ -11,14 +11,16 @@ un turno abierto.
 """
 
 import importlib
+import os
 import sqlite3
 import uuid
 from decimal import Decimal
 
 import pytest
 from argon2 import PasswordHasher
-from sqlalchemy import event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
+from sqlalchemy.pool import StaticPool
 
 from src.config.settings import settings
 from src.modules.users.infrastructure import security
@@ -152,6 +154,93 @@ class RedisFalso:
 
     def get(self, clave: str) -> bytes | None:
         return self.marcas.get(clave)
+
+
+def crear_engine_de_prueba(request):
+    """El motor de base de datos de un test.
+
+    Por default, SQLite en memoria (lo de siempre: aislado por test sin
+    hacer nada). Si `TEST_DATABASE_URL` apunta a un Postgres (la suite corre
+    contra los dos motores, ver ADR de "la suite corre contra Postgres"),
+    cada test recibe su propio **schema** dentro de esa misma base —`CREATE
+    SCHEMA` + `search_path` vía `schema_translate_map`, que SQLAlchemy trata
+    como si las tablas vivieran ahí— en vez de un archivo `:memory:` propio.
+    El aislamiento es el mismo: un test nunca ve las filas de otro. El
+    schema se dropea al terminar el test; si el proceso muere a mitad de
+    camino, el próximo run contra la misma base deja un schema huérfano con
+    nombre único —no colisiona con nada, solo ocupa espacio hasta un `DROP
+    SCHEMA` manual.
+
+    SQLite no hace cumplir el largo de un `VARCHAR` ni algunos `CHECK`; por
+    eso el CI corre la suite completa **una vez por motor** (matriz), no
+    solo contra el más rápido.
+
+    Función simple y no fixture: `test_sync_motor.py` necesita **dos** bases
+    independientes en el mismo test (nube + hub), y una fixture normal solo
+    se resuelve una vez por test. `_engine_de_prueba` de abajo es el
+    envoltorio para el caso común de una sola base.
+    """
+    url = os.environ.get("TEST_DATABASE_URL")
+    if not url:
+        return create_engine(
+            "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+        )
+
+    schema = f"t{uuid.uuid4().hex[:16]}"
+    # `idle_in_transaction_session_timeout`: una sesión de un test que no se
+    # cierra bien (encontrado de verdad corriendo esto contra Postgres: una
+    # transacción quedó abierta y bloqueó el `DROP SCHEMA` del test siguiente
+    # a mano, sin este límite se cuelga para siempre) deja de bloquear el
+    # `DROP SCHEMA` de abajo — Postgres la mata sola a los 15 s. Bajo SQLite
+    # esto es invisible: la base entera desaparece con el engine.
+    engine = create_engine(
+        url, connect_args={"options": "-c idle_in_transaction_session_timeout=15000"}
+    ).execution_options(schema_translate_map={None: schema})
+    with engine.connect() as conn:
+        conn.execute(text(f'CREATE SCHEMA "{schema}"'))
+        conn.commit()
+
+    def _soltar_schema():
+        with engine.connect() as conn:
+            # Sin este límite, un lock que no se libera cuelga el `DROP` para
+            # siempre en vez de fallar con un error legible.
+            conn.execute(text("SET lock_timeout = '20s'"))
+            conn.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+            conn.commit()
+        engine.dispose()
+
+    request.addfinalizer(_soltar_schema)
+    return engine
+
+
+@pytest.fixture()
+def _engine_de_prueba(request):
+    return crear_engine_de_prueba(request)
+
+
+@pytest.fixture(scope="session")
+def _app_compartida():
+    """`create_app()` una sola vez por sesión de pytest, no una vez por test.
+
+    Reanaliza la firma de las ~200 rutas de las 9 apps montadas (~200 ms);
+    con ~48 archivos de test llamándola cada uno, era la mayor parte de lo
+    que un test tarda que no es su propio trabajo. Compartirla es seguro
+    porque lo único que cada `env()` muta del objeto es
+    `app.dependency_overrides[get_db]` (y `get_db_reportes]`), que se pisa
+    entero en cada test, y el registro de listeners ya es idempotente
+    (`_registrado` en cada módulo, ver `src/core/app.py`).
+
+    **No** la usan los archivos que necesitan una app *fresca* por test:
+    `test_security.py` (compara `docs_url`/`openapi_url` antes y después de
+    cambiar `settings.es_produccion`, que `create_app()` sólo lee al
+    construir) y `test_observabilidad.py` (agrega una ruta ad-hoc al `app`
+    para probar el handler de error no controlado) siguen llamando
+    `create_app()` directo, y por eso no comparten esta fixture.
+    """
+    import src.core.models_registry  # noqa: F401
+    from src.core.app import create_app
+
+    return create_app()
 
 
 @pytest.fixture(autouse=True, scope="session")

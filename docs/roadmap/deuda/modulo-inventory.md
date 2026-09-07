@@ -42,12 +42,13 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ✅ 2026-08-12 **Abastecedor de respaldo** (ADR-040, RN-INV-022,
   migración `a7c04e3b91d5`): dar de baja el central dejaba a la sucursal sin
   poder pedir nada.
-- ⬜ **No se puede vaciar un abastecedor ya elegido** (2026-08-12): los
-  `PATCH` de organización tratan `null` como "no tocar" (convención de
-  `users/api/schemas.py`), así que elegir "Ninguno" en el selector no lo
-  limpia — solo lo deja como estaba. Es previo a este cambio y ahora tiene un
-  campo más. Se arregla con un centinela explícito en el `Update`, que es un
-  cambio de contrato para las cinco entidades de organización.
+- ✅ 2026-09-06 **Ya se puede vaciar un abastecedor ya elegido** (declarado
+  2026-08-12, resuelto en `docs/roadmap/deuda/transversal.md` → "El PATCH de
+  organización no tenía forma de vaciar un opcional", ADR-096, bloque
+  `fix/transversal-patch-vaciar-un-opcional`). Era la misma deuda anotada
+  dos veces en dos documentos — el centinela explícito que pedía esta
+  entrada es exactamente el que entró ahí, para las cinco entidades de
+  organización.
 
 - ✅ 2026-08-03 **Recetas editables** (ADR-023, migración `b6d1e83f47ac`):
   CRUD de receta e ítems, duplicar con "(copy)", escalar por factor y
@@ -451,16 +452,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   comparte el problema. Los códigos ya asignados de 4 caracteres no se
   tocan. De paso, RN-GEN-005 dejó de decir que `id_interno` es
   **inmutable** — ya era falso desde ADR-052 (2026-08-20).
-- ⬜ **Los importadores no tienen carril de pruebas contra Postgres**
-  (2026-08-20): `pytest` corre sobre SQLite con `create_all`, y el job
-  `migraciones` corre Alembic contra Postgres pero **no la suite**
-  (`.github/workflows/ci.yml`). SQLite no aplica el largo de un `VARCHAR`, así
-  que una fila con el código demasiado largo pasa en verde y da
-  `StringDataRightTruncation` en producción. La defensa actual es validar el
-  largo **en el importador** y un test que ata la constante a la columna del
-  modelo (`test_importacion_articulos.py`), pero eso cubre las columnas que
-  alguien se acordó de atar. Se cierra corriendo la suite también contra
-  Postgres en CI.
+- ✅ 2026-09-06 **Los importadores ya tienen carril de pruebas contra
+  Postgres** (declarado 2026-08-20). `pytest` corría sólo sobre SQLite con
+  `create_all`, y el job `migraciones` corría Alembic contra Postgres pero
+  **no la suite** (`.github/workflows/ci.yml`) — SQLite no aplica el largo
+  de un `VARCHAR`, así que una fila con el código demasiado largo pasaba en
+  verde y daba `StringDataRightTruncation` en producción. Nuevo job
+  `backend-postgres` (ADR-097) corre la suite completa —incluidos
+  `test_importacion_articulos.py` y el resto— contra un Postgres real, con
+  cada test en su propio schema. La defensa por importador (validar el
+  largo antes de insertar, el test que ata la constante a la columna) sigue
+  ahí; esto agrega la red de fondo para las columnas que nadie se acordó de
+  atar.
 
 ## ~~Mitad-y-mitad: la regla de Odoo descuenta de menos~~ — SALDADA 2026-08-23
 

@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
@@ -58,8 +58,8 @@ pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 
 @pytest.fixture
-def session():
-    engine = create_engine("sqlite://")
+def session(_engine_de_prueba):
+    engine = _engine_de_prueba
     # SQLite trae las FK **apagadas** por defecto; Postgres no las apaga
     # nunca. Sin este PRAGMA, borrar un padre dejando al hijo apuntándolo
     # pasa en verde acá y revienta en producción — que es exactamente lo que

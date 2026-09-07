@@ -10,7 +10,7 @@ anual o supera el límite, RN-GER-007) queda diferido: ni
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -19,7 +19,17 @@ from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
 
 class Campana(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "campana"
-    __table_args__ = (UniqueConstraint("empresa_id", "nombre"),)
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "nombre"),
+        CheckConstraint(
+            "tipo IN ('notoriedad', 'impulso_venta', 'lanzamiento', 'medios', 'evento')",
+            name="tipo_campana",
+        ),
+        CheckConstraint(
+            "estado IN ('brief', 'aprobada', 'en_curso', 'cerrada')",
+            name="estado_campana",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     marca_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("marca.id"))

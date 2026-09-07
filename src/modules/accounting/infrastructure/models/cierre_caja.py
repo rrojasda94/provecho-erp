@@ -5,7 +5,7 @@ contabilidad, gerencia y RRHH (evento `accounting.cierre_caja_irregular`).
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Numeric, UniqueConstraint
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Numeric, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -14,7 +14,21 @@ from src.core.model_base import JsonB, TimestampMixin, UuidPkMixin
 
 class CierreCaja(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "cierre_caja"
-    __table_args__ = (UniqueConstraint("apertura_caja_id"),)
+    __table_args__ = (
+        UniqueConstraint("apertura_caja_id"),
+        CheckConstraint(
+            "descuadre_atribucion IN ('cajero', 'tercero_reportado', 'encargado')",
+            name="descuadre_atribucion",
+        ),
+        CheckConstraint(
+            "custodia IN ('local_caja_fuerte', 'traslado_contabilidad')",
+            name="custodia_cierre_caja",
+        ),
+        CheckConstraint(
+            "estado IN ('en_proceso', 'conforme', 'con_irregularidad')",
+            name="estado_cierre_caja",
+        ),
+    )
 
     # 1:1 — un cierre por apertura.
     apertura_caja_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("apertura_caja.id"))

@@ -11,7 +11,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Date, Enum, ForeignKey, Numeric
+from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -20,6 +20,19 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class ContratoLaboral(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "contrato_laboral"
+
+    __table_args__ = (
+        CheckConstraint(
+            "modalidad IN ('indeterminado', 'modal_inicio_incremento', "
+            "'modal_necesidad_mercado', 'modal_temporada', 'tiempo_parcial', "
+            "'jornada_reducida')",
+            name="modalidad_contrato_laboral",
+        ),
+        CheckConstraint(
+            "estado IN ('borrador', 'firmado', 'finalizado')",
+            name="estado_contrato_laboral",
+        ),
+    )
 
     trabajador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trabajador.id"))
     modalidad: Mapped[str] = mapped_column(

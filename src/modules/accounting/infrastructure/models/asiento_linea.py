@@ -4,7 +4,7 @@ cuadra (RN-CTB-001), validado en `domain.rules.cuadra` antes de persistir."""
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Numeric
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -13,6 +13,13 @@ from src.core.model_base import UuidPkMixin
 
 class AsientoLinea(Base, UuidPkMixin):
     __tablename__ = "asiento_linea"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('debe', 'haber')",
+            name="tipo_linea_asiento",
+        ),
+    )
 
     asiento_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("asiento.id"))
     cuenta_contable_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cuenta_contable.id"))

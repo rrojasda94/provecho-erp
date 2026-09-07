@@ -5,7 +5,7 @@ vía `regla_asiento`, RN-CTB-003)."""
 import uuid
 from datetime import date
 
-from sqlalchemy import Date, Enum, ForeignKey, Index, String
+from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -17,6 +17,14 @@ class Asiento(Base, UuidPkMixin, TimestampMixin):
     __table_args__ = (
         # `vw_bi_contabilidad` (ADR-083) agrupa por empresa y rango de fecha.
         Index("ix_asiento_fecha_empresa", "fecha", "empresa_id"),
+        CheckConstraint(
+            "origen IN ('manual', 'automatico')",
+            name="origen_asiento",
+        ),
+        CheckConstraint(
+            "estado IN ('registrado', 'anulado')",
+            name="estado_asiento",
+        ),
     )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))

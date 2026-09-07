@@ -32,6 +32,10 @@ class ReglaDestinatario(Base, UuidPkMixin, TimestampMixin):
             "(tipo = 'dinamico' AND dinamico    IS NOT NULL)",
             name="ck_regla_destinatario_referencia",
         ),
+        CheckConstraint(
+            "tipo IN ('area', 'rol', 'usuario', 'dinamico')",
+            name="tipo_destinatario",
+        ),
     )
 
     regla_id: Mapped[uuid.UUID] = mapped_column(

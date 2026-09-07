@@ -10,7 +10,6 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
@@ -25,8 +24,8 @@ from tests.test_facturacion_electronica import _venta_pagada
 
 
 @pytest.fixture
-def session():
-    engine = create_engine("sqlite://")
+def session(_engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         yield s

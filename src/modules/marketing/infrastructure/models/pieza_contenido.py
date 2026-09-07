@@ -4,7 +4,7 @@ marca (RN-MKT-002) y su uso de marca está validado (RN-MKT-001)."""
 import uuid
 from datetime import date
 
-from sqlalchemy import Boolean, Date, Enum, ForeignKey, String
+from sqlalchemy import Boolean, CheckConstraint, Date, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -13,6 +13,13 @@ from src.core.model_base import JsonB, TimestampMixin, UuidPkMixin
 
 class PiezaContenido(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "pieza_contenido"
+
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('planificada', 'publicada', 'descartada')",
+            name="estado_pieza_contenido",
+        ),
+    )
 
     # Opcional: hay contenido de marca que no cuelga de ninguna campaña.
     campana_id: Mapped[uuid.UUID | None] = mapped_column(

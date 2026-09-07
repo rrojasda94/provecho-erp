@@ -20,7 +20,7 @@ la señal correcta.
 import uuid
 from datetime import date
 
-from sqlalchemy import Date, Enum, ForeignKey, String
+from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -45,6 +45,13 @@ MOTIVO_OMISION = Enum(
 
 class AsientoOmitido(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "asiento_omitido"
+
+    __table_args__ = (
+        CheckConstraint(
+            "motivo IN ('periodo_cerrado', 'sin_cuentas', 'sin_plantilla')",
+            name="motivo_asiento_omitido",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"), index=True)
     # El evento operativo que lo pedía (`sales.venta_confirmada`, ...).
