@@ -125,6 +125,80 @@ def test_crear_articulo_y_sku(env):
     assert r2.status_code == 201
 
 
+def test_editar_sku_corrige_codigo_y_codigo_barras(env):
+    """El código de barras mal tecleado —o el código interno— solo se
+    corregía por SQL: no existía `editar_sku`."""
+    client, ids, _ = env
+    h = _token(client)
+    art_id = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "Q002", "nombre": "Queso",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    }).json()["id"]
+    sku = client.post("/api/v1/inventory/skus", headers=h, json={
+        "articulo_id": art_id, "codigo": "SKU-VIEJO",
+    }).json()
+
+    r = client.patch(
+        f"/api/v1/inventory/skus/{sku['id']}", headers=h,
+        json={"codigo": "SKU-NUEVO", "codigo_barras": "7501234567890"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["codigo"] == "SKU-NUEVO"
+    assert r.json()["codigo_barras"] == "7501234567890"
+
+
+def test_editar_sku_respeta_unicidad_de_codigo(env):
+    client, ids, _ = env
+    h = _token(client)
+    art_id = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "Q003", "nombre": "Queso",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    }).json()["id"]
+    a = client.post("/api/v1/inventory/skus", headers=h, json={
+        "articulo_id": art_id, "codigo": "SKU-A",
+    }).json()
+    b = client.post("/api/v1/inventory/skus", headers=h, json={
+        "articulo_id": art_id, "codigo": "SKU-B",
+    }).json()
+
+    # Contra el código de otro SKU: 409.
+    assert client.patch(
+        f"/api/v1/inventory/skus/{b['id']}", headers=h, json={"codigo": "SKU-A"},
+    ).status_code == 409
+
+    # Contra su propio código: no es un choque consigo mismo.
+    assert client.patch(
+        f"/api/v1/inventory/skus/{a['id']}", headers=h, json={"codigo": "SKU-A"},
+    ).status_code == 200
+
+
+def test_editar_sku_puede_darlo_de_baja(env):
+    client, ids, _ = env
+    h = _token(client)
+    art_id = client.post("/api/v1/inventory/articulos", headers=h, json={
+        "empresa_id": ids["empresa_id"], "id_interno": "Q004", "nombre": "Queso",
+        "unidad_medida_id": ids["udm_id"], "tipo": "insumo",
+    }).json()["id"]
+    sku = client.post("/api/v1/inventory/skus", headers=h, json={
+        "articulo_id": art_id, "codigo": "SKU-BAJA",
+    }).json()
+
+    r = client.patch(
+        f"/api/v1/inventory/skus/{sku['id']}", headers=h, json={"activo": False},
+    )
+    assert r.status_code == 200
+    assert r.json()["activo"] is False
+
+
+def test_editar_sku_inexistente_404(env):
+    client, ids, _ = env
+    h = _token(client)
+    r = client.patch(
+        f"/api/v1/inventory/skus/{uuid.uuid4()}", headers=h, json={"codigo": "X"},
+    )
+    assert r.status_code == 404
+
+
 def test_articulo_nace_con_sku(env):
     """RN-PRD-006. Un artículo sin SKU es inerte y en silencio: `stock` y
     `movimiento_inventario` cuelgan de `sku_id`, así que no tiene existencias

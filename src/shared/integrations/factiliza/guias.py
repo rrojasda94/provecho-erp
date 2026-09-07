@@ -17,15 +17,13 @@ from decimal import Decimal
 # Catálogo 01 — tipo de comprobante: guía de remisión remitente.
 TIPO_DOC_GUIA_REMITENTE = "09"
 
-# Catálogo 03 — unidad de medida. Solo se mapean las que el negocio usa; el
-# catálogo de SUNAT tiene cientos y adivinar el resto sería peor que el
-# fallback. Una unidad sin mapear sale como `NIU` (unidad), que es lo que
-# SUNAT espera de un bien contable por piezas.
-#
-# El lugar correcto para esto es una columna `codigo_sunat` en
-# `unidad_medida`, editable desde Catálogo (ver ROADMAP → Deuda técnica):
-# mientras solo la guía lo necesite, una columna que alguien tiene que
-# llenar a mano es más trabajo que este diccionario.
+# Catálogo 03 — unidad de medida, usado solo como semilla y como último
+# recurso. `unidad_medida.codigo_sunat` (editable desde Catálogo) es la
+# fuente correcta desde que existe la columna; este diccionario cubre las
+# unidades que el negocio ya tenía antes de poder llenarla, y toda unidad
+# nueva que nadie configuró todavía. Una unidad sin mapear y sin columna
+# sale como `NIU` (unidad), que es lo que SUNAT espera de un bien contable
+# por piezas.
 UNIDAD_SUNAT_POR_DEFECTO = "NIU"
 UNIDADES_SUNAT = {
     "kilo": "KGM",
@@ -43,8 +41,15 @@ UNIDADES_SUNAT = {
 }
 
 
-def codigo_unidad(nombre_udm: str) -> str:
-    """Código SUNAT de una unidad de medida por su nombre en el catálogo."""
+def codigo_unidad(nombre_udm: str, codigo_sunat: str | None = None) -> str:
+    """Código SUNAT de una unidad de medida.
+
+    `codigo_sunat` es lo que alguien configuró a mano en Catálogo y manda
+    si está presente. Sin eso, cae al diccionario por nombre, y si tampoco
+    reconoce el nombre, a `NIU`.
+    """
+    if codigo_sunat:
+        return codigo_sunat
     return UNIDADES_SUNAT.get((nombre_udm or "").strip().lower(), UNIDAD_SUNAT_POR_DEFECTO)
 
 

@@ -20,6 +20,7 @@ export type Merma = {
   cantidad: string;
   motivo: string | null;
   estado: string;
+  creado_por: string;
 };
 export type OpcionAlmacen = { id: string; nombre: string };
 export type OpcionSku = { id: string; etiqueta: string };
@@ -53,15 +54,18 @@ export function MermasCliente({
   almacenes,
   skus,
   permisos,
+  usuarioId,
 }: {
   mermas: Merma[];
   almacenes: OpcionAlmacen[];
   skus: OpcionSku[];
   permisos: string[];
+  usuarioId: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState("");
   const [enviando, setEnviando] = useState("");
+  const [almacenFiltro, setAlmacenFiltro] = useState("");
   const puedeRegistrar = tienePermiso(permisos, "inventory.solicitar_ajuste");
   const puedeResolver = tienePermiso(permisos, "inventory.aprobar_ajuste");
 
@@ -70,6 +74,11 @@ export function MermasCliente({
     [almacenes],
   );
   const nombreSku = useMemo(() => new Map(skus.map((s) => [s.id, s.etiqueta])), [skus]);
+
+  const mermasFiltradas = useMemo(
+    () => (almacenFiltro ? mermas.filter((m) => m.almacen_id === almacenFiltro) : mermas),
+    [mermas, almacenFiltro],
+  );
 
   async function resolver(id: string, destino: "desecho" | "reintegro") {
     setEnviando(id);
@@ -107,8 +116,14 @@ export function MermasCliente({
       {
         id: "acciones",
         header: "",
-        cell: ({ row }) =>
-          row.original.estado !== "activa" || !puedeResolver ? null : (
+        cell: ({ row }) => {
+          // RN-INV-019: quien registró la merma no firma su propia baja.
+          // El servidor ya lo rechaza con 409; esconder el botón evita que
+          // se lo coma como un error después de apretarlo.
+          const puedeResolverEsta =
+            puedeResolver && row.original.creado_por !== usuarioId;
+          if (row.original.estado !== "activa" || !puedeResolverEsta) return null;
+          return (
             <div className="flex items-center gap-3">
               {/* Desechar primero: es el destino de la enorme mayoría, y
                   ofrecer el reintegro con el mismo peso invita a devolver al
@@ -132,13 +147,14 @@ export function MermasCliente({
                 Reintegrar
               </button>
             </div>
-          ),
+          );
+        },
       },
     ],
     // `resolver` se recrea en cada render; lo que cambia las columnas es
     // quién puede resolver, qué fila está enviando y los catálogos.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [puedeResolver, enviando, nombreAlmacen, nombreSku],
+    [puedeResolver, usuarioId, enviando, nombreAlmacen, nombreSku],
   );
 
   return (
@@ -161,9 +177,26 @@ export function MermasCliente({
         </p>
       )}
 
+      {almacenes.length > 1 && (
+        <label className="flex w-64 flex-col gap-1 text-xs font-semibold">
+          Filtrar por almacén
+          <select
+            value={almacenFiltro}
+            onChange={(e) => setAlmacenFiltro(e.target.value)}
+          >
+            <option value="">Todos</option>
+            {almacenes.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.nombre}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
       <TablaDatos
         columnas={columnas}
-        datos={mermas}
+        datos={mermasFiltradas}
         placeholderBusqueda="Buscar por almacén o motivo..."
         vacio="No hay mermas apartadas."
       />

@@ -109,12 +109,17 @@ class UnidadMedidaCreate(BaseModel):
     # no hay un default universal correcto; el default del modelo (3) es
     # solo el más común, quien crea la unidad decide el suyo.
     decimales: int = Field(ge=0, le=6, default=3)
+    # Catálogo 03 de SUNAT (ej. "KGM", "NIU", "LTR"), para la guía de
+    # remisión. Sin esto, `codigo_unidad()` traduce con su diccionario y
+    # cae en "NIU" si no reconoce el nombre.
+    codigo_sunat: str | None = Field(default=None, min_length=1, max_length=3)
 
 
 class UnidadMedidaUpdate(BaseModel):
     nombre: str | None = None
     ratio: Decimal | None = None
     decimales: int | None = Field(default=None, ge=0, le=6)
+    codigo_sunat: str | None = Field(default=None, min_length=1, max_length=3)
 
 
 class UnidadMedidaOut(BaseModel):
@@ -126,12 +131,13 @@ class UnidadMedidaOut(BaseModel):
     # Con cuántos decimales se teclea una cantidad en esta unidad
     # (RN-GER-010): 3 para kilos, 0 para unidades sueltas.
     decimales: int
+    codigo_sunat: str | None
 
 
 # --- Artículos ---
 class ArticuloCreate(BaseModel):
     empresa_id: uuid.UUID | None = None
-    id_interno: str = Field(min_length=1, max_length=4)
+    id_interno: str = Field(min_length=1, max_length=8)
     nombre: str = Field(min_length=1, max_length=150)
     unidad_medida_id: uuid.UUID
     tipo: str = Field(max_length=30)
@@ -153,7 +159,7 @@ class ArticuloUpdate(BaseModel):
     # Un código de 4 caracteres mal tecleado se arrastra por toda la
     # operación —es lo que el almacenero lee en el estante— y hasta ahora
     # era inmutable.
-    id_interno: str | None = Field(default=None, min_length=1, max_length=4)
+    id_interno: str | None = Field(default=None, min_length=1, max_length=8)
     nombre: str | None = Field(default=None, min_length=1, max_length=150)
     categoria_id: uuid.UUID | None = None
     tipo: str | None = Field(default=None, max_length=30)
@@ -183,6 +189,15 @@ class SkuCreate(BaseModel):
     articulo_id: uuid.UUID
     codigo: str = Field(min_length=1, max_length=50)
     codigo_barras: str | None = None
+
+
+class SkuUpdate(BaseModel):
+    """Campo ausente o `null` = no tocar. `articulo_id` no está: un SKU no
+    cambia de artículo — eso es dar de alta uno nuevo y archivar el viejo."""
+
+    codigo: str | None = Field(default=None, min_length=1, max_length=50)
+    codigo_barras: str | None = None
+    activo: bool | None = None
 
 
 class SkuOut(BaseModel):
@@ -721,7 +736,7 @@ class ArticuloImportadoIn(BaseModel):
 
     id: uuid.UUID | None = None
     accion: Literal["crear", "actualizar", "omitir"] = "crear"
-    codigo: str = Field(min_length=1, max_length=4)
+    codigo: str = Field(min_length=1, max_length=8)
     nombre: str = Field(min_length=1, max_length=150)
     tipo: str = Field(default="insumo", max_length=30)
     unidad_medida_id: uuid.UUID | None = None
@@ -980,6 +995,10 @@ class DevolucionOut(BaseModel):
 
 class DevolucionDetalleOut(DevolucionOut):
     items: list[DevolucionItemOut]
+    # Resueltos por el router vía el contrato público de `users`
+    # (`nombres_de_usuarios`): la ficha muestra un nombre, no un UUID.
+    registrado_por_nombre: str | None = None
+    anulado_por_nombre: str | None = None
 
 
 # --- Merma ------------------------------------------------------------------
@@ -1008,6 +1027,12 @@ class MermaOut(BaseModel):
     motivo: str | None
     estado: str
     referencia_id: uuid.UUID | None
+    # Quién la registró: la pantalla necesita esconderle los botones de
+    # resolver (RN-INV-019 — quien registra no firma su propia baja) en vez
+    # de dejar que se los coma como un 409. `liberado_por` es el otro lado
+    # del mismo rastro: quién sí resolvió.
+    creado_por: uuid.UUID
+    liberado_por: uuid.UUID | None
 
 
 class GuiaRemisionOut(BaseModel):

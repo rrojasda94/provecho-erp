@@ -46,6 +46,7 @@ from src.modules.purchases.application.queries_publicas import proveedor_para_gu
 from src.modules.users.infrastructure.models import Almacen, Empresa
 from src.shared import fechas
 from src.shared.integrations.factiliza import (
+    DocumentoDescargado,
     FactilizaClient,
     FactilizaError,
 )
@@ -98,7 +99,7 @@ def _linea(
         sku_id,
         cantidad,
         articulo.nombre,
-        guias_mapper.codigo_unidad(udm.nombre if udm else ""),
+        guias_mapper.codigo_unidad(udm.nombre if udm else "", udm.codigo_sunat if udm else None),
     )
 
 
@@ -429,6 +430,13 @@ def de_transferencia(session: Session, transferencia_id: uuid.UUID) -> GuiaRemis
     return guia
 
 
+def de_devolucion(session: Session, devolucion_id: uuid.UUID) -> GuiaRemision:
+    guia = GuiaRemisionRepo(session).de_devolucion(devolucion_id)
+    if guia is None:
+        raise NoEncontrado("esa devolución todavía no tiene guía de remisión")
+    return guia
+
+
 def q_listar(
     session: Session,
     *,
@@ -437,3 +445,40 @@ def q_listar(
 ):
     """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
     return GuiaRemisionRepo(session).q_list(empresa_id, estado_emision)
+
+
+FORMATOS_DESCARGA = ("pdf", "xml", "cdr")
+
+
+def descargar_documento(
+    session: Session,
+    guia_id: uuid.UUID,
+    formato: str,
+    client: FactilizaClient | None = None,
+) -> DocumentoDescargado:
+    """Baja el PDF, el XML firmado o el CDR de una guía ya aceptada.
+
+    Mismo criterio que `sales.comprobantes.descargar_documento`: se pide al
+    proveedor en el momento y no se guarda — su copia es la buena mientras
+    Factiliza siga activo. `recurso="despatch"` es la única diferencia con
+    el comprobante: mismo verbo, mismo formato de respuesta, otro prefijo de
+    ruta.
+    """
+    if formato not in FORMATOS_DESCARGA:
+        raise ReglaNegocio(f"formato no descargable: {formato}")
+    repo = GuiaRemisionRepo(session)
+    guia = repo.get(guia_id)
+    if guia is None:
+        raise NoEncontrado("guía de remisión no encontrada")
+    if guia.estado_emision != "aceptado":
+        raise ReglaNegocio(
+            f"la guía está {guia.estado_emision}: sin aceptación de SUNAT no "
+            "hay documento que descargar"
+        )
+    return (client or FactilizaClient()).descargar(
+        formato,
+        guias_mapper.TIPO_DOC_GUIA_REMITENTE,
+        guia.serie,
+        guia.correlativo,
+        recurso="despatch",
+    )

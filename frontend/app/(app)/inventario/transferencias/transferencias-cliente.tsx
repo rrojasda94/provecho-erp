@@ -7,10 +7,10 @@ import { Insignia } from "@/components/estado/insignia";
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
-import { pedir } from "@/lib/cliente-api";
+import { ErrorApi, pedir } from "@/lib/cliente-api";
 import { tienePermiso } from "@/lib/permisos";
 
-import { recibirTransferenciaAction, trasladoDirectoAction } from "./actions";
+import { emitirGuiaAction, recibirTransferenciaAction, trasladoDirectoAction } from "./actions";
 
 export type Transferencia = {
   id: string;
@@ -29,11 +29,26 @@ type TransferenciaItem = {
 };
 type TransferenciaDetalle = Transferencia & { items: TransferenciaItem[] };
 
+type GuiaRemision = {
+  id: string;
+  serie: string;
+  correlativo: number;
+  estado_emision: string;
+  detalle_emision: string | null;
+};
+
 export type OpcionSku = { id: string; etiqueta: string };
 
 const TONO: Record<string, "exito" | "peligro" | "neutro"> = {
   en_transito: "peligro",
   recibida: "exito",
+};
+
+const TONO_GUIA: Record<string, "exito" | "alerta" | "peligro" | "info" | "neutro"> = {
+  pendiente: "info",
+  aceptado: "exito",
+  rechazado: "peligro",
+  error: "alerta",
 };
 
 /**
@@ -63,6 +78,7 @@ export function TransferenciasCliente({
 }) {
   const puedeRecibir = tienePermiso(permisos, "inventory.recepcion");
   const puedeTransferir = tienePermiso(permisos, "inventory.transferir");
+  const puedeEmitirGuia = tienePermiso(permisos, "inventory.emitir_guia");
 
   const nombreDeSku = useMemo(
     () => new Map(skus.map((s) => [s.id, s.etiqueta])),
@@ -101,14 +117,18 @@ export function TransferenciasCliente({
       {
         id: "acciones",
         header: "",
-        cell: ({ row }) =>
-          row.original.estado !== "en_transito" || !puedeRecibir ? null : (
-            <DialogoRecibir transferencia={row.original} nombreDeSku={nombreDeSku} />
-          ),
+        cell: ({ row }) => (
+          <div className="flex items-center gap-3">
+            {row.original.estado === "en_transito" && puedeRecibir && (
+              <DialogoRecibir transferencia={row.original} nombreDeSku={nombreDeSku} />
+            )}
+            {puedeEmitirGuia && <DialogoGuia transferencia={row.original} />}
+          </div>
+        ),
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [puedeRecibir, nombreDeAlmacen, skus],
+    [puedeRecibir, puedeEmitirGuia, nombreDeAlmacen, skus],
   );
 
   return (
@@ -347,5 +367,143 @@ function DialogoTrasladoDirecto({
         <input name="observacion" maxLength={500} placeholder="Por qué se manda, si hace falta" />
       </label>
     </DialogoFormulario>
+  );
+}
+
+/**
+ * Guía de remisión del traslado.
+ *
+ * Cuatro endpoints con ADR (ADR-027) y catorce pruebas sin un solo llamador
+ * desde el frontend: quien despachaba un traslado no tenía dónde emitir la
+ * guía que la ley exige para que la mercadería viaje por la vía pública.
+ *
+ * Al abrir se pregunta si ya existe una (`GET .../guia`): si el traslado ya
+ * tiene guía se muestra su estado y, aceptada, los enlaces de descarga —
+ * volver a enviar el formulario no numera una segunda, el servidor devuelve
+ * la misma (RN-TRP-002). Si no existe, se muestra el formulario: lo único
+ * que se teclea es lo que el sistema no puede saber.
+ */
+function DialogoGuia({ transferencia }: { transferencia: Transferencia }) {
+  const [guia, setGuia] = useState<GuiaRemision | null | undefined>(undefined);
+  const [errorCarga, setErrorCarga] = useState("");
+
+  async function cargar() {
+    setErrorCarga("");
+    setGuia(undefined);
+    try {
+      const detalle = await pedir<GuiaRemision>(
+        `/inventory/transferencias/${transferencia.id}/guia`,
+      );
+      setGuia(detalle);
+    } catch (e) {
+      if (e instanceof ErrorApi && e.status === 404) {
+        setGuia(null);
+        return;
+      }
+      setGuia(null);
+      setErrorCarga("No se pudo consultar si el traslado ya tiene guía.");
+    }
+  }
+
+  const yaEmitida = guia != null;
+
+  return (
+    <DialogoFormulario
+      titulo="Guía de remisión"
+      disparador="Guía"
+      claseDisparador="text-xs font-semibold text-primary hover:underline"
+      etiquetaEnvio="Emitir"
+      etiquetaPendiente="Emitiendo..."
+      accion={emitirGuiaAction}
+      ancho="max-w-lg"
+      ayuda="Los bienes salen de la transferencia, no se teclean. Lo que sí se teclea es lo que el sistema no puede saber: quién maneja, en qué vehículo, cuánto pesa y qué día arranca el viaje."
+      alAbrir={cargar}
+      envioDeshabilitado={yaEmitida || guia === undefined}
+    >
+      <input type="hidden" name="transferencia_id" value={transferencia.id} />
+      {errorCarga && (
+        <p role="alert" className="text-sm font-semibold text-status-danger">
+          {errorCarga}
+        </p>
+      )}
+      {guia === undefined && !errorCarga && (
+        <p className="text-sm text-muted-foreground">Consultando...</p>
+      )}
+      {yaEmitida && guia && <ResumenGuia guia={guia} />}
+      {guia === null && !errorCarga && <CamposGuia />}
+    </DialogoFormulario>
+  );
+}
+
+function ResumenGuia({ guia }: { guia: GuiaRemision }) {
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      <p className="flex items-center gap-2">
+        <span className="font-semibold">
+          {guia.serie}-{String(guia.correlativo).padStart(8, "0")}
+        </span>
+        <Insignia tono={TONO_GUIA[guia.estado_emision] ?? "neutro"}>
+          {guia.estado_emision}
+        </Insignia>
+      </p>
+      {guia.detalle_emision && (
+        <p className="text-xs text-muted-foreground">{guia.detalle_emision}</p>
+      )}
+      {guia.estado_emision === "aceptado" && (
+        <div className="flex gap-3">
+          {(["pdf", "xml", "cdr"] as const).map((formato) => (
+            <a
+              key={formato}
+              href={`/api/proxy/api/v1/inventory/guias-remision/${guia.id}/descargar/${formato}`}
+              title={formato === "cdr" ? "Constancia de recepción de SUNAT" : undefined}
+              className="text-xs font-semibold text-primary hover:underline"
+            >
+              {formato.toUpperCase()}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CamposGuia() {
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1 text-xs font-semibold">
+          Chofer — nombres
+          <input name="chofer_nombres" required minLength={2} maxLength={120} />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold">
+          Chofer — apellidos
+          <input name="chofer_apellidos" required minLength={2} maxLength={120} />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold">
+          Documento
+          <input name="chofer_num_doc" required minLength={8} maxLength={15} />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold">
+          Licencia
+          <input name="chofer_licencia" required minLength={6} maxLength={20} />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold">
+          Placa del vehículo
+          <input name="vehiculo_placa" required minLength={6} maxLength={10} />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold">
+          Peso bruto (kg)
+          <input name="peso_bruto_kg" type="number" min="0.001" step="0.001" required />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold">
+          Inicio del traslado
+          <input name="fecha_inicio_traslado" type="date" />
+        </label>
+      </div>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Observación
+        <input name="observacion" maxLength={500} />
+      </label>
+    </>
   );
 }

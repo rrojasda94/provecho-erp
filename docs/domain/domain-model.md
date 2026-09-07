@@ -240,11 +240,11 @@ el Almacén Virtual de Activos; puede tener categorías, igual que
 productos o vehículos.
 
 Todo Activo (artículo, activo no corriente, producto comercial, servicio)
-lleva un `id_interno`: 4 caracteres alfanuméricos, autogenerado por el ERP
-al crearse, inmutable e irrepetible — distinto del `id` UUID y del SKU
-(que es solo de artículo). Al darse de baja o descontinuarse, un Activo se
-archiva (se oculta de listados); nunca se elimina de la base de datos
-(RN-GEN-005/006).
+lleva un `id_interno`: hasta 8 caracteres alfanuméricos, único en todo el
+grupo (no por empresa), autogenerado por el ERP al crearse y corregible
+por pantalla — distinto del `id` UUID y del SKU (que es solo de artículo).
+Al darse de baja o descontinuarse, un Activo se archiva (se oculta de
+listados); nunca se elimina de la base de datos (RN-GEN-005/006).
 
 ### Categoría
 

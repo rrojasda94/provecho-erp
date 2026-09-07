@@ -15,7 +15,12 @@ class Articulo(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __table_args__ = (UniqueConstraint("id_interno"),)
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
-    id_interno: Mapped[str] = mapped_column(String(4))
+    # Único en TODO el grupo, no por empresa (decisión 2026-09-06): dos
+    # empresas del grupo no pueden compartir código. 8 y no 4 —el largo
+    # original— porque un catálogo de trescientos artículos agotaba rápido
+    # el espacio de códigos de 4 caracteres compartido entre todas las
+    # empresas; los códigos ya asignados de 4 caracteres siguen valiendo.
+    id_interno: Mapped[str] = mapped_column(String(8))
     nombre: Mapped[str] = mapped_column(String(150))
     categoria_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("categoria.id"), nullable=True
@@ -39,7 +44,7 @@ class Articulo(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
         Integer, nullable=True
     )
     # Identificador del sistema de origen ("__export__.product_template_1308_...").
-    # `id_interno` son 4 caracteres que la gente teclea; esto es la clave del
+    # `id_interno` son pocos caracteres que la gente teclea; esto es la clave del
     # otro sistema, que puede tener cualquier forma. Reimportar la misma
     # planilla actualiza en vez de duplicar (ADR-057).
     ref_externa: Mapped[str | None] = mapped_column(

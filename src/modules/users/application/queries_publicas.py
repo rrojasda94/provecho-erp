@@ -9,7 +9,9 @@ o pendiente), y para responderlo importaban `users.domain.rules`.
 """
 
 import uuid
+from collections.abc import Sequence
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.modules.users.application import auth, notificaciones
@@ -46,6 +48,30 @@ def obtener_usuario(session: Session, usuario_id: uuid.UUID) -> Usuario | None:
     ya validó por otra vía (ej. `autorizacion.verificar`, que solo devuelve
     el id) — típicamente para pasarlo a `check_permission` con `contexto`."""
     return UsuarioRepo(session).get(usuario_id)
+
+
+def nombres_de_usuarios(
+    session: Session, usuario_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, str]:
+    """`usuario_id` → nombre para mostrar, mismo patrón que
+    `inventory.nombres_de_articulos`: para módulos que guardan un
+    `usuario_id` (quién solicitó, quién aprobó, quién cerró) y tienen que
+    imprimir un nombre en vez de un UUID.
+
+    `nombre_display` es el nombre real de la persona cuando se cargó al
+    dar de alta la cuenta; sin él —una cuenta `agente_ia`, o una humana a
+    la que nunca se le completó— cae al `username`, que siempre existe.
+    Los ids que no existen sencillamente no aparecen: quien los muestre
+    decide qué poner en su lugar.
+    """
+    if not usuario_ids:
+        return {}
+    filas = session.execute(
+        select(Usuario.id, Usuario.nombre_display, Usuario.username).where(
+            Usuario.id.in_(list(usuario_ids))
+        )
+    )
+    return {fila.id: fila.nombre_display or fila.username for fila in filas}
 
 
 # Resultados de `verificar_pin_de`. Son strings y no excepciones porque

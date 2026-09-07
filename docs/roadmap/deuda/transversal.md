@@ -293,7 +293,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   recompilación por ruta, que era el otro sumando.
 
 - ✅ 2026-09-06 **La consulta de documento se cachea, con TTL** (bloque
-  `fix/transversal-relojes-documento-y-cache`, ADR-090, declarado
+  `fix/transversal-relojes-documento-y-cache`, ADR-095, declarado
   2026-08-26). Nuevo
   `shared/integrations/factiliza/cache.py`: `consultar_dni`/`consultar_ruc`
   cachean la respuesta **de negocio** (`ConsultaPersona`/`ConsultaEmpresa`

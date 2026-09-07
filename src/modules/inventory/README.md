@@ -36,6 +36,12 @@ Migración `e2b7c40d91af`, ADR-056, RN-COM-037, RN-UDM-005.
 **`receta_item.aplica_valores`** (JSONB, nullable): array de
 `producto_atributo_valor.id`. NULL o `[]` = la línea aplica siempre, que es
 el caso de todas las recetas de hoy — por eso no hay backfill.
+`agregar_item`/`editar_item` validan cada valor contra
+`sales.queries_publicas::valores_ofrecidos_de_receta` (ADR-092, 2026-09-06):
+409 si nombra un valor que ningún producto de la receta ofrece. Solo en la
+escritura — lo ya guardado sigue leyéndose por `aplica_a_variante`, que es
+conservador con lo que no reconoce; una receta que ningún producto usa
+todavía acepta cualquier valor, porque no hay contra qué comparar.
 
 La regla es la de Odoo 18 (`mrp.bom.line._skip_bom_line` →
 `_skip_for_no_variant`), en `domain/rules.aplica_a_variante`: se agrupan los
@@ -301,10 +307,13 @@ lógica de cada entidad en su propio archivo de `application/`.
 - **La unidad de un artículo existente no se cambia**: `editar_articulo` la
   excluye a propósito, y una fila que la cambie se reporta como problema en vez
   de ignorarse en silencio.
-- El largo de `id_interno` (4) se valida **en el importador**: SQLite no aplica
-  el largo de un `VARCHAR`, así que sin eso la fila pasa en verde y revienta
-  contra Postgres. Un test ata la constante a la columna del modelo.
-- Los SKU **solo se crean**; uno con código ya usado se informa. Ver deuda.
+- El largo de `id_interno` (8, único en todo el grupo — ADR-091) se valida
+  **en el importador**: SQLite no aplica el largo de un `VARCHAR`, así que
+  sin eso la fila pasa en verde y revienta contra Postgres. Un test ata la
+  constante a la columna del modelo.
+- Los SKU **solo se crean por planilla**; uno con código ya usado se
+  informa y no se toca — corregirlo es `PATCH /skus/{id}`, la pantalla de
+  a uno.
 
 Exportar pide permiso de **lectura** (`inventory.leer`): son los mismos datos
 que el listado, solo empaquetados. Plantilla, validar e importar piden
@@ -337,7 +346,16 @@ que el listado, solo empaquetados. Plantilla, validar e importar piden
   van por almacén y sucursal/marca cuelgan de él.
 - Pantallas nuevas: `/inventario/solicitudes` (la lista de la jornada +
   aprobar/rechazar/cancelar) y `/inventario/conteos` (abrir, contar a
-  ciegas, cerrar viendo los ajustes generados, anular con motivo).
+  ciegas, cerrar viendo los ajustes generados, anular con motivo). **Aprobar
+  recorta por SKU** (2026-09-06): el diálogo arranca con lo pedido en cada
+  línea y deja bajarlo antes de enviar `SolicitudAprobar.aprobadas` —en 0 la
+  línea queda fuera y no reserva nada—, mismo molde que el `Picking` del
+  despacho.
+- **Cerrar un conteo arma o pone al día el borrador del almacén contado**
+  (2026-09-06, RN-INV-026, ADR-093): todo cierre, no solo el general —el
+  refresco es aditivo, así que dispararlo de más no tiene costo. Un almacén
+  sin abastecedor (el central) no rompe el cierre: armar el borrador se
+  atrapa y se ignora, es consecuencia, no condición.
 
 Tests: `tests/test_solicitudes_borrador.py` (10 casos) y los agregados a
 `tests/test_conteos.py`. Recorrido de uso:
@@ -555,8 +573,9 @@ desde un PATCH; el resto se cambia por otro valor.
 
 `PATCH /articulos/{id}` acepta `id_interno` desde el 2026-08-10, con la misma
 unicidad del alta (reenviar el propio código no choca consigo mismo). Es el
-código de cuatro caracteres que el almacenero lee en el estante: tecleado mal
-se arrastra por toda la operación y hasta ahora era inmutable.
+código —hasta 8 caracteres desde ADR-091, único en todo el grupo— que el
+almacenero lee en el estante: tecleado mal se arrastra por toda la
+operación.
 
 **`unidad_medida_id` no está en `ArticuloUpdate` y no va a estar.** El stock,
 los movimientos y las recetas ya cargadas están expresados en la unidad
@@ -596,6 +615,13 @@ lote.
   vencimiento declarados por el proveedor (RN-VNC-002) y producción con
   `origen=produccion`. Un ingreso sin lote de un artículo que lo controla
   entra al lote del día — nada queda fuera de la trazabilidad.
+- **Reposición por anulación** (2026-09-06, ADR-094): una venta anulada, o
+  una nota de crédito con reposición, no entra al lote del día — entra al
+  lote del que salió. `listeners._reponer` reconstruye los lotes de la
+  salida original por `movimiento_inventario.referencia` (el `venta_id`) y
+  reparte en el mismo orden en que FEFO los tomó; una reposición parcial
+  prioriza el primer lote consumido. Sin rastro —venta anterior a este
+  cambio— cae al lote del día, como antes.
 
 | Método | Ruta | Permiso |
 |--------|------|---------|
@@ -628,7 +654,7 @@ Endpoints `/api/v1/inventory`:
 | POST/GET | `/categorias` | `gestionar_catalogo` / `leer` |
 | GET | `/categorias/{id}` | `leer` |
 | GET | `/articulos/{id}` | `leer` |
-| GET | `/skus/{id}` | `leer` — el SKU con su artículo y su saldo por almacén |
+| GET/PATCH | `/skus/{id}` | `leer` / `gestionar_catalogo` — el GET trae el SKU con su artículo y su saldo por almacén; el PATCH corrige `codigo`/`codigo_barras`/`activo` (ADR-091), nunca `articulo_id` |
 | GET | `/ajustes?almacen_id&estado` | `leer` — no existía: `ajuste_fuera_margen` reportaba un hecho que no se podía ir a mirar (ADR-036) |
 | GET | `/ajustes/{id}` | `leer` — con artículo, almacén, solicitante y aprobador resueltos |
 | GET | `/unidades-medida` | `leer` — catálogo global, sin filtro de tenant (`data-model.md` §3) |
@@ -665,23 +691,30 @@ negativa es 409: una salida de un artículo con lote reparte por FEFO
 `application/listeners.py`), consumido por `core.dashboard_router` para el
 dashboard gerencial.
 
-**Guía de remisión** (2026-08-05, ADR-027): cuelga de `transferencia`
-porque lo que declara es un traslado, y el traslado es un hecho de
-inventario (RN-GDR-002: la emite el almacén). Las líneas **se derivan**
-de `transferencia_item` agrupadas por SKU —RN-TRP-002 exige que lo
-transportado coincida con lo declarado, así que no hay formulario de
-ítems— y solo se teclea lo que el sistema no puede saber: chofer,
-vehículo, peso bruto y fecha de inicio del viaje. Un traslado, una guía
-(`transferencia_id` único) y correlativo por `(empresa, serie)`. El envío
-a SUNAT es asíncrono (`POST /despatch/send` vía Celery): la guía impresa
-es la que viaja y un rechazo se corrige y reemite, no detiene el camión.
+**Guía de remisión** (2026-08-05, ADR-027; pantalla y descarga 2026-09-06,
+ADR-090): cuelga de `transferencia` porque lo que declara es un traslado, y
+el traslado es un hecho de inventario (RN-GDR-002: la emite el almacén).
+Las líneas **se derivan** de `transferencia_item` agrupadas por SKU
+—RN-TRP-002 exige que lo transportado coincida con lo declarado, así que
+no hay formulario de ítems— y solo se teclea lo que el sistema no puede
+saber: chofer, vehículo, peso bruto y fecha de inicio del viaje. Un
+traslado, una guía (`transferencia_id` único) y correlativo por
+`(empresa, serie)`. El envío a SUNAT es asíncrono (`POST /despatch/send`
+vía Celery): la guía impresa es la que viaja y un rechazo se corrige y
+reemite, no detiene el camión. Se emite desde la pantalla de su documento
+origen —Traslados o Devoluciones, botón «Guía»— y no desde una pantalla
+propia; `GET /guias-remision/{id}/descargar/{formato}` baja el PDF/XML/CDR
+de una guía aceptada, mismo criterio que `sales.descargar_comprobante`
+(recurso `"despatch"` en vez de `"invoice"` sobre el mismo
+`FactilizaClient.descargar`). `unidad_medida.codigo_sunat` (nullable,
+editable desde Catálogo) manda sobre el diccionario de doce entradas de
+`guias.py` cuando está configurada.
 
 **Diferido (deuda del módulo):** del slice de abastecimiento,
 `reserva_stock` sigue con dos tipos sin productor (`produccion` y
 `carrito`, que esperan a sus módulos) y la transferencia no lleva vehículo
-ni tracking (`vehiculo` no existe). Del slice de lote: la reposición por
-venta anulada entra al lote del día y no al lote del que salió. Ver
-ROADMAP → Deuda técnica → Módulo inventory.
+ni tracking (`vehiculo` no existe). Ver ROADMAP → Deuda técnica → Módulo
+inventory.
 
 ## Barridos periódicos (Celery beat, 2026-08-06)
 
@@ -785,7 +818,7 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
   como "gratis" en lugar de "desconocido".
 
 
-## Merma y devolución (2026-08-06, ADR-028)
+## Merma y devolución (2026-08-06, ADR-028; pantalla al día 2026-09-06)
 
 | Método | Ruta | Permiso |
 |--------|------|---------|
@@ -796,11 +829,21 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
 | GET | `/devoluciones?almacen_id&origen` | `leer` |
 | GET | `/devoluciones/{id}` | `leer` |
 | POST | `/devoluciones/{id}/anular` | `registrar_movimiento` |
-| POST | `/devoluciones/{id}/guia-remision` | `emitir_guia` |
+| GET/POST | `/devoluciones/{id}/guia-remision` | `leer` / `emitir_guia` |
 
 Sin permisos nuevos: la merma reusa los del ajuste porque la segregación es
 la misma —quien declara que algo no sirve no firma su baja— y un permiso
-nuevo para la misma idea sería una segunda matriz que mantener.
+nuevo para la misma idea sería una segunda matriz que mantener. Esa misma
+regla es la razón por la que `MermaOut` expone `creado_por`/`liberado_por`:
+la pantalla necesita el dato para esconderle el botón a quien registró en
+vez de dejar que se coma el 409 al apretarlo.
+
+`GET /devoluciones/{id}` resuelve `registrado_por`/`anulado_por` contra el
+contrato público de `users` (`nombres_de_usuarios`, mismo patrón que
+`nombres_de_articulos` en el KDS) y los suma como
+`registrado_por_nombre`/`anulado_por_nombre` — la ficha no muestra UUID. El
+formulario de alta acepta varias líneas (`sku_id[]`/`cantidad[]`), aunque
+la API las aceptaba desde el primer día.
 
 **La recepción de transferencia admite parcial** desde el mismo día:
 `{"parcial": true}` ingresa lo declarado y deja el resto **en tránsito**.
@@ -810,7 +853,7 @@ viene en camino. El evento `inventory.transferencia_recibida` sale **una
 sola vez**, al cerrar — si no, `accounting` asentaría el faltante de cada
 entrega por separado.
 
-Tests: `tests/test_merma_devolucion.py` (12 casos).
+Tests: `tests/test_merma_devolucion.py` (15 casos).
 
 ## Offline: el ciclo de abastecimiento en el hub (2026-08-07, ADR-009 fase 3)
 

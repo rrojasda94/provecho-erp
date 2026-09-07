@@ -1,4 +1,4 @@
-# ADR-090 — La consulta de documento se cachea, con TTL
+# ADR-095 — La consulta de documento se cachea, con TTL
 
 - Estado: aceptado
 - Fecha: 2026-09-06

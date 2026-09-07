@@ -45,7 +45,7 @@ function leerFormulario(formData: FormData): DatosArticulo {
 
 function validarComunes(datos: DatosArticulo): string | null {
   if (!datos.idInterno || !datos.nombre) return "Código y nombre son obligatorios.";
-  if (datos.idInterno.length > 4) return "El código interno son máximo 4 caracteres.";
+  if (datos.idInterno.length > 8) return "El código interno son máximo 8 caracteres.";
   return null;
 }
 

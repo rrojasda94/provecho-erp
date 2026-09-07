@@ -605,6 +605,33 @@ def productos_que_usan_receta(session: Session, receta_id: uuid.UUID) -> list[st
     )
 
 
+def valores_ofrecidos_de_receta(session: Session, receta_id: uuid.UUID) -> set[str]:
+    """`producto_atributo_valor.id` (texto) que algún producto de esta receta
+    puede recibir — la unión de `catalogo.valores_ofrecidos` de cada uno.
+
+    Lo consulta `inventory` para validar `receta_item.aplica_valores` al
+    escribir: la condición de una línea nombra valores del producto que usa
+    la receta, y sin este contrato el servidor no tenía cómo saber si un
+    valor pertenece a algo que de verdad vende esa receta. Conjunto vacío =
+    ningún producto la usa (o ninguno ofrece nada) — el llamador decide qué
+    hacer con eso, acá no hay nada contra qué validar.
+    """
+    # Import diferido: `catalogo` importa `inventory.queries_publicas`, que
+    # importa `recetas`, que importa este módulo — a nivel de archivo el
+    # ciclo se cerraría.
+    from src.modules.sales.application import catalogo as catalogo_uc
+
+    productos = list(
+        session.scalars(
+            select(ProductoComercial).where(ProductoComercial.receta_id == receta_id)
+        )
+    )
+    ofrecidos: set[str] = set()
+    for producto in productos:
+        ofrecidos |= catalogo_uc.valores_ofrecidos(session, producto)
+    return ofrecidos
+
+
 def atributo_de_valores(
     session: Session, valor_ids: Sequence[uuid.UUID | str]
 ) -> dict[str, str]:

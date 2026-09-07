@@ -810,8 +810,10 @@ de su módulo y se prueban de forma aislada.
 - **RN-GEN-004** Los agentes de IA (`tipo=agente_ia`) obedecen exactamente las
   mismas reglas de dominio que un humano; solo cambian sus permisos.
 - **RN-GEN-005** Todo Activo (artículo, activo no corriente, producto
-  comercial, servicio) tiene un `id_interno` de 4 caracteres alfanuméricos,
-  autogenerado por el ERP al crearse, inmutable e irrepetible.
+  comercial, servicio) tiene un `id_interno` de hasta 8 caracteres
+  alfanuméricos, único en todo el grupo (no por empresa). Se autogenera al
+  crearse; se corrige por pantalla (nunca por planilla, ADR-052), no es
+  inmutable.
 - **RN-GEN-006** Dar de baja o descontinuar un Activo lo archiva (se oculta
   de listados); nunca se elimina de la base de datos.
 - **RN-GEN-007** Los datos de una persona natural (nombres, apellidos,
@@ -1212,6 +1214,14 @@ producción se hace en cocinas de sucursal. Ver
   después: entre pedir y aprobar el stock se mueve, y recalcularla contaría
   una historia distinta de la que quien pidió vio. Es lo que le permite al
   abastecedor priorizar sin adivinar.
+- **RN-INV-026** Cerrar un conteo cíclico arma o pone al día el borrador del
+  requerimiento del almacén contado (RN-INV-023), sin excepción por tipo de
+  conteo. El conteo es exactamente el momento en que alguien tiene el
+  estante a la vista; el borrador es **aditivo** (RN-INV-023), así que
+  dispararlo en cada cierre nunca pisa lo que el turno ya tecleó. Un almacén
+  sin abastecedor propio (el central, principio de la cadena) no arma
+  borrador — el conteo se cierra igual, armar la lista es una consecuencia
+  del cierre, no una condición.
 - **RN-INV-025** El catálogo de artículos **se baja, se edita y se vuelve a
   subir** en el mismo formato, con revisión en el medio (ADR-051). La
   identidad de una fila es su `ID` o, si va vacío, su **código interno** — el

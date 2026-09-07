@@ -99,8 +99,8 @@ erDiagram
   `activos` es virtual (sin ubicación física ni stock de SKUs). Equipamiento
   y política FEFO/FIFO por tipo — ver
   [domain-model.md](../domain/domain-model.md#almacenes).
-- **activo**: id_interno (4 alfanuméricos, autogenerado, inmutable,
-  único), empresa_id, categoria_id (opcional), nombre, ficha técnica,
+- **activo**: id_interno (hasta 8 alfanuméricos, autogenerado, único en
+  todo el grupo, corregible por pantalla — RN-GEN-005), empresa_id, categoria_id (opcional), nombre, ficha técnica,
   número de serie, fecha de compra, proveedor_id, número de factura, valor
   de depreciación (calculada por el área contable), historial de
   mantenimiento/reparaciones, estado (`activo` | `de_baja`), archivado
@@ -349,8 +349,9 @@ erDiagram
   `POST /api/v1/inventory/categorias-udm`, permiso `gestionar_catalogo`,
   implementado 2026-08-02) — antes solo se editaba por seeder/migración.
 - **articulo** (inventariable): empresa_id (tenant directo — `categoria_id`
-  es opcional, no sirve de puente de tenant por sí solo), id_interno (4
-  alfanuméricos, autogenerado, inmutable, único — RN-GEN-005), nombre,
+  es opcional, no sirve de puente de tenant por sí solo), id_interno (hasta
+  8 alfanuméricos, autogenerado, único en todo el grupo, corregible por
+  pantalla — RN-GEN-005), nombre,
   categoria_id (opcional), unidad_medida_id, tipo (`insumo` | `subreceta` | `mercaderia` | `empaque`
   | `repuesto` | `suministro` — **enum extensible**: se agregan tipos
   nuevos cuando el negocio lo requiera, sin migración destructiva),
@@ -410,8 +411,9 @@ erDiagram
   del artículo** y se redondea a sus decimales (RN-UDM-001, RN-COM-024): la
   línea no tiene columna de UdM porque sería una segunda verdad sobre la
   misma cantidad.
-- **producto_comercial** (vendible): id_interno (4 alfanuméricos,
-  autogenerado, inmutable, único), marca_id, nombre, receta_id (**nullable
+- **producto_comercial** (vendible): id_interno (hasta 8 alfanuméricos,
+  autogenerado, único en todo el grupo, corregible por pantalla —
+  RN-GEN-005), marca_id, nombre, receta_id (**nullable
   desde ADR-023**: NULL solo en el padre de un grupo de variantes),
   **producto_padre_id** (nullable, auto-FK — si está seteado, esta fila es
   una variante: Pizza Peperoni Familiar cuelga de Pizza Peperoni),
@@ -473,8 +475,9 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   `venta_item.precio_unitario` sigue siendo el snapshot de lo cobrado: una
   venta ya confirmada no cambia si la lista cambia después.
 
-- **servicio** (vendible, intangible): id_interno (4 alfanuméricos,
-  autogenerado, inmutable, único), marca_id, nombre, tipo (`delivery` |
+- **servicio** (vendible, intangible): id_interno (hasta 8 alfanuméricos,
+  autogenerado, único en todo el grupo, corregible por pantalla —
+  RN-GEN-005), marca_id, nombre, tipo (`delivery` |
   ... — catálogo futuro), fórmula de costeo (JSONB, propia por tipo),
   margen_contribucion, pct_emergencia, tarifa (fija o por distancia —
   delivery usa por distancia; RN-SRV-001..003), archivado (bool — oculta

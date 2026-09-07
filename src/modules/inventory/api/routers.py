@@ -5,8 +5,9 @@ Reusa las dependencias de auth/RBAC del módulo users (mecanismo transversal).
 
 import uuid
 from datetime import date
+from typing import Literal
 
-from fastapi import APIRouter, Depends, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
@@ -50,8 +51,10 @@ from src.modules.users.api.deps import (
     require_permission,
     tiene_permiso,
 )
+from src.modules.users.application.queries_publicas import nombres_de_usuarios
 from src.modules.users.infrastructure.models import Usuario
 from src.shared import planilla
+from src.shared.integrations.factiliza import FactilizaError
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -362,6 +365,20 @@ def crear_sku(
         codigo=body.codigo,
         codigo_barras=body.codigo_barras,
     )
+    session.commit()
+    return sku
+
+
+@router.patch("/skus/{sku_id}", response_model=schemas.SkuOut)
+def editar_sku(
+    sku_id: uuid.UUID,
+    body: schemas.SkuUpdate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_sku(session, sku_id, tenant)
+    sku = catalogo.editar_sku(session, sku_id, **body.model_dump())
     session.commit()
     return sku
 
@@ -1073,6 +1090,32 @@ def listar_guias(
     )
 
 
+@router.get(
+    "/guias-remision/{guia_id}/descargar/{formato}", response_class=Response
+)
+def descargar_guia(
+    guia_id: uuid.UUID,
+    formato: Literal["pdf", "xml", "cdr"],
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    """Baja el PDF que se entrega con la carga, o el XML firmado y el CDR
+    que son el respaldo ante SUNAT. Mismo criterio que el comprobante
+    (`sales/comprobantes.descargar_documento`): se pide a Factiliza en el
+    momento y no se archiva."""
+    try:
+        documento = guias_uc.descargar_documento(session, guia_id, formato)
+    except FactilizaError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(e)) from e
+    return Response(
+        content=documento.contenido,
+        media_type=documento.content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{documento.nombre_archivo}"'
+        },
+    )
+
+
 # --- Conteo cíclico ---------------------------------------------------------
 # `/conteos/programa` y `/conteos/verificar-vencidos` van antes que
 # `/conteos/{conteo_id}`: si no, FastAPI intenta leer "programa" como UUID.
@@ -1720,9 +1763,13 @@ def ver_devolucion(
 ):
     exigir_devolucion(session, devolucion_id, tenant)
     devolucion, items = devoluciones_uc.detalle(session, devolucion_id)
+    ids = [i for i in (devolucion.registrado_por, devolucion.anulado_por) if i]
+    nombres = nombres_de_usuarios(session, ids)
     return schemas.DevolucionDetalleOut(
         **schemas.DevolucionOut.model_validate(devolucion).model_dump(),
         items=[schemas.DevolucionItemOut.model_validate(i) for i in items],
+        registrado_por_nombre=nombres.get(devolucion.registrado_por),
+        anulado_por_nombre=nombres.get(devolucion.anulado_por),
     )
 
 
@@ -1740,6 +1787,20 @@ def anular_devolucion(
     devolucion = devoluciones_uc.anular_devolucion(session, devolucion_id, actor.id)
     session.commit()
     return devolucion
+
+
+@router.get(
+    "/devoluciones/{devolucion_id}/guia-remision",
+    response_model=schemas.GuiaRemisionOut,
+)
+def ver_guia_de_devolucion(
+    devolucion_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_devolucion(session, devolucion_id, tenant)
+    return guias_uc.de_devolucion(session, devolucion_id)
 
 
 @router.post("/devoluciones/{devolucion_id}/guia-remision",
