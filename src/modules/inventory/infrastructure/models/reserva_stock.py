@@ -9,7 +9,7 @@ Sirve para que dos sucursales no se prometan el mismo saco de harina.
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Numeric
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -45,6 +45,21 @@ ESTADO_RESERVA = Enum(
 
 class ReservaStock(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "reserva_stock"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('solicitud', 'produccion', 'merma', 'carrito')",
+            name="tipo_reserva",
+        ),
+        CheckConstraint(
+            "motivo IN ('devolucion', 'rechazo_sucursal', 'auditoria')",
+            name="motivo_reserva_merma",
+        ),
+        CheckConstraint(
+            "estado IN ('activa', 'liberada', 'consumida', 'pendiente_desecho')",
+            name="estado_reserva",
+        ),
+    )
 
     almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))
     sku_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sku.id"))

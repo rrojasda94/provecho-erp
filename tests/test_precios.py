@@ -10,12 +10,10 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 import src.core.models_registry  # noqa: F401
-from src.core.app import create_app
 from src.core.database import Base
 from src.modules.inventory.application import listeners
 from src.modules.inventory.infrastructure.models import (
@@ -45,10 +43,8 @@ MANANA = HOY + timedelta(days=1)
 
 
 @pytest.fixture()
-def env(monkeypatch):
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+def env(monkeypatch, _app_compartida, _engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     monkeypatch.setattr(listeners, "session_factory", TestSession)
@@ -87,7 +83,7 @@ def env(monkeypatch):
                    marca_id=str(marca.id), producto_id=str(producto.id))
         s.commit()
 
-    app = create_app()
+    app = _app_compartida
 
     def _override_get_db():
         session = TestSession()

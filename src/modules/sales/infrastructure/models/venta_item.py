@@ -5,7 +5,7 @@ vender (snapshot — no depende de lista_precio para existir).
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -14,6 +14,14 @@ from src.core.model_base import JsonB, TimestampMixin, UuidPkMixin
 
 class VentaItem(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "venta_item"
+
+    __table_args__ = (
+        CheckConstraint(
+            "estado_preparacion IN ('pendiente', 'en_preparacion', 'listo', "
+            "'entregado')",
+            name="estado_preparacion_item",
+        ),
+    )
 
     venta_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("venta.id"))
     producto_comercial_id: Mapped[uuid.UUID] = mapped_column(

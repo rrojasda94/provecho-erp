@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text, func
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -29,6 +29,10 @@ class ReporteEmitido(Base, UuidPkMixin, TimestampMixin):
         Index("ix_reporte_emitido_empresa", "empresa_id", "emitido_at"),
         # La columna de la matriz: cuántos y cuándo por emisión.
         Index("ix_reporte_emitido_codigo", "codigo_emision", "emitido_at"),
+        CheckConstraint(
+            "nivel IN ('info', 'aviso', 'urgente')",
+            name="nivel_reporte",
+        ),
     )
 
     # Nulo solo si el hecho no pudo atribuirse a una empresa (un almacén

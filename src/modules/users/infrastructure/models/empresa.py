@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -19,6 +19,18 @@ class Empresa(
     Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, UbicacionMixin
 ):
     __tablename__ = "empresa"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('operativa', 'logistica', 'servicios', 'asesoria', "
+            "'transporte')",
+            name="tipo_empresa",
+        ),
+        CheckConstraint(
+            "zona_tributaria IN ('amazonia_ley27037', 'general')",
+            name="zona_tributaria",
+        ),
+    )
 
     grupo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("grupo.id"))
     razon_social: Mapped[str] = mapped_column(String(255))

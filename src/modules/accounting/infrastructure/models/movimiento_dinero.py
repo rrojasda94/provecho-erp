@@ -11,7 +11,15 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -20,7 +28,21 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class MovimientoDinero(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "movimiento_dinero"
-    __table_args__ = (UniqueConstraint("comprobante_id"),)
+    __table_args__ = (
+        UniqueConstraint("comprobante_id"),
+        CheckConstraint(
+            "tipo IN ('egreso', 'ingreso')",
+            name="tipo_movimiento_dinero",
+        ),
+        CheckConstraint(
+            "medio_pago IN ('transferencia', 'cheque', 'efectivo')",
+            name="medio_pago_movimiento_dinero",
+        ),
+        CheckConstraint(
+            "estado IN ('pendiente', 'ejecutado', 'rechazado')",
+            name="estado_movimiento_dinero",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     tipo: Mapped[str] = mapped_column(

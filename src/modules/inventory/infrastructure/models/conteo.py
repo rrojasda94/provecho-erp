@@ -12,7 +12,7 @@ el conteo nunca toca el stock por su cuenta.
 import datetime
 import uuid
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, String
+from sqlalchemy import CheckConstraint, Date, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -37,6 +37,17 @@ ESTADO_CONTEO = Enum(
 
 class Conteo(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "conteo"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('rutina', 'ajuste', 'auditoria')",
+            name="tipo_conteo",
+        ),
+        CheckConstraint(
+            "estado IN ('abierto', 'cerrado', 'anulado')",
+            name="estado_conteo",
+        ),
+    )
 
     almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))
     # NULL = conteo general (todas las categorías del almacén).

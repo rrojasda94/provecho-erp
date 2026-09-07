@@ -3,7 +3,7 @@ no nulo (conversión real), no por volumen bruto — RN-MKT-003."""
 
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -12,6 +12,13 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class Lead(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "lead"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('contacto', 'visita', 'cupon', 'registro')",
+            name="tipo_lead",
+        ),
+    )
 
     campana_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campana.id"))
     canal: Mapped[str] = mapped_column(String(50))

@@ -14,7 +14,7 @@ import datetime
 import uuid
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
@@ -40,8 +40,8 @@ from tests.conftest import abrir_caja_directa
 
 
 @pytest.fixture()
-def env():
-    engine = create_engine("sqlite://")
+def env(_engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         grupo = Grupo(nombre="Grupo Majambo")

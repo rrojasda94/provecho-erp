@@ -276,16 +276,28 @@ La diferencia no es teórica: ya dejó pasar bugs.
   cuyo almacén ya no existe) y tres tests que sembraban un id inventado.
   Corolario para escribir tests: **un `uuid.uuid4()` en una columna FK ya no
   compila** — hay que sembrar la fila, que es lo que la base real exige.
-- **Largo de `VARCHAR` y tipos** — SQLite no los valida (ver
-  `docs/roadmap/deuda/transversal.md`). Sigue abierto: la única red es probar
-  cada migración contra un Postgres real. Los importadores de planilla
-  (2026-08-20, ADR-052) le agregan una segunda: **validan el largo ellos
-  mismos**, por fila, para que un `Código = "HARINA"` se reporte como problema
-  en vez de pasar en verde y dar `StringDataRightTruncation` en producción — y
-  `test_importacion_articulos.py` ata la constante a `Articulo.__table__.c
-  .id_interno.type.length`, así que ensanchar la columna sin mover la
-  constante se pone rojo. Cubre las columnas que alguien se acordó de atar,
-  no todas.
+- **Largo de `VARCHAR` y tipos** — SQLite no los valida. La red histórica era
+  probar cada migración contra un Postgres real (job `migraciones`) y que
+  los importadores de planilla (2026-08-20, ADR-052) **validen el largo
+  ellos mismos**, por fila, para que un `Código = "HARINA"` se reporte como
+  problema en vez de pasar en verde y dar `StringDataRightTruncation` en
+  producción — `test_importacion_articulos.py` ata la constante a
+  `Articulo.__table__.c.id_interno.type.length`, así que ensanchar la
+  columna sin mover la constante se pone rojo. Cubre las columnas que
+  alguien se acordó de atar, no todas. Desde **2026-09-06** (ADR-090) hay
+  una tercera red que no depende de acordarse de nada por columna: la suite
+  **completa** puede correr contra un Postgres real seteando
+  `TEST_DATABASE_URL` (job `backend-postgres` en CI, no obligatorio) — cada
+  test recibe su propio schema (`tests/conftest.py::crear_engine_de_prueba`),
+  mismo aislamiento que el SQLite `:memory:` de siempre.
+- **`Enum(native_enum=False)` sin `CHECK`** — desde SQLAlchemy 1.4,
+  `create_constraint` vale `False` por defecto: un valor fuera del
+  vocabulario entraba sin ruido y reventaba recién en la lectura
+  (`LookupError` → 500). Las 113 columnas que le faltaba el `CHECK`
+  (`persona.tipo_documento` fue la primera, `c9f4a2e70b18`) lo tienen desde
+  ADR-090 — y como SQLite **sí** hace cumplir un `CHECK` una vez que existe,
+  esto ya se prueba en cualquier corrida, sin necesidad de Postgres. Guardia
+  en `tests/test_arquitectura.py` para que la lista no vuelva a crecer.
 - **`statement_timeout`** — no existe en SQLite. La configuración de los dos
   engines (`docs/engineering/devops.md` → «Dos engines») es inocua ahí, a
   propósito: fuera de Postgres el parámetro no se pasa.
@@ -298,6 +310,8 @@ costaba ~130 ms de ida y vuelta: lo pagaba toda prueba que pasara por HTTP
 y también las pantallas, que se sentían lentas en desarrollo. En local esa
 latencia baja al orden del milisegundo.
 
-Las pruebas automatizadas siguen usando SQLite en memoria o un archivo
-desechable: no dependen de que Postgres esté levantado. El cambio le pega
-sobre todo a e2e y al trabajo manual contra la API.
+Las pruebas automatizadas siguen usando SQLite en memoria por default: no
+dependen de que Postgres esté levantado. El cambio le pega sobre todo a e2e
+y al trabajo manual contra la API. La excepción es correr la suite con
+`TEST_DATABASE_URL` seteada (ver arriba, ADR-090), que sí necesita el
+`db` del docker-compose arriba.

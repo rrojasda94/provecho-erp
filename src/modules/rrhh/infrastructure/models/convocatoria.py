@@ -6,7 +6,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Date, Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -15,6 +15,17 @@ from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
 
 class Convocatoria(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "convocatoria"
+
+    __table_args__ = (
+        CheckConstraint(
+            "motivo IN ('reemplazo', 'refuerzo', 'puesto_nuevo')",
+            name="motivo_convocatoria",
+        ),
+        CheckConstraint(
+            "estado IN ('borrador', 'publicada', 'cerrada')",
+            name="estado_convocatoria",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     # Dónde se necesita cubrir el puesto; nulo si es transversal a la empresa.

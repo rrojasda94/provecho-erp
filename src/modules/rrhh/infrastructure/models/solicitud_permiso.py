@@ -6,7 +6,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Date, Enum, ForeignKey, Numeric, Text
+from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, Numeric, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -15,6 +15,18 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class SolicitudPermiso(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "solicitud_permiso"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('vacaciones', 'licencia_con_goce', 'licencia_sin_goce', "
+            "'permiso_horas')",
+            name="tipo_solicitud_permiso",
+        ),
+        CheckConstraint(
+            "estado IN ('pendiente', 'aprobada', 'rechazada')",
+            name="estado_solicitud_permiso",
+        ),
+    )
 
     trabajador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trabajador.id"))
     tipo: Mapped[str] = mapped_column(

@@ -8,13 +8,11 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 import src.core.models_registry  # noqa: F401  (puebla Base.metadata)
 from src.config.settings import settings
-from src.core.app import create_app
 from src.core.database import Base
 from src.modules.users.api.deps import get_db
 from src.modules.users.domain import rules
@@ -22,16 +20,14 @@ from src.modules.users.infrastructure.models import RefreshToken
 
 
 @pytest.fixture()
-def entorno():
+def entorno(_app_compartida, _engine_de_prueba):
     """La app sembrada y su `sessionmaker`.
 
     Se separa de `client` para que una prueba que necesita tocar la base por
     fuera de la API —envejecer un refresh token, por ejemplo— pida las dos
     cosas sin duplicar el armado.
     """
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
@@ -40,7 +36,7 @@ def entorno():
     with TestSession() as s:
         seed(s)
 
-    app = create_app()
+    app = _app_compartida
 
     def _override_get_db():
         session = TestSession()

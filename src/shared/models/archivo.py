@@ -7,7 +7,7 @@ las tablas `plantilla` y `usuario` (slices posteriores).
 
 import uuid
 
-from sqlalchemy import BigInteger, Enum, String, Uuid
+from sqlalchemy import BigInteger, CheckConstraint, Enum, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -16,6 +16,10 @@ from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
 
 class Archivo(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "archivo"
+
+    __table_args__ = (
+        CheckConstraint("origen IN ('generado', 'subido')", name="origen_archivo"),
+    )
 
     nombre: Mapped[str] = mapped_column(String(255))
     extension: Mapped[str] = mapped_column(String(10))

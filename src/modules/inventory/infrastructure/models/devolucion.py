@@ -20,7 +20,7 @@ movimiento y dos lugares donde el stock puede quedar distinto.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -65,6 +65,26 @@ ESTADO_DEVOLUCION = Enum(
 
 class Devolucion(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "devolucion"
+
+    __table_args__ = (
+        CheckConstraint(
+            "origen IN ('proveedor', 'cliente')",
+            name="origen_devolucion",
+        ),
+        CheckConstraint(
+            "motivo IN ('vencido', 'dañado', 'incumplimiento_plazo', "
+            "'no_requerido', 'error_solicitud', 'duplicidad')",
+            name="motivo_devolucion",
+        ),
+        CheckConstraint(
+            "destino IN ('desecho', 'auditoria', 'reintegro')",
+            name="destino_devolucion",
+        ),
+        CheckConstraint(
+            "estado IN ('registrada', 'anulada')",
+            name="estado_devolucion",
+        ),
+    )
 
     almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))
     origen: Mapped[str] = mapped_column(ORIGEN_DEVOLUCION)

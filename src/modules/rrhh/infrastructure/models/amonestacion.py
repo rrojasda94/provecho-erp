@@ -5,7 +5,7 @@ derecho a descargo."""
 import uuid
 from datetime import date
 
-from sqlalchemy import Date, Enum, ForeignKey, String, Text
+from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -14,6 +14,13 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class Amonestacion(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "amonestacion"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('verbal', 'escrita')",
+            name="tipo_amonestacion",
+        ),
+    )
 
     trabajador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trabajador.id"))
     tipo: Mapped[str] = mapped_column(

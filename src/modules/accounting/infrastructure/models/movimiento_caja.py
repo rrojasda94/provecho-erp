@@ -12,7 +12,7 @@ banco). Esto es exclusivamente el efectivo físico de UNA apertura de caja.
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -21,6 +21,13 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class MovimientoCaja(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "movimiento_caja"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('ingreso', 'retiro')",
+            name="tipo_movimiento_caja",
+        ),
+    )
 
     # El cierre suma todos los movimientos de su apertura: se consulta por
     # esta columna en cada cierre y en cada arqueo.

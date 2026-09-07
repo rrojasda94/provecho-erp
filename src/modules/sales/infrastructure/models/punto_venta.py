@@ -4,7 +4,7 @@ web o kiosko).
 
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -13,6 +13,16 @@ from src.core.model_base import JsonB, TimestampMixin, UuidPkMixin
 
 class PuntoVenta(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "punto_venta"
+
+    __table_args__ = (
+        CheckConstraint(
+            "canal IN ('trabajador', 'web', 'kiosko')", name="canal_punto_venta"
+        ),
+        CheckConstraint(
+            "politica_pago IN ('adelantado', 'al_finalizar')",
+            name="politica_pago_punto_venta",
+        ),
+    )
 
     sucursal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sucursal.id"))
     canal: Mapped[str] = mapped_column(

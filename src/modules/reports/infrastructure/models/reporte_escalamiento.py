@@ -70,6 +70,24 @@ class ReporteEscalamiento(Base, UuidPkMixin, TimestampMixin):
             "OR (cerrado_at IS NOT NULL)",
             name="ck_reporte_escalamiento_cierre_fechado",
         ),
+        CheckConstraint(
+            "origen IN ('central_pedidos', 'punto_venta', 'produccion')",
+            name="origen_escalamiento",
+        ),
+        CheckConstraint(
+            "motivo IN ('queja', 'demora', 'error_sistema', "
+            "'desistimiento_no_resuelto', 'no_conformidad_calidad')",
+            name="motivo_escalamiento",
+        ),
+        CheckConstraint(
+            "nivel_actual IN ('supervisor', 'comercial', 'gerencia')",
+            name="nivel_escalamiento",
+        ),
+        CheckConstraint(
+            "estado IN ('abierto', 'resuelto_supervisor', 'escalado', "
+            "'resuelto', 'cerrado')",
+            name="estado_escalamiento",
+        ),
     )
 
     # Desnormalizada y NOT NULL: filtrar por tenant sin join, y un reporte que

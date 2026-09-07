@@ -234,17 +234,15 @@ def test_un_ruc_sin_domicilio_no_rompe(monkeypatch):
 
 # --- El endpoint HTTP -------------------------------------------------------
 @pytest.fixture()
-def api(monkeypatch):
+def api(monkeypatch, _app_compartida, _engine_de_prueba):
     """La consulta expuesta al frontend. Existía el cliente y existían los
     helpers que lo usan al crear, pero ninguna pantalla podía preguntar antes
     de tipear: `nombres_desde_dni` no se llamaba desde ningún caso de uso."""
     from fastapi.testclient import TestClient
-    from sqlalchemy import create_engine, select
+    from sqlalchemy import select
     from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.pool import StaticPool
 
     import src.core.models_registry  # noqa: F401
-    from src.core.app import create_app
     from src.core.database import Base
     from src.modules.users.api.deps import get_db
     from src.modules.users.infrastructure.models import Rol, Usuario, UsuarioRol
@@ -255,9 +253,7 @@ def api(monkeypatch):
     # prueba el endpoint, no la configuración del despliegue.
     monkeypatch.setattr(settings, "factiliza_token", "token-de-prueba")
 
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     with TestSession() as s:
@@ -281,7 +277,7 @@ def api(monkeypatch):
             )
         s.commit()
 
-    app = create_app()
+    app = _app_compartida
 
     def _override():
         session = TestSession()

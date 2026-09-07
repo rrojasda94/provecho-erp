@@ -5,7 +5,7 @@ Contra SQLite en memoria: valida los datos sembrados y la idempotencia
 """
 
 import pytest
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
@@ -32,8 +32,8 @@ SEDE_CASTILLA = "Jr. Ramón Castilla 248 - Tarapoto"
 
 
 @pytest.fixture
-def session():
-    engine = create_engine("sqlite://")
+def session(_engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         yield s

@@ -8,12 +8,10 @@ prueba lo que usa la pantalla de administración: `GET /clientes/listado` y
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 import src.core.models_registry  # noqa: F401
-from src.core.app import create_app
 from src.core.database import Base
 from src.modules.sales.application import clientes as clientes_uc
 from src.modules.sales.infrastructure.models import Cliente
@@ -32,15 +30,13 @@ from src.modules.users.infrastructure.security import hash_pin
 
 
 @pytest.fixture()
-def env(monkeypatch):
+def env(monkeypatch, _app_compartida, _engine_de_prueba):
     # Sin esto el alta de un jurídico consulta SUNAT de verdad y la razón
     # social del test depende de la red.
     monkeypatch.setattr(
         clientes_uc, "razon_social_desde_ruc", lambda ruc, tecleada: tecleada
     )
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
@@ -87,7 +83,7 @@ def env(monkeypatch):
         )
         s.commit()
 
-    app = create_app()
+    app = _app_compartida
 
     def _override_get_db():
         session = TestSession()

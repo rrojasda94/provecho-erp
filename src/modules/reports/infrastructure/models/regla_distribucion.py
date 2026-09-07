@@ -12,7 +12,7 @@ existe (RN-REP-001).
 
 import uuid
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Index, String, text
+from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -43,6 +43,14 @@ class ReglaDistribucion(Base, UuidPkMixin, TimestampMixin):
             unique=True,
             sqlite_where=text("sucursal_id IS NULL"),
             postgresql_where=text("sucursal_id IS NULL"),
+        ),
+        CheckConstraint(
+            "nivel IN ('info', 'aviso', 'urgente')",
+            name="nivel_regla",
+        ),
+        CheckConstraint(
+            "canal IN ('bandeja')",
+            name="canal_regla",
         ),
     )
 

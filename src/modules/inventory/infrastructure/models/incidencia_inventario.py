@@ -20,7 +20,7 @@ Se agrega el día que haya que distinguir "ya lo arreglé" de "todavía no".
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -49,6 +49,17 @@ TIPO_INCIDENCIA = Enum(
 
 class IncidenciaInventario(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "incidencia_inventario"
+
+    __table_args__ = (
+        CheckConstraint(
+            "origen IN ('venta', 'orden_compra', 'orden_produccion')",
+            name="origen_incidencia_inventario",
+        ),
+        CheckConstraint(
+            "tipo IN ('sin_almacen', 'sin_sku', 'stock_insuficiente')",
+            name="tipo_incidencia_inventario",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"), index=True)
     origen: Mapped[str] = mapped_column(ORIGEN_INCIDENCIA)

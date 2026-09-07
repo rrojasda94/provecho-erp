@@ -27,22 +27,31 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   vez de una conexión real de 5 s —o, con la base de desarrollo levantada, un
   barrido corriendo contra ella—. `marketing/application/tasks.py` ya tenía
   `session_factory` y solo faltaba en la lista.
-- **Cada test rearma el esquema, el seeder y la app desde cero** (2026-08-08).
-  44 de los 58 archivos de test copiaron el mismo fixture `env` —
-  `create_engine("sqlite://")` + `create_all` de las 99 tablas + `seed(s)` +
-  `create_app()`— y **ninguno declara `scope=`**. Costo medido por test: 65 ms
-  el esquema, ~112 ms el seeder y ~200 ms `create_app()`, que hace a FastAPI
-  reanalizar la firma de todas las rutas (49.005 llamadas a `get_dependant` en
-  un solo archivo de 22 tests). Es la mayor parte de lo que queda: el trabajo
-  real del test es la minoría. Ya se atacó lo barato (Argon2id de prueba,
-  Redis en memoria, `pytest-xdist`, ver CHANGELOG 2026-08-08) y con eso
-  alcanza por ahora. Cuando vuelva a molestar, en este orden: **(a)**
-  `create_app()` una sola vez por sesión con `dependency_overrides[get_db]`
-  por test —quita el ~30% y es un fixture compartido, no un rediseño—; **(b)**
-  esquema + seed una sola vez y cada test dentro de una transacción con
-  `SAVEPOINT` que se revierte al terminar, que es el cambio grande porque
-  obliga a revisar los tests que hacen `commit()` a mano. No hacer (b) antes
-  de (a): puede que con (a) ya no haga falta.
+- ✅ 2026-09-06 **Cada test rearma el esquema, el seeder y la app desde
+  cero** (declarado 2026-08-08). Hecho el paso **(a)**: `create_app()` pasa a
+  compartirse una vez por sesión de pytest
+  (`tests/conftest.py::_app_compartida`) en vez de reconstruirse en cada uno
+  de los ~50 archivos que tenían su propio `env()` — quitaba ~200 ms por
+  test, el mayor costo individual. `crear_engine_de_prueba` centraliza
+  también la creación del motor (antes 75 `create_engine("sqlite://")`
+  repetidos) — condición necesaria para el punto siguiente: parametrizar el
+  motor por `TEST_DATABASE_URL` sin tocar 75 archivos de nuevo. El paso
+  **(b)** (esquema + seed una sola vez por worker con `SAVEPOINT` por test)
+  sigue sin hacer — no hizo falta para lo que motivó esto (ver ADR-090); si
+  el job `backend-postgres` resulta demasiado lento en la práctica, es el
+  siguiente escalón.
+- ✅ 2026-09-06 **La suite corre contra Postgres, no sólo SQLite** (ADR-090).
+  `crear_engine_de_prueba` da a cada test su propio schema Postgres cuando
+  `TEST_DATABASE_URL` está seteada — mismo aislamiento que el SQLite
+  `:memory:` de siempre, motor real. Nuevo job `backend-postgres` en CI (no
+  forma parte de los seis obligatorios, misma lógica que `uso`: hacerlo
+  obligatorio es una decisión aparte). Encontrado corriendo esto de verdad:
+  una sesión colgada bloqueaba el `DROP SCHEMA` del test siguiente —
+  probablemente un proceso de diagnóstico matado a la fuerza durante el
+  desarrollo, no un leak real de la app— así que se agregó
+  `idle_in_transaction_session_timeout`/`lock_timeout` igual, para que
+  cualquier sesión que no se cierre bien falle con un error legible en vez
+  de colgar el job para siempre.
 - ✅ 2026-08-08 **`audit_log` transversal de verdad** (ADR-031). La tabla
   declaraba "consumido por todos los módulos" y el código decía otra cosa:
   el único escritor era `AuditLogRepo` en `users`, `rrhh` lo alcanzaba
@@ -297,21 +306,25 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   segunda llamada sin caché sería confiar en el cliente. Contraste: la tarifa
   de delivery sí cachea su geometría (`_distancia_cacheada`).
 
-- ⬜ **112 columnas `Enum(native_enum=False)` sin CHECK** (113 en total, una arreglada) (encontrado 2026-08-30
-  arreglando `persona.tipo_documento`). `create_constraint` vale `False` por
-  defecto desde SQLAlchemy 1.4 y `validate_strings` también: un valor fuera del
-  vocabulario **entra sin ruido** —el bind processor lo deja pasar y la columna
-  es un `VARCHAR` del largo del valor más largo— y después revienta en la
-  **lectura**, con `LookupError` → 500 en cada consulta que cargue esa fila. No
-  es un alta rechazada: es una fila ilegible para todos hasta que alguien la
-  corrija a mano en la base. `persona.tipo_documento` es la que mordió (se le
-  puso un `CheckConstraint` explícito en `__table_args__` y el CHECK en la
-  migración `c9f4a2e70b18` — explícito y no `create_constraint=True` porque el
-  CHECK que genera el tipo queda ligado a él y `alembic check` no lo ve del
-  lado del modelo); el patrón está en todo el repo. Barrerlo es una migración con un CHECK por
-  columna y el saneo previo de cada una, así que va aparte. De paso: SQLite
-  **sí** hace cumplir los CHECK, así que ponerlos también cierra el hueco de
-  que la suite pase en verde sobre algo que Postgres rechaza.
+- ✅ 2026-09-06 **113 columnas `Enum(native_enum=False)` sin CHECK, barridas**
+  (ADR-090). `create_constraint` vale `False` por defecto desde SQLAlchemy
+  1.4 y `validate_strings` también: un valor fuera del vocabulario **entraba
+  sin ruido** —el bind processor lo dejaba pasar y la columna era un
+  `VARCHAR` del largo del valor más largo— y después reventaba en la
+  **lectura**, con `LookupError` → 500 en cada consulta que cargara esa
+  fila. Mismo patrón que `persona.tipo_documento` (`c9f4a2e70b18`,
+  2026-08-30, la primera en morder): `CheckConstraint` explícito en
+  `__table_args__` con el mismo `name=` que el `Enum` —no
+  `create_constraint=True`, que queda ligado al tipo y `alembic check` lo ve
+  como constraint sobrante del lado del modelo. 114 `CheckConstraint`
+  nuevos en 65 tablas, migración `c4f3e14f5bce` (sanea las columnas
+  nullable antes de crear el CHECK; las NOT NULL fallan ruidoso si hay una
+  fila sucia, no hay a dónde sanearlas sin inventar un dato). Probada de
+  verdad contra Postgres: `upgrade` → `downgrade` → `upgrade` →
+  `alembic check` limpio, y un `UPDATE` con un valor fuera de vocabulario
+  rechazado por el CHECK real. Guardia nueva en
+  `tests/test_arquitectura.py` para que la lista no vuelva a crecer sin que
+  el CHECK llegue en el mismo cambio.
 
 - ⬜ **El 8/11 del documento está escrito a mano en cuatro sitios más**
   (2026-08-30). El vocabulario y los largos por tipo ya viven en

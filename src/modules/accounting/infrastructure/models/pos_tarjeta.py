@@ -12,7 +12,14 @@ una sucursal, se presta a la que lo necesite.
 
 import uuid
 
-from sqlalchemy import Boolean, Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Enum,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -21,7 +28,13 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class PosTarjeta(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "pos_tarjeta"
-    __table_args__ = (UniqueConstraint("serie", name="uq_pos_tarjeta_serie"),)
+    __table_args__ = (
+        UniqueConstraint("serie", name="uq_pos_tarjeta_serie"),
+        CheckConstraint(
+            "estado IN ('operativo', 'averiado', 'baja')",
+            name="estado_pos_tarjeta",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     # NULL = terminal de emergencia del pool de contabilidad (RN-POS-009).

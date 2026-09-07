@@ -18,7 +18,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import src.core.models_registry  # noqa: F401
-from src.core.app import create_app
 from src.core.database import Base
 from src.modules.reports.application import destinatarios as resolucion
 from src.modules.reports.application import emision as emision_uc
@@ -181,10 +180,8 @@ def test_sin_ninguna_regla_no_hay_eleccion():
 # Con base: resolución de destinatarios y emisión.
 # =============================================================================
 @pytest.fixture()
-def env():
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+def env(_engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     Sesion = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     with Sesion() as s:
@@ -807,7 +804,7 @@ def test_un_area_de_otra_empresa_no_puede_ser_destinataria(env):
 # API: permisos, doble puerta y aislamiento de tenant.
 # =============================================================================
 @pytest.fixture()
-def api():
+def api(_app_compartida):
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -827,7 +824,7 @@ def api():
         def _override():
             yield s
 
-        app = create_app()
+        app = _app_compartida
         app.dependency_overrides[get_db] = _override
         app.dependency_overrides[get_db_reportes] = _override
         with TestClient(app) as c:

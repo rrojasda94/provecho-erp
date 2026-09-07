@@ -12,6 +12,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     Enum,
     ForeignKey,
@@ -29,7 +30,17 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 class EncuestaSatisfaccion(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "encuesta_satisfaccion"
     # Una encuesta por venta: reenviar no crea otra fila.
-    __table_args__ = (UniqueConstraint("venta_id"),)
+    __table_args__ = (
+        UniqueConstraint("venta_id"),
+        CheckConstraint(
+            "canal IN ('pos', 'whatsapp', 'link')",
+            name="canal_encuesta",
+        ),
+        CheckConstraint(
+            "estado IN ('enviada', 'respondida', 'expirada')",
+            name="estado_encuesta",
+        ),
+    )
 
     # De qué empresa es. Denormalizado a propósito, como `postulante`: la
     # encuesta cuelga de una venta y la venta vive en `sales`, así que sin

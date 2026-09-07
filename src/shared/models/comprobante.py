@@ -17,6 +17,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     Enum,
     ForeignKey,
@@ -79,6 +80,23 @@ class Comprobante(Base, UuidPkMixin, TimestampMixin):
         # La ficha de una OC pide sus comprobantes por acá, y `compra_id` no
         # tiene FK (es de otro módulo) así que tampoco tenía índice.
         Index("ix_comprobante_compra_id", "compra_id"),
+        CheckConstraint(
+            "direccion IN ('emitido', 'recibido')", name="direccion_comprobante"
+        ),
+        CheckConstraint(
+            "tipo IN ('boleta', 'factura', 'nc', 'rhe', 'ticket_compra')",
+            name="tipo_comprobante",
+        ),
+        CheckConstraint(
+            "sustento IN ('efectivo', 'voucher_medio_pago', "
+            "'movimiento_bancario', 'contrato_credito')",
+            name="sustento_comprobante",
+        ),
+        CheckConstraint(
+            "estado_emision IN ('no_aplica', 'pendiente', 'aceptado', "
+            "'rechazado', 'error')",
+            name="estado_emision_comprobante",
+        ),
     )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
