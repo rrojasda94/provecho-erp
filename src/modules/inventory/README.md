@@ -615,6 +615,13 @@ lote.
   vencimiento declarados por el proveedor (RN-VNC-002) y producción con
   `origen=produccion`. Un ingreso sin lote de un artículo que lo controla
   entra al lote del día — nada queda fuera de la trazabilidad.
+- **Reposición por anulación** (2026-09-06, ADR-094): una venta anulada, o
+  una nota de crédito con reposición, no entra al lote del día — entra al
+  lote del que salió. `listeners._reponer` reconstruye los lotes de la
+  salida original por `movimiento_inventario.referencia` (el `venta_id`) y
+  reparte en el mismo orden en que FEFO los tomó; una reposición parcial
+  prioriza el primer lote consumido. Sin rastro —venta anterior a este
+  cambio— cae al lote del día, como antes.
 
 | Método | Ruta | Permiso |
 |--------|------|---------|
@@ -706,9 +713,8 @@ editable desde Catálogo) manda sobre el diccionario de doce entradas de
 **Diferido (deuda del módulo):** del slice de abastecimiento,
 `reserva_stock` sigue con dos tipos sin productor (`produccion` y
 `carrito`, que esperan a sus módulos) y la transferencia no lleva vehículo
-ni tracking (`vehiculo` no existe). Del slice de lote: la reposición por
-venta anulada entra al lote del día y no al lote del que salió. Ver
-ROADMAP → Deuda técnica → Módulo inventory.
+ni tracking (`vehiculo` no existe). Ver ROADMAP → Deuda técnica → Módulo
+inventory.
 
 ## Barridos periódicos (Celery beat, 2026-08-06)
 
