@@ -20,8 +20,14 @@ Sin CHECK explícito (no `create_constraint=True`): ese queda ligado al tipo
 corrida contra el modelo, que ya declara el CHECK aparte en
 `__table_args__`.
 
+Rebasada al reconciliar en `docs/deuda-inventory-y-transversal-al-dia`
+(B7): escrita originalmente sobre `c7a1e94b2d38` (el head de `main` al
+abrir la rama), pero el bloque de `inventory` mergea antes y agrega su
+propia cadena de migraciones hasta `fab77826b2c9` — esta pasa a revisar
+esa, no la vieja, para no dejar dos cabezas.
+
 Revision ID: c4f3e14f5bce
-Revises: c7a1e94b2d38
+Revises: fab77826b2c9
 Create Date: 2026-09-06 20:15:17.110879
 
 """
@@ -32,7 +38,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "c4f3e14f5bce"
-down_revision: str | None = "c7a1e94b2d38"
+down_revision: str | None = "fab77826b2c9"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

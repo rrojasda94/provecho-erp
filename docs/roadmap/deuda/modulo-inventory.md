@@ -42,12 +42,13 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 - ✅ 2026-08-12 **Abastecedor de respaldo** (ADR-040, RN-INV-022,
   migración `a7c04e3b91d5`): dar de baja el central dejaba a la sucursal sin
   poder pedir nada.
-- ⬜ **No se puede vaciar un abastecedor ya elegido** (2026-08-12): los
-  `PATCH` de organización tratan `null` como "no tocar" (convención de
-  `users/api/schemas.py`), así que elegir "Ninguno" en el selector no lo
-  limpia — solo lo deja como estaba. Es previo a este cambio y ahora tiene un
-  campo más. Se arregla con un centinela explícito en el `Update`, que es un
-  cambio de contrato para las cinco entidades de organización.
+- ✅ 2026-09-06 **Ya se puede vaciar un abastecedor ya elegido** (declarado
+  2026-08-12, resuelto en `docs/roadmap/deuda/transversal.md` → "El PATCH de
+  organización no tenía forma de vaciar un opcional", ADR-096, bloque
+  `fix/transversal-patch-vaciar-un-opcional`). Era la misma deuda anotada
+  dos veces en dos documentos — el centinela explícito que pedía esta
+  entrada es exactamente el que entró ahí, para las cinco entidades de
+  organización.
 
 - ✅ 2026-08-03 **Recetas editables** (ADR-023, migración `b6d1e83f47ac`):
   CRUD de receta e ítems, duplicar con "(copy)", escalar por factor y
@@ -104,11 +105,12 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     (`disponible_negativo` en el catálogo, ADR-024). Sigue siendo un estado
     alcanzable a propósito; lo que faltaba era dónde verlo sin saber de
     antemano qué SKU mirar.
-  - 🔶 **Tipos de reserva sin productor**: `merma` ya lo tiene
-    (2026-08-06, ADR-028). Quedan `produccion` y `carrito`, que esperan a
-    sus módulos, y eso **no es un pendiente de este módulo**: construirle un
-    productor a un tipo cuyo caso de uso todavía no existe es inventar el
-    caso de uso.
+  - ✅ 2026-09-06 **Tipos de reserva sin productor — cerrado por decisión**:
+    `merma` ya lo tiene (2026-08-06, ADR-028). Quedan `produccion` y
+    `carrito`, que esperan a sus módulos. **Decisión**: no es un pendiente
+    de este módulo — construirle un productor a un tipo cuyo caso de uso
+    todavía no existe es inventar el caso de uso. Vuelve cuando el módulo
+    que lo necesita lo pida.
   - ✅ 2026-08-07 **Transferencia sin vehículo ni tracking — descartado**
     (decidido con el usuario). No hay flota: el traslado lo hace alguien del
     grupo en su propio vehículo, y la placa se teclea en la guía, que es el
@@ -172,12 +174,14 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     marca `por_vencer` con la ventana del artículo; `por_vencer_dias` en la
     consulta la sobrescribe. Un artículo sin ventana no avisa —`False`, no
     `True`: sin política de vencimiento no hay nada que avisar.
-  - 🔶 **`inventory.lote_vencido_detectado`: consumidor ✅ 2026-08-06,
-    `responsable_id` sigue pendiente.** `users` lo pone en la bandeja del
-    almacén con nivel `urgente` —el stock ya se contaba como vendible—.
-    Lo que queda es el memorándum a RRHH (RN-VNC), bloqueado no por falta
-    de aviso sino porque `almacen` no tiene responsable modelado: se avisa
-    al rol, no a una persona.
+  - ✅ 2026-09-06 **`inventory.lote_vencido_detectado`: `responsable_id` —
+    cerrado por decisión** (consumidor ✅ 2026-08-06). `users` lo pone en la
+    bandeja del almacén con nivel `urgente` —el stock ya se contaba como
+    vendible—. **Decisión**: el memorándum a RRHH (RN-VNC) queda bloqueado
+    porque `almacen` no tiene responsable modelado, y modelarlo solo para
+    esto sería invertido — se avisa al rol, y el rol es quien mira la
+    bandeja. Entra el día que aparezca un responsable por almacén con más
+    de un uso.
   - ✅ 2026-08-06 **Motivo del override de lote**
     (`movimiento_inventario.motivo_lote`, RN-LOT-004 nueva). Se exige solo
     cuando el lote elegido **no** es el que FEFO sugería: pedirlo también
@@ -289,11 +293,13 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   mermas que había apartado; no borra la fila.
   **Sucursal→central no se modeló acá**: es una `transferencia` (ADR-020) y
   duplicarla sería un segundo camino para el mismo movimiento.
-- 🔶 **Guía de una venta con reparto**: `guia_remision.transferencia_id`
-  **ya es nullable** desde 2026-08-06 —la devolución a proveedor fue el
-  segundo emisor y forzó el cambio, tal como este punto anticipaba—, así
-  que el reparto propio solo tendría que sumar su `venta_id`. Sigue abierto
-  porque no hay reparto propio todavía.
+- ✅ 2026-09-06 **Guía de una venta con reparto — cerrado por decisión**:
+  `guia_remision.transferencia_id` **ya es nullable** desde 2026-08-06 —la
+  devolución a proveedor fue el segundo emisor y forzó el cambio, tal como
+  este punto anticipaba—, así que el reparto propio solo tendría que sumar
+  su `venta_id`, una columna. **Decisión**: no hay reparto propio todavía
+  (`sales` no lo modela), así que no hay caso de uso que sumar la columna
+  resuelva. Entra el mismo día que `sales` tenga reparto propio.
 - ✅ 2026-09-06 **Descarga de PDF/XML/CDR de la guía** (bloque
   `feat/inventario-guia-remision`). `FactilizaClient.descargar` ganó
   `recurso: "invoice" | "despatch"` —mismo verbo, mismo formato de
@@ -375,9 +381,16 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   resuelve `registrado_por`/`anulado_por` y los suma a
   `DevolucionDetalleOut` como `_nombre`; no se tocó el listado, que no los
   necesita y evitaría una resolución N+1 por fila.
-- ⬜ **La nota de crédito sigue sin pantalla** (`sales/application/notas_credito.py`):
-  es la devolución de una **venta**, no de mercadería, y por eso no entró
-  con esto. Sin ella, deshacer algo ya cobrado no tiene camino por UI.
+- ✅ 2026-09-06 **Corrección: "la nota de crédito sigue sin pantalla" era
+  falso** (declarado originalmente, corregido al recontar la deuda). Existe
+  desde el 2026-08-06: `emitirNotaCreditoAction` en
+  `frontend/app/(app)/ventas/actions.ts:63`, `DialogoNotaCredito` en
+  `frontend/app/(app)/ventas/jornada-cliente.tsx:193` (total o parcial por
+  línea, repone stock). Es la devolución de una **venta**, no de mercadería
+  — nunca fue deuda de `inventory`; entró acá por error de clasificación.
+  Lo que sí sigue sin hacer (representación impresa y un listado propio de
+  notas de crédito) se anota en `docs/roadmap/deuda/modulo-sales.md`, que es
+  donde corresponde.
 - ✅ 2026-08-15 **El importador se puede usar de verdad** (ADR-048). Desde
   ADR-046 el backend estaba bien y la pantalla no servía para nada: el proxy
   del navegador (`frontend/app/api/proxy/[...ruta]/route.ts`) decodificaba
@@ -547,3 +560,10 @@ poner el jamón en la Mitad 1 y en la Mitad 2 — el caso exacto por el que
 existe ADR-056. Ahora filtra por `(insumo, condición)`, la misma identidad
 del 409 del servidor y de la celda de la matriz.
 
+
+## Anotación (no es deuda, queda escrita)
+
+`frontend/uso/responsive.spec.ts` visitaba `/inventario/skus`, que **no
+tiene `page.tsx`** propio (sólo `skus/[id]`): no hay lista, se llega a un
+SKU desde la ficha de su artículo. Sale del smoke (2026-09-06) hasta que
+alguien decida que hace falta una lista propia — hoy nadie la pidió.

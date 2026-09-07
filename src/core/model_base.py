@@ -59,7 +59,8 @@ class UbicacionMixin:
     dirección en una app de navegación.
 
     Prefijo `ubicacion_` y no `direccion_` justamente porque la columna de
-    texto no se llama igual en las cinco tablas que lo usan.
+    texto no se llama igual en las siete tablas que lo usan (`empresa`,
+    `sucursal`, `almacen`, `persona`, `cliente`, `proveedor`, `venta`).
 
     **Todo nullable.** Una dirección escrita a mano es válida: en Tarapoto hay
     calles que Google no conoce, y el alta no puede depender de que un tercero

@@ -42,7 +42,9 @@ const RUTAS = [
   "/inventario/lotes",
   "/inventario/ajustes",
   "/inventario/categorias",
-  "/inventario/skus",
+  // "/inventario/skus" no tiene page.tsx propio (sólo "skus/[id]"): no hay
+  // lista, se llega a un SKU desde la ficha de su artículo. Sale del smoke
+  // hasta que exista la lista (docs/roadmap/deuda/modulo-inventory.md).
   "/inventario/unidades-medida",
   "/inventario/devoluciones",
   "/inventario/mermas",
