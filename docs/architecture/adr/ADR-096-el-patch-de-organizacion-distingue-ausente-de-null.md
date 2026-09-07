@@ -92,8 +92,6 @@ Las cinco entidades de organización adoptan el mismo mecanismo:
 ## Nota de coordinación
 
 Esta rama (`fix/transversal-patch-vaciar-un-opcional`) se escribió en
-paralelo con otras tres que también reclamaban ADR-090 sobre el mismo `main`
-(última ADR en `main` era 089): `fix/transversal-relojes-documento-y-cache`
-(ADR-095), `feat/inventario-*`/`fix/inventario-*` (ADR-090 a 094, el bloque
-de inventory) y `chore/transversal-suite-contra-postgres` (ADR-097). Se
-renumeró a 096 al reconciliar todo en `docs/deuda-inventory-y-transversal-al-dia`.
+paralelo con `fix/transversal-relojes-documento-y-cache` (mergeada como
+ADR-095) y el bloque de `inventory` (ADR-090 a 094), sobre el mismo `main`
+que entonces terminaba en 089. Renumerada a 096 al mergear.

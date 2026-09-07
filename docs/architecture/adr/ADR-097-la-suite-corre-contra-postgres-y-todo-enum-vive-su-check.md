@@ -144,8 +144,7 @@ mano; si reaparece, necesita el mismo cuidado.
 ## Nota de coordinación
 
 Esta rama (`chore/transversal-suite-contra-postgres`) se escribió en
-paralelo con `fix/transversal-relojes-documento-y-cache` (T1, ADR-095),
-`fix/transversal-patch-vaciar-un-opcional` (T2, ADR-096) y el bloque de
-`inventory` (ADR-090 a 094), las cuatro sobre el mismo `main` (última ADR en
-`main` era 089) y las cuatro reclamando ADR-090. Se renumeró a 097 al
-reconciliar todo en `docs/deuda-inventory-y-transversal-al-dia`.
+paralelo con `fix/transversal-relojes-documento-y-cache` (T1, mergeada como
+ADR-095), `fix/transversal-patch-vaciar-un-opcional` (T2, ADR-096) y el
+bloque de `inventory` (ADR-090 a 094), sobre el mismo `main` que entonces
+terminaba en 089. Renumerada a 097 al mergear.

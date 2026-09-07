@@ -8,7 +8,7 @@
   `func.date(Comprobante.created_at)` comparaba contra fechas que el
   usuario piensa en hora Perú — un comprobante registrado pasadas las
   19:00 caía del lado equivocado del filtro por fecha.
-- **La consulta de DNI/RUC se cachea, con TTL de 5 minutos** (ADR-090). El
+- **La consulta de DNI/RUC se cachea, con TTL de 5 minutos** (ADR-095). El
   alta consulta el mismo documento dos veces (botón «Buscar» +
   revalidación al guardar, ADR-041, que sigue igual); ahora solo la
   primera le paga al proveedor.
