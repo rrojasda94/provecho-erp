@@ -301,10 +301,13 @@ lógica de cada entidad en su propio archivo de `application/`.
 - **La unidad de un artículo existente no se cambia**: `editar_articulo` la
   excluye a propósito, y una fila que la cambie se reporta como problema en vez
   de ignorarse en silencio.
-- El largo de `id_interno` (4) se valida **en el importador**: SQLite no aplica
-  el largo de un `VARCHAR`, así que sin eso la fila pasa en verde y revienta
-  contra Postgres. Un test ata la constante a la columna del modelo.
-- Los SKU **solo se crean**; uno con código ya usado se informa. Ver deuda.
+- El largo de `id_interno` (8, único en todo el grupo — ADR-091) se valida
+  **en el importador**: SQLite no aplica el largo de un `VARCHAR`, así que
+  sin eso la fila pasa en verde y revienta contra Postgres. Un test ata la
+  constante a la columna del modelo.
+- Los SKU **solo se crean por planilla**; uno con código ya usado se
+  informa y no se toca — corregirlo es `PATCH /skus/{id}`, la pantalla de
+  a uno.
 
 Exportar pide permiso de **lectura** (`inventory.leer`): son los mismos datos
 que el listado, solo empaquetados. Plantilla, validar e importar piden
@@ -555,8 +558,9 @@ desde un PATCH; el resto se cambia por otro valor.
 
 `PATCH /articulos/{id}` acepta `id_interno` desde el 2026-08-10, con la misma
 unicidad del alta (reenviar el propio código no choca consigo mismo). Es el
-código de cuatro caracteres que el almacenero lee en el estante: tecleado mal
-se arrastra por toda la operación y hasta ahora era inmutable.
+código —hasta 8 caracteres desde ADR-091, único en todo el grupo— que el
+almacenero lee en el estante: tecleado mal se arrastra por toda la
+operación.
 
 **`unidad_medida_id` no está en `ArticuloUpdate` y no va a estar.** El stock,
 los movimientos y las recetas ya cargadas están expresados en la unidad
@@ -628,7 +632,7 @@ Endpoints `/api/v1/inventory`:
 | POST/GET | `/categorias` | `gestionar_catalogo` / `leer` |
 | GET | `/categorias/{id}` | `leer` |
 | GET | `/articulos/{id}` | `leer` |
-| GET | `/skus/{id}` | `leer` — el SKU con su artículo y su saldo por almacén |
+| GET/PATCH | `/skus/{id}` | `leer` / `gestionar_catalogo` — el GET trae el SKU con su artículo y su saldo por almacén; el PATCH corrige `codigo`/`codigo_barras`/`activo` (ADR-091), nunca `articulo_id` |
 | GET | `/ajustes?almacen_id&estado` | `leer` — no existía: `ajuste_fuera_margen` reportaba un hecho que no se podía ir a mirar (ADR-036) |
 | GET | `/ajustes/{id}` | `leer` — con artículo, almacén, solicitante y aprobador resueltos |
 | GET | `/unidades-medida` | `leer` — catálogo global, sin filtro de tenant (`data-model.md` §3) |

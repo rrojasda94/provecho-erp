@@ -57,7 +57,7 @@ CABECERA_ARTICULOS = (
 )
 CABECERA_SKUS = ("Artículo", "Código", "Código de barras", "Activo")
 
-LARGO_CODIGO = 4
+LARGO_CODIGO = 8
 """Igual que `articulo.id_interno`, y **único en todo el grupo**, no por
 empresa. Se valida acá porque SQLite no aplica el largo de un VARCHAR: la fila
 pasaría en verde para reventar contra Postgres."""

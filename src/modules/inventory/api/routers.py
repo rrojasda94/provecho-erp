@@ -369,6 +369,20 @@ def crear_sku(
     return sku
 
 
+@router.patch("/skus/{sku_id}", response_model=schemas.SkuOut)
+def editar_sku(
+    sku_id: uuid.UUID,
+    body: schemas.SkuUpdate,
+    _: Usuario = Depends(require_permission(CATALOGO)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_sku(session, sku_id, tenant)
+    sku = catalogo.editar_sku(session, sku_id, **body.model_dump())
+    session.commit()
+    return sku
+
+
 @router.get("/skus/{sku_id}", response_model=schemas.SkuDetalleOut)
 def obtener_sku(
     sku_id: uuid.UUID,

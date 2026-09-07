@@ -425,19 +425,23 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   falla es asimétrico: subir la hoja equivocada no puede vaciar una receta sin
   que nadie vea el número. La identidad es la columna `ID` que escribe el
   export, no el nombre — el nombre es justamente lo que se edita.
-- ⬜ **Los SKU solo se crean por planilla, no se editan** (2026-08-20,
-  ADR-052): no existe `editar_sku` en `catalogo.py`, así que un SKU cuyo
-  código ya existe se informa como omitido y no se toca. Tocarlo a medias sería
-  peor que informarlo, pero corregir un código de barras mal tecleado sigue
-  exigiendo la pantalla de a uno. Se cierra agregando `editar_sku` con las
-  mismas reglas de unicidad que `crear_sku`.
-- ⬜ **`articulo.id_interno` son 4 caracteres únicos en TODO el grupo**
-  (2026-08-20): no por empresa —`UniqueConstraint("id_interno")` sin
-  `empresa_id`—, así que un catálogo de trescientos artículos exige trescientos
-  códigos distintos de cuatro caracteres compartidos entre todas las empresas.
-  El importador lo exige y **valida el largo por fila** en vez de
-  autogenerarlo, porque un código inventado termina tecleado en una orden de
-  compra. Ensancharlo es una migración con datos existentes y no entró acá.
+- ✅ 2026-09-06 **`editar_sku` existe** (bloque
+  `feat/inventario-catalogo-editable`, ADR-091). `PATCH /inventory/skus/{id}`
+  con las mismas reglas de unicidad que `crear_sku` — `codigo`,
+  `codigo_barras`, `activo`; `articulo_id` no está, un SKU no cambia de
+  artículo. **El importador no cambia**: sigue informando un código
+  repetido como omitido y no lo toca — corregirlo por planilla en silencio
+  es el mismo riesgo que ADR-046 evitó con el nombre y la unidad del
+  artículo; corregirlo sigue siendo la pantalla de a uno, que ahora existe.
+- ✅ 2026-09-06 **`articulo.id_interno` pasa de 4 a 8 caracteres** (bloque
+  `feat/inventario-catalogo-editable`, ADR-091, migración `fab77826b2c9`).
+  **Sigue único en todo el grupo, no por empresa** — decisión explícita:
+  hoy opera una sola empresa y el significado de "un código que cualquiera
+  del grupo escribe sin ambigüedad" no cambia hasta que haga falta de
+  verdad. Mismo ensanche en `sales.producto_comercial.id_interno`, que
+  comparte el problema. Los códigos ya asignados de 4 caracteres no se
+  tocan. De paso, RN-GEN-005 dejó de decir que `id_interno` es
+  **inmutable** — ya era falso desde ADR-052 (2026-08-20).
 - ⬜ **Los importadores no tienen carril de pruebas contra Postgres**
   (2026-08-20): `pytest` corre sobre SQLite con `create_all`, y el job
   `migraciones` corre Alembic contra Postgres pero **no la suite**

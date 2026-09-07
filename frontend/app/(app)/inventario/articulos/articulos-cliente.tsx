@@ -110,7 +110,7 @@ function DialogoNuevoArticulo({
     >
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Código interno (máx. 4)
-        <input name="id_interno" required maxLength={4} placeholder="H001" />
+        <input name="id_interno" required maxLength={8} placeholder="H001" />
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Nombre
@@ -169,7 +169,7 @@ function DialogoEditarArticulo({
       <input type="hidden" name="id" value={articulo.id} />
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Código interno (máx. 4)
-        <input name="id_interno" required maxLength={4} defaultValue={articulo.id_interno} />
+        <input name="id_interno" required maxLength={8} defaultValue={articulo.id_interno} />
       </label>
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Nombre

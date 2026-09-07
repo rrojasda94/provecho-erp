@@ -349,9 +349,9 @@ def test_un_codigo_mas_largo_que_la_columna_se_reporta_por_fila(env):
     client, _ = env
     h = _token(client)
     revision = _validar(client, h, _libro(
-        [["", "HARINA", "Harina", "insumo", "Gramo", "", "0.01", "No", "", "No"]],
+        [["", "HARINA-01", "Harina", "insumo", "Gramo", "", "0.01", "No", "", "No"]],
     )).json()
-    assert any("supera los 4" in p for p in revision["articulos"][0]["problemas"])
+    assert any("supera los 8" in p for p in revision["articulos"][0]["problemas"])
 
 
 def test_un_codigo_repetido_se_informa_en_vez_de_reventar(env):

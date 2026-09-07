@@ -810,8 +810,10 @@ de su módulo y se prueban de forma aislada.
 - **RN-GEN-004** Los agentes de IA (`tipo=agente_ia`) obedecen exactamente las
   mismas reglas de dominio que un humano; solo cambian sus permisos.
 - **RN-GEN-005** Todo Activo (artículo, activo no corriente, producto
-  comercial, servicio) tiene un `id_interno` de 4 caracteres alfanuméricos,
-  autogenerado por el ERP al crearse, inmutable e irrepetible.
+  comercial, servicio) tiene un `id_interno` de hasta 8 caracteres
+  alfanuméricos, único en todo el grupo (no por empresa). Se autogenera al
+  crearse; se corrige por pantalla (nunca por planilla, ADR-052), no es
+  inmutable.
 - **RN-GEN-006** Dar de baja o descontinuar un Activo lo archiva (se oculta
   de listados); nunca se elimina de la base de datos.
 - **RN-GEN-007** Los datos de una persona natural (nombres, apellidos,
