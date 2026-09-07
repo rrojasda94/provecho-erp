@@ -15,13 +15,11 @@ from decimal import Decimal
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 import src.core.models_registry  # noqa: F401
 from src.config.settings import settings
-from src.core.app import create_app
 from src.core.database import Base
 from src.core.sync import estado_conexion, motor, watermark
 from src.core.sync.cliente_nube import ClienteNube, ErrorNube
@@ -73,16 +71,14 @@ from src.modules.users.infrastructure.security import hash_pin, verify_pin
 from src.seeders.hub import alta_hub
 from src.seeders.seed import seed
 from src.shared import fechas
-from tests.conftest import abrir_caja_directa
+from tests.conftest import abrir_caja_directa, crear_engine_de_prueba
 
 PIN_CAJERO = "123456"
 PIN_HUB = "654321"
 
 
-def _base():
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+def _base(request):
+    engine = crear_engine_de_prueba(request)
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
@@ -233,9 +229,9 @@ class Entorno:
 
 
 @pytest.fixture()
-def entorno(monkeypatch):
-    NubeSession = _base()
-    HubSession = _base()
+def entorno(monkeypatch, _app_compartida, request):
+    NubeSession = _base(request)
+    HubSession = _base(request)
     ids = _poblar_nube(NubeSession)
 
     monkeypatch.setattr(settings, "deployment_mode", "hub")
@@ -248,7 +244,7 @@ def entorno(monkeypatch):
     # El listener corre contra la nube salvo que un test diga lo contrario.
     monkeypatch.setattr(listeners, "session_factory", NubeSession)
 
-    app = create_app()
+    app = _app_compartida
 
     def _override_get_db():
         session = NubeSession()

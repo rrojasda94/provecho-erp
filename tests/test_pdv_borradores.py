@@ -10,7 +10,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine, event
+from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
@@ -36,8 +36,8 @@ TICKET = {
 
 
 @pytest.fixture
-def session():
-    engine = create_engine("sqlite://")
+def session(_engine_de_prueba):
+    engine = _engine_de_prueba
     event.listen(
         engine,
         "connect",

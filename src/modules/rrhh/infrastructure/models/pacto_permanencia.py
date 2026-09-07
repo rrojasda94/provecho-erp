@@ -6,7 +6,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Date, Enum, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -15,6 +15,13 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class PactoPermanencia(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "pacto_permanencia"
+
+    __table_args__ = (
+        CheckConstraint(
+            "capacitacion_tipo IN ('curso', 'posgrado', 'diplomado', 'capacitacion')",
+            name="tipo_capacitacion_pacto",
+        ),
+    )
 
     trabajador_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("trabajador.id"))
     capacitacion_descripcion: Mapped[str] = mapped_column(String(255))

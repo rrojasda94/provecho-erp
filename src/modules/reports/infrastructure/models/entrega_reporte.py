@@ -14,7 +14,7 @@ lectura la registra la bandeja.
 
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -31,6 +31,10 @@ class EntregaReporte(Base, UuidPkMixin, TimestampMixin):
         ),
         # La consulta de `/mios`.
         Index("ix_entrega_usuario", "usuario_id"),
+        CheckConstraint(
+            "canal IN ('bandeja')",
+            name="canal_entrega",
+        ),
     )
 
     reporte_emitido_id: Mapped[uuid.UUID] = mapped_column(

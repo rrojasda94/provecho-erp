@@ -22,7 +22,7 @@ Esta tabla es para las decisiones que **no** tienen su propio flujo tipado.
 import uuid
 from datetime import date
 
-from sqlalchemy import Date, Enum, ForeignKey, Index, String, Text
+from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -47,6 +47,14 @@ class DecisionGerencial(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
             "ix_decision_gerencial_referencia",
             "referencia_tipo",
             "referencia_id",
+        ),
+        CheckConstraint(
+            "tipo IN ({})".format(", ".join(f"'{t}'" for t in TIPOS)),
+            name="tipo_decision_gerencial",
+        ),
+        CheckConstraint(
+            "resultado IN ({})".format(", ".join(f"'{r}'" for r in RESULTADOS)),
+            name="resultado_decision_gerencial",
         ),
     )
 

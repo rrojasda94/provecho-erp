@@ -6,13 +6,11 @@ from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 import src.core.models_registry  # noqa: F401
 from src.config.settings import settings
-from src.core.app import create_app
 from src.core.database import Base
 from src.modules.rrhh.application.privacidad import purgar_postulantes_vencidos
 from src.modules.rrhh.infrastructure.models import Postulante
@@ -22,10 +20,8 @@ from src.shared.models import AuditLog
 
 
 @pytest.fixture()
-def env():
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+def env(_app_compartida, _engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
@@ -37,7 +33,7 @@ def env():
         ids["empresa_id"] = str(s.scalar(select(Empresa)).id)
         s.commit()
 
-    app = create_app()
+    app = _app_compartida
 
     def _override_get_db():
         session = TestSession()

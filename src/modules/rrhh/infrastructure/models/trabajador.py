@@ -15,7 +15,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Numeric, String, select
+from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey, Numeric, String, select
 from sqlalchemy.orm import Mapped, column_property, declared_attr, mapped_column
 
 from src.core.database import Base
@@ -25,6 +25,21 @@ from src.modules.users.infrastructure.models import Usuario
 
 class Trabajador(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "trabajador"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo_vinculo IN ('planilla', 'practicante', 'locacion_servicios')",
+            name="tipo_vinculo_trabajador",
+        ),
+        CheckConstraint(
+            "sistema_pensiones IN ('onp', 'afp')",
+            name="sistema_pensiones",
+        ),
+        CheckConstraint(
+            "estado IN ('activo', 'cesado', 'suspendido')",
+            name="estado_trabajador",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     persona_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("persona.id"))

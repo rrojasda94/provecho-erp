@@ -11,7 +11,7 @@ Cambiar un precio regular = nueva lista vigente, nunca editar la vigente
 import uuid
 from datetime import date
 
-from sqlalchemy import Boolean, Date, Enum, ForeignKey, String
+from sqlalchemy import Boolean, CheckConstraint, Date, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -20,6 +20,16 @@ from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
 
 class ListaPrecio(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "lista_precio"
+
+    __table_args__ = (
+        CheckConstraint(
+            "canal IN ('pdv', 'agente_ia', 'delivery')", name="canal_lista_precio"
+        ),
+        CheckConstraint(
+            "modalidad IN ('mesa', 'takeout', 'delivery')",
+            name="modalidad_lista_precio",
+        ),
+    )
 
     marca_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("marca.id"))
     nombre: Mapped[str] = mapped_column(String(100))

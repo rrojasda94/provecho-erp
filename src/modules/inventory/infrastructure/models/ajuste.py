@@ -8,7 +8,7 @@ aprobarse genera el `movimiento_inventario` tipo `ajuste`.
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Numeric
+from sqlalchemy import Boolean, CheckConstraint, Enum, ForeignKey, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -28,6 +28,20 @@ ESTADO_AJUSTE = Enum(
 
 class Ajuste(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "ajuste"
+
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('pendiente', 'aprobado', 'rechazado')",
+            name="estado_ajuste",
+        ),
+        # `motivo` reusa el `Enum` de `movimiento_inventario` (mismo
+        # vocabulario, MOTIVO_AJUSTE) pero es otra tabla: el CHECK va acá
+        # también, no solo en `movimiento_inventario`.
+        CheckConstraint(
+            "motivo IN ('sobrante', 'faltante', 'merma', 'error_registro')",
+            name="motivo_ajuste",
+        ),
+    )
 
     almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))
     sku_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sku.id"))

@@ -265,3 +265,77 @@ def test_permisos_exigidos_por_la_api_existen_en_el_seeder() -> None:
         "permisos exigidos por la API y ausentes de PERMISOS en "
         f"src/seeders/seed.py: {sorted(exigidos - sembrados)}"
     )
+
+
+def _nombres_de_kwarg(nodo: ast.Call, kwarg: str) -> str | None:
+    """El valor de `kwarg=...` en una llamada, si es un string literal."""
+    for kw in nodo.keywords:
+        if kw.arg == kwarg and isinstance(kw.value, ast.Constant) and isinstance(
+            kw.value.value, str
+        ):
+            return kw.value.value
+    return None
+
+
+def _es_llamada_a(nodo: ast.expr, nombre: str) -> bool:
+    return isinstance(nodo, ast.Call) and (
+        (isinstance(nodo.func, ast.Name) and nodo.func.id == nombre)
+        or (isinstance(nodo.func, ast.Attribute) and nodo.func.attr == nombre)
+    )
+
+
+@pytest.mark.parametrize(
+    "archivo",
+    [
+        *_archivos("infrastructure", "models", "*.py"),
+        *(SRC / "shared" / "models").glob("*.py"),
+    ],
+    ids=str,
+)
+def test_todo_enum_sin_tipo_nativo_tiene_su_check_constraint(archivo: pathlib.Path) -> None:
+    """`Enum(..., native_enum=False)` no emite ningún CHECK por sí solo
+    (`create_constraint` vale `False` desde SQLAlchemy 1.4): un valor fuera
+    del vocabulario entra sin ruido y revienta con `LookupError` → 500 en
+    **cada lectura** posterior de esa fila — no es un alta rechazada, es una
+    fila envenenada para todos (ver `docs/roadmap/deuda/transversal.md`).
+
+    El CHECK va explícito en `__table_args__` y no como
+    `Enum(create_constraint=True)`: ese queda ligado al tipo (`_type_bound`)
+    y `alembic check` lo ve como un constraint sobrante en cada corrida.
+    Convención (ver `persona.py`, el primero en aplicarla): el
+    `CheckConstraint` lleva el **mismo** `name=` que el `Enum` que
+    respalda — este test compara por ese nombre.
+
+    No detecta el caso (hoy único, en `ajuste.py`/`movimiento_inventario.py`)
+    de un `Enum` construido en un archivo y reusado por `mapped_column` en
+    otro: ahí el `CheckConstraint` del segundo archivo no tiene, en ese
+    mismo archivo, un `Enum(...)` textual que lo reclame. Se revisó a mano
+    al escribir este test; una reaparición del patrón necesita el mismo
+    cuidado.
+    """
+    arbol = ast.parse(archivo.read_text(encoding="utf-8"))
+    enums_sin_check = set()
+    checks = set()
+    for nodo in ast.walk(arbol):
+        if _es_llamada_a(nodo, "Enum"):
+            # `_nombres_de_kwarg` sólo lee strings; `native_enum=False` es un
+            # bool, así que se busca aparte.
+            es_no_nativo = any(
+                kw.arg == "native_enum"
+                and isinstance(kw.value, ast.Constant)
+                and kw.value.value is False
+                for kw in nodo.keywords
+            )
+            if es_no_nativo:
+                nombre = _nombres_de_kwarg(nodo, "name")
+                if nombre:
+                    enums_sin_check.add(nombre)
+        elif _es_llamada_a(nodo, "CheckConstraint"):
+            nombre = _nombres_de_kwarg(nodo, "name")
+            if nombre:
+                checks.add(nombre)
+    faltantes = enums_sin_check - checks
+    assert not faltantes, (
+        f"{archivo}: Enum(native_enum=False) sin CheckConstraint a juego: "
+        f"{sorted(faltantes)}"
+    )

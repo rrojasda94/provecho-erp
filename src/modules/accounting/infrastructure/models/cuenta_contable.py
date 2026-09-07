@@ -2,7 +2,14 @@
 
 import uuid
 
-from sqlalchemy import Boolean, Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Enum,
+    ForeignKey,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -11,7 +18,13 @@ from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
 
 class CuentaContable(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "cuenta_contable"
-    __table_args__ = (UniqueConstraint("empresa_id", "codigo"),)
+    __table_args__ = (
+        UniqueConstraint("empresa_id", "codigo"),
+        CheckConstraint(
+            "tipo IN ('activo', 'pasivo', 'patrimonio', 'ingreso', 'gasto')",
+            name="tipo_cuenta_contable",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     codigo: Mapped[str] = mapped_column(String(20))

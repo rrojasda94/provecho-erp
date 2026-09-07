@@ -4,7 +4,7 @@ cargo, arqueo, verificación)."""
 import uuid
 from datetime import date
 
-from sqlalchemy import Date, Enum, ForeignKey, String, Text
+from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -13,6 +13,13 @@ from src.core.model_base import JsonB, TimestampMixin, UuidPkMixin
 
 class Acta(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "acta"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('reunion', 'incidente', 'entrega_cargo', 'arqueo', 'verificacion')",
+            name="tipo_acta",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     tipo: Mapped[str] = mapped_column(

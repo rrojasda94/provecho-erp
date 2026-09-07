@@ -21,6 +21,7 @@ import uuid
 from decimal import Decimal
 
 from sqlalchemy import (
+    CheckConstraint,
     Date,
     Enum,
     ForeignKey,
@@ -77,6 +78,18 @@ class GuiaRemision(Base, UuidPkMixin, TimestampMixin):
         # siguen la convención (una sola columna), así que no llevan nombre.
         UniqueConstraint("transferencia_id"),
         UniqueConstraint("devolucion_id"),
+        CheckConstraint(
+            "motivo_traslado IN ('01', '04', '13', '18')",
+            name="motivo_traslado_guia",
+        ),
+        CheckConstraint(
+            "modalidad_traslado IN ('01', '02')",
+            name="modalidad_traslado_guia",
+        ),
+        CheckConstraint(
+            "estado_emision IN ('pendiente', 'aceptado', 'rechazado', 'error')",
+            name="estado_emision_guia",
+        ),
     )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))

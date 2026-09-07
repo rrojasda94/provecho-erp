@@ -14,7 +14,17 @@ lo que regaló una persona de lo que aplicó una regla.
 import uuid
 from datetime import date, time
 
-from sqlalchemy import Boolean, Date, Enum, ForeignKey, Integer, Numeric, String, Time
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    Enum,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Time,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -23,6 +33,13 @@ from src.core.model_base import JsonB, SoftDeleteMixin, TimestampMixin, UuidPkMi
 
 class Promocion(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "promocion"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('nxm', 'cantidad', 'combo', 'monto_minimo')",
+            name="tipo_promocion",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"), index=True)
     nombre: Mapped[str] = mapped_column(String(120))

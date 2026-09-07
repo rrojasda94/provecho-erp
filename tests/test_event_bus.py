@@ -2,9 +2,8 @@
 sesión que publicó, y descarte en rollback."""
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 import src.core.models_registry  # noqa: F401
 from src.core.database import Base
@@ -13,10 +12,8 @@ from src.modules.users.infrastructure.models import Grupo
 
 
 @pytest.fixture()
-def Session():
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+def Session(_engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 

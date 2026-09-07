@@ -7,9 +7,8 @@ quedarse sin colores porque alguien aprobó un `#zzz`.
 """
 
 import pytest
-from sqlalchemy import create_engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 import src.core.models_registry  # noqa: F401  (puebla Base.metadata)
 from src.core.database import Base
@@ -20,14 +19,12 @@ from src.shared.models import ParametroEmpresa
 
 
 @pytest.fixture()
-def empresa():
+def empresa(_engine_de_prueba):
     """Empresa y usuario reales del seeder: `parametro_empresa` tiene FK a las
     dos y SQLite las valida en estos tests."""
     from src.seeders.seed import seed
 
-    engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
-    )
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     Sesion = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     with Sesion() as s:

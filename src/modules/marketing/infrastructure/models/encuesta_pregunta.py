@@ -13,7 +13,15 @@ UUID que todavía no existen.
 
 import uuid
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
@@ -30,6 +38,10 @@ class EncuestaPregunta(Base, UuidPkMixin, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("plantilla_id", "codigo", name="uq_encuesta_pregunta_codigo"),
         UniqueConstraint("plantilla_id", "orden", name="uq_encuesta_pregunta_orden"),
+        CheckConstraint(
+            "tipo IN ({})".format(", ".join(f"'{t}'" for t in TIPOS)),
+            name="tipo_pregunta_encuesta",
+        ),
     )
 
     plantilla_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("encuesta_plantilla.id"))

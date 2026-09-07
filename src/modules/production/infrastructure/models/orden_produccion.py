@@ -9,7 +9,7 @@ Costeo (RN-PRD-018) se calcula al completar, nunca a mano.
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -18,6 +18,14 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class OrdenProduccion(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "orden_produccion"
+
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('borrador', 'en_proceso', 'conforme', "
+            "'no_conforme_reprocesado', 'no_conforme_desechado')",
+            name="estado_orden_produccion",
+        ),
+    )
 
     articulo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("articulo.id"))
     almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))

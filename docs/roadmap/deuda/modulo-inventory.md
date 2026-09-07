@@ -451,16 +451,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   comparte el problema. Los códigos ya asignados de 4 caracteres no se
   tocan. De paso, RN-GEN-005 dejó de decir que `id_interno` es
   **inmutable** — ya era falso desde ADR-052 (2026-08-20).
-- ⬜ **Los importadores no tienen carril de pruebas contra Postgres**
-  (2026-08-20): `pytest` corre sobre SQLite con `create_all`, y el job
-  `migraciones` corre Alembic contra Postgres pero **no la suite**
-  (`.github/workflows/ci.yml`). SQLite no aplica el largo de un `VARCHAR`, así
-  que una fila con el código demasiado largo pasa en verde y da
-  `StringDataRightTruncation` en producción. La defensa actual es validar el
-  largo **en el importador** y un test que ata la constante a la columna del
-  modelo (`test_importacion_articulos.py`), pero eso cubre las columnas que
-  alguien se acordó de atar. Se cierra corriendo la suite también contra
-  Postgres en CI.
+- ✅ 2026-09-06 **Los importadores ya tienen carril de pruebas contra
+  Postgres** (declarado 2026-08-20). `pytest` corría sólo sobre SQLite con
+  `create_all`, y el job `migraciones` corría Alembic contra Postgres pero
+  **no la suite** (`.github/workflows/ci.yml`) — SQLite no aplica el largo
+  de un `VARCHAR`, así que una fila con el código demasiado largo pasaba en
+  verde y daba `StringDataRightTruncation` en producción. Nuevo job
+  `backend-postgres` (ADR-097) corre la suite completa —incluidos
+  `test_importacion_articulos.py` y el resto— contra un Postgres real, con
+  cada test en su propio schema. La defensa por importador (validar el
+  largo antes de insertar, el test que ata la constante a la columna) sigue
+  ahí; esto agrega la red de fondo para las columnas que nadie se acordó de
+  atar.
 
 ## ~~Mitad-y-mitad: la regla de Odoo descuenta de menos~~ — SALDADA 2026-08-23
 

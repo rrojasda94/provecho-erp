@@ -21,7 +21,16 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, LargeBinary, Numeric, String
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    Numeric,
+    String,
+)
 from sqlalchemy.orm import Mapped, deferred, mapped_column
 
 from src.core.database import Base
@@ -30,6 +39,13 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class Marcacion(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "marcacion"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('entrada', 'salida')",
+            name="tipo_marcacion",
+        ),
+    )
 
     asistencia_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("asistencia.id"), index=True

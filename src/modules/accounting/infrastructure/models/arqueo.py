@@ -4,7 +4,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Enum, ForeignKey, Numeric
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -13,6 +13,13 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class Arqueo(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "arqueo"
+
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('sorpresa', 'programado')",
+            name="tipo_arqueo",
+        ),
+    )
 
     punto_venta_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("punto_venta.id"))
     tipo: Mapped[str] = mapped_column(

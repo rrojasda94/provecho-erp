@@ -11,7 +11,7 @@ Ley 29733).
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, String
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -21,6 +21,13 @@ from src.modules.rrhh.domain.rules import ESTADOS_POSTULANTE
 
 class Postulante(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "postulante"
+
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ({})".format(", ".join(f"'{e}'" for e in ESTADOS_POSTULANTE)),
+            name="estado_postulante",
+        ),
+    )
 
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     # Nulo si es postulación espontánea o referido fuera de una búsqueda

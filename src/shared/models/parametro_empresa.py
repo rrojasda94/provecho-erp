@@ -14,7 +14,16 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, Text, text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -36,6 +45,10 @@ class ParametroEmpresa(Base, UuidPkMixin, TimestampMixin):
             unique=True,
             sqlite_where=text("estado = 'vigente'"),
             postgresql_where=text("estado = 'vigente'"),
+        ),
+        CheckConstraint(
+            "estado IN ({})".format(", ".join(f"'{e}'" for e in ESTADOS)),
+            name="estado_parametro_empresa",
         ),
     )
 

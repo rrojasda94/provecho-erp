@@ -12,7 +12,7 @@ slice cubre lo que FEFO necesita: qué vence primero y de dónde vino.
 import uuid
 from datetime import date
 
-from sqlalchemy import Date, Enum, ForeignKey, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -38,7 +38,17 @@ CONDICION_ALMACENAMIENTO = Enum(
 
 class Lote(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "lote"
-    __table_args__ = (UniqueConstraint("articulo_id", "codigo"),)
+    __table_args__ = (
+        UniqueConstraint("articulo_id", "codigo"),
+        CheckConstraint(
+            "origen IN ('compra', 'produccion', 'carga_inicial', 'ajuste')",
+            name="origen_lote",
+        ),
+        CheckConstraint(
+            "condicion_almacenamiento IN ('refrigerado', 'congelado', 'ambiente')",
+            name="condicion_almacenamiento",
+        ),
+    )
 
     articulo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("articulo.id"))
     codigo: Mapped[str] = mapped_column(String(50))

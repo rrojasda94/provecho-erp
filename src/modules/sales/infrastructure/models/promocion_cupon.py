@@ -19,7 +19,16 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, Enum, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -28,7 +37,12 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 
 class PromocionCupon(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "promocion_cupon"
-    __table_args__ = (UniqueConstraint("grupo_id", "nombre"),)
+    __table_args__ = (
+        UniqueConstraint("grupo_id", "nombre"),
+        CheckConstraint(
+            "estado IN ('activa', 'terminada')", name="estado_promocion_cupon"
+        ),
+    )
 
     grupo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("grupo.id"), index=True)
     nombre: Mapped[str] = mapped_column(String(120))

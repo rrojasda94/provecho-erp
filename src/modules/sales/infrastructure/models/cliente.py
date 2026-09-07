@@ -12,7 +12,7 @@ enrutan al mismo `cliente` por sus datos (persona/contacto).
 
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -26,6 +26,10 @@ from src.core.model_base import (
 
 class Cliente(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, UbicacionMixin):
     __tablename__ = "cliente"
+
+    __table_args__ = (
+        CheckConstraint("tipo IN ('natural', 'juridico')", name="tipo_cliente"),
+    )
 
     grupo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("grupo.id"))
     tipo: Mapped[str] = mapped_column(

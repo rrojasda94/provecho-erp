@@ -18,6 +18,7 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import (
+    CheckConstraint,
     Enum,
     ForeignKey,
     Index,
@@ -44,6 +45,27 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
         # rango de `fecha_orden` filtrando "ingreso real" (`estado`); sin este
         # índice, un año completo hace table scan.
         Index("ix_venta_fecha_orden_estado", "fecha_orden", "estado"),
+        CheckConstraint(
+            "canal IN ('pdv', 'agente_ia', 'delivery')", name="canal_venta"
+        ),
+        CheckConstraint(
+            "modalidad IN ('mesa', 'takeout', 'delivery')", name="modalidad_venta"
+        ),
+        CheckConstraint(
+            "estado IN ({})".format(
+                ", ".join(f"'{v}'" for v in rules.ESTADOS_VENTA)
+            ),
+            name="estado_venta",
+        ),
+        CheckConstraint("tipo IN ('venta', 'consumo_personal')", name="tipo_venta"),
+        CheckConstraint(
+            "consumo_motivo IN ('fin_semana', 'feriado', 'alta_actividad', "
+            "'capacitacion', 'otro')",
+            name="motivo_consumo_personal",
+        ),
+        CheckConstraint(
+            "descuento_modo IN ('porcentaje', 'monto')", name="modo_descuento_venta"
+        ),
     )
 
     sucursal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sucursal.id"))

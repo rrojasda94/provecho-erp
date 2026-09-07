@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, Integer, String
+from sqlalchemy import CheckConstraint, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -19,6 +19,14 @@ class Sucursal(
     Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin, UbicacionMixin
 ):
     __tablename__ = "sucursal"
+
+    __table_args__ = (
+        CheckConstraint("estado IN ('activa', 'inactiva')", name="estado_sucursal"),
+        CheckConstraint(
+            "tenencia IN ('propia', 'alquilada', 'del_grupo')",
+            name="tenencia_sucursal",
+        ),
+    )
 
     marca_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("marca.id"))
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))

@@ -12,7 +12,6 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
@@ -51,8 +50,8 @@ INSUMOS = ("Masa", "Queso", "Cebolla")
 
 
 @pytest.fixture
-def session():
-    engine = create_engine("sqlite://")
+def session(_engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         yield s

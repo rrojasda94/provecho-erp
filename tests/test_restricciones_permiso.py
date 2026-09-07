@@ -8,7 +8,6 @@ from decimal import Decimal
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 import src.core.models_registry  # noqa: F401
@@ -66,8 +65,8 @@ def test_varias_dimensiones_a_la_vez():
 
 # --- UsuarioRepo.restricciones (infra) ---------------------------------------
 @pytest.fixture()
-def session():
-    engine = create_engine("sqlite://")
+def session(_engine_de_prueba):
+    engine = _engine_de_prueba
     Base.metadata.create_all(engine)
     with Session(engine) as s:
         yield s

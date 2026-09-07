@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.core.database import Base
@@ -23,6 +23,13 @@ from src.core.model_base import JsonB, TimestampMixin, UuidPkMixin
 
 class EvaluacionAgencia(Base, UuidPkMixin, TimestampMixin):
     __tablename__ = "evaluacion_agencia"
+
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('borrador', 'evaluada', 'decidida')",
+            name="estado_evaluacion_agencia",
+        ),
+    )
 
     campana_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campana.id"))
     objetivo: Mapped[str] = mapped_column(String(255))
