@@ -41,7 +41,10 @@ from src.modules.inventory.infrastructure.models import (
     UnidadMedida,
 )
 from src.modules.inventory.infrastructure.repositories import ArticuloRepo, RecetaRepo
-from src.modules.sales.application.queries_publicas import productos_que_usan_receta
+from src.modules.sales.application.queries_publicas import (
+    productos_que_usan_receta,
+    valores_ofrecidos_de_receta,
+)
 from src.shared.aritmetica import evaluar, redondear
 from src.shared.texto import a_titulo
 
@@ -208,6 +211,7 @@ def agregar_item(
             "también su insumo"
         )
     udm_linea = _udm_de_linea(session, unidad_medida_id, articulo, udm)
+    _validar_condicion(session, receta_id, aplica_valores)
     condicion = _condicion_normalizada(aplica_valores)
     repo = RecetaRepo(session)
     # El mismo insumo puede repetirse **si cada línea aplica a otra
@@ -276,7 +280,40 @@ def _condicion_normalizada(
     return frozenset(str(v) for v in (valores or []))
 
 
+def _validar_condicion(
+    session: Session,
+    receta_id: uuid.UUID,
+    aplica_valores: Sequence[uuid.UUID | str] | None,
+) -> None:
+    """Un valor de la condición tiene que ofrecerlo un producto que de
+    verdad usa esta receta — si no, la línea nunca aplica y nadie se entera
+    hasta que alguien note que faltó un ingrediente en la comanda.
+
+    Se valida en la escritura, no en la lectura: `rules.aplica_a_variante`
+    sigue siendo conservador con lo ya guardado (un valor huérfano forma su
+    propio grupo y la línea no aplica) — validar acá no vuelve retroactivo
+    lo que ya pasó, solo cierra la puerta a que entre algo nuevo mal.
+
+    Ninguna receta en `aplica_valores` es la mayoría de las líneas —sin
+    condición no hay nada que validar—. Y una receta que ningún producto usa
+    todavía no tiene contra qué comparar: el editor ya esconde la columna en
+    ese caso (ADR-063 §4), así que el servidor tampoco puede exigir nada.
+    """
+    if not aplica_valores:
+        return
+    ofrecidos = valores_ofrecidos_de_receta(session, receta_id)
+    if not ofrecidos:
+        return
+    huerfanos = [str(v) for v in aplica_valores if str(v) not in ofrecidos]
+    if huerfanos:
+        raise ReglaNegocio(
+            "la condición nombra valores que ningún producto de esta receta "
+            f"ofrece: {', '.join(huerfanos)}"
+        )
+
+
 def _cambiar_condicion(
+    session: Session,
     repo: RecetaRepo,
     item: RecetaItem,
     articulo: Articulo,
@@ -288,6 +325,7 @@ def _cambiar_condicion(
     condicion = _condicion_normalizada(aplica_valores)
     if condicion == _condicion_normalizada(item.aplica_valores):
         return
+    _validar_condicion(session, item.receta_id, aplica_valores)
     if any(
         otro.id != item.id
         and otro.articulo_id == item.articulo_id
@@ -320,7 +358,7 @@ def editar_item(
         raise NoEncontrado("ítem de receta no encontrado")
     articulo, udm_articulo = _articulo_y_udm(session, item.articulo_id)
     if aplica_valores is not None:
-        _cambiar_condicion(repo, item, articulo, aplica_valores)
+        _cambiar_condicion(session, repo, item, articulo, aplica_valores)
     if unidad_medida_id is not None:
         udm = _udm_de_linea(session, unidad_medida_id, articulo, udm_articulo)
         item.unidad_medida_id = udm.id if udm is not udm_articulo else None

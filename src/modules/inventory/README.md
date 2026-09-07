@@ -36,6 +36,12 @@ Migración `e2b7c40d91af`, ADR-056, RN-COM-037, RN-UDM-005.
 **`receta_item.aplica_valores`** (JSONB, nullable): array de
 `producto_atributo_valor.id`. NULL o `[]` = la línea aplica siempre, que es
 el caso de todas las recetas de hoy — por eso no hay backfill.
+`agregar_item`/`editar_item` validan cada valor contra
+`sales.queries_publicas::valores_ofrecidos_de_receta` (ADR-092, 2026-09-06):
+409 si nombra un valor que ningún producto de la receta ofrece. Solo en la
+escritura — lo ya guardado sigue leyéndose por `aplica_a_variante`, que es
+conservador con lo que no reconoce; una receta que ningún producto usa
+todavía acepta cualquier valor, porque no hay contra qué comparar.
 
 La regla es la de Odoo 18 (`mrp.bom.line._skip_bom_line` →
 `_skip_for_no_variant`), en `domain/rules.aplica_a_variante`: se agrupan los

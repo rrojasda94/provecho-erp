@@ -480,24 +480,29 @@ cumple nunca. Las 52 líneas del archivo resultaron ser **todas simétricas**, y
 `scripts/odoo/` las parte en una por mitad con la mitad del gramaje. Ver la
 enmienda de ADR-056.
 
-## La condición de una línea no se valida contra el producto (2026-08-23)
+## ~~La condición de una línea no se valida contra el producto~~ — SALDADA 2026-09-06 (ADR-092)
 
-`receta_item.aplica_valores` guarda PTAV de `sales`, y `inventory` no puede
-verificar contra su ORM que esos valores pertenezcan al producto que usa la
-receta. Hoy el único guardarraíl es la lectura conservadora: un valor que
+`receta_item.aplica_valores` guarda PTAV de `sales`, y `inventory` no podía
+verificar contra su ORM que esos valores pertenecieran al producto que usa la
+receta. El único guardarraíl era la lectura conservadora: un valor que
 `atributo_de_valores` no reconoce forma su propio grupo y la línea no aplica.
+Alcanzaba para no descontar de más, que es el lado caro, pero dejaba pasar
+una receta mal armada sin avisar. El editor (hoy
+`components/catalogo/receta-editor.tsx`) ya reducía el caso malo a un
+cliente que llame la API a mano o a una carga masiva, pero el servidor
+seguía sin verificar nada.
 
-Alcanza para no descontar de más, que es el lado caro, pero deja pasar una
-receta mal armada sin avisar. Cuando se construya el editor de la condición
-(F4/F5) conviene validarla ahí, donde `sales` sí está a mano, y no en el
-camino del descuento.
-
-**Sigue abierta** (2026-08-24, ADR-063). El editor de receta —hoy
-`components/catalogo/receta-editor.tsx`, antes el lienzo— solo ofrece las
-casillas de los valores del producto abierto, con lo que el caso malo se
-reduce a un cliente que llame la API a mano o a una carga masiva. Pero el
-servidor sigue sin verificar nada: la validación tiene que vivir en
-`inventory/api`, contra el contrato público de `sales`.
+**Cómo se saldó**: nuevo `sales.queries_publicas::valores_ofrecidos_de_receta`
+(bloque `feat/inventario-condicion-validada`), la unión de
+`catalogo.valores_ofrecidos` de cada producto que usa la receta.
+`agregar_item`/`editar_item` lo consultan al escribir y rechazan con 409 un
+valor que ningún producto de la receta ofrece. **No retroactivo**: lo ya
+guardado sigue leyéndose por `rules.aplica_a_variante`, que es conservador
+— revalidar en la lectura volvería ilegible una receta que hoy funciona por
+un cambio de catálogo que no tiene nada que ver con ella. Una receta que
+ningún producto usa sigue aceptando cualquier valor: sin producto no hay
+contra qué comparar, mismo criterio que ya usa el editor para esconder la
+columna.
 
 ## ~~`fusionar()` sumaba las líneas condicionadas como si aplicaran siempre~~ — VOID 2026-08-24 (ADR-063)
 

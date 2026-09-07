@@ -233,9 +233,11 @@ def test_duplicar_agrega_copy_y_clona_las_lineas(env):
 
 
 # --- La condición de una línea, por la API de la receta (ADR-056) -----------
-# Los ids son PTAV de `sales`: `inventory` no los valida contra su ORM (es
-# deuda conocida), así que acá alcanza con que sean UUID bien formados. Los
-# nombres siguen el archivo real: "m1_ame" se lee "Mitad 1: Americana".
+# Los ids son PTAV de `sales`. Ninguna de estas recetas cuelga de un
+# producto, así que `_validar_condicion` (ADR-092) no tiene contra qué
+# comparar y acepta cualquier UUID bien formado — el caso de rechazo vive
+# en tests/test_atributos_catalogo.py, con un producto real de por medio.
+# Los nombres siguen el archivo real: "m1_ame" se lee "Mitad 1: Americana".
 M1_AME = str(uuid.uuid4())
 M1_HAW = str(uuid.uuid4())
 M2_AME = str(uuid.uuid4())
