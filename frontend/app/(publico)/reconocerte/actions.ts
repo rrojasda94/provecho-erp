@@ -1,6 +1,7 @@
 "use server";
 
 import { ApiError, apiFetch } from "@/lib/api";
+import { tipoPorLargo } from "@/lib/documento";
 import { ubicacionDe } from "@/lib/ubicacion-form";
 
 import type { Cupon, EstadoRegistro } from "./estado";
@@ -42,7 +43,7 @@ export async function buscarNombreAction(
   numeroDocumento: string,
 ): Promise<{ nombres: string; apellidos: string }> {
   const dni = numeroDocumento.trim();
-  if (!/^\d{8}$/.test(dni)) return { nombres: "", apellidos: "" };
+  if (tipoPorLargo(dni) !== "dni") return { nombres: "", apellidos: "" };
   try {
     return await apiFetch(`/api/v1/sales/publico/reconocerte/dni/${dni}/nombre`);
   } catch {
@@ -69,7 +70,7 @@ export async function registrarAction(
   // Validación de forma acá, reglas de negocio en la API. Lo primero evita
   // un viaje para decir algo que se ve desde el navegador; lo segundo no se
   // duplica, porque una regla escrita dos veces se corrige una sola.
-  if (!/^\d{8}$/.test(numeroDocumento)) {
+  if (tipoPorLargo(numeroDocumento) !== "dni") {
     return { error: "El DNI son 8 dígitos.", cupon: null };
   }
   if (!nombre) {

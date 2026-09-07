@@ -33,7 +33,7 @@ celery_app.conf.update(
     task_serializer="json",
     result_serializer="json",
     accept_content=["json"],
-    timezone="America/Lima",
+    timezone=settings.zona_horaria,
     enable_utc=True,
     # Encolar NUNCA puede colgar al que encola. Quien llama a `apply_async`
     # suele estar dentro de un request —el listener de `sales.venta_confirmada`

@@ -6,7 +6,7 @@ import {
   ConsultaDocumento,
   type Consulta,
 } from "@/components/consulta/buscar-documento";
-import { documentoValido, LARGO_DNI, LARGO_RUC } from "@/lib/documento";
+import { documentoValido, LARGO_DNI, LARGO_RUC, tipoPorLargo } from "@/lib/documento";
 import {
   agruparExtras,
   elegidosEn,
@@ -1551,12 +1551,14 @@ export function DialogoCliente({
    * que quiso registrarse como cliente con su documento tocaba "Guardar
    * cliente" y **no pasaba nada** — sin error, sin aviso, sin alta.
    */
-  const documentoValido =
-    documento.trim().length === LARGO_DNI ||
-    documento.trim().length === LARGO_RUC;
+  // `docCompleto` y no `documentoValido`: ese nombre ya es la función
+  // importada de `@/lib/documento`, que acepta vacío (RN-PTS-005) — un
+  // documento sin terminar de teclear no debe contar como "ya tiene
+  // contacto", así que acá hace falta la versión estricta.
+  const docCompleto = tipoPorLargo(documento.trim()) !== null;
   const faltaContacto = !nombre.trim()
     ? "Falta el nombre"
-    : telefono.trim().length >= 6 || documentoValido
+    : telefono.trim().length >= 6 || docCompleto
       ? null
       : "Falta el teléfono o un DNI/RUC completo";
 

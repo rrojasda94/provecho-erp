@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { esSinPermiso, type Falla } from "@/lib/carga";
+import { tipoPorLargo } from "@/lib/documento";
 import { apiKds } from "@/lib/kds";
 import { tienePermiso } from "@/lib/permisos";
 import {
@@ -736,7 +737,7 @@ export default function PdvCliente({
       if (propina > 0) await registrarPropina(numero, propina);
       notificar(
         `Orden #${numero} cobrada · ${soles(totalACobrar(activo, seleccion))} · ${
-          doc.length === 11 ? "factura" : "boleta"
+          tipoPorLargo(doc) === "ruc" ? "factura" : "boleta"
         } emitida`,
       );
       setDialogo(null);
