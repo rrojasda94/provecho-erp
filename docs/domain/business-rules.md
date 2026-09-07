@@ -1214,6 +1214,14 @@ producción se hace en cocinas de sucursal. Ver
   después: entre pedir y aprobar el stock se mueve, y recalcularla contaría
   una historia distinta de la que quien pidió vio. Es lo que le permite al
   abastecedor priorizar sin adivinar.
+- **RN-INV-026** Cerrar un conteo cíclico arma o pone al día el borrador del
+  requerimiento del almacén contado (RN-INV-023), sin excepción por tipo de
+  conteo. El conteo es exactamente el momento en que alguien tiene el
+  estante a la vista; el borrador es **aditivo** (RN-INV-023), así que
+  dispararlo en cada cierre nunca pisa lo que el turno ya tecleó. Un almacén
+  sin abastecedor propio (el central, principio de la cadena) no arma
+  borrador — el conteo se cierra igual, armar la lista es una consecuencia
+  del cierre, no una condición.
 - **RN-INV-025** El catálogo de artículos **se baja, se edita y se vuelve a
   subir** en el mismo formato, con revisión en el medio (ADR-051). La
   identidad de una fila es su `ID` o, si va vacío, su **código interno** — el

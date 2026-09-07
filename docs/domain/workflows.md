@@ -151,10 +151,11 @@ Encargado/Supervisor → envío a Almacén Central. `GET
 está bajo `stock_minimo` (RN-INV-013) y el Encargado la edita —incluida la
 cantidad menor que describe el paso 8— antes de enviarla; lo que se agrega a
 mano queda marcado como pedido del local y no como urgencia (RN-INV-024).
-El paso 4 (el conteo **genera** el borrador automáticamente) queda **fuera**
-de este slice: hoy el borrador se arma independiente del conteo cíclico
-(ADR-019), leyendo el stock vigente al abrir la pantalla, no el resultado de
-un conteo recién cerrado — encadenar los dos es deuda técnica. Los pasos
+**El paso 4 se cerró el 2026-09-06** (RN-INV-026, ADR-093): cerrar cualquier
+conteo cíclico arma o pone al día el borrador del almacén contado, sin
+esperar a que alguien abra la pantalla. Es aditivo —no pisa lo que el turno
+ya tecleó en un borrador abierto— y no distingue conteo general de conteo
+por categoría: cualquier cierre dispara el mismo refresco. Los pasos
 10–14 (picking, packing, transporte, recepción, devoluciones) siguen sin
 implementarse: el ciclo de aprobación → despacho → recepción ya existía
 desde ADR-020, y es lo que cubren `GET /inventory/transferencias` y las
