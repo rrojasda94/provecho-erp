@@ -181,6 +181,20 @@ class Settings(BaseSettings):
     whatsapp_plantilla_en_camino: str = "pedido_en_camino"
     whatsapp_plantilla_entregado: str = "pedido_entregado"
     whatsapp_plantilla_entrega_fallida: str = "entrega_fallida"
+    # --- SMTP (canal de alerta por correo, ADR-033) --------------------------
+    # Sin `smtp_host`, `reports` sigue sin ningún canal más allá de la
+    # bandeja: el envío se omite y queda en el log, nunca rompe el resto de
+    # la distribución (mismo criterio que un backup sin S3 configurado).
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    # Remitente que ve quien recibe el correo — no necesariamente igual a
+    # `smtp_user` (proveedores como SES separan credencial de remitente
+    # verificado).
+    smtp_from: str = "no-responder@provecho.local"
+    smtp_use_tls: bool = True
+    smtp_timeout_segundos: float = 10.0
     # --- Google Maps (direcciones y reparto) --------------------------------
     # Dos claves y no una porque Google no deja restringir la misma por
     # referente HTTP **y** por IP a la vez, y son dos usos con riesgos

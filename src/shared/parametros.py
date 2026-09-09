@@ -19,6 +19,7 @@ from src.shared.repositories import ParametroEmpresaRepo
 # el código de área no reemplaza el nombre del módulo técnico.
 MODULOS = (
     "accounting",
+    "assets",
     "delivery",
     "inventory",
     "marketing",

@@ -22,6 +22,8 @@ celery_app = Celery(
     backend=settings.broker_url,
     include=[
         "src.core.tasks_salud",
+        "src.modules.accounting.application.tasks",
+        "src.modules.assets.application.tasks",
         "src.modules.delivery.application.tasks",
         "src.modules.inventory.application.tasks",
         "src.modules.marketing.application.tasks",
@@ -82,6 +84,23 @@ celery_app.conf.beat_schedule = {
     "reportar-conteos-vencidos": {
         "task": "inventory.reportar_conteos_vencidos",
         "schedule": crontab(hour=6, minute=15),
+    },
+    # Después de los dos barridos de inventory (mismo motivo: antes del
+    # turno). Una vez al día alcanza: el aviso es idempotente por ventana
+    # (`plan.aviso_proximo_en`/`aviso_vencido_en`), así que correrlo más
+    # seguido no cambiaría nada — solo hay algo nuevo que avisar cuando un
+    # plan o un documento cruza a "próximo" o a "vencido", y eso no pasa más
+    # de una vez por día.
+    "barrer-vencimientos-de-activos": {
+        "task": "assets.barrer_vencimientos",
+        "schedule": crontab(hour=6, minute=30),
+    },
+    # Un asiento por activo por mes: correrlo el día 1 alcanza — es
+    # idempotente por `<activo_id>:<AAAA-MM>`, así que un reintento o un
+    # segundo disparo el mismo mes no duplica nada.
+    "correr-depreciacion-mensual": {
+        "task": "accounting.correr_depreciacion_mensual",
+        "schedule": crontab(day_of_month=1, hour=5, minute=0),
     },
     # Salidas sin marcar: cada hora y no una vez al día. La hora límite es
     # de cada turno —el de mañana vence a media tarde, el de noche de

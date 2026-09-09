@@ -17,6 +17,7 @@ import {
   ScrollText,
   SlidersHorizontal,
   Users,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -187,6 +188,15 @@ export const MODULOS: Modulo[] = [
     prefijoPermiso: "inventory.",
     area: "abastecimiento",
     Icono: Package,
+  },
+  {
+    clave: "activos",
+    nombre: "Activos",
+    descripcion: "Equipos y vehículos: mantenimiento, combustible y vencimientos",
+    href: "/activos/cronograma",
+    prefijoPermiso: "assets.",
+    area: "abastecimiento",
+    Icono: Wrench,
   },
   {
     clave: "contabilidad",

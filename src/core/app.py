@@ -23,6 +23,8 @@ from src.core.sync.api.routers import router as sync_router
 from src.core.tenant import FueraDeAlcance
 from src.modules.accounting.api.routers import router as accounting_router
 from src.modules.accounting.application import listeners as accounting_listeners
+from src.modules.assets.api.routers import router as assets_router
+from src.modules.assets.application import listeners as assets_listeners
 from src.modules.delivery.api.publico_routers import router as delivery_publico_router
 from src.modules.delivery.api.routers import router as delivery_router
 from src.modules.delivery.application import listeners as delivery_listeners
@@ -99,6 +101,14 @@ TAGS_METADATA = [
         "description": "Catálogo de artículos, stock por almacén, movimientos y ajustes.",
     },
     {"name": "purchases", "description": "Proveedores y ciclo de orden de compra."},
+    {
+        "name": "assets",
+        "description": (
+            "Activos (equipamiento y vehículos): kilometraje y consumo de "
+            "combustible, cronograma de mantenimiento y documentos con "
+            "fecha de vencimiento (SOAT, licencias, certificados)."
+        ),
+    },
     {
         "name": "delivery",
         "description": (
@@ -326,6 +336,7 @@ def create_app() -> FastAPI:
     app.include_router(sales_router, prefix="/api/v1")
     app.include_router(kds_router, prefix="/api/v1")
     app.include_router(purchases_router, prefix="/api/v1")
+    app.include_router(assets_router, prefix="/api/v1")
     app.include_router(delivery_router, prefix="/api/v1")
     app.include_router(production_router, prefix="/api/v1")
     app.include_router(accounting_router, prefix="/api/v1")
@@ -349,6 +360,7 @@ def create_app() -> FastAPI:
     app.include_router(reports_router, prefix="/api/v1")
     inventory_listeners.register()
     accounting_listeners.register()
+    assets_listeners.register()
     marketing_listeners.register()
     sales_listeners.register()
     # Después de `sales`: `delivery` escucha `sales.venta_entregada`/

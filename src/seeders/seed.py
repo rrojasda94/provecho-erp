@@ -145,6 +145,16 @@ PERMISOS = [
         "purchases.dar_conformidad",
         "Dar conformidad al comprobante recibido (dispara el pago)",
     ),
+    ("assets.leer", "Consultar activos, mantenimiento y documentos con vencimiento"),
+    (
+        "assets.gestionar",
+        "Alta y edición de activos, planes de mantenimiento y documentos con vencimiento",
+    ),
+    (
+        "assets.mantener",
+        "Registrar kilometraje, cargas de combustible y ejecutar órdenes de mantenimiento",
+    ),
+    ("assets.dar_baja", "Dar de baja un activo"),
     ("delivery.leer", "Consultar repartidores, rutas y entregas"),
     (
         "delivery.despachar",
@@ -387,6 +397,13 @@ ROLES = {
         "inventory.aprobar_solicitud",
         "inventory.liberar_reserva",
         "sales.leer_clientes_externos",
+        # El encargado ve el estado de los equipos y vehículos de su local,
+        # da de alta lo que llega y registra kilometraje/combustible y
+        # mantenimiento del día a día. Dar de baja un activo sigue siendo
+        # decisión de un administrador (mismo criterio que `purchases.aprobar`).
+        "assets.leer",
+        "assets.gestionar",
+        "assets.mantener",
         # Puede dar de alta repartidores propios; también despacha y ve el
         # reparto cuando le toca cubrir el turno (ADR-098).
         "delivery.leer",
@@ -455,6 +472,11 @@ ROLES = {
         "inventory.solicitar_ajuste",
         "inventory.contar",
         "inventory.solicitar_insumos",
+        # Kilometraje, combustible y mantenimiento de los vehículos que usa
+        # para transferencias/reparto — no da de alta activos nuevos ni los
+        # da de baja, eso es de quien administra o del encargado del local.
+        "assets.leer",
+        "assets.mantener",
     ],
     "agente_ia": ["sales.crear_pedido"],
     # Cuenta de servicio del hub de sucursal (ADR-009): lo mínimo para
@@ -480,6 +502,12 @@ ROLES = {
         # Qué se pide más y desde dónde, para negociar volumen (contrato
         # público de inventory).
         "inventory.leer_solicitudes_externas",
+        # El área que compra el equipo o el vehículo es la misma que
+        # coordina su mantenimiento con el proveedor de servicio
+        # (RN-MNT-002/004) y da de alta el activo cuando llega.
+        "assets.leer",
+        "assets.gestionar",
+        "assets.mantener",
     ],
     "jefe_cocina": [
         "production.crear",
@@ -503,6 +531,10 @@ ROLES = {
         # Contabilidad audita a Compras, Almacén y las cajas de sucursal
         # (RN-CTB-009): sin el rastro, auditar es preguntar de buena fe.
         "auditoria.leer",
+        # Solo lectura: el valor de compra y la vida útil de un activo son
+        # insumo para la depreciación (deuda declarada, ver ROADMAP), no
+        # algo que Contabilidad dé de alta.
+        "assets.leer",
     ],
     "rrhh_admin": [
         "rrhh.leer",
@@ -525,6 +557,12 @@ ROLES = {
         # alta de infraestructura del ciclo laboral, no del local en sí.
         "rrhh.terminal_gestionar",
         "rrhh.capacitacion_gestionar",
+        # Solo lectura: el carné de sanidad o la licencia de conducir de un
+        # trabajador quedan registrados como `documento_vigencia` con sujeto
+        # `trabajador`, y RRHH necesita verlos aunque no los administre desde
+        # este módulo (el alta va por el mismo permiso que cualquier otro
+        # documento, `assets.gestionar`, que RRHH no tiene).
+        "assets.leer",
     ],
     # Marketing atrae demanda y cuida la marca; no se aprueba su propio
     # brief — eso lo valida Gerencia (RN-MKT-003, RN-GER-007).
@@ -607,6 +645,7 @@ ROLES_POR_AREA = {
     "caja": ("cajero",),
     "contabilidad": ("contador",),
     "rrhh": ("rrhh_admin",),
+    "compras": ("comprador",),
 }
 
 # Usuarios de desarrollo (username, rol). Todos con PIN 123456 y acceso a todas

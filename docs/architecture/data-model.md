@@ -99,37 +99,72 @@ erDiagram
   `activos` es virtual (sin ubicación física ni stock de SKUs). Equipamiento
   y política FEFO/FIFO por tipo — ver
   [domain-model.md](../domain/domain-model.md#almacenes).
-- **activo**: id_interno (hasta 8 alfanuméricos, autogenerado, único en
-  todo el grupo, corregible por pantalla — RN-GEN-005), empresa_id, categoria_id (opcional), nombre, ficha técnica,
-  número de serie, fecha de compra, proveedor_id, número de factura, valor
-  de depreciación (calculada por el área contable), historial de
-  mantenimiento/reparaciones, estado (`activo` | `de_baja`), archivado
-  (bool — oculta de listados, nunca se elimina). Baja/venta exige acta_id
-  (depreciación total requerida).
-- **orden_mantenimiento**: activo_id (vehículo/equipamiento) o
-  sucursal_id/almacen_id (si es local), tipo (`programado` |
-  `adelantado`), frecuencia_recomendada (RN-MNT-001),
-  proveedor_servicio_id, fecha_programada, motivo_adelanto (`desperfecto`
-  | `baja_productividad`, si `adelantado`), reportado_por (trabajador),
-  reportado_a (`compras` | `contabilidad`, RN-MNT-004), repuestos_utilizados
-  (FK `repuesto_compatibilidad`), costo, estado.
-- **repuesto_compatibilidad**: articulo_id (tipo=`repuesto`), activo_id
-  (equipamiento o vehículo compatible), modelo_compatible,
-  numero_serie_compatible (RN-RPT-002).
-- **equipamiento**: activo_id (extiende `activo` 1:1), categoria_id
-  (opcional, RN-EQP-004), etiqueta_codigo (RN-EQP-001), responsable_uso_id
-  (trabajador), induccion_recibida (bool, RN-EQP-002). Reporte de avería
-  → `orden_mantenimiento` (ver Mantenimiento). Mal uso comprobado → reporte
-  a RRHH → `memorandum` o `amonestacion` (RN-EQP-003).
-- **flota**: empresa_id, nombre, tipo_vehiculo predominante (`moto` |
-  `carro` | `camion` | ...), descripcion. Agrupador de vehículos de la
-  empresa — funciona como una categoría por la cual ubicar un vehículo
-  (ej. "flota de reparto en moto", "flota de abastecimiento").
-- **vehiculo**: activo_id (extiende `activo` 1:1), flota_id, tipo (`moto` |
-  `carro` | `camion` | ...), placa, numero_motor, numero_chasis,
-  kilometraje, tenencia (`propio` | `alquilado`), responsable_id
-  (trabajador, RN-VEH-002), gps_equipado (bool), camara_equipada (bool),
-  licenciado_a_trabajador_id (nullable — beneficio laboral, RN-VEH-003).
+- **activo** — módulo `assets` (ADR-099): empresa_id, sucursal_id (opcional),
+  tipo (`equipamiento` | `vehiculo`), id_interno (hasta 8 alfanuméricos,
+  único por empresa — **lo teclea quien da de alta**, igual que
+  `articulo.id_interno`; pese a RN-GEN-005 hoy nada en el ERP lo
+  autogenera), nombre, categoria (texto libre, no FK — no es el catálogo de
+  `inventory`), marca, modelo, numero_serie, etiqueta_codigo (RN-EQP-001),
+  fecha_compra, valor_compra, vida_util_meses, proveedor_id (sin FK —
+  `purchases`), comprobante_compra_id (FK `comprobante`),
+  responsable_trabajador_id (sin FK — `rrhh`), estado (`operativo` |
+  `en_mantenimiento` | `de_baja`), archivado (bool — oculta de listados,
+  nunca se elimina), notas. Extiende con una fila de `vehiculo` cuando
+  `tipo="vehiculo"`. La depreciación y la baja por venta con acta
+  (RN-ACT-001/002) siguen pendientes en `accounting` (deuda declarada).
+- **vehiculo**: activo_id (PK, extiende `activo` 1:1), placa (única —
+  registro nacional, no por empresa), tipo_vehiculo (`moto` | `auto` |
+  `camioneta` | `camion` | `otro`), numero_motor, numero_chasis, tenencia
+  (`propio` | `alquilado`), kilometraje_actual (cache de la última
+  `lectura_odometro`). `flota` **queda diferida**: sin reparto con varias
+  unidades por categorizar todavía es un formulario que nadie llenaría
+  (deuda declarada).
+- **lectura_odometro**: vehiculo_id, fecha, km, origen (`manual` |
+  `carga_combustible` | `mantenimiento`), registrado_por, nota. El km
+  nunca retrocede (RN-VEH-005); cada lectura actualiza
+  `vehiculo.kilometraje_actual`.
+- **carga_combustible**: vehiculo_id, fecha, galones, monto,
+  tipo_combustible (opcional), km_odometro, comprobante_id (FK
+  `comprobante`, **NOT NULL + UNIQUE** — RN-VEH-006, el comprobante nace en
+  `purchases` vía compra directa sobre un artículo `tipo="servicio"`, ADR-099),
+  km_recorridos y rendimiento_km_gal (derivados y congelados al registrar),
+  anomalo (bool, RN-VEH-007), registrado_por.
+- **plan_mantenimiento**: activo_id, nombre, descripcion, cada_dias y/o
+  cada_km (al menos uno — `cada_km` solo si el activo es vehículo),
+  dias_aviso, km_aviso (RN-MNT-005), proveedor_servicio_id (sin FK —
+  `purchases`), km_base (kilometraje del vehículo al crear el plan, para no
+  contar el ciclo desde 0), ultima_fecha, ultimo_km, activo (bool),
+  aviso_proximo_en / aviso_vencido_en (idempotencia del barrido diario).
+  Estado (`al_dia` | `proximo` | `vencido`) es derivado, nunca columna.
+- **orden_mantenimiento**: activo_id, plan_id (nullable — un adelanto por
+  avería no viene de un plan, RN-MNT-003), tipo (`programado` |
+  `adelantado`), motivo_adelanto (`desperfecto` | `baja_productividad`, si
+  `adelantado`), fecha_programada, fecha_realizada, km_al_realizar,
+  proveedor_servicio_id (sin FK), reportado_por (RN-MNT-004),
+  descripcion, resultado, costo, comprobante_id (FK `comprobante`,
+  nullable, único), estado (`programada` | `en_curso` | `realizada` |
+  `cancelada`). Al realizarse con `plan_id`, actualiza
+  `ultima_fecha`/`ultimo_km` del plan y limpia sus avisos.
+- **orden_mantenimiento_repuesto**: orden_mantenimiento_id, articulo_id (sin
+  FK — `inventory`), nombre_articulo (congelado al consumir), cantidad,
+  costo_unitario (opcional). Al realizarse la orden, publica
+  `assets.repuesto_consumido` para que `inventory` descuente stock
+  (RN-MNT-006).
+- **repuesto_compatibilidad**: activo_id, articulo_id (sin FK —
+  `inventory`), notas. `UniqueConstraint(activo_id, articulo_id)`. Catálogo
+  de sugerencias para la pantalla de alta de una orden (RN-RPT-002): un
+  repuesto no listado igual se puede registrar.
+- **documento_vigencia** — permisos y certificados con fecha de vencimiento
+  (SOAT, revisión técnica, licencia de funcionamiento, carné de sanidad,
+  licencia de conducir, etc.; ADR-099, pedido del usuario — no existía
+  ninguna entidad para esto): empresa_id, sujeto_tipo (`activo` |
+  `sucursal` | `empresa` | `trabajador`) + sujeto_id (sin FK — polimórfico
+  entre tres módulos, mismo patrón que `notificacion`), tipo_documento
+  (catálogo cerrado en `assets.domain.rules.TIPOS_DOCUMENTO`), numero,
+  emisor, fecha_emision, fecha_vencimiento, dias_aviso, renovado_por_id
+  (auto-FK — renovar crea una fila nueva y encadena, nunca sobrescribe),
+  aviso_proximo_en / aviso_vencido_en, notas. Estado (`vigente` | `proximo`
+  | `vencido` | `renovado`) es derivado.
 - **categoria**: empresa_id, nombre, padre_id (jerarquía; NULL = raíz),
   asiento_contable_config (JSONB — **rol contable → código del PCGE**, con los
   siete roles de `accounting.domain.plantillas.ROLES`: `compra`,
@@ -720,8 +755,12 @@ en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
   no opcional como decía la especificación de julio: el único emisor de hoy
   es un traslado entre almacenes. La guía de una venta con reparto lo
   volverá nullable cuando exista reparto propio.
-  **No hay `vehiculo_id`**: sin flota, una tabla de vehículos sería un
-  formulario que hay que llenar antes de emitir la primera guía (ADR-027).
+  **`vehiculo_id`** (agregado 2026-09-09, ADR-099): sin FK — `vehiculo` es
+  dominio de `assets`—, opcional. Si viene, su placa se resuelve por
+  `assets.application.queries_publicas.vehiculo_para_guia` y se congela en
+  `vehiculo_placa` al emitir; si no, `vehiculo_placa` sigue aceptando texto
+  libre (RN-VEH-008), compatibilidad con guías de antes de que `assets`
+  existiera.
 - **guia_remision_item**: guia_remision_id, sku_id, cantidad, descripcion y
   unidad (códigos snapshot). Las líneas **se derivan** de
   `transferencia_item` y se agrupan por SKU: RN-TRP-002 exige que lo
@@ -760,14 +799,25 @@ en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
   respuesta, RN-CMP-004; camino simplificado: proveedor `preferente` +
   ítem recurrente emite sin cotización, sustento = requerimiento de
   almacén + factura), requerimiento_activo_id (obligatorio si tipo
-  `activo`), almacen_destino_id, estado (`borrador` | `emitida` |
-  `recibida_parcial` | `recibida` | `anulada`), idempotency_key. Ítems en
-  **orden_compra_item** (articulo, cantidad, costo).
-- **requerimiento_activo**: area_solicitante, especificacion (ficha
-  técnica requerida), aprobado_area (bool + aprobador), aprobado_gerencia
-  (bool + aprobador — dos aprobaciones distintas, ambas registradas,
-  bloqueo a nivel de dominio antes de emitir la OC tipo `activo`),
-  cotizaciones vinculadas (mínimo 2), estado.
+  `activo` — CHECK `(tipo='activo') = (requerimiento_activo_id IS NOT
+  NULL)`), almacen_destino_id (**nulo si tipo `activo`** — un activo no
+  entra a un almacén de `inventory`, ADR-099), estado (`borrador` |
+  `emitida` | `recibida_parcial` | `recibida` | `anulada`; tipo `activo`
+  solo usa `recibida`, nunca `recibida_parcial` — recepción total),
+  idempotency_key. Ítems de tipo `insumo` en **orden_compra_item**
+  (articulo, cantidad, costo); tipo `activo` no tiene ítems, la única
+  "línea" es su `requerimiento_activo`.
+- **requerimiento_activo** (implementada 2026-09-09, ADR-099): empresa_id,
+  sucursal_id (destino, opcional), id_interno (el futuro `activo.id_interno`
+  — se tecleó acá, RN-GEN-005 sigue sin generador), nombre, categoria,
+  marca, modelo, costo_estimado (se vuelve `activo.valor_compra` al
+  recibir), vida_util_meses (opcional, para que `accounting` empiece a
+  depreciar apenas nace el activo), solicitado_por, notas.
+  **`area_solicitante`/`aprobado_area`/`aprobado_gerencia`/cotizaciones
+  vinculadas de la especificación original no se construyeron**: la
+  aprobación de esta OC es la misma de cualquier otra (umbral +
+  `purchases.aprobar`), deuda declarada. Tampoco admite comprar varias
+  unidades del mismo activo en una fila (sin `cantidad`).
 - **recepcion_compra**: orden_compra_id, comprobante_id (sustento,
   RN-CMP-005), asiento_id, movimiento_dinero_id (egreso o crédito con
   plazo, RN-CMP-006/007 — módulo tesorería, ver sección 9), ítems
@@ -1400,6 +1450,13 @@ Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
   (`domain/plantillas.py`), que sí puede expresar el asiento peruano completo
   —N líneas, con IGV desagregado y asiento de destino—, cosa que un par
   debe/haber no puede. La regla sigue ganando cuando existe.
+- **activo_depreciacion** (ADR-099, 2026-09-09): empresa_id, activo_id (sin
+  FK — `assets`), valor_compra/vida_util_meses/fecha_inicio (congelados al
+  primer barrido que ve el activo), depreciado_acumulado. El barrido
+  mensual (PROC-CTB-010) lee `assets.application.queries_publicas.
+  activos_depreciables` y postea un asiento por activo por mes (debe
+  `6813`, haber `3913`) mientras quede algo pendiente; se detiene solo al
+  llegar a `de_baja` o al depreciar el valor completo.
 
 **El IGV vive en el comprobante** (2026-08-29, ADR-081). `comprobante.gravado_igv` (nullable, migración `dfb195b14433`) dice si **esa** operación lleva IGV; `NULL` deja decidir al default de la empresa (`empresa.config_fiscal["igv_por_defecto"]`, y si tampoco está, `zona_tributaria`). Lo resuelve `src/shared/tributos.py`, único lugar del ERP que decide el régimen — antes la misma condición estaba copiada en el asiento contable y en el comprobante electrónico. Está en `comprobante` y no en `venta` ni en `orden_compra` porque el IGV nace con el documento: el crédito fiscal se toma con el comprobante anotado y el débito con el emitido, así que los asientos de venta confirmada y de compra recibida van **sin** IGV y lo reconoce el asiento del comprobante.
 
@@ -2045,16 +2102,24 @@ dos cosas nunca van a ser un módulo.
   `reserva_stock`, `transferencia`/`transferencia_item`. El picking reparte
   por FEFO y emite una línea por lote tomado. Un módulo aparte habría
   necesitado el dominio de `inventory` para hacer eso mismo.
-- **Ruta / flota** ⬜ sigue sin dueño, y sin operación real que lo pida. Lo
-  único pendiente del transporte de hoy es la **guía de remisión**, que es
-  un comprobante (deuda de `inventory` y de `sales`), no un módulo.
+- **Ruta / flota (dentro de `vehiculo`)** ⬜ sigue sin dueño: `flota` como
+  agrupador queda diferida (deuda de `assets`), y el ruteo/tracking de una
+  operación de reparto propia sigue sin caso real que lo pida. Lo pendiente
+  del transporte de hoy sigue siendo la **guía de remisión**, que es un
+  comprobante (deuda de `inventory` y de `sales`), no un módulo.
 - **Tesorería** ✅ dentro de `accounting` por decisión del usuario:
   `movimiento_dinero`, caja, `custodia_efectivo`.
 - **BI/reportes** ✅ en `core/reportes` (ADR-024): catálogo de reportes +
   `tablero` guardado por usuario y compartido por rol.
-- **Activos** ⬜ con dueño repartido a propósito: se compran en `purchases`
-  (`requerimiento_activo`, OC tipo `activo`) y se deprecian en `accounting`
-  (activo fijo, PROC-CTB-007/010).
+- **Activos: registro operativo** ✅ módulo `assets` (ADR-099, 2026-09-09):
+  activo/equipamiento/vehículo, kilometraje y combustible, mantenimiento y
+  documentos con vencimiento. La **depreciación** ✅ vive en `accounting`
+  (activo fijo, PROC-CTB-010, resuelto 2026-09-09 — ver §Recursos). El
+  ciclo de **compra** ✅ vive en `purchases` (OC tipo `activo` +
+  `requerimiento_activo`, resuelto 2026-09-09 — recepción total publica el
+  evento que `assets` consume para dar de alta el activo solo); la doble
+  aprobación de área/gerencia y las cotizaciones mínimas que la
+  especificación original pedía siguen sin construirse (deuda declarada).
 - **Proyectos** ⬜ sin caso: el grupo no ejecuta obra ni proyectos
   facturables.
 

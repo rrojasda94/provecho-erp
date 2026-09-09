@@ -1051,6 +1051,20 @@ producción se hace en cocinas de sucursal. Ver
   trabajador como beneficio laboral durante su estadía en la empresa.
 - **RN-VEH-004** El registro de kilometraje de un vehículo da fe del buen
   uso y del cumplimiento de las rutas establecidas.
+- **RN-VEH-005** El kilometraje registrado de un vehículo nunca retrocede:
+  una lectura menor a la última conocida se rechaza (`assets`, ADR-099).
+- **RN-VEH-006** Toda carga de combustible sustenta su propio comprobante
+  recibido; ningún comprobante se reutiliza en dos cargas ni en una orden
+  de mantenimiento (`assets`, ADR-099).
+- **RN-VEH-007** Una carga cuyo rendimiento cae muy por debajo del promedio
+  reciente del vehículo se marca como consumo anómalo y se reporta a
+  Gerencia y Contabilidad — puede ser una fuga, una manipulación o un mal
+  uso (`assets`, ADR-099).
+- **RN-VEH-008** Una guía de remisión puede declarar el vehículo eligiendo
+  el registrado en Activos (`vehiculo_id`); su placa se congela en la guía
+  al emitir, igual que el lugar de origen/destino. Sin `vehiculo_id` sigue
+  aceptando la placa tecleada a mano, para quien todavía no lo registra ahí
+  (`inventory`, contrato público `assets.vehiculo_para_guia`).
 
 ## Mantenimiento
 
@@ -1062,13 +1076,25 @@ producción se hace en cocinas de sucursal. Ver
   reporta desperfectos o baja de productividad del equipo.
 - **RN-MNT-004** El reporte que adelanta un mantenimiento se dirige al
   área de compras y al área contable, para coordinar.
+- **RN-MNT-005** El aviso de un mantenimiento próximo se dispara con una
+  anticipación configurable por plan (días y/o kilometraje) y otra vez al
+  vencer si nadie lo atendió — una vez por cada uno de los dos avisos, no
+  repetido mientras la ventana no cambie (`assets`, ADR-099).
+- **RN-MNT-006** Los repuestos usados al realizar una orden de
+  mantenimiento se registran con cantidad y descuentan stock de
+  `inventory` vía evento (`assets.repuesto_consumido`) — nunca importando su
+  dominio. El consumo real ya ocurrió: sin SKU activo o sin stock
+  suficiente queda una `incidencia_inventario`, la orden no se bloquea
+  (mismo criterio que el consumo de producción, `assets` ADR-099).
 
 ## Repuesto
 
 - **RN-RPT-001** El stock mínimo de un repuesto se define según la
   frecuencia o urgencia de su uso, no con una regla única.
 - **RN-RPT-002** Un repuesto debe tener número de serie o modelo
-  compatible con el equipamiento/vehículo al que corresponde.
+  compatible con el equipamiento/vehículo al que corresponde. Implementado
+  como catálogo de sugerencias (`repuesto_compatibilidad`, `assets`
+  ADR-099): no bloquea registrar en la orden un repuesto no listado.
 - **RN-RPT-003** La adquisición de un repuesto es responsabilidad del
   área de compras y del área de almacén.
 - **RN-RPT-004** Un repuesto puede usarse para repotenciar un equipo
@@ -1086,6 +1112,27 @@ producción se hace en cocinas de sucursal. Ver
   la gravedad, se eleva un reporte a RRHH, que notifica con memorándum o
   sanción.
 - **RN-EQP-004** El equipamiento se audita de manera rutinaria.
+
+## Documento de vigencia
+
+- **RN-DOC-001** Un permiso, certificado o licencia con fecha de
+  vencimiento (SOAT, revisión técnica, licencia de funcionamiento,
+  certificado de Defensa Civil, fumigación, registro sanitario, carné de
+  sanidad, licencia de conducir) se registra ligado a su sujeto: un activo,
+  una sucursal, la empresa, o un trabajador (`assets`, ADR-099).
+- **RN-DOC-002** El aviso de un documento próximo a vencer se dispara con
+  una anticipación configurable por documento, y otra vez al vencer —una
+  vez por cada uno de los dos avisos, no repetido mientras la ventana no
+  cambie.
+- **RN-DOC-003** Renovar un documento no reescribe su fecha de vencimiento:
+  crea un documento nuevo y encadena el anterior como renovado. El vencido
+  sigue disponible para consulta (una inspección puede pedirlo).
+- **RN-DOC-004** Un documento ya renovado no admite una segunda renovación
+  sobre la misma fila; la cadena avanza siempre desde la punta vigente.
+- **RN-DOC-005** Un documento admite adjuntar su escaneo (PDF o imagen,
+  máx. 20 MB): el binario se sube directo a S3 con una URL prefirmada que
+  el backend genera (`assets`, 2026-09-09); el ERP solo guarda el vínculo y
+  los metadatos (mismo patrón que `marketing.application.adjuntos`).
 
 ## Almacén virtual de activos
 
@@ -1328,6 +1375,10 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-CMP-015** La compra de un activo o equipamiento requiere cotización
   comparativa de mínimo 2 proveedores y validación de especificación y
   precio por el área solicitante y por gerencia antes de emitir la OC.
+  **Sin construir todavía** (2026-09-09, ADR-099): la OC tipo `activo` ya
+  existe (`requerimiento_activo`), pero se aprueba y emite igual que
+  cualquier otra — la cotización comparativa y la doble validación de esta
+  regla quedan como deuda declarada del módulo `purchases`.
 - **RN-CMP-016** El ERP calcula automáticamente el indicador de desempeño
   de cada proveedor (cumplimiento de plazo, conformidad en recepción,
   variación de precio) a partir de las recepciones registradas contra su
@@ -1338,6 +1389,9 @@ producción se hace en cocinas de sucursal. Ver
   aplica el descuento por planilla del monto faltante (extiende
   RN-RRHH-007). Faltante reiterado (2+ veces) del mismo responsable puede
   escalar a carta de amonestación (RN-RRHH-004).
+- **RN-CMP-018** Recibir una OC tipo `activo` es total, nunca parcial —el
+  activo llegó o no llegó— y publica el evento que da de alta el activo en
+  `assets` automáticamente (`purchases`, ADR-099).
 
 ## Ventas
 

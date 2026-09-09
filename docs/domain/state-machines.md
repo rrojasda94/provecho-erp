@@ -191,5 +191,51 @@ stateDiagram-v2
     cerrado --> [*]
 ```
 
+## Activo
+
+```mermaid
+stateDiagram-v2
+    [*] --> operativo
+    operativo --> en_mantenimiento: se inicia una orden de mantenimiento
+    en_mantenimiento --> operativo: se realiza la orden (si no quedó de baja)
+    operativo --> de_baja
+    en_mantenimiento --> de_baja
+```
+
+`de_baja` no vuelve a `operativo` — RN-ACT-001/002 (depreciación total +
+acta) siguen pendientes en `accounting`; hoy es un acto administrativo del
+módulo `assets` (ADR-099).
+
+## Orden de mantenimiento
+
+```mermaid
+stateDiagram-v2
+    [*] --> programada
+    programada --> en_curso: iniciar
+    en_curso --> realizada: realizar (RN-MNT-002/003)
+    programada --> realizada: realizar directo
+    programada --> cancelada
+    en_curso --> cancelada
+```
+
+Al `realizar` con `plan_id`, el plan actualiza `ultima_fecha`/`ultimo_km` y
+limpia sus avisos (RN-MNT-005).
+
+## Documento de vigencia
+
+```mermaid
+stateDiagram-v2
+    [*] --> vigente
+    vigente --> proximo: entra en la ventana de aviso (RN-DOC-002)
+    proximo --> vencido
+    vigente --> renovado: se registra el reemplazo (RN-DOC-003)
+    proximo --> renovado
+    vencido --> renovado
+```
+
+`vigente`/`proximo`/`vencido` son derivados (nunca columna); `renovado` es
+el único estado real: `renovado_por_id` apunta al documento que lo
+reemplazó y la fila vieja no se toca (RN-DOC-004).
+
 > Al dar estados a una entidad nueva: modelar aquí su máquina antes de
 > implementar las transiciones.

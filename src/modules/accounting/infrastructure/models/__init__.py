@@ -2,6 +2,9 @@
 contable núcleo (plan de cuentas, asiento, periodo_contable, data-model §8).
 """
 
+from src.modules.accounting.infrastructure.models.activo_depreciacion import (
+    ActivoDepreciacion,
+)
 from src.modules.accounting.infrastructure.models.apertura_caja import AperturaCaja
 from src.modules.accounting.infrastructure.models.arqueo import Arqueo
 from src.modules.accounting.infrastructure.models.asiento import Asiento
@@ -27,6 +30,7 @@ from src.modules.accounting.infrastructure.models.pos_tarjeta import PosTarjeta
 from src.modules.accounting.infrastructure.models.regla_asiento import ReglaAsiento
 
 __all__ = [
+    "ActivoDepreciacion",
     "AperturaCaja",
     "Arqueo",
     "Asiento",
