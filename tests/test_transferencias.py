@@ -702,6 +702,41 @@ def test_origen_y_destino_distintos(env):
     assert r.status_code == 409
 
 
+def test_produccion_no_despacha_directo_a_sucursal(env):
+    """RN-CDP-001: una cocina de producción entrega al almacén central,
+    nunca directo a un local — el segundo tramo es un traslado de siempre."""
+    client, ids, TestSession = env
+    with TestSession() as s:
+        produccion = Almacen(
+            empresa_id=uuid.UUID(ids["empresa_id"]),
+            nombre="Cocina de producción",
+            tipo="produccion",
+            almacen_abastecedor_id=uuid.UUID(ids["central_id"]),
+        )
+        s.add(produccion)
+        s.commit()
+        produccion_id = str(produccion.id)
+
+    h = _token(client)
+    _ingresar(client, h, produccion_id, ids["sku_servilleta"], 10)
+
+    r = client.post("/api/v1/inventory/transferencias", headers=h, json={
+        "origen_almacen_id": produccion_id,
+        "destino_almacen_id": ids["local_id"],
+        "items": [{"sku_id": ids["sku_servilleta"], "cantidad": "5"}],
+    })
+    assert r.status_code == 409
+    assert "RN-CDP-001" in r.json()["detail"]
+
+    # El mismo origen sí puede despachar al central: ese tramo no cambia.
+    r_central = client.post("/api/v1/inventory/transferencias", headers=h, json={
+        "origen_almacen_id": produccion_id,
+        "destino_almacen_id": ids["central_id"],
+        "items": [{"sku_id": ids["sku_servilleta"], "cantidad": "5"}],
+    })
+    assert r_central.status_code == 201, r_central.text
+
+
 def test_despachar_sin_stock_falla_entera(env):
     client, ids, _ = env
     h = _token(client)
