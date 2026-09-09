@@ -22,6 +22,7 @@ from src.modules.delivery.infrastructure.models import Entrega, RutaReparto
 from src.modules.rrhh.infrastructure.models import Trabajador
 from src.modules.sales.application import listeners as sales_listeners
 from src.modules.sales.infrastructure.models import (
+    Cliente,
     ProductoComercial,
     PuntoVenta,
     Venta,
@@ -30,6 +31,7 @@ from src.modules.sales.infrastructure.models import (
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
     Empresa,
+    Grupo,
     Marca,
     Persona,
     Rol,
@@ -171,7 +173,13 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
 
 
 def _crear_venta_delivery(
-    session, ids, *, estados_items=("listo",), con_ubicacion=True, estado="pagada"
+    session,
+    ids,
+    *,
+    estados_items=("listo",),
+    con_ubicacion=True,
+    estado="pagada",
+    cliente_id=None,
 ):
     """Una venta delivery lista (o no) para entrar a una ruta."""
     venta = Venta(
@@ -185,6 +193,7 @@ def _crear_venta_delivery(
         total=Decimal("35.00"),
         idempotency_key=str(uuid.uuid4()),
         direccion_entrega="Jr. Amazonas 123",
+        cliente_id=cliente_id,
     )
     if con_ubicacion:
         venta.ubicacion_lat = LAT_CLIENTE
@@ -232,6 +241,19 @@ def test_crear_repartidor_duplicado_es_conflicto(env):
         },
     )
     assert r.status_code == 409
+
+
+def test_listar_repartidores_trae_el_nombre_de_la_cuenta(env):
+    client, ids, headers, _ = env
+    r = client.get(
+        "/api/v1/delivery/repartidores",
+        params={"sucursal_id": ids["sucursal_id"]},
+        headers=headers["aprobador1"],
+    )
+    assert r.status_code == 200
+    por_id = {rep["id"]: rep["nombre"] for rep in r.json()}
+    assert por_id[ids["repartidor1_id"]] == "Kevin Test"
+    assert por_id[ids["repartidor2_id"]] == "Ana Test"
 
 
 def test_repartidor_sin_permiso_de_despacho_no_puede_listar_todos(env):
@@ -287,6 +309,35 @@ def test_tablero_no_muestra_pedido_a_medio_preparar(env):
         headers=headers["aprobador1"],
     )
     assert r.json()["sin_asignar"] == []
+
+
+def test_tablero_muestra_el_repartidor_y_las_paradas_de_cada_ruta(env):
+    client, ids, headers, TestSession = env
+    with TestSession() as s:
+        venta = _crear_venta_delivery(s, ids)
+        venta_id = str(venta.id)
+
+    r1 = client.post(
+        "/api/v1/delivery/rutas",
+        headers=headers["aprobador1"],
+        json={
+            "sucursal_id": ids["sucursal_id"],
+            "repartidor_id": ids["repartidor1_id"],
+            "venta_ids": [venta_id],
+        },
+    )
+    assert r1.status_code == 201, r1.text
+
+    r2 = client.get(
+        "/api/v1/delivery/tablero",
+        params={"sucursal_id": ids["sucursal_id"]},
+        headers=headers["aprobador1"],
+    )
+    assert r2.status_code == 200
+    ruta = next(r for r in r2.json()["rutas"] if r["repartidor_id"] == ids["repartidor1_id"])
+    assert ruta["repartidor_nombre"] == "Kevin Test"
+    assert len(ruta["paradas"]) == 1
+    assert ruta["paradas"][0]["venta_id"] == venta_id
 
 
 # --- Crear ruta ---------------------------------------------------------------
@@ -450,6 +501,29 @@ def test_iniciar_entregar_marca_la_venta_entregada_por_evento(env):
         assert item.estado_preparacion == "entregado"
         venta = s.get(Venta, uuid.UUID(venta_id))
         assert venta.repartidor_externo_plataforma is None
+
+
+def test_historial_de_entregas_trae_la_venta_y_el_repartidor_resueltos(env):
+    client, ids, headers, TestSession = env
+    venta_id, ruta_id, entrega_id = _crear_y_asignar_ruta(client, ids, headers, TestSession)
+    client.post(f"/api/v1/delivery/rutas/{ruta_id}/iniciar", headers=headers["aprobador1"])
+    r = client.post(
+        f"/api/v1/delivery/entregas/{entrega_id}/entregar",
+        headers=headers["kevinrep"],
+        json={"lat": "-6.49", "lng": "-76.36"},
+    )
+    assert r.status_code == 200, r.text
+
+    r2 = client.get(
+        "/api/v1/delivery/entregas",
+        params={"sucursal_id": ids["sucursal_id"]},
+        headers=headers["aprobador1"],
+    )
+    assert r2.status_code == 200
+    fila = next(e for e in r2.json()["items"] if e["venta_id"] == venta_id)
+    assert fila["numero_orden"] is not None
+    assert fila["direccion_entrega"] == "Jr. Amazonas 123"
+    assert fila["repartidor_nombre"] == "Kevin Test"
 
 
 def test_repartidor_ajeno_no_puede_entregar_la_ruta_de_otro(env):
@@ -703,6 +777,60 @@ def test_ping_actualiza_la_ultima_posicion_y_el_eta_de_la_proxima_parada(env):
         entrega = s.get(Entrega, uuid.UUID(entrega_id))
         assert entrega.eta_at is not None
         assert entrega.eta_at != eta_inicial
+
+
+# --- Mis rutas (PWA del repartidor, ADR-098) ------------------------------------
+def test_mis_rutas_trae_las_paradas_con_venta_y_cliente_resueltos(env):
+    client, ids, headers, TestSession = env
+    with TestSession() as s:
+        grupo = s.scalar(select(Grupo))
+        persona = Persona(nombres="Rosa", apellidos="Vela", telefono="987654321")
+        s.add(persona)
+        s.flush()
+        cliente = Cliente(grupo_id=grupo.id, tipo="natural", persona_id=persona.id)
+        s.add(cliente)
+        s.flush()
+        venta = _crear_venta_delivery(s, ids, estado="orden", cliente_id=cliente.id)
+        venta_id = str(venta.id)
+
+    r1 = client.post(
+        "/api/v1/delivery/rutas",
+        headers=headers["aprobador1"],
+        json={
+            "sucursal_id": ids["sucursal_id"],
+            "repartidor_id": ids["repartidor1_id"],
+            "venta_ids": [venta_id],
+        },
+    )
+    assert r1.status_code == 201, r1.text
+
+    r2 = client.get("/api/v1/delivery/mi/rutas", headers=headers["kevinrep"])
+    assert r2.status_code == 200
+    rutas = r2.json()
+    assert len(rutas) == 1
+    paradas = rutas[0]["paradas"]
+    assert len(paradas) == 1
+    parada = paradas[0]
+    assert parada["venta_id"] == venta_id
+    assert parada["estado"] == "asignada"
+    assert parada["direccion_entrega"] == "Jr. Amazonas 123"
+    assert parada["cliente_nombre"] == "Rosa Vela"
+    assert parada["cliente_telefono"] == "987654321"
+    assert Decimal(parada["monto_a_cobrar"]) == Decimal("35.00")
+
+    # `anarep` es otro repartidor: no ve la ruta ajena.
+    r3 = client.get("/api/v1/delivery/mi/rutas", headers=headers["anarep"])
+    assert r3.json() == []
+
+
+def test_mis_rutas_no_cobra_una_venta_ya_pagada(env):
+    client, ids, headers, TestSession = env
+    venta_id, _, _ = _crear_y_asignar_ruta(client, ids, headers, TestSession)
+
+    r = client.get("/api/v1/delivery/mi/rutas", headers=headers["kevinrep"])
+    assert r.status_code == 200
+    parada = next(p for ruta in r.json() for p in ruta["paradas"] if p["venta_id"] == venta_id)
+    assert parada["monto_a_cobrar"] is None
 
 
 # --- Ruteo real contra Google, con fallback (ADR-098) ----------------------------

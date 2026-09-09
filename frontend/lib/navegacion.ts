@@ -42,6 +42,11 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Caja", href: "/contabilidad/caja" },
     { label: "Reglas de asiento", href: "/contabilidad/reglas-asiento" },
   ],
+  delivery: [
+    { label: "Tablero", href: "/delivery" },
+    { label: "Repartidores", href: "/delivery/repartidores" },
+    { label: "Historial", href: "/delivery/entregas" },
+  ],
   gerencia: [
     { label: "Parámetros", href: "/gerencia/parametros" },
     { label: "Delivery", href: "/gerencia/delivery" },

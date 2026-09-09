@@ -176,6 +176,11 @@ class Settings(BaseSettings):
     # ventana de 24 h, Meta no acepta otra cosa.
     whatsapp_plantilla_encuesta: str = "encuesta_satisfaccion"
     whatsapp_plantilla_idioma: str = "es"
+    # Plantillas de `delivery` (ADR-098): pedido en camino, entregado y
+    # entrega fallida — mismo mecanismo, tres hitos distintos.
+    whatsapp_plantilla_en_camino: str = "pedido_en_camino"
+    whatsapp_plantilla_entregado: str = "pedido_entregado"
+    whatsapp_plantilla_entrega_fallida: str = "entrega_fallida"
     # --- Google Maps (direcciones y reparto) --------------------------------
     # Dos claves y no una porque Google no deja restringir la misma por
     # referente HTTP **y** por IP a la vez, y son dos usos con riesgos
