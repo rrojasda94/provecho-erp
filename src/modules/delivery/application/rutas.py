@@ -21,9 +21,12 @@ from src.modules.delivery.domain import rules
 from src.modules.delivery.infrastructure.models import Entrega, Repartidor, RutaReparto
 from src.modules.delivery.infrastructure.repositories import EntregaRepo, RutaRepo
 from src.modules.sales.application.queries_publicas import venta_para_reparto
+from src.modules.users.application.queries_publicas import notificar_a
 from src.modules.users.infrastructure.models import Sucursal
 from src.shared.auditoria import registrar as auditar
 from src.shared.integrations.google import Coordenada
+
+TIPO_RUTA_ASIGNADA = "delivery.ruta_asignada"
 
 
 def _validar_venta_para_ruta(
@@ -171,6 +174,14 @@ def crear(
             "optimizada_por": plan.fuente,
         },
         empresa_id=empresa_id,
+        sucursal_id=sucursal_id,
+    )
+    notificar_a(
+        session,
+        repartidor.usuario_id,
+        tipo=TIPO_RUTA_ASIGNADA,
+        titulo="Tienes una ruta nueva",
+        cuerpo=f"Te asignaron {len(ventas)} entrega(s). Revísala desde tu teléfono.",
         sucursal_id=sucursal_id,
     )
     return ruta
@@ -368,7 +379,3 @@ def q_list(
     estado: str | None = None,
 ):
     return RutaRepo(session).q_list(sucursal_ids, estado=estado)
-
-
-def mis_rutas(session: Session, repartidor_id: uuid.UUID) -> list[RutaReparto]:
-    return RutaRepo(session).vivas_de_repartidor(repartidor_id)

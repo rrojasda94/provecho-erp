@@ -248,9 +248,7 @@ def ventas_por_hora(
     por_hora: dict[int, dict] = {}
     for hora, cantidad, total in filas:
         local = (int(hora) + desfase) % 24
-        acumulado = por_hora.setdefault(
-            local, {"cantidad": 0, "total": Decimal(0)}
-        )
+        acumulado = por_hora.setdefault(local, {"cantidad": 0, "total": Decimal(0)})
         acumulado["cantidad"] += cantidad
         acumulado["total"] += Decimal(total)
     return [
@@ -448,16 +446,10 @@ def puntos_venta_de_empresa(
     return list(session.scalars(stmt))
 
 
-def puntos_venta_de_sucursal(
-    session: Session, sucursal_id: uuid.UUID
-) -> list[uuid.UUID]:
+def puntos_venta_de_sucursal(session: Session, sucursal_id: uuid.UUID) -> list[uuid.UUID]:
     """IDs de `punto_venta` de una sucursal. Lo usa `accounting` para
     encontrar la caja abierta del local sin importar `PuntoVenta`."""
-    return list(
-        session.scalars(
-            select(PuntoVenta.id).where(PuntoVenta.sucursal_id == sucursal_id)
-        )
-    )
+    return list(session.scalars(select(PuntoVenta.id).where(PuntoVenta.sucursal_id == sucursal_id)))
 
 
 def puntos_venta_rotulados(
@@ -481,15 +473,11 @@ def puntos_venta_rotulados(
     return {pv_id: f"{sucursal} · {serie}" for pv_id, sucursal, serie in filas}
 
 
-def sucursal_de_punto_venta(
-    session: Session, punto_venta_id: uuid.UUID
-) -> uuid.UUID | None:
+def sucursal_de_punto_venta(session: Session, punto_venta_id: uuid.UUID) -> uuid.UUID | None:
     """Sucursal a la que pertenece un punto de venta — `accounting` la
     necesita para validar el alcance de tenant de caja/arqueo (ADR-004) sin
     importar `PuntoVenta`, que es dominio de `sales`."""
-    return session.scalar(
-        select(PuntoVenta.sucursal_id).where(PuntoVenta.id == punto_venta_id)
-    )
+    return session.scalar(select(PuntoVenta.sucursal_id).where(PuntoVenta.id == punto_venta_id))
 
 
 def venta_para_encuesta(session: Session, venta_id: uuid.UUID) -> dict | None:
@@ -502,9 +490,7 @@ def venta_para_encuesta(session: Session, venta_id: uuid.UUID) -> dict | None:
     if venta is None:
         return None
     estados = list(
-        session.scalars(
-            select(VentaItem.estado_preparacion).where(VentaItem.venta_id == venta_id)
-        )
+        session.scalars(select(VentaItem.estado_preparacion).where(VentaItem.venta_id == venta_id))
     )
     return {
         "id": venta.id,
@@ -544,10 +530,11 @@ def contacto_de_cliente(session: Session, cliente_id: uuid.UUID) -> dict | None:
 def venta_para_reparto(session: Session, venta_id: uuid.UUID) -> dict | None:
     """Lo que `delivery` necesita para asignar y rutear una venta (ADR-098):
     sucursal, modalidad, canal, dirección/ubicación, la distancia ya
-    cotizada, si tiene plataforma externa (RN-PER-003 la excluye del
-    reparto propio) y si todos sus ítems llegaron a `listo` o ya se
-    entregó. `delivery` no importa `Venta`/`VentaItem` — pasa siempre por
-    acá.
+    cotizada, el total (para el "monto a cobrar" que ve el repartidor en
+    una venta todavía `orden`, sin pagar), si tiene plataforma externa
+    (RN-PER-003 la excluye del reparto propio) y si todos sus ítems
+    llegaron a `listo` o ya se entregó. `delivery` no importa
+    `Venta`/`VentaItem` — pasa siempre por acá.
 
     `None` = la venta no existe.
     """
@@ -555,9 +542,7 @@ def venta_para_reparto(session: Session, venta_id: uuid.UUID) -> dict | None:
     if venta is None:
         return None
     estados = list(
-        session.scalars(
-            select(VentaItem.estado_preparacion).where(VentaItem.venta_id == venta_id)
-        )
+        session.scalars(select(VentaItem.estado_preparacion).where(VentaItem.venta_id == venta_id))
     )
     return {
         "id": venta.id,
@@ -573,6 +558,7 @@ def venta_para_reparto(session: Session, venta_id: uuid.UUID) -> dict | None:
         "ubicacion_lng": venta.ubicacion_lng,
         "distancia_entrega_km": venta.distancia_entrega_km,
         "repartidor_externo_plataforma": venta.repartidor_externo_plataforma,
+        "total": venta.total,
         "lista": rules.pedido_entregable(estados),
         "entregada": rules.pedido_entregado(estados),
     }
@@ -638,9 +624,7 @@ def ventas_listas_para_reparto(
     return resultado
 
 
-def total_efectivo_cobrado(
-    session: Session, punto_venta_id: uuid.UUID, desde: datetime
-) -> Decimal:
+def total_efectivo_cobrado(session: Session, punto_venta_id: uuid.UUID, desde: datetime) -> Decimal:
     """Suma de pagos confirmados en efectivo de ventas de este punto de
     venta desde `desde` — usado por `accounting` para reconciliar el cierre
     de caja (PROC-CTB-001); nunca se llama al revés (accounting no expone
@@ -659,9 +643,7 @@ def total_efectivo_cobrado(
     return Decimal(total)
 
 
-def total_tarjeta_cobrado(
-    session: Session, punto_venta_id: uuid.UUID, desde: datetime
-) -> Decimal:
+def total_tarjeta_cobrado(session: Session, punto_venta_id: uuid.UUID, desde: datetime) -> Decimal:
     """Lo cobrado con tarjeta en este punto de venta desde `desde`.
 
     El cierre de caja cuadra efectivo **y** tarjetas (RN-POS-004): sin este
@@ -719,9 +701,7 @@ def valores_ofrecidos_de_receta(session: Session, receta_id: uuid.UUID) -> set[s
     from src.modules.sales.application import catalogo as catalogo_uc
 
     productos = list(
-        session.scalars(
-            select(ProductoComercial).where(ProductoComercial.receta_id == receta_id)
-        )
+        session.scalars(select(ProductoComercial).where(ProductoComercial.receta_id == receta_id))
     )
     ofrecidos: set[str] = set()
     for producto in productos:
@@ -729,9 +709,7 @@ def valores_ofrecidos_de_receta(session: Session, receta_id: uuid.UUID) -> set[s
     return ofrecidos
 
 
-def atributo_de_valores(
-    session: Session, valor_ids: Sequence[uuid.UUID | str]
-) -> dict[str, str]:
+def atributo_de_valores(session: Session, valor_ids: Sequence[uuid.UUID | str]) -> dict[str, str]:
     """`producto_atributo_valor.id` → `atributo.id`, los dos como texto.
 
     Lo consulta `inventory` para decidir si una línea de receta condicionada
@@ -783,4 +761,3 @@ def categoria_de_productos(
         )
     ).all()
     return dict(filas)
-

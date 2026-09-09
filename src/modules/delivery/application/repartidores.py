@@ -20,6 +20,26 @@ from src.modules.rrhh.application.queries_publicas import (
 )
 
 
+def con_nombre(session: Session, repartidor: Repartidor) -> dict:
+    """El repartidor con el nombre de su cuenta ya resuelto: el tablero de
+    despacho y el diálogo de "nueva ruta" eligen repartidor por nombre, no
+    por id — `RepartidorOut` no lo traía porque el alta (`candidatos`) ya
+    lo resolvía por su cuenta, pero listar/editar no."""
+    cuenta = cuenta_de_trabajador(session, repartidor.trabajador_id)
+    return {
+        "id": repartidor.id,
+        "empresa_id": repartidor.empresa_id,
+        "sucursal_id": repartidor.sucursal_id,
+        "trabajador_id": repartidor.trabajador_id,
+        "usuario_id": repartidor.usuario_id,
+        "nombre": cuenta["nombre"] if cuenta else None,
+        "vehiculo_tipo": repartidor.vehiculo_tipo,
+        "placa": repartidor.placa,
+        "telefono": repartidor.telefono,
+        "activo": repartidor.activo,
+    }
+
+
 def candidatos(session: Session, empresa_id: uuid.UUID) -> list[dict]:
     """Trabajadores con cuenta que todavía no son repartidor — lo que
     ofrece la pantalla de alta antes de elegir uno."""

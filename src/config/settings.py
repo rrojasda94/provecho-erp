@@ -176,6 +176,11 @@ class Settings(BaseSettings):
     # ventana de 24 h, Meta no acepta otra cosa.
     whatsapp_plantilla_encuesta: str = "encuesta_satisfaccion"
     whatsapp_plantilla_idioma: str = "es"
+    # Plantillas de `delivery` (ADR-098): pedido en camino, entregado y
+    # entrega fallida — mismo mecanismo, tres hitos distintos.
+    whatsapp_plantilla_en_camino: str = "pedido_en_camino"
+    whatsapp_plantilla_entregado: str = "pedido_entregado"
+    whatsapp_plantilla_entrega_fallida: str = "entrega_fallida"
     # --- SMTP (canal de alerta por correo, ADR-033) --------------------------
     # Sin `smtp_host`, `reports` sigue sin ningún canal más allá de la
     # bandeja: el envío se omite y queda en el log, nunca rompe el resto de

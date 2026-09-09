@@ -17,8 +17,8 @@ catálogo: [../architecture/events.md](../architecture/events.md).
 | accounting | [src/modules/accounting/README.md](../../src/modules/accounting/README.md) | Abierto parcialmente (ciclo de caja), spec completa pendiente |
 | rrhh | [src/modules/rrhh/README.md](../../src/modules/rrhh/README.md) | Abierto parcialmente (solo `trabajador`), spec completa pendiente |
 | reports | [src/modules/reports/README.md](../../src/modules/reports/README.md) | Slice core implementado 2026-08-08 (ADR-033): emisión por evento, distribución por área/rol/usuario y matriz de gobierno. No confundir con `core/reportes`, que es la consulta bajo demanda (ADR-024) |
-| assets | [src/modules/assets/README.md](../../src/modules/assets/README.md) | Slice core implementado 2026-09-09 (ADR-099): activo/vehículo, kilometraje/combustible, mantenimiento y documentos con vencimiento. El ciclo de compra sigue en `purchases` y la depreciación en `accounting`, a propósito |
-| delivery | [src/modules/delivery/README.md](../../src/modules/delivery/README.md) | Slices 2-3 implementados 2026-09-09 (ADR-098): repartidores, tablero, ciclo de ruta/entrega con ruteo real u heurístico, GPS y seguimiento público con mapa. Falta PWA del repartidor, tablero del ERP y avisos |
+| assets | [src/modules/assets/README.md](../../src/modules/assets/README.md) | Slice core implementado 2026-09-09 (ADR-099): activo/vehículo, kilometraje/combustible, mantenimiento y documentos con vencimiento. El ciclo de compra sigue en `purchases` y la depreciación en `accounting` — deuda ya cerrada el mismo día, solo `flota` queda pendiente |
+| delivery | [src/modules/delivery/README.md](../../src/modules/delivery/README.md) | Slices 2-6 implementados 2026-09-09 (ADR-098): repartidores, ciclo de ruta/entrega con ruteo real u heurístico, GPS, seguimiento público con mapa, PWA instalable del repartidor, tablero de despacho en el ERP y aviso al cliente por WhatsApp con fallback copiar/`wa.me` |
 
 ## Futuros (se especifican antes de construirse)
 

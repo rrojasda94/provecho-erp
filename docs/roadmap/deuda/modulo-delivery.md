@@ -37,3 +37,54 @@ MVP, para que no se descubran a mitad de una auditoría:
 - ⬜ **Un repartidor propio no puede llevar la ruta de otra sucursal en el
   mismo turno.** El scope de `delivery.repartir` es por ruta propia, no
   hay reparto cruzado entre locales cercanos. No es un caso pedido hoy.
+
+Declarada al construir el slice 4 (PWA del repartidor):
+
+- ⬜ **Los íconos de `public/reparto/manifest.webmanifest` son un
+  cuadrado de color, no diseño de marca.** Se generaron localmente (sin
+  herramienta de diseño a mano en ese momento) solo para que el manifiesto
+  tenga íconos válidos de 192/512 y la PWA sea instalable — cambiarlos por
+  el ícono real de Provecho/Majambo es una tarea de diseño, no de código.
+
+Declarada al construir el slice 5 (tablero de despacho):
+
+- ⬜ **El tablero no reordena, agrega ni quita paradas de una ruta ya
+  creada** (`PUT /delivery/rutas/{id}/paradas` existe y lo usa el backend
+  al reintentar, pero no hay diálogo de "editar ruta" en
+  `app/(app)/delivery/`). Hoy, para cambiar una ruta planificada, se
+  cancela y se crea de nuevo.
+- ⬜ **El despacho no puede forzar iniciar/finalizar una ruta desde el
+  tablero**, aunque el permiso lo permite (`delivery.despachar` alcanza
+  para `POST .../iniciar|finalizar`, no solo el repartidor dueño):
+  `tarjeta-ruta.tsx` solo ofrece "Cancelar". Sirve para el caso normal
+  —el repartidor inicia y finaliza desde la PWA— pero no para un
+  teléfono sin batería o una ruta que hay que cerrar a mano.
+- ⬜ **`tablero.rutas_vivas` y `entregas.historial_enriquecido` resuelven
+  la venta y el repartidor de cada fila con una llamada aparte** (N+1):
+  barato con pocas rutas vivas y una página de historial acotada
+  (`page_size` máx. 100), pero una consulta agregada sería más liviana si
+  el volumen crece. Mismo costo que ya aceptó `mi_reparto.ruta_con_paradas`
+  en el slice 4.
+- ⬜ **El mapa de una ruta (`mapa-rutas.tsx`) no dibuja el trazo del
+  ruteo heurístico**, solo el de Google (`ruta.polyline`, que la
+  heurística nunca calcula). Se ven los pines numerados igual, sin la
+  línea entre ellos — una polilínea aproximada por distancia en línea
+  recta sería confusa (no es la calle real) y se prefirió no dibujar
+  nada antes que dibujar algo falso.
+
+Declarada al construir el slice 6 (notificaciones por WhatsApp):
+
+- ⬜ **El "contacto de la sucursal" de la plantilla `entrega_fallida` es
+  solo su nombre, nunca un teléfono.** `Sucursal` no tiene columna de
+  teléfono ni existe un contrato público que la resuelva — cuando exista,
+  la plantilla puede pasar a un contacto real en vez de "el local".
+- ⬜ **El ETA que viaja en la plantilla `pedido_en_camino` es el mismo
+  heurístico de `entrega.eta_at`** (deuda ya declarada arriba: "no se
+  recotiza contra Google en ruta"), redondeado a minutos enteros contra el
+  momento del envío — no se vuelve a recalcular si el aviso se reintenta
+  varios minutos después.
+- ⬜ **Un rechazo de Meta (`aviso_error`) no tiene pantalla propia.** Queda
+  en la fila de la entrega y se ve en el historial (`GET
+  /delivery/entregas`), pero nada resalta "este aviso falló" en el
+  tablero — el despachador tiene el enlace copiable como red de
+  seguridad, pero no una alerta activa.
