@@ -1,6 +1,7 @@
-"""Routers FastAPI del módulo delivery: repartidores, rutas y entregas
-(ADR-098). El seguimiento público vive aparte, en `api/publico_routers.py`
-(slice de ruteo real y seguimiento — todavía no existe en este slice).
+"""Routers FastAPI del módulo delivery: repartidores, rutas, entregas y el
+GPS de una ruta en curso (ADR-098). El seguimiento público del cliente
+vive aparte, en `api/publico_routers.py` — es la única superficie de
+`delivery` sin JWT.
 """
 
 import base64
@@ -11,9 +12,10 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
+from src.core.rate_limit import consumir
 from src.core.tenant import Tenant
 from src.modules.delivery.api import schemas
-from src.modules.delivery.application import entregas, repartidores
+from src.modules.delivery.application import entregas, posiciones, repartidores
 from src.modules.delivery.application import rutas as rutas_uc
 from src.modules.delivery.application import tablero as tablero_uc
 from src.modules.delivery.application.scope import (
@@ -285,6 +287,31 @@ def cancelar_ruta(
     ruta = rutas_uc.cancelar(session, ruta_id, actor_id=actor.id)
     session.commit()
     return ruta
+
+
+@router.post("/rutas/{ruta_id}/posiciones", status_code=204)
+def registrar_posicion(
+    ruta_id: uuid.UUID,
+    body: schemas.PosicionIn,
+    actor: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    ruta = exigir_ruta(session, ruta_id, tenant)
+    _autorizar_sobre_ruta(session, actor, ruta)
+    # Un ping cada pocos segundos por celular: el límite es por si un bug
+    # del cliente manda de más, no una cuota que un repartidor normal toque.
+    consumir("posicion_gps", str(actor.id), 30, 60)
+    posiciones.registrar_ping(
+        session,
+        ruta_id,
+        lat=body.lat,
+        lng=body.lng,
+        precision_m=body.precision_m,
+        registrado_at=body.registrado_at,
+    )
+    session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/mi/rutas", response_model=list[schemas.RutaOut])

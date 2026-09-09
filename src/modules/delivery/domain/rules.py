@@ -174,3 +174,17 @@ def duracion_heuristica_seg(distancia_m: int, velocidad_media_kmh: Decimal) -> i
         return 0
     horas = (Decimal(distancia_m) / Decimal(1000)) / velocidad_media_kmh
     return round(horas * 3600)
+
+
+def eta_desde(
+    ahora: datetime,
+    distancia_m: int,
+    velocidad_media_kmh: Decimal,
+) -> datetime:
+    """Refresco barato del ETA de la parada siguiente, en cada ping de GPS
+    (RN-DLV — sin re-cotizar contra Google en cada posición, que es deuda
+    declarada): la distancia en línea recta desde donde está el repartidor
+    ahora hasta el destino, a la misma velocidad media heurística que usa
+    el resto del ruteo sin red.
+    """
+    return ahora + timedelta(seconds=duracion_heuristica_seg(distancia_m, velocidad_media_kmh))

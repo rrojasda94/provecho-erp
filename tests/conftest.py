@@ -312,6 +312,9 @@ MODULOS_CON_SESSION_FACTORY = (
     # abren su propia sesión y hay que blanquearlos igual que a los demás.
     "src.modules.delivery.application.listeners",
     "src.modules.sales.application.listeners",
+    # Barridos de purga de GPS y evidencia (ADR-098) — mismo motivo que los
+    # demás barridos de la lista de arriba.
+    "src.modules.delivery.application.tasks",
 )
 
 

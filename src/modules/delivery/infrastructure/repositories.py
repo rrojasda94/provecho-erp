@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from src.modules.delivery.infrastructure.models import (
@@ -197,11 +197,13 @@ class PosicionRepo:
         self.s.flush()
         return posicion
 
-    def anteriores_a(self, limite: datetime) -> list[PosicionRepartidor]:
-        """Breadcrumb más viejo que `limite` — lo usa el barrido de purga
-        (`delivery_posiciones_retencion_dias`)."""
-        return list(
-            self.s.scalars(
-                select(PosicionRepartidor).where(PosicionRepartidor.registrado_at < limite)
-            )
+    def borrar_anteriores_a(self, limite: datetime) -> int:
+        """Purga en bloque el breadcrumb más viejo que `limite`
+        (`delivery_posiciones_retencion_dias`). Un `DELETE` masivo y no
+        cargar filas para borrarlas una a una: con un ping cada pocos
+        segundos por repartidor, un mes de retención son cientos de miles
+        de filas."""
+        resultado = self.s.execute(
+            delete(PosicionRepartidor).where(PosicionRepartidor.registrado_at < limite)
         )
+        return resultado.rowcount

@@ -2,7 +2,7 @@
 ruta, heurística de ruteo y ETA acumulado. Sin infraestructura — nada de
 esto abre una sesión."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 from src.modules.delivery.domain import rules
@@ -129,3 +129,10 @@ def test_duracion_heuristica_a_mas_velocidad_menos_tiempo():
 
 def test_duracion_heuristica_sin_velocidad_no_revienta():
     assert rules.duracion_heuristica_seg(10_000, Decimal("0")) == 0
+
+
+def test_eta_desde_suma_la_duracion_heuristica():
+    ahora = datetime(2026, 9, 9, 12, 0, tzinfo=UTC)
+    eta = rules.eta_desde(ahora, 10_000, Decimal("20"))
+    assert eta > ahora
+    assert eta == ahora + timedelta(seconds=rules.duracion_heuristica_seg(10_000, Decimal("20")))

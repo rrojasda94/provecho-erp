@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
 from src.modules.delivery.application.errors import Conflicto, NoEncontrado, ReglaNegocio
+from src.modules.delivery.application.seguimiento import token_expira_en
 from src.modules.delivery.domain import rules
 from src.modules.delivery.infrastructure.models import Entrega, Repartidor
 from src.modules.delivery.infrastructure.repositories import EntregaRepo
@@ -54,6 +55,10 @@ def entregar(
     entrega.entregado_por = repartidor.usuario_id
     entrega.resultado_lat = lat
     entrega.resultado_lng = lng
+    # RN-DLV-008: el enlace público sigue vivo unas horas más después del
+    # resultado, no se apaga de golpe (el cliente todavía puede querer ver
+    # que llegó).
+    entrega.token_expira_at = token_expira_en(ahora)
     if foto is not None:
         entrega.evidencia_foto = foto
     if observacion is not None:
@@ -114,6 +119,7 @@ def fallar(
     entrega.motivo_detalle = detalle
     entrega.resultado_lat = lat
     entrega.resultado_lng = lng
+    entrega.token_expira_at = token_expira_en()
     if foto is not None:
         entrega.evidencia_foto = foto
     session.flush()
@@ -192,6 +198,7 @@ def cerrar(session: Session, entrega_id: uuid.UUID, *, actor_id: uuid.UUID) -> E
 
     antes = {"estado": entrega.estado}
     entrega.estado = "cancelada"
+    entrega.token_expira_at = token_expira_en()
     session.flush()
 
     auditar(
@@ -216,9 +223,11 @@ def cerrar_por_venta_entregada(
     entrega = EntregaRepo(session).get_por_venta(venta_id)
     if entrega is None or entrega.estado in ("entregada", "cancelada"):
         return
+    ahora = datetime.now(UTC)
     entrega.estado = "entregada"
-    entrega.fecha_entrega = datetime.now(UTC)
+    entrega.fecha_entrega = ahora
     entrega.entregado_por = entregado_por
+    entrega.token_expira_at = token_expira_en(ahora)
     session.flush()
 
 
@@ -230,4 +239,5 @@ def cancelar_por_venta_anulada(session: Session, venta_id: uuid.UUID) -> None:
     if entrega is None or not rules.cancela_sola_por_anulacion(entrega.estado):
         return
     entrega.estado = "cancelada"
+    entrega.token_expira_at = token_expira_en()
     session.flush()

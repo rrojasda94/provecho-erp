@@ -1,13 +1,14 @@
 # Historial — Módulo `delivery`
 
-Estado vigente: 🔶 En curso — slice core implementado (2026-09-09,
-ADR-098): repartidores propios, tablero de despacho y el ciclo completo de
-una ruta (crear con ruteo heurístico, editar paradas, iniciar, entregar o
-fallar cada parada, reintentar o cerrar la fallida, finalizar o cancelar
-la ruta), con la convergencia por evento hacia y desde `sales` en los dos
-sentidos. Falta ruteo real contra Google Routes, GPS de flota, el enlace
-público de seguimiento y el aviso automático por WhatsApp (ver
-`docs/roadmap/deuda/modulo-delivery.md`).
+Estado vigente: 🔶 En curso — slices 2 y 3 implementados (2026-09-09,
+ADR-098): repartidores propios, tablero de despacho, el ciclo completo de
+una ruta (crear con ruteo real contra Google o heurístico, editar
+paradas, iniciar, entregar o fallar cada parada, reintentar o cerrar la
+fallida, finalizar o cancelar), GPS del repartidor en ruta y el enlace
+público de seguimiento con mapa en vivo, con la convergencia por evento
+hacia y desde `sales` en los dos sentidos. Falta la PWA del repartidor, el
+tablero definitivo en el frontend del ERP y el aviso automático por
+WhatsApp (ver `docs/roadmap/deuda/modulo-delivery.md`).
 
 ## Cronología
 
@@ -92,3 +93,58 @@ incluida la cadena completa iniciar → entregar → `sales.venta_entregada`,
 y el camino inverso KDS → cierra la entrega de `delivery`). Suite completa
 verde en SQLite (2453 pruebas), `ruff` limpio, `alembic check` sin
 diferencias, contrato OpenAPI regenerado.
+
+### 2026-09-09 — Slice 3: ruteo real, GPS y seguimiento público
+
+`shared/integrations/google/rutas.py` ganó `ruta_optima()` contra
+`computeRoutes` con `optimizeWaypointOrder`: pide el orden y la ruta
+completa (con polilínea) saliendo del local y volviendo a él, misma
+doctrina de clave-en-servidor que `distancia_km`. `application/ruteo.py`
+la intenta primero cuando la ruta pide `optimizar=true` y hay más de una
+parada; cualquier fallo (`RutasError`, sin clave) cae a la heurística
+vecino-más-cercano sin romper la creación de la ruta —
+`ruta.optimizada_por` queda registrando cuál de las dos se usó.
+
+GPS: `POST /rutas/{id}/posiciones` (`application/posiciones.py`) acepta
+un ping solo con la ruta `en_curso` y del repartidor dueño; guarda el
+trazo (`posicion_repartidor`), actualiza `ruta.ultima_*` y recalcula por
+haversine el ETA de la siguiente parada sin resolver — sin volver a
+consultar a Google en cada ping (deuda declarada: re-cotización).
+
+Seguimiento público: `application/seguimiento.py` + `api/publico_routers.py`
+exponen `GET /delivery/publico/seguimiento/{token}` sin autenticación,
+con el mismo criterio de token anónimo y 404 uniforme que
+`marketing/api/publico_routers.py`. La respuesta (`SeguimientoOut`) es
+deliberadamente mínima (RN-DLV-008): estado traducido a cuatro valores
+públicos, ETA, primer nombre del repartidor, su última posición solo
+mientras la entrega está `en_ruta`, destino y una línea de tiempo — nunca
+monto, teléfono, dirección en texto ni las demás paradas de la salida
+(no lleva polilínea). El token se genera al asignar la entrega a una ruta
+y expira `delivery_seguimiento_vigencia_horas` después de resolverse.
+Purga de posiciones y de evidencia por Celery beat
+(`application/tasks.py`, `delivery_posiciones_retencion_dias` y
+`delivery_evidencia_retencion_dias`).
+
+Bug encontrado y corregido en el mismo cambio: comparar
+`entrega.token_expira_at` (aware) contra `datetime.now(UTC)` revienta en
+SQLite porque la columna vuelve sin zona tras el `commit` — mismo defecto
+que ya resolvía `sales.domain.rules._sin_zona`; se replicó el mismo
+parche en `seguimiento.py`.
+
+Frontend: `app/(publico)/seguimiento/[token]/` (Server Component +
+Server Action sin token, igual que `postular/[token]/`; sondeo cada 10 s
+que se apaga solo al llegar a un estado final; mapa con dos marcadores
+—repartidor y destino— usando `cargarMaps`/`useConfigMapas`, degradado a
+solo texto sin clave de Google) y `lib/geo.ts` (Haversine que espeja
+`shared/ubicacion.py::metros_entre`, y el decodificador de
+`encodedPolyline` para cuando el tablero de despacho del slice 5 dibuje
+la ruta).
+
+Pruebas: `tests/test_google_rutas.py` (12 casos, `ruta_optima` con httpx
+parcheado), `tests/test_delivery_seguimiento.py` (7 casos: claves exactas,
+posición solo en `en_ruta`, 404 uniforme, `Cache-Control: no-store`),
+casos nuevos en `tests/test_delivery.py` (ping GPS, fallback de Google) y
+`tests/test_delivery_rules.py` (`eta_desde`), y `lib/geo.test.ts` en el
+frontend. Suite completa verde en SQLite y contra Postgres real
+(ADR-097), `ruff` y `eslint` limpios, `alembic check` sin diferencias,
+contrato OpenAPI regenerado.

@@ -4,8 +4,9 @@ hacia y desde `sales` (delivery.entrega_registrada ⇄ sales.venta_entregada/
 venta_anulada).
 """
 
+import base64
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -17,7 +18,7 @@ import src.core.models_registry  # noqa: F401
 from src.core.database import Base
 from src.modules.delivery.application import listeners as delivery_listeners
 from src.modules.delivery.application import repartidores as repartidores_uc
-from src.modules.delivery.infrastructure.models import Entrega
+from src.modules.delivery.infrastructure.models import Entrega, RutaReparto
 from src.modules.rrhh.infrastructure.models import Trabajador
 from src.modules.sales.application import listeners as sales_listeners
 from src.modules.sales.infrastructure.models import (
@@ -647,3 +648,200 @@ def test_anular_la_venta_cancela_la_entrega_pendiente(env):
     with TestSession() as s:
         entrega = s.get(Entrega, uuid.UUID(entrega_id))
         assert entrega.estado == "cancelada"
+
+
+# --- GPS (ADR-098, RN-DLV-007) ---------------------------------------------------
+def test_ping_fuera_de_ruta_en_curso_es_conflicto(env):
+    client, ids, headers, TestSession = env
+    _venta_id, ruta_id, _entrega_id = _crear_y_asignar_ruta(client, ids, headers, TestSession)
+
+    r = client.post(
+        f"/api/v1/delivery/rutas/{ruta_id}/posiciones",
+        headers=headers["kevinrep"],
+        json={"lat": "-6.49", "lng": "-76.36", "registrado_at": "2026-09-09T12:00:00Z"},
+    )
+    assert r.status_code == 409
+
+
+def test_repartidor_ajeno_no_puede_pinguear_la_ruta_de_otro(env):
+    client, ids, headers, TestSession = env
+    _venta_id, ruta_id, _entrega_id = _crear_y_asignar_ruta(client, ids, headers, TestSession)
+    client.post(f"/api/v1/delivery/rutas/{ruta_id}/iniciar", headers=headers["aprobador1"])
+
+    r = client.post(
+        f"/api/v1/delivery/rutas/{ruta_id}/posiciones",
+        headers=headers["anarep"],
+        json={"lat": "-6.49", "lng": "-76.36", "registrado_at": "2026-09-09T12:00:00Z"},
+    )
+    assert r.status_code == 403
+
+
+def test_ping_actualiza_la_ultima_posicion_y_el_eta_de_la_proxima_parada(env):
+    client, ids, headers, TestSession = env
+    _venta_id, ruta_id, entrega_id = _crear_y_asignar_ruta(client, ids, headers, TestSession)
+    client.post(f"/api/v1/delivery/rutas/{ruta_id}/iniciar", headers=headers["aprobador1"])
+    with TestSession() as s:
+        eta_inicial = s.get(Entrega, uuid.UUID(entrega_id)).eta_at
+
+    r = client.post(
+        f"/api/v1/delivery/rutas/{ruta_id}/posiciones",
+        headers=headers["kevinrep"],
+        json={
+            "lat": "-6.4888",
+            "lng": "-76.3611",
+            "precision_m": 12,
+            "registrado_at": "2026-09-09T12:05:00Z",
+        },
+    )
+    assert r.status_code == 204
+
+    with TestSession() as s:
+        ruta = s.get(RutaReparto, uuid.UUID(ruta_id))
+        assert ruta.ultima_lat == Decimal("-6.488800")
+        assert ruta.ultima_lng == Decimal("-76.361100")
+        assert ruta.ultima_precision_m == 12
+        entrega = s.get(Entrega, uuid.UUID(entrega_id))
+        assert entrega.eta_at is not None
+        assert entrega.eta_at != eta_inicial
+
+
+# --- Ruteo real contra Google, con fallback (ADR-098) ----------------------------
+def test_crear_ruta_usa_google_cuando_esta_habilitado(env, monkeypatch):
+    from src.modules.delivery.application import ruteo
+
+    client, ids, headers, TestSession = env
+    with TestSession() as s:
+        v1 = _crear_venta_delivery(s, ids)
+        v2 = _crear_venta_delivery(s, ids)
+
+    def _google_falso(origen, paradas):
+        from src.shared.integrations.google import RutaCalculada
+        from src.shared.integrations.google import Tramo as TramoGoogle
+
+        return RutaCalculada(
+            orden=[1, 0],
+            tramos=[TramoGoogle(1000, 120), TramoGoogle(1500, 180)],
+            distancia_m=3000,
+            duracion_seg=400,
+            polyline="polilinea-de-prueba",
+        )
+
+    monkeypatch.setattr(ruteo, "google_habilitado", lambda: True)
+    monkeypatch.setattr(ruteo, "google_ruta_optima", _google_falso)
+
+    r = client.post(
+        "/api/v1/delivery/rutas",
+        headers=headers["aprobador1"],
+        json={
+            "sucursal_id": ids["sucursal_id"],
+            "repartidor_id": ids["repartidor1_id"],
+            "venta_ids": [str(v1.id), str(v2.id)],
+        },
+    )
+    assert r.status_code == 201, r.text
+    ruta = r.json()
+    assert ruta["optimizada_por"] == "google"
+    assert ruta["polyline"] == "polilinea-de-prueba"
+    assert ruta["distancia_m"] == 3000
+
+
+def test_crear_ruta_cae_a_heuristica_si_google_falla(env, monkeypatch):
+    from src.modules.delivery.application import ruteo
+    from src.shared.integrations.google import RutasError
+
+    client, ids, headers, TestSession = env
+    with TestSession() as s:
+        v1 = _crear_venta_delivery(s, ids)
+
+    def _google_explota(origen, paradas):
+        raise RutasError("Google no responde")
+
+    monkeypatch.setattr(ruteo, "google_habilitado", lambda: True)
+    monkeypatch.setattr(ruteo, "google_ruta_optima", _google_explota)
+
+    r = client.post(
+        "/api/v1/delivery/rutas",
+        headers=headers["aprobador1"],
+        json={
+            "sucursal_id": ids["sucursal_id"],
+            "repartidor_id": ids["repartidor1_id"],
+            "venta_ids": [str(v1.id)],
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["optimizada_por"] == "heuristica"
+
+
+# --- Purgas periódicas (ADR-098) --------------------------------------------------
+def test_purgar_posiciones_borra_solo_lo_viejo(env, monkeypatch):
+    from src.modules.delivery.application import tasks as delivery_tasks
+    from src.modules.delivery.infrastructure.models import PosicionRepartidor
+
+    client, ids, headers, TestSession = env
+    monkeypatch.setattr(delivery_tasks, "session_factory", TestSession)
+    _venta_id, ruta_id, _entrega_id = _crear_y_asignar_ruta(client, ids, headers, TestSession)
+
+    hace_40_dias = datetime.now(UTC) - timedelta(days=40)
+    hace_1_dia = datetime.now(UTC) - timedelta(days=1)
+    with TestSession() as s:
+        ruta_uuid = uuid.UUID(ruta_id)
+        repartidor_id = s.get(RutaReparto, ruta_uuid).repartidor_id
+        s.add_all(
+            [
+                PosicionRepartidor(
+                    ruta_id=ruta_uuid,
+                    repartidor_id=repartidor_id,
+                    lat=Decimal("-6.49"),
+                    lng=Decimal("-76.36"),
+                    registrado_at=hace_40_dias,
+                ),
+                PosicionRepartidor(
+                    ruta_id=ruta_uuid,
+                    repartidor_id=repartidor_id,
+                    lat=Decimal("-6.49"),
+                    lng=Decimal("-76.36"),
+                    registrado_at=hace_1_dia,
+                ),
+            ]
+        )
+        s.commit()
+
+    borradas = delivery_tasks.purgar_posiciones()
+    assert borradas == 1
+
+    with TestSession() as s:
+        restantes = s.scalars(select(PosicionRepartidor)).all()
+        assert len(restantes) == 1
+
+
+def test_purgar_evidencias_vacia_solo_las_resueltas_y_vencidas(env, monkeypatch):
+    from src.modules.delivery.application import tasks as delivery_tasks
+
+    client, ids, headers, TestSession = env
+    monkeypatch.setattr(delivery_tasks, "session_factory", TestSession)
+    _venta_id, ruta_id, entrega_id = _crear_y_asignar_ruta(client, ids, headers, TestSession)
+    client.post(f"/api/v1/delivery/rutas/{ruta_id}/iniciar", headers=headers["aprobador1"])
+    r = client.post(
+        f"/api/v1/delivery/entregas/{entrega_id}/entregar",
+        headers=headers["kevinrep"],
+        json={"foto": base64.b64encode(b"foto-de-prueba").decode()},
+    )
+    assert r.status_code == 200
+
+    hace_100_dias = datetime.now(UTC) - timedelta(days=100)
+    with TestSession() as s:
+        entrega = s.get(Entrega, uuid.UUID(entrega_id))
+        assert entrega.evidencia_foto == b"foto-de-prueba"
+        # Se resolvió "hoy": todavía no toca purgarla.
+        assert delivery_tasks.purgar_evidencias() == 0
+        entrega = s.get(Entrega, uuid.UUID(entrega_id))
+        assert entrega.evidencia_foto == b"foto-de-prueba"
+        # Se fuerza la antigüedad para simular que ya pasó el plazo.
+        entrega.updated_at = hace_100_dias
+        s.commit()
+
+    assert delivery_tasks.purgar_evidencias() == 1
+    with TestSession() as s:
+        entrega = s.get(Entrega, uuid.UUID(entrega_id))
+        assert entrega.evidencia_foto is None
+        assert entrega.estado == "entregada"

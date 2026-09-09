@@ -24,28 +24,40 @@ dispara `delivery` por evento, nunca importando el dominio de `sales`
 `posicion_repartidor` (el trazo GPS de una ruta en curso). Detalle en
 `docs/architecture/data-model.md` §6b.
 
-## Estado (slice core implementado 2026-09-09, ADR-098)
+## Estado (slice 3 implementado 2026-09-09, ADR-098)
 
 Operativo en `/api/v1/delivery`: alta y edición de repartidores propios,
-tablero de despacho, ciclo completo de una ruta (crear con ruteo
+tablero de despacho, ciclo completo de una ruta (crear con ruteo real u
 heurístico → editar paradas → iniciar → entregar/fallar cada parada →
 reintentar o cerrar la fallida → finalizar o cancelar), evidencia
-fotográfica y la convergencia por evento con `sales` en los dos sentidos
+fotográfica, GPS del repartidor en ruta, seguimiento público con mapa, y
+la convergencia por evento con `sales` en los dos sentidos
 (`delivery.entrega_registrada` marca la venta entregada;
 `sales.venta_entregada`/`venta_anulada` cierran o cancelan la entrega).
 Capas `domain/rules.py`, `application/` (`repartidores.py`, `rutas.py`,
-`ruteo.py`, `entregas.py`, `tablero.py`, `parametros.py`, `listeners.py`),
-`infrastructure/`, `api/`. Migración `69f4ca1d58f4` aplicada.
+`ruteo.py`, `posiciones.py`, `entregas.py`, `seguimiento.py`, `tablero.py`,
+`parametros.py`, `listeners.py`, `tasks.py`), `infrastructure/`,
+`api/routers.py`, `api/publico_routers.py`. Migración `69f4ca1d58f4`
+aplicada. Frontend: `app/(publico)/seguimiento/[token]/` (página pública
+con mapa y línea de tiempo, sondeo cada 10 s) y `lib/geo.ts` (Haversine y
+decodificador de polilínea).
 
-**Sin ruteo real todavía**: `application/ruteo.py` solo aplica la
-heurística vecino-más-cercano (`optimizada_por` sale `heuristica` o
-`manual`, nunca `google`) — la Routes API con `optimizeWaypointOrder`
-llega en el próximo slice. **Sin GPS ni seguimiento público**: no existen
-todavía `POST /rutas/{id}/posiciones` ni el enlace público de seguimiento
-(`token_publico` queda sin generar). **Sin avisos**: no hay plantillas de
-WhatsApp ni tareas de Celery — eso es un slice aparte. Ver
-`docs/roadmap/deuda/modulo-delivery.md` y el orden de slices en
-`docs/roadmap/historial/modulo-delivery.md`.
+`application/ruteo.py` intenta primero `computeRoutes` con
+`optimizeWaypointOrder` (`shared/integrations/google/rutas.py::ruta_optima`)
+cuando hay más de una parada, la creación pide optimizar y hay clave de
+Google configurada; si Google no responde o no hay clave, cae a la
+heurística vecino-más-cercano sin romper la operación (`optimizada_por`
+registra cuál de las dos se usó). Cada ping GPS (`POST
+/rutas/{id}/posiciones`) actualiza el trazo (`posicion_repartidor`), la
+última posición de la ruta y el ETA heurístico de la siguiente parada sin
+resolver. Los pings y las posiciones expuestas se purgan por Celery beat
+(`delivery_posiciones_retencion_dias`, `delivery_evidencia_retencion_dias`).
+
+**Sin avisos todavía**: no hay plantillas de WhatsApp ni tareas de envío
+— eso es un slice aparte. **Sin PWA del repartidor**: el GPS y la
+evidencia se prueban por API, todavía no hay pantalla de reparto
+(`app/reparto/`). Ver `docs/roadmap/deuda/modulo-delivery.md` y el orden
+de slices en `docs/roadmap/historial/modulo-delivery.md`.
 
 ### Casos de uso
 
@@ -54,17 +66,22 @@ WhatsApp ni tareas de Celery — eso es un slice aparte. Ver
   vehículo y sucursal.
 - **Tablero de despacho**: ver los pedidos delivery ya listos sin asignar
   (`sales.ventas_listas_para_reparto`) y las rutas en curso con su última
-  posición conocida (hoy siempre vacía — sin GPS todavía).
-- **Crear una ruta**: elegir repartidor y uno o más pedidos; el servidor
-  ordena las paradas con la heurística vecino-más-cercano y calcula
-  distancia y ETA por parada. `PUT .../paradas` reemplaza el conjunto de
-  una ruta que no salió todavía.
+  posición conocida.
+- **Crear una ruta**: elegir repartidor y uno o más pedidos; con
+  `optimizar=true` el servidor pide el orden y la ruta a Google
+  (`ruta_optima`) y cae a la heurística vecino-más-cercano si no hay
+  clave o Google falla; calcula distancia y ETA por parada.
+  `PUT .../paradas` reemplaza el conjunto de una ruta que no salió todavía.
 - **Iniciar / finalizar / cancelar una ruta**.
+- **Registrar un ping GPS** (`POST .../posiciones`) mientras la ruta está
+  en curso: guarda el trazo y refresca el ETA de la próxima parada.
 - **Entregar / fallar una parada**, con ubicación y foto opcional; un
   fallo pide motivo (y detalle si es "otro").
 - **Reintentar o cerrar** una entrega fallida.
-- Pendientes de slice: seguir el pedido por enlace público, y avisar al
-  cliente por WhatsApp.
+- **Seguir el pedido por el enlace público**: el cliente ve el estado, el
+  ETA, el nombre del repartidor y su posición en vivo mientras está en
+  camino — nunca monto, teléfono ni las demás paradas (RN-DLV-008).
+- Pendiente de slice: avisar al cliente por WhatsApp.
 
 ### Endpoints
 
@@ -81,13 +98,12 @@ WhatsApp ni tareas de Celery — eso es un slice aparte. Ver
 | PUT | `/delivery/rutas/{id}/paradas` | `delivery.despachar` |
 | POST | `/delivery/rutas/{id}/iniciar\|finalizar` | `delivery.despachar` o repartidor dueño de la ruta |
 | POST | `/delivery/rutas/{id}/cancelar` | `delivery.despachar` |
+| POST | `/delivery/rutas/{id}/posiciones` | repartidor dueño de la ruta, `en_curso` |
 | GET | `/delivery/mi/rutas` | `delivery.repartir` |
 | POST | `/delivery/entregas/{id}/entregar\|fallar` | `delivery.repartir` (propia) o `delivery.despachar` |
 | POST | `/delivery/entregas/{id}/reintentar\|cerrar` | `delivery.despachar` |
 | GET | `/delivery/entregas[/{id}/evidencia]` | `delivery.leer` |
-
-Pendientes de slice: `POST /delivery/rutas/{id}/posiciones` y
-`GET /delivery/publico/seguimiento/{token}`.
+| GET | `/delivery/publico/seguimiento/{token}` | sin autenticación, token anónimo |
 
 Ver `docs/architecture/events.md` para el detalle de payloads.
 

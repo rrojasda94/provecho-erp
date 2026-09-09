@@ -152,3 +152,55 @@ class VentaListaOut(BaseModel):
 class TableroOut(BaseModel):
     sin_asignar: list[VentaListaOut]
     rutas: list[RutaOut]
+
+
+class PosicionIn(BaseModel):
+    lat: Decimal = Field(ge=-90, le=90)
+    lng: Decimal = Field(ge=-180, le=180)
+    precision_m: int | None = Field(default=None, ge=0)
+    #: Reloj del teléfono, no el del servidor — ver
+    #: `infrastructure/models/posicion_repartidor.py`.
+    registrado_at: datetime
+
+
+EstadoPublico = Literal["preparando", "en_camino", "entregado", "no_entregado"]
+
+
+class SeguimientoSucursalOut(BaseModel):
+    nombre: str
+
+
+class SeguimientoRepartidorOut(BaseModel):
+    #: Solo el primer nombre (RN-DLV-008).
+    nombre: str
+
+
+class SeguimientoPosicionOut(BaseModel):
+    lat: Decimal
+    lng: Decimal
+    registrado_at: datetime | None
+
+
+class SeguimientoDestinoOut(BaseModel):
+    lat: Decimal | None
+    lng: Decimal | None
+
+
+class SeguimientoHitoOut(BaseModel):
+    hito: str
+    at: datetime | None
+
+
+class SeguimientoOut(BaseModel):
+    """Lo mínimo que ve el cliente por el enlace público (RN-DLV-008):
+    nunca monto, teléfono, dirección en texto ni las demás paradas de la
+    ruta."""
+
+    estado_publico: EstadoPublico
+    numero_orden: int | None
+    sucursal: SeguimientoSucursalOut
+    repartidor: SeguimientoRepartidorOut | None
+    eta_at: datetime | None
+    posicion: SeguimientoPosicionOut | None
+    destino: SeguimientoDestinoOut
+    linea_tiempo: list[SeguimientoHitoOut]

@@ -19752,6 +19752,62 @@
         "title": "PosVerificadoIn",
         "type": "object"
       },
+      "PosicionIn": {
+        "properties": {
+          "lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Lng"
+          },
+          "precision_m": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precision M"
+          },
+          "registrado_at": {
+            "format": "date-time",
+            "title": "Registrado At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lat",
+          "lng",
+          "registrado_at"
+        ],
+        "title": "PosicionIn",
+        "type": "object"
+      },
       "PostulacionPublica": {
         "description": "Cuerpo del formulario público. Sin `fecha_postulacion`: la pone el\nservidor, si no el cliente podría postular fuera de la fecha límite.",
         "properties": {
@@ -25818,6 +25874,208 @@
           "total"
         ],
         "title": "SeccionEstadoOut",
+        "type": "object"
+      },
+      "SeguimientoDestinoOut": {
+        "properties": {
+          "lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lng"
+          }
+        },
+        "required": [
+          "lat",
+          "lng"
+        ],
+        "title": "SeguimientoDestinoOut",
+        "type": "object"
+      },
+      "SeguimientoHitoOut": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "hito": {
+            "title": "Hito",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hito",
+          "at"
+        ],
+        "title": "SeguimientoHitoOut",
+        "type": "object"
+      },
+      "SeguimientoOut": {
+        "description": "Lo mínimo que ve el cliente por el enlace público (RN-DLV-008):\nnunca monto, teléfono, dirección en texto ni las demás paradas de la\nruta.",
+        "properties": {
+          "destino": {
+            "$ref": "#/components/schemas/SeguimientoDestinoOut"
+          },
+          "estado_publico": {
+            "enum": [
+              "preparando",
+              "en_camino",
+              "entregado",
+              "no_entregado"
+            ],
+            "title": "Estado Publico",
+            "type": "string"
+          },
+          "eta_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta At"
+          },
+          "linea_tiempo": {
+            "items": {
+              "$ref": "#/components/schemas/SeguimientoHitoOut"
+            },
+            "title": "Linea Tiempo",
+            "type": "array"
+          },
+          "numero_orden": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Orden"
+          },
+          "posicion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeguimientoPosicionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "repartidor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeguimientoRepartidorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sucursal": {
+            "$ref": "#/components/schemas/SeguimientoSucursalOut"
+          }
+        },
+        "required": [
+          "estado_publico",
+          "numero_orden",
+          "sucursal",
+          "repartidor",
+          "eta_at",
+          "posicion",
+          "destino",
+          "linea_tiempo"
+        ],
+        "title": "SeguimientoOut",
+        "type": "object"
+      },
+      "SeguimientoPosicionOut": {
+        "properties": {
+          "lat": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Lat",
+            "type": "string"
+          },
+          "lng": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Lng",
+            "type": "string"
+          },
+          "registrado_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registrado At"
+          }
+        },
+        "required": [
+          "lat",
+          "lng",
+          "registrado_at"
+        ],
+        "title": "SeguimientoPosicionOut",
+        "type": "object"
+      },
+      "SeguimientoRepartidorOut": {
+        "properties": {
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "SeguimientoRepartidorOut",
+        "type": "object"
+      },
+      "SeguimientoSucursalOut": {
+        "properties": {
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "SeguimientoSucursalOut",
         "type": "object"
       },
       "SemaforoOut": {
@@ -35543,6 +35801,48 @@
         ]
       }
     },
+    "/api/v1/delivery/publico/seguimiento/{token}": {
+      "get": {
+        "operationId": "ver_seguimiento_api_v1_delivery_publico_seguimiento__token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeguimientoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Ver Seguimiento",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
     "/api/v1/delivery/repartidores": {
       "get": {
         "operationId": "listar_repartidores_api_v1_delivery_repartidores_get",
@@ -36166,6 +36466,57 @@
           }
         ],
         "summary": "Editar Paradas",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/rutas/{ruta_id}/posiciones": {
+      "post": {
+        "operationId": "registrar_posicion_api_v1_delivery_rutas__ruta_id__posiciones_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ruta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Ruta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosicionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Posicion",
         "tags": [
           "delivery"
         ]

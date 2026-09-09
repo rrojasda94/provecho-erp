@@ -16,6 +16,7 @@ from src.core.events import event_bus
 from src.modules.delivery.application import ruteo
 from src.modules.delivery.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.delivery.application.parametros import ParametrosReparto, parametros_de
+from src.modules.delivery.application.seguimiento import nuevo_token
 from src.modules.delivery.domain import rules
 from src.modules.delivery.infrastructure.models import Entrega, Repartidor, RutaReparto
 from src.modules.delivery.infrastructure.repositories import EntregaRepo, RutaRepo
@@ -151,6 +152,9 @@ def crear(
                 tramo_duracion_seg=tramo.duracion_seg,
                 destino_lat=venta["ubicacion_lat"],
                 destino_lng=venta["ubicacion_lng"],
+                # RN-DLV-008: token nuevo en cada asignación, nunca uno
+                # heredado de un intento anterior.
+                token_publico=nuevo_token(),
             )
         )
     session.flush()
@@ -230,6 +234,10 @@ def editar_paradas(
         entrega.tramo_duracion_seg = tramo.duracion_seg
         entrega.destino_lat = venta["ubicacion_lat"]
         entrega.destino_lng = venta["ubicacion_lng"]
+        # RN-DLV-008: token nuevo en cada asignación (alta o reingreso a
+        # una ruta), nunca uno heredado de un intento anterior.
+        entrega.token_publico = nuevo_token()
+        entrega.token_expira_at = None
     session.flush()
 
     auditar(

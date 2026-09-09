@@ -17,7 +17,7 @@ catálogo: [../architecture/events.md](../architecture/events.md).
 | accounting | [src/modules/accounting/README.md](../../src/modules/accounting/README.md) | Abierto parcialmente (ciclo de caja), spec completa pendiente |
 | rrhh | [src/modules/rrhh/README.md](../../src/modules/rrhh/README.md) | Abierto parcialmente (solo `trabajador`), spec completa pendiente |
 | reports | [src/modules/reports/README.md](../../src/modules/reports/README.md) | Slice core implementado 2026-08-08 (ADR-033): emisión por evento, distribución por área/rol/usuario y matriz de gobierno. No confundir con `core/reportes`, que es la consulta bajo demanda (ADR-024) |
-| delivery | [src/modules/delivery/README.md](../../src/modules/delivery/README.md) | Slice core implementado 2026-09-09 (ADR-098): repartidores, tablero, ciclo de ruta/entrega con ruteo heurístico. Falta ruteo real, GPS, seguimiento público y avisos |
+| delivery | [src/modules/delivery/README.md](../../src/modules/delivery/README.md) | Slices 2-3 implementados 2026-09-09 (ADR-098): repartidores, tablero, ciclo de ruta/entrega con ruteo real u heurístico, GPS y seguimiento público con mapa. Falta PWA del repartidor, tablero del ERP y avisos |
 
 ## Futuros (se especifican antes de construirse)
 
