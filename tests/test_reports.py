@@ -685,6 +685,41 @@ def test_cambiar_la_regla_no_reescribe_lo_ya_entregado(env):
     assert entregas[0].motivo == motivo_original
 
 
+# --- Canal de alerta por correo (2026-09-09) ----------------------------------
+def test_regla_con_canal_email_marca_la_entrega(env):
+    """La entrega hereda el canal de la regla que la resolvió — lo que
+    `users.application.listeners` usa para decidir si además del correo va
+    la bandeja."""
+    s, ids = env
+    reglas_uc.crear_regla(
+        s,
+        empresa_id=ids["empresa"].id,
+        codigo_emision="sales.venta_anulada",
+        canal="email",
+        destinatarios=[
+            reglas_uc.DestinatarioIn(tipo="area", area_id=ids["area_gerencia"].id)
+        ],
+        actor_id=ids["supervisor1"].id,
+    )
+    s.commit()
+
+    reporte, destinatarios = emision_uc.emitir(
+        s,
+        "sales.venta_anulada",
+        {
+            "venta_id": str(uuid.uuid4()),
+            "sucursal_id": str(ids["sucursal"].id),
+            "usuario_id": str(ids["cajero"].id),
+        },
+    )
+    s.commit()
+    assert destinatarios == [ids["supervisor1"].id]
+    entrega = s.scalar(
+        select(EntregaReporte).where(EntregaReporte.reporte_emitido_id == reporte.id)
+    )
+    assert entrega.canal == "email"
+
+
 # --- Gobierno y auditoría -----------------------------------------------------
 def test_crear_una_regla_deja_rastro_en_audit_log(env):
     """RN-REP-007: «si hay modificaciones en los flujos» se responde con

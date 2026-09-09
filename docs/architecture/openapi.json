@@ -26219,8 +26219,11 @@
             "type": "boolean"
           },
           "canal": {
-            "const": "bandeja",
             "default": "bandeja",
+            "enum": [
+              "bandeja",
+              "email"
+            ],
             "title": "Canal",
             "type": "string"
           },
@@ -26355,7 +26358,10 @@
           "canal": {
             "anyOf": [
               {
-                "const": "bandeja",
+                "enum": [
+                  "bandeja",
+                  "email"
+                ],
                 "type": "string"
               },
               {
