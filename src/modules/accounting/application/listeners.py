@@ -14,11 +14,13 @@ Cubre hoy 6 eventos operativos: `purchases.oc_emitida`,
 solo asienta cuando el traslado llegó con faltante— y
 `inventory.consumo_personal_valorizado`, la comida del personal llevada a
 gasto (RN-COM-025), que se reversa con
-`inventory.consumo_personal_reversado` si el consumo se anula. El resto de
-los documentados en `events.md` (pago
-registrado, comprobante emitido de venta, ajuste, caja chica...) no se
-generan aún porque los módulos de origen todavía no los publican — ver
-ROADMAP, deuda técnica de accounting.
+`inventory.consumo_personal_reversado` si el consumo se anula, e
+`inventory.merma_registrada`/`production.orden_desechada` (ADR-098) —
+merma de mercadería y desecho de producción, mismo circuito (D 6599 / H
+201). El resto de los documentados en `events.md` (pago registrado,
+comprobante emitido de venta, ajuste, caja chica...) no se generan aún
+porque los módulos de origen todavía no los publican — ver ROADMAP, deuda
+técnica de accounting.
 """
 
 import logging
@@ -111,6 +113,20 @@ def _desglose_de_compra(session, items: list[dict]) -> list[dict]:
             }
         )
     return desglose
+
+
+def _desglose_de_produccion(session, articulo_id: str, monto: Decimal) -> list[dict]:
+    """De qué categoría es el artículo producido que se desechó (ADR-086,
+    ADR-098) — un solo ítem, no una lista de líneas como en una compra."""
+    clasificacion = clasificacion_de_articulos(session, [uuid.UUID(articulo_id)])
+    datos = clasificacion.get(uuid.UUID(articulo_id))
+    return [
+        {
+            "categoria_id": (datos or {}).get("categoria_id"),
+            "es_servicio": bool((datos or {}).get("es_servicio")),
+            "monto": monto,
+        }
+    ]
 
 
 def _desglose_de_venta(session, items: list[dict]) -> list[dict]:
@@ -502,6 +518,46 @@ def on_merma_registrada(payload: dict) -> None:
         log.exception("fallo generando asiento de merma de %s", payload.get("sku_id"))
 
 
+def on_orden_desechada(payload: dict) -> None:
+    """Desecho de producción (ADR-098): el costo de los insumos ya
+    consumidos, que `registrar_consumo` descontó del almacén sin que
+    ningún asiento lo reflejara todavía — es la pérdida real del hallazgo.
+
+    No es `inventory.merma_registrada`: el producto terminado de una orden
+    desechada nunca llegó a existir como stock, así que no hay reserva que
+    apartar. Desglosado por la categoría del artículo **producido**, no de
+    los insumos.
+    """
+    try:
+        monto = Decimal(payload.get("monto") or 0)
+        if monto <= 0:
+            return
+        with session_factory() as session:
+            empresa_id = _empresa_de_almacen(session, payload["almacen_id"])
+            if empresa_id is None:
+                log.warning(
+                    "orden de producción desechada %s en almacén sin empresa, "
+                    "asiento omitido",
+                    payload.get("orden_produccion_id"),
+                )
+            else:
+                _generar(
+                    session,
+                    empresa_id=empresa_id,
+                    evento="production.orden_desechada",
+                    referencia_origen=payload["orden_produccion_id"],
+                    monto=monto,
+                    glosa=f"Desecho de producción por {payload['merma_motivo']}",
+                    desglose=_desglose_de_produccion(session, payload["articulo_id"], monto),
+                )
+            session.commit()
+    except Exception:
+        log.exception(
+            "fallo generando asiento de desecho de producción %s",
+            payload.get("orden_produccion_id"),
+        )
+
+
 def on_empresa_creada(payload: dict) -> None:
     """Una empresa nueva nace con su plan de cuentas (ADR-089).
 
@@ -558,6 +614,7 @@ def register() -> None:
         "inventory.transferencia_recibida", on_transferencia_recibida
     )
     event_bus.subscribe("inventory.merma_registrada", on_merma_registrada)
+    event_bus.subscribe("production.orden_desechada", on_orden_desechada)
     event_bus.subscribe(
         "inventory.consumo_personal_valorizado", on_consumo_personal_valorizado
     )

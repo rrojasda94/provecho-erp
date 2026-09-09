@@ -13,6 +13,7 @@ from sqlalchemy.orm import sessionmaker
 
 import src.core.models_registry  # noqa: F401
 from src.core.database import Base
+from src.core.events import event_bus
 from src.modules.inventory.application import listeners
 from src.modules.inventory.infrastructure.models import (
     Articulo,
@@ -463,3 +464,69 @@ def test_auditoria_registra_crear_consumo_y_completar(env):
             )
         ).all()
     assert set(acciones) == {"crear", "registrar_consumo", "completar"}
+
+
+# --- Desecho → contabilidad (feat/produccion-desecho-a-contabilidad, ADR-098) ---
+def test_completar_desechado_publica_orden_desechada_con_costo_insumos(env):
+    """ADR-098: el hecho contable del desecho es el costo de los insumos ya
+    consumidos, no la merma de `inventory` — el producto terminado de una
+    orden desechada nunca llegó a existir como stock."""
+    client, ids, _ = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-desecho-1").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+
+    eventos = []
+    event_bus.subscribe("production.orden_desechada", eventos.append)
+    r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
+        "resultado": "no_conforme_desechado", "merma_cantidad": "10",
+        "merma_motivo": "contaminación", "evidencia_destruccion_url": "https://x/evidencia.jpg",
+    })
+    assert r.status_code == 200
+
+    (evento,) = eventos
+    assert evento["orden_produccion_id"] == orden_id
+    assert evento["almacen_id"] == ids["almacen_id"]
+    assert evento["articulo_id"] == ids["masa_id"]
+    # 10 de harina a 2.00 (ver `_consumo_body`): el costo de insumos, no la
+    # mano de obra (que ya se reconoce aparte, como gasto de planilla).
+    assert Decimal(evento["monto"]) == Decimal("20.00")
+    assert evento["merma_motivo"] == "contaminación"
+
+
+def test_completar_reprocesado_no_publica_orden_desechada(env):
+    """Reproceso no genera merma ni asiento (RN-PRD): el insumo se corrigió,
+    no se perdió."""
+    client, ids, _ = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-reproceso-1").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+
+    eventos = []
+    event_bus.subscribe("production.orden_desechada", eventos.append)
+    r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
+        "resultado": "no_conforme_reprocesado",
+    })
+    assert r.status_code == 200
+    assert eventos == []
+
+
+def test_completar_conforme_no_publica_orden_desechada(env):
+    client, ids, _ = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-conforme-sin-desecho").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+
+    eventos = []
+    event_bus.subscribe("production.orden_desechada", eventos.append)
+    r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
+        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+    })
+    assert r.status_code == 200
+    assert eventos == []

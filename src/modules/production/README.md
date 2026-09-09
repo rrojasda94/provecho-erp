@@ -68,13 +68,11 @@ Deuda del slice (ver
 [`docs/roadmap/deuda/modulo-production.md`](../../../docs/roadmap/deuda/modulo-production.md)):
 `plan_produccion`/cronograma (hoy la orden se crea sin plan),
 `checklist_inocuidad_turno` (bloqueo de cocina por fallo de inocuidad),
-`reporte_produccion` consolidado, asiento contable propio para el desecho
-(la merma de `inventory` no aplica: el producto terminado de una orden
-desechada nunca entró a inventario), subrecetas anidadas (una orden que
+`reporte_produccion` consolidado, subrecetas anidadas (una orden que
 consume otra subreceta con su propia orden), costeo real (hoy
 `costo_unitario` lo tipea el cliente). Ya saldado: lote/trazabilidad del
-producto terminado, auditoría e idempotencia de consumo/completar
-(2026-09-09).
+producto terminado, auditoría e idempotencia de consumo/completar, y el
+asiento contable del desecho (ADR-098) (2026-09-09).
 
 ## Casos de uso
 
@@ -140,11 +138,12 @@ reproceso o desecho con evidencia → reporte de escalamiento).
   por `inventory` para sumar producto terminado y recalcular
   `costo_promedio`), `production.no_conformidad_detectada` (consumido por
   `reports`, que abre el `reporte_escalamiento`; consumido por
-  Comercial/Gerencia ante reincidencia). El desecho (`merma_cantidad`/
-  `merma_motivo` en la orden) todavía **no** dispara ningún asiento
-  contable — es deuda pendiente, no se reusa `inventory.merma_registrada`
-  porque el producto terminado de una orden desechada nunca ingresó a
-  inventory (ver ROADMAP). Reproceso (`no_conforme_reprocesado`)
+  Comercial/Gerencia ante reincidencia), `production.orden_desechada`
+  (solo cuando el resultado es `no_conforme_desechado`, consumido
+  por `accounting` para el asiento por el costo de insumos consumidos —
+  **no** es `inventory.merma_registrada`: el producto terminado de una
+  orden desechada nunca ingresó a inventory, así que no hay reserva que
+  apartar; ver ADR-098). Reproceso (`no_conforme_reprocesado`)
   correctamente no genera merma ni asiento, solo el detalle de la
   corrección en el reporte de escalamiento.
   `production.equipo_frio_fuera_rango` (alerta inmediata a Gerencia,

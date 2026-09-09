@@ -883,10 +883,13 @@ producción se hace en cocinas de sucursal. Ver
   reincidencia por el mismo motivo escala a Comercial/Gerencia para
   revisión de receta o proceso, igual que el resto de reportes de
   escalamiento del ERP. Un solo asiento contable posible por hallazgo,
-  según el estadio final: si se desecha, el registro de merma (RN-INV-017)
-  es ese asiento; si se reprocesa, no hay merma ni asiento — el reporte
-  solo detalla cómo se corrigió. **Implementado desde ADR-036**: el hallazgo
-  emite `production.no_conformidad_detectada` y el escalamiento se abre sobre
+  según el estadio final: si se desecha, el asiento por el costo de los
+  insumos consumidos (`production.orden_desechada`, ADR-098 — no es la
+  merma de `inventory`, RN-INV-017: el producto terminado de una orden
+  desechada nunca llegó a existir como stock); si se reprocesa, no hay
+  merma ni asiento — el reporte solo detalla cómo se corrigió.
+  **Implementado desde ADR-036**: el hallazgo emite
+  `production.no_conformidad_detectada` y el escalamiento se abre sobre
   ese reporte, no sobre la orden — así conserva la foto, el actor y la doble
   puerta de RN-REP-002.
 - **RN-PRD-015** La destrucción de un lote no conforme se realiza dentro

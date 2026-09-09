@@ -214,13 +214,17 @@ def _cerrar_no_conforme(
     orden: OrdenProduccion,
     *,
     resultado: str,
+    costo_insumos: Decimal,
     merma_cantidad: Decimal | None,
     merma_motivo: str | None,
     evidencia_destruccion_url: str | None,
     registrado_por: uuid.UUID | None,
 ) -> dict:
     """Reproceso no genera merma ni asiento (RN-PRD); desecho exige
-    evidencia de destrucción antes de aceptar la merma (RN-PRD-015)."""
+    evidencia de destrucción antes de aceptar la merma (RN-PRD-015) y
+    dispara el asiento contable por el costo de insumos ya consumidos
+    (ADR-098 — no se reusa `inventory.merma_registrada`: el producto
+    terminado de una orden desechada nunca llegó a existir como stock)."""
     extra: dict = {}
     if resultado == "no_conforme_desechado":
         if not merma_cantidad or Decimal(str(merma_cantidad)) <= 0:
@@ -249,6 +253,22 @@ def _cerrar_no_conforme(
         },
         session=session,
     )
+    if resultado == "no_conforme_desechado":
+        # Un solo asiento contable posible por hallazgo (política del área):
+        # el reproceso no llega hasta acá, ya volvió arriba.
+        event_bus.publish(
+            "production.orden_desechada",
+            {
+                "orden_produccion_id": str(orden.id),
+                "almacen_id": str(orden.almacen_id),
+                "articulo_id": str(orden.articulo_id),
+                "merma_cantidad": str(orden.merma_cantidad),
+                "merma_motivo": orden.merma_motivo,
+                "monto": str(costo_insumos),
+                "registrado_por": str(registrado_por) if registrado_por else None,
+            },
+            session=session,
+        )
     return extra
 
 
@@ -311,6 +331,7 @@ def completar_orden_produccion(
             session,
             orden,
             resultado=resultado,
+            costo_insumos=costo_insumos,
             merma_cantidad=merma_cantidad,
             merma_motivo=merma_motivo,
             evidencia_destruccion_url=evidencia_destruccion_url,
