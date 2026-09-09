@@ -101,6 +101,18 @@ PROPUESTAS: list[tuple[str, str, dict, str | None, str]] = [
         "venta que igual iba a ocurrir. Requiere aprobación conjunta de "
         "Comercial + RRHH + Gerencia (política comercial §3).",
     ),
+    (
+        "assets",
+        "tolerancia_consumo_pct",
+        {"porcentaje": 25},
+        "25 %",
+        "Confirma el 25 % semilla (`rules.TOLERANCIA_CONSUMO_PCT_DEFECTO`): "
+        "una carga rinde por debajo del promedio de las últimas 5 cuando cae "
+        "más de un cuarto por debajo, suficiente para no marcar como anómalo "
+        "el ruido normal de manejo urbano vs. carretera. Requiere al menos 3 "
+        "cargas previas del mismo vehículo. Revisar con el primer trimestre "
+        "de cargas reales.",
+    ),
 ]
 
 PROPUESTAS += [

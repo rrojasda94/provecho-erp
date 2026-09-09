@@ -1,44 +1,36 @@
 /**
- * Una foto chica de la cámara frontal, en base64 (RN-RRHH-024, ADR-079).
+ * Una foto chica de la cámara, en base64 — frontal por defecto (RN-RRHH-024,
+ * ADR-079), trasera cuando la llama `delivery` para la evidencia de una
+ * entrega (ADR-098): ahí lo que importa es la puerta, no la cara de quien
+ * entrega.
  *
  * Es evidencia, no biometría: nadie la compara contra nada, solo queda
- * disponible para RRHH si algo no cuadra. Por eso el fallo es silencioso —
+ * disponible después si algo no cuadra. Por eso el fallo es silencioso —
  * sin cámara, sin permiso o sin HTTPS, el marcaje sigue igual — y por eso
- * 320px al 60% alcanza: no hace falta reconocer una cara, alcanza con que
+ * 320px al 60% alcanza: no hace falta una foto nítida, alcanza con que
  * alguien la mire después.
  */
 
 const ANCHO = 320;
 const CALIDAD = 0.6;
 
-export async function capturarFoto(): Promise<string | null> {
-  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
-    return null;
-  }
-  let stream: MediaStream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: "user" },
-      audio: false,
-    });
-  } catch {
-    // Permiso denegado, sin cámara, o el navegador no la expone (http sin
-    // TLS fuera de localhost): no es un error del marcaje.
-    return null;
-  }
+/** Un frame recién arrancada la cámara sale negro en la mayoría de
+ * tablets: esperar el primer `loadeddata` es lo que garantiza que ya hay
+ * imagen real antes de dibujarla al canvas. */
+async function esperarPrimerFrame(video: HTMLVideoElement): Promise<void> {
+  if (video.readyState >= 2) return;
+  await new Promise<void>((resolve) => {
+    video.onloadeddata = () => resolve();
+  });
+}
 
+async function capturarCuadro(stream: MediaStream): Promise<string | null> {
   try {
     const video = document.createElement("video");
     video.srcObject = stream;
     video.muted = true;
     await video.play();
-    // Un frame recién arrancada la cámara sale negro en la mayoría de
-    // tablets: esperar el primer `loadeddata` es lo que garantiza que ya
-    // hay imagen real antes de dibujarla al canvas.
-    await new Promise<void>((resolve) => {
-      if (video.readyState >= 2) return resolve();
-      video.onloadeddata = () => resolve();
-    });
+    await esperarPrimerFrame(video);
 
     const alto = Math.round((ANCHO * video.videoHeight) / video.videoWidth) || ANCHO;
     const canvas = document.createElement("canvas");
@@ -56,6 +48,25 @@ export async function capturarFoto(): Promise<string | null> {
     return null;
   } finally {
     for (const track of stream.getTracks()) track.stop();
+  }
+}
+
+export async function capturarFoto(
+  opciones: { camara?: "user" | "environment" } = {},
+): Promise<string | null> {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    return null;
+  }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: opciones.camara ?? "user" },
+      audio: false,
+    });
+    return await capturarCuadro(stream);
+  } catch {
+    // Permiso denegado, sin cámara, o el navegador no la expone (http sin
+    // TLS fuera de localhost): no es un error del marcaje.
+    return null;
   }
 }
 

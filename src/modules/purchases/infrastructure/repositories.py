@@ -12,6 +12,7 @@ from src.modules.purchases.infrastructure.models import (
     Proveedor,
     RecepcionCompra,
     RecepcionItem,
+    RequerimientoActivo,
 )
 from src.modules.users.infrastructure.models import Almacen
 
@@ -37,6 +38,19 @@ class ProveedorRepo:
         self.s.add(proveedor)
         self.s.flush()
         return proveedor
+
+
+class RequerimientoActivoRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, requerimiento_id: uuid.UUID) -> RequerimientoActivo | None:
+        return self.s.get(RequerimientoActivo, requerimiento_id)
+
+    def add(self, requerimiento: RequerimientoActivo) -> RequerimientoActivo:
+        self.s.add(requerimiento)
+        self.s.flush()
+        return requerimiento
 
 
 class OrdenCompraRepo:

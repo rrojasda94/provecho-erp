@@ -18,7 +18,7 @@ import src.core.models_registry  # noqa: F401
 from src.core.database import Base
 from src.modules.rrhh.application import avisos_asistencia, turnos
 from src.modules.rrhh.application import terminales as terminales_uc
-from src.modules.rrhh.infrastructure.models import Asistencia, TurnoSucursal
+from src.modules.rrhh.infrastructure.models import Asistencia, Trabajador, TurnoSucursal
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
     Empresa,
@@ -667,3 +667,119 @@ def test_el_barrido_no_avisa_antes_de_la_hora_limite(env):
     with TestSession() as s:
         antes = datetime(2026, 8, 24, 17, 30, tzinfo=LIMA)
         assert avisos_asistencia.barrer(s, antes) == []
+
+
+# --- Contrato público: horas asistidas y trabajadores activos --------------
+def test_horas_asistidas_resta_entrada_y_salida_mas_extra(env):
+    """`production` (RN-PRD-018) necesita horas reales, no tipeadas: es el
+    caso feliz del contrato."""
+    from src.modules.rrhh.application import queries_publicas
+
+    client, ids, TestSession = env
+    h = _token(client)
+    trabajador_id = uuid.UUID(_crear_trabajador(client, h, ids))
+    fecha = date(2026, 8, 24)
+    with TestSession() as s:
+        s.add(
+            Asistencia(
+                trabajador_id=trabajador_id,
+                fecha=fecha,
+                hora_entrada=time(9, 0),
+                hora_salida=time(17, 30),
+                # Nunca la pone el pad (RN-RRHH-022): la carga RRHH a mano.
+                horas_extra=Decimal("1.50"),
+            )
+        )
+        s.commit()
+
+    with TestSession() as s:
+        horas = queries_publicas.horas_asistidas(s, [trabajador_id], fecha)
+    # 8.5 h trabajadas (09:00-17:30) + 1.5 h extra = 10.
+    assert horas == {trabajador_id: Decimal("10.00")}
+
+
+def test_horas_asistidas_sin_salida_marcada_es_cero(env):
+    """El turno sigue abierto: no hay una hora parcial que reconstruir."""
+    from src.modules.rrhh.application import queries_publicas
+
+    client, ids, TestSession = env
+    h = _token(client)
+    trabajador_id = uuid.UUID(_crear_trabajador(client, h, ids))
+    fecha = date(2026, 8, 24)
+    with TestSession() as s:
+        s.add(
+            Asistencia(trabajador_id=trabajador_id, fecha=fecha, hora_entrada=time(9, 0))
+        )
+        s.commit()
+
+    with TestSession() as s:
+        horas = queries_publicas.horas_asistidas(s, [trabajador_id], fecha)
+    assert horas == {trabajador_id: Decimal("0.00")}
+
+
+def test_horas_asistidas_sin_fila_ese_dia_no_aparece(env):
+    """RN-RRHH-009: no marcado no se considera — ni siquiera como cero."""
+    from src.modules.rrhh.application import queries_publicas
+
+    client, ids, TestSession = env
+    h = _token(client)
+    trabajador_id = uuid.UUID(_crear_trabajador(client, h, ids))
+
+    with TestSession() as s:
+        horas = queries_publicas.horas_asistidas(s, [trabajador_id], date(2026, 8, 24))
+    assert horas == {}
+
+
+def test_horas_asistidas_sin_trabajadores_no_consulta(env):
+    _, _, TestSession = env
+    from src.modules.rrhh.application import queries_publicas
+
+    with TestSession() as s:
+        assert queries_publicas.horas_asistidas(s, [], date(2026, 8, 24)) == {}
+
+
+def test_trabajadores_activos_filtra_por_area_y_excluye_cesados(env):
+    from src.modules.rrhh.application import queries_publicas
+
+    client, ids, TestSession = env
+    h = _token(client)
+    # Ana Torres, área "Cocina" por defecto de `_crear_trabajador`.
+    cocinero_id = uuid.UUID(_crear_trabajador(client, h, ids))
+
+    with TestSession() as s:
+        vendedor_persona = Persona(
+            nombres="Luis", apellidos="Ramos", tipo_documento="dni",
+            numero_documento="20000002",
+        )
+        cesada_persona = Persona(
+            nombres="Rosa", apellidos="Cesada", tipo_documento="dni",
+            numero_documento="20000003",
+        )
+        s.add_all([vendedor_persona, cesada_persona])
+        s.flush()
+        s.add_all([
+            Trabajador(
+                empresa_id=uuid.UUID(ids["empresa_id"]), persona_id=vendedor_persona.id,
+                cargo="Vendedor", area="Comercial", tipo_vinculo="planilla",
+                fecha_ingreso=date(2026, 1, 1),
+            ),
+            # Misma área que Ana, pero cesada: no debe aparecer.
+            Trabajador(
+                empresa_id=uuid.UUID(ids["empresa_id"]), persona_id=cesada_persona.id,
+                cargo="Cocinera", area="Cocina", tipo_vinculo="planilla",
+                fecha_ingreso=date(2026, 1, 1), estado="cesado",
+            ),
+        ])
+        s.commit()
+
+    with TestSession() as s:
+        cocina = queries_publicas.trabajadores_activos(
+            s, uuid.UUID(ids["empresa_id"]), area="Cocina"
+        )
+        todos = queries_publicas.trabajadores_activos(s, uuid.UUID(ids["empresa_id"]))
+
+    assert [t["cargo"] for t in cocina] == ["Cocinero"]
+    assert {t["id"] for t in cocina} == {cocinero_id}
+    # Sin filtro de área: Ana y el vendedor: la cesada sigue fuera aunque
+    # comparta área con Ana.
+    assert {t["nombre"] for t in todos} == {"Ana Torres", "Luis Ramos"}
