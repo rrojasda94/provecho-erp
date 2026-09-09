@@ -755,8 +755,12 @@ en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
   no opcional como decía la especificación de julio: el único emisor de hoy
   es un traslado entre almacenes. La guía de una venta con reparto lo
   volverá nullable cuando exista reparto propio.
-  **No hay `vehiculo_id`**: sin flota, una tabla de vehículos sería un
-  formulario que hay que llenar antes de emitir la primera guía (ADR-027).
+  **`vehiculo_id`** (agregado 2026-09-09, ADR-098): sin FK — `vehiculo` es
+  dominio de `assets`—, opcional. Si viene, su placa se resuelve por
+  `assets.application.queries_publicas.vehiculo_para_guia` y se congela en
+  `vehiculo_placa` al emitir; si no, `vehiculo_placa` sigue aceptando texto
+  libre (RN-VEH-008), compatibilidad con guías de antes de que `assets`
+  existiera.
 - **guia_remision_item**: guia_remision_id, sku_id, cantidad, descripcion y
   unidad (códigos snapshot). Las líneas **se derivan** de
   `transferencia_item` y se agrupan por SKU: RN-TRP-002 exige que lo

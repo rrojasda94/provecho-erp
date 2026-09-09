@@ -1060,6 +1060,11 @@ producción se hace en cocinas de sucursal. Ver
   reciente del vehículo se marca como consumo anómalo y se reporta a
   Gerencia y Contabilidad — puede ser una fuga, una manipulación o un mal
   uso (`assets`, ADR-098).
+- **RN-VEH-008** Una guía de remisión puede declarar el vehículo eligiendo
+  el registrado en Activos (`vehiculo_id`); su placa se congela en la guía
+  al emitir, igual que el lugar de origen/destino. Sin `vehiculo_id` sigue
+  aceptando la placa tecleada a mano, para quien todavía no lo registra ahí
+  (`inventory`, contrato público `assets.vehiculo_para_guia`).
 
 ## Mantenimiento
 

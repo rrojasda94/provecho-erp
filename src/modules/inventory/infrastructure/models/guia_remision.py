@@ -10,10 +10,13 @@ Serie y correlativo son **propios del almacén** (`T001-…`), no los del punto
 de venta: la caja no emite guías y colgarlas de su serie mezclaría dos
 numeraciones que SUNAT lleva por separado.
 
-Los datos del chofer y del vehículo viajan acá, sin entidad `vehiculo`: el
-grupo no tiene flota propia ni operación de reparto con ruteo (ver ROADMAP
-→ Deuda técnica), y una tabla de vehículos sería un formulario que nadie
-mantiene. Cuando exista flota, `vehiculo_placa` se reemplaza por su FK.
+Los datos del chofer viajan acá, tecleados: `inventory` no tiene ni tendrá
+un padrón de choferes. El vehículo, desde que existe `assets.Vehiculo`
+(ADR-098), se puede elegir por `vehiculo_id` — sin FK, `assets` es otro
+módulo — y su placa se congela en `vehiculo_placa` al emitir, igual que
+`lugar_origen`/`lugar_destino`. `vehiculo_id` es opcional y `vehiculo_placa`
+sigue aceptando texto libre por compatibilidad con guías ya emitidas antes
+de que `assets` existiera.
 """
 
 import datetime
@@ -126,6 +129,9 @@ class GuiaRemision(Base, UuidPkMixin, TimestampMixin):
     chofer_num_doc: Mapped[str] = mapped_column(String(15))
     chofer_licencia: Mapped[str] = mapped_column(String(20))
     vehiculo_placa: Mapped[str] = mapped_column(String(10))
+    # Sin FK: `vehiculo` es dominio de `assets`. Nulo en guías emitidas antes
+    # de que `assets` existiera, o cuando se sigue tecleando la placa a mano.
+    vehiculo_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     emitida_por: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuario.id"))
     observacion: Mapped[str | None] = mapped_column(String(500), nullable=True)
     # --- Emisión electrónica (mismo juego que `comprobante`) -----------------

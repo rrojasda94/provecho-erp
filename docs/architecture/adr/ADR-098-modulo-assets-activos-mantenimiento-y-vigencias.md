@@ -145,8 +145,11 @@ consulta (no cuando se carga por id y se valida después).
 - **Depreciación en `accounting`**: sigue pendiente (deuda ya declarada de
   ese módulo); `assets.valor_compra`/`vida_util_meses` quedan ahí como
   insumo para cuando se construya.
-- **`guia_remision.vehiculo_placa`** sigue siendo texto libre: reemplazarla
-  por una FK a `vehiculo` es deuda de `inventory`, no de este slice.
+- ~~**`guia_remision.vehiculo_placa`** sigue siendo texto libre~~ — resuelto
+  el mismo día (2026-09-09): `guia_remision.vehiculo_id` (sin FK) resuelve
+  la placa por `assets.application.queries_publicas.vehiculo_para_guia` y la
+  congela al emitir (RN-VEH-008, ADR-027 actualizado). `vehiculo_placa`
+  sigue aceptando texto libre cuando no se elige un vehículo.
 - **Adjuntos de `documento_vigencia`** son solo metadata (mismo patrón que
   `marketing.application.adjuntos`): la subida binaria a S3 la hace el
   cliente directo contra el storage, no este módulo.

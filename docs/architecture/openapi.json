@@ -12392,11 +12392,30 @@
             ],
             "title": "Peso Bruto Kg"
           },
+          "vehiculo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vehiculo Id"
+          },
           "vehiculo_placa": {
-            "maxLength": 10,
-            "minLength": 6,
-            "title": "Vehiculo Placa",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "minLength": 6,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vehiculo Placa"
           }
         },
         "required": [
@@ -12405,7 +12424,6 @@
           "chofer_apellidos",
           "chofer_num_doc",
           "chofer_licencia",
-          "vehiculo_placa",
           "peso_bruto_kg"
         ],
         "title": "GuiaDevolucionCreate",
@@ -12487,11 +12505,30 @@
             ],
             "title": "Peso Bruto Kg"
           },
+          "vehiculo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vehiculo Id"
+          },
           "vehiculo_placa": {
-            "maxLength": 10,
-            "minLength": 6,
-            "title": "Vehiculo Placa",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "minLength": 6,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vehiculo Placa"
           }
         },
         "required": [
@@ -12499,7 +12536,6 @@
           "chofer_apellidos",
           "chofer_num_doc",
           "chofer_licencia",
-          "vehiculo_placa",
           "peso_bruto_kg"
         ],
         "title": "GuiaRemisionCreate",
@@ -12632,6 +12668,18 @@
             ],
             "title": "Transferencia Id"
           },
+          "vehiculo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vehiculo Id"
+          },
           "vehiculo_placa": {
             "title": "Vehiculo Placa",
             "type": "string"
@@ -12657,6 +12705,7 @@
           "chofer_num_doc",
           "chofer_licencia",
           "vehiculo_placa",
+          "vehiculo_id",
           "estado_emision",
           "detalle_emision",
           "observacion",
@@ -12821,6 +12870,18 @@
             ],
             "title": "Transferencia Id"
           },
+          "vehiculo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vehiculo Id"
+          },
           "vehiculo_placa": {
             "title": "Vehiculo Placa",
             "type": "string"
@@ -12846,6 +12907,7 @@
           "chofer_num_doc",
           "chofer_licencia",
           "vehiculo_placa",
+          "vehiculo_id",
           "estado_emision",
           "detalle_emision",
           "observacion"
