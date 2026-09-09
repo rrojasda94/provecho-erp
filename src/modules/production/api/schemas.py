@@ -28,9 +28,30 @@ class OrdenProduccionOut(BaseModel):
     costo_real_unitario: Decimal | None
     merma_cantidad: Decimal | None
     merma_motivo: str | None
+    evidencia_archivo_id: uuid.UUID | None = None
     fecha_vencimiento: date | None
     lote_codigo: str | None
     trazabilidad: dict | None
+
+
+class EvidenciaCreate(BaseModel):
+    """Evidencia de destrucción ya subida al storage — mismo contrato que
+    `marketing.AdjuntoCreate` (RN-PRD-015)."""
+
+    nombre: str = Field(min_length=1, max_length=255)
+    mime_type: str = Field(min_length=3, max_length=100)
+    tamano_bytes: int = Field(gt=0)
+    url_storage: str = Field(min_length=3, max_length=500)
+
+
+class EvidenciaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nombre: str
+    extension: str
+    mime_type: str
+    tamano_bytes: int
+    url_storage: str
 
 
 class ConsumoProduccionItemOut(BaseModel):
@@ -99,7 +120,9 @@ class CompletarOrdenIn(BaseModel):
     horas_hombre: Decimal | None = Field(default=None, ge=0)
     merma_cantidad: Decimal | None = Field(default=None, gt=0)
     merma_motivo: str | None = None
-    evidencia_destruccion_url: str | None = None
+    # Ya no viaja acá: la evidencia de destrucción (RN-PRD-015) se sube
+    # antes vía `POST /ordenes/{id}/evidencia` — `completar` solo exige que
+    # ya exista (`orden.evidencia_archivo_id`).
     # Trazabilidad del lote (RN-LOT-002/003, RN-VNC-001): solo tiene efecto
     # cuando `resultado="conforme"` — es lo que produce el lote del producto
     # terminado. Sin `fecha_vencimiento` el lote nace sin vencimiento y FEFO

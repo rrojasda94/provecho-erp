@@ -56,7 +56,14 @@ class OrdenProduccion(Base, UuidPkMixin, TimestampMixin):
     # Solo si estado=no_conforme_desechado (RN-PRD-015/018).
     merma_cantidad: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
     merma_motivo: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    evidencia_destruccion_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Reemplaza al string libre `evidencia_destruccion_url` desde
+    # `feat/produccion-evidencia-como-archivo` (RN-PRD-015): la evidencia se
+    # sube vía `POST /ordenes/{id}/evidencia` (`application/evidencia.py`,
+    # mismo mecanismo que `marketing.application.adjuntos`) y queda como
+    # `Archivo`, no como texto sin validar.
+    evidencia_archivo_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("archivo.id"), nullable=True
+    )
     # Los tres siguientes solo se llenan al completar con resultado
     # `conforme`: son lo que el listener de `inventory` necesita para que el
     # lote del producto terminado nazca con vencimiento real (RN-VNC-001) y

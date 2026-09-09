@@ -84,6 +84,16 @@ def abrir(
         raise ReglaNegocio(
             "un reporte que no se pudo atribuir a una empresa no se escala"
         )
+    if evidencia_id is None:
+        # RN-PRD-015 una sola vez: si el hecho ya trajo su evidencia (hoy,
+        # `production.orden_desechada` vía `production.no_conformidad_
+        # detectada`), quien escala no la vuelve a pegar a mano — antes
+        # `orden_produccion.evidencia_destruccion_url` (string libre) y
+        # `reporte_escalamiento.evidencia_id` (FK `archivo`) eran dos
+        # mecanismos para la misma regla y ninguno llenaba al otro.
+        dato = (reporte.datos or {}).get("evidencia_id")
+        if dato:
+            evidencia_id = uuid.UUID(dato) if isinstance(dato, str) else dato
     if reglas.exige_evidencia(motivo, (reporte.datos or {}).get("resultado")):
         if evidencia_id is None:
             raise ReglaNegocio(

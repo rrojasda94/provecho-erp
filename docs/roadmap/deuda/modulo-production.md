@@ -121,11 +121,19 @@ hasta ahora:
   en `inventory.application.transferencias._validar_almacenes` — hoy nada
   impide despachar de un almacén `produccion` a uno `sucursal`. Bloque
   `fix/inventario-cdp-001-y-conteo-produccion`.
-- ⬜ **Doble mecanismo de evidencia para RN-PRD-015**:
-  `orden_produccion.evidencia_destruccion_url` es un string libre, mientras
-  `reporte_escalamiento.evidencia_id` es una FK a `archivo` (con storage
-  S3 real). Son dos formas de cumplir la misma regla y ninguna llena la
-  otra. Bloque `feat/produccion-evidencia-como-archivo`.
+- ✅ 2026-09-09 **Doble mecanismo de evidencia para RN-PRD-015** (bloque
+  `feat/produccion-evidencia-como-archivo`). `orden_produccion.
+  evidencia_destruccion_url` (string libre) desaparece: la evidencia se
+  registra vía `POST /ordenes/{id}/evidencia` como `Archivo`
+  (`orden.evidencia_archivo_id`, `src/shared/adjuntos.py` — extraído de
+  `marketing.application.adjuntos`, que ya validaba MIME/tamaño para lo
+  mismo). `completar_orden_produccion` con `no_conforme_desechado` exige
+  que ya exista; el mismo id viaja en `production.no_conformidad_
+  detectada.evidencia_id` y `reports.application.escalamientos.abrir` lo
+  usa como default de `reporte_escalamiento.evidencia_id` (la FK que ya
+  existía) sin que el usuario lo vuelva a pegar a mano al abrir el
+  escalamiento. Migración con datos: toda `evidencia_destruccion_url` no
+  nula se convierte en `Archivo` antes de borrar la columna.
 - ⬜ **Horas-hombre tipeadas a mano**: `CompletarOrdenIn.horas_hombre` es un
   número libre pese a que RRHH ya tiene asistencia/marcación real
   (`asistencia`, `marcacion`); falta el contrato público de lectura.

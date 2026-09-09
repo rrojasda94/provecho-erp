@@ -69,7 +69,17 @@ snapshot al registrar el consumo, para comparar contra `costo_insumos`
 | GET | `/ordenes/{id}` | `production.leer` |
 | GET | `/ordenes/{id}/consumo-sugerido` | `production.leer` |
 | POST | `/ordenes/{id}/consumo` | `production.crear` |
+| POST | `/ordenes/{id}/evidencia` | `production.completar` |
 | POST | `/ordenes/{id}/completar` | `production.completar` |
+
+`POST /ordenes/{id}/evidencia` registra la evidencia de destrucción ya
+subida al storage (`nombre`, `mime_type`, `tamano_bytes`, `url_storage`,
+mismo contrato que `marketing.AdjuntoCreate`) como `Archivo`
+(`orden.evidencia_archivo_id`, `shared/adjuntos.py`) — `completar` con
+`no_conforme_desechado` exige que ya exista una (RN-PRD-015, bloque
+`feat/produccion-evidencia-como-archivo`, 2026-09-09). Reemplaza al string
+libre `evidencia_destruccion_url` que se tecleaba en el mismo `completar`
+sin que nadie pudiera verificarlo.
 
 Eventos: publica `production.consumo_registrado` (inventory descuenta
 insumos, tipo `consumo_produccion`), `production.orden_completada`
@@ -86,10 +96,11 @@ Deuda del slice (ver
 `reporte_produccion` consolidado, subrecetas anidadas (una orden que
 consume otra subreceta con su propia orden). Ya saldado: lote/trazabilidad
 del producto terminado, auditoría e idempotencia de consumo/completar, el
-asiento contable del desecho (ADR-098) (2026-09-09), y el costeo real
+asiento contable del desecho (ADR-098) (2026-09-09), el costeo real
 —`costo_promedio` por defecto, consumo sugerido desde la BOM, tarifa de
 mano de obra por empresa y desviación de desperdicio real vs. esperado
-(2026-09-09)—.
+(2026-09-09)—, y la evidencia de destrucción como `Archivo` en vez de
+string libre (2026-09-09).
 
 ## Casos de uso
 
@@ -104,7 +115,9 @@ mano de obra por empresa y desviación de desperdicio real vs. esperado
   no conforme reprocesado, o no conforme desechado.
 - No conformidad (cualquier resultado no conforme) emite el reporte, y desde
   ahí se abre el `reporte_escalamiento` (origen `produccion`, ADR-036);
-  desecho exige evidencia de destrucción adjunta (RN-PRD-015).
+  desecho exige evidencia de destrucción ya adjuntada (`POST .../evidencia`,
+  RN-PRD-015) — la misma evidencia viaja en el payload y llena
+  `reporte_escalamiento.evidencia_id` sin pedirla dos veces.
 - Calcular costo real de la orden automáticamente (insumos consumidos +
   mano de obra) — nunca a mano; el desperdicio real por insumo se
   registra por tipo y peso, contrastado contra el esperado de la receta
@@ -126,8 +139,8 @@ mano de obra por empresa y desviación de desperdicio real vs. esperado
 - Toda orden de producción pasa control de calidad antes de despachar
   (RN-PRD-013); nunca se salta este paso por presión de cronograma.
 - No conformidad siempre genera reporte de escalamiento, se corrija o se
-  deseche (RN-PRD-014); desecho sin evidencia de destrucción no cierra
-  el reporte (RN-PRD-015).
+  deseche (RN-PRD-014); desecho sin evidencia de destrucción ya adjuntada
+  (`POST /ordenes/{id}/evidencia`) no completa la orden (RN-PRD-015).
 - Cambio de receta/subreceta notifica con urgencia a quienes fabrican y
   actualiza costos el mismo día (RN-PRD-009).
 - Nunca despacha directo a sucursal, solo a Almacén Central (RN-CDP-001).
@@ -153,9 +166,11 @@ reproceso o desecho con evidencia → reporte de escalamiento).
 - Publica: `production.consumo_registrado` (consumido por `inventory` para
   descontar insumos vía FEFO), `production.orden_completada` (consumido
   por `inventory` para sumar producto terminado y recalcular
-  `costo_promedio`), `production.no_conformidad_detectada` (consumido por
-  `reports`, que abre el `reporte_escalamiento`; consumido por
-  Comercial/Gerencia ante reincidencia), `production.orden_desechada`
+  `costo_promedio`), `production.no_conformidad_detectada` (con
+  `evidencia_id` si ya se adjuntó, consumido por `reports`, que abre el
+  `reporte_escalamiento` con esa misma evidencia sin pedirla de nuevo;
+  consumido por Comercial/Gerencia ante reincidencia),
+  `production.orden_desechada`
   (solo cuando el resultado es `no_conforme_desechado`, consumido
   por `accounting` para el asiento por el costo de insumos consumidos —
   **no** es `inventory.merma_registrada`: el producto terminado de una

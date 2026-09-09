@@ -10,6 +10,12 @@ polimórfico: crear storage propio para marketing habría sido una segunda
 tabla de archivos con las mismas columnas. El ERP guarda el **vínculo y los
 metadatos**, no el binario: el binario vive en S3 y quien lo sube habla
 directo con el storage.
+
+La validación de MIME/tamaño y la creación del `Archivo` viven en
+`src/shared/adjuntos.py` desde `feat/produccion-evidencia-como-archivo`
+(2026-09-09): `production` necesitaba la misma cuenta para la evidencia de
+destrucción de un desecho (RN-PRD-015) y era la segunda copia, no la
+primera excepción.
 """
 
 import uuid
@@ -19,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from src.modules.marketing.application.errors import Conflicto, NoEncontrado
 from src.modules.marketing.infrastructure.repositories import PiezaContenidoRepo
+from src.shared import adjuntos as adjuntos_compartidos
 from src.shared.models import Archivo
 
 ENTIDAD = "pieza_contenido"
@@ -50,27 +57,18 @@ def adjuntar(
         raise NoEncontrado("pieza de contenido no encontrada")
     if pieza.estado == "descartada":
         raise Conflicto("la pieza está descartada; no admite adjuntos")
-    if not mime_type.startswith(MIME_PERMITIDOS):
-        raise Conflicto(f"tipo de archivo no admitido para una pieza: {mime_type}")
-    if tamano_bytes > TAMANO_MAXIMO_BYTES:
-        raise Conflicto(
-            f"el archivo supera el máximo de {TAMANO_MAXIMO_BYTES // (1024 * 1024)} MB"
-        )
-
-    archivo = Archivo(
+    return adjuntos_compartidos.crear_archivo(
+        session,
         nombre=nombre,
-        extension=nombre.rsplit(".", 1)[-1][:10] if "." in nombre else "",
         mime_type=mime_type,
         tamano_bytes=tamano_bytes,
         url_storage=url_storage,
-        origen="subido",
         entidad_tipo=ENTIDAD,
         entidad_id=pieza_id,
         subido_por=subido_por,
+        mime_permitidos=MIME_PERMITIDOS,
+        tamano_maximo_bytes=TAMANO_MAXIMO_BYTES,
     )
-    session.add(archivo)
-    session.flush()
-    return archivo
 
 
 def listar(session: Session, pieza_id: uuid.UUID) -> list[Archivo]:
