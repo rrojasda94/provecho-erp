@@ -7,12 +7,14 @@ import { Insignia } from "@/components/estado/insignia";
 
 import type { Activo } from "../activos-cliente";
 import {
+  agregarRepuestoCompatibleAction,
   cancelarOrdenAction,
   crearDocumentoAction,
   crearOrdenAction,
   crearPlanAction,
   darBajaActivoAction,
   iniciarOrdenAction,
+  quitarRepuestoCompatibleAction,
   realizarOrdenAction,
   registrarCargaAction,
   registrarLecturaAction,
@@ -64,6 +66,12 @@ export type ResumenConsumo = {
   cargas: number;
   promedio_km_gal: string | null;
   anomalas: number;
+};
+
+export type RepuestoCompatible = {
+  id: string;
+  articulo_id: string;
+  notas: string | null;
 };
 
 export type ComprobanteDisponible = {
@@ -518,6 +526,23 @@ function DialogoRealizarOrden({
         Costo (S/)
         <input name="costo" type="number" step="0.01" min={0} />
       </label>
+      <p className="text-xs text-muted-foreground">
+        Repuesto usado (opcional) — descuenta stock de Inventario.
+      </p>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        ID del artículo (repuesto)
+        <input name="repuesto_articulo_id" placeholder="uuid del artículo" />
+      </label>
+      <div className="flex gap-2">
+        <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+          Cantidad
+          <input name="repuesto_cantidad" type="number" step="0.001" min={0} />
+        </label>
+        <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
+          Almacén de salida
+          <input name="almacen_id" placeholder="uuid del almacén" />
+        </label>
+      </div>
     </DialogoFormulario>
   );
 }
@@ -584,6 +609,61 @@ function SeccionOrdenes({
         <ul className="flex flex-col gap-2">
           {ordenes.map((o) => (
             <FilaOrden key={o.id} orden={o} activo={activo} hoy={hoy} />
+          ))}
+        </ul>
+      )}
+    </Seccion>
+  );
+}
+
+function DialogoNuevoRepuesto({ activoId }: { activoId: string }) {
+  return (
+    <DialogoFormulario
+      titulo="Repuesto compatible"
+      disparador="+ Repuesto"
+      accion={agregarRepuestoCompatibleAction}
+    >
+      <input type="hidden" name="activo_id" value={activoId} />
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        ID del artículo (Inventario)
+        <input name="articulo_id" required placeholder="uuid del artículo" />
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Notas
+        <input name="notas" maxLength={255} />
+      </label>
+    </DialogoFormulario>
+  );
+}
+
+function SeccionRepuestos({
+  activo,
+  repuestos,
+}: {
+  activo: Activo;
+  repuestos: RepuestoCompatible[];
+}) {
+  return (
+    <Seccion
+      titulo="Repuestos compatibles"
+      accion={<DialogoNuevoRepuesto activoId={activo.id} />}
+    >
+      {repuestos.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Sin repuestos sugeridos todavía.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {repuestos.map((r) => (
+            <li key={r.id} className="flex items-center justify-between gap-2 text-sm">
+              <span>
+                {r.articulo_id}
+                {r.notas && ` · ${r.notas}`}
+              </span>
+              <BotonAccion
+                ocultos={{ activo_id: activo.id, repuesto_id: r.id }}
+                accion={quitarRepuestoCompatibleAction}
+                etiqueta="Quitar"
+              />
+            </li>
           ))}
         </ul>
       )}
@@ -683,6 +763,7 @@ export function FichaActivoCliente({
   cargas,
   consumo,
   comprobantesDisponibles,
+  repuestosCompatibles,
 }: {
   activo: Activo;
   planes: PlanMantenimiento[];
@@ -692,6 +773,7 @@ export function FichaActivoCliente({
   cargas: CargaCombustible[];
   consumo: ResumenConsumo | null;
   comprobantesDisponibles: ComprobanteDisponible[];
+  repuestosCompatibles: RepuestoCompatible[];
 }) {
   const hoy = new Date().toISOString().slice(0, 10);
 
@@ -710,6 +792,7 @@ export function FichaActivoCliente({
       )}
       <SeccionPlanes activo={activo} planes={planes} />
       <SeccionOrdenes activo={activo} planes={planes} ordenes={ordenes} hoy={hoy} />
+      <SeccionRepuestos activo={activo} repuestos={repuestosCompatibles} />
       <SeccionDocumentos activo={activo} documentos={documentos} />
     </div>
   );

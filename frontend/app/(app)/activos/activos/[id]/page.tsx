@@ -12,6 +12,7 @@ import {
   type LecturaOdometro,
   type OrdenMantenimiento,
   type PlanMantenimiento,
+  type RepuestoCompatible,
   type ResumenConsumo,
 } from "./ficha-cliente";
 
@@ -43,7 +44,7 @@ export default async function FichaActivoPage({
 
   const esVehiculo = activo.tipo === "vehiculo";
 
-  const [planes, ordenes, documentos, lecturas, cargas, consumo, comprobantes] =
+  const [planes, ordenes, documentos, lecturas, cargas, consumo, comprobantes, repuestosCompatibles] =
     await Promise.all([
       apiFetch<PlanMantenimiento[]>(`/api/v1/assets/activos/${id}/planes`, { token }).catch(
         () => [] as PlanMantenimiento[],
@@ -78,6 +79,9 @@ export default async function FichaActivoPage({
             token,
           }).catch(() => [] as ComprobanteDisponible[])
         : Promise.resolve([] as ComprobanteDisponible[]),
+      apiFetch<RepuestoCompatible[]>(`/api/v1/assets/activos/${id}/repuestos-compatibles`, {
+        token,
+      }).catch(() => [] as RepuestoCompatible[]),
     ]);
 
   return (
@@ -90,6 +94,7 @@ export default async function FichaActivoPage({
       cargas={cargas}
       consumo={consumo}
       comprobantesDisponibles={comprobantes}
+      repuestosCompatibles={repuestosCompatibles}
     />
   );
 }

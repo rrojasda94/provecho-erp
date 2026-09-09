@@ -1075,13 +1075,21 @@ producción se hace en cocinas de sucursal. Ver
   anticipación configurable por plan (días y/o kilometraje) y otra vez al
   vencer si nadie lo atendió — una vez por cada uno de los dos avisos, no
   repetido mientras la ventana no cambie (`assets`, ADR-098).
+- **RN-MNT-006** Los repuestos usados al realizar una orden de
+  mantenimiento se registran con cantidad y descuentan stock de
+  `inventory` vía evento (`assets.repuesto_consumido`) — nunca importando su
+  dominio. El consumo real ya ocurrió: sin SKU activo o sin stock
+  suficiente queda una `incidencia_inventario`, la orden no se bloquea
+  (mismo criterio que el consumo de producción, `assets` ADR-098).
 
 ## Repuesto
 
 - **RN-RPT-001** El stock mínimo de un repuesto se define según la
   frecuencia o urgencia de su uso, no con una regla única.
 - **RN-RPT-002** Un repuesto debe tener número de serie o modelo
-  compatible con el equipamiento/vehículo al que corresponde.
+  compatible con el equipamiento/vehículo al que corresponde. Implementado
+  como catálogo de sugerencias (`repuesto_compatibilidad`, `assets`
+  ADR-098): no bloquea registrar en la orden un repuesto no listado.
 - **RN-RPT-003** La adquisición de un repuesto es responsabilidad del
   área de compras y del área de almacén.
 - **RN-RPT-004** Un repuesto puede usarse para repotenciar un equipo

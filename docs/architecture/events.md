@@ -156,6 +156,7 @@ accounting.asiento_generado
 | `assets.documento_por_vencer` | assets | **reports** (gerencia/contabilidad/rrhh) | documento_id, empresa_id, sujeto_tipo, sujeto_id, tipo_documento, fecha_vencimiento | El barrido diario encuentra un `documento_vigencia` (SOAT, licencia de funcionamiento, carné de sanidad, etc.) que entra en su ventana de aviso. Una sola vez por ventana | RN-DOC-001..004 |
 | `assets.documento_vencido` | assets | **reports** | documento_id, empresa_id, sujeto_tipo, sujeto_id, tipo_documento, fecha_vencimiento | El documento ya pasó su fecha de vencimiento | RN-DOC-001..004 |
 | `assets.consumo_anomalo` | assets | **reports** (gerencia/contabilidad) | carga_id, activo_id, empresa_id, rendimiento_km_gal, galones, km_recorridos, registrado_por | Una carga de combustible rinde muy por debajo del promedio reciente del vehículo (RN-VEH-007). Se publica al registrar la carga, no por barrido | RN-VEH-006/007 |
+| `assets.repuesto_consumido` | assets | inventory (`on_repuesto_consumido`, descuenta stock — mismo criterio no bloqueante que `on_consumo_registrado`) | orden_mantenimiento_id, almacen_id, empresa_id, items[{articulo_id, cantidad}] | Al realizar una orden de mantenimiento con repuestos. Sin SKU activo o sin stock suficiente: queda una `incidencia_inventario`, la orden no se frena | RN-MNT-006 |
 
 > **Nota (2026-07-27)**: `sales.venta_entregada` y `marketing.encuesta_enviada`
 > vuelven a la tabla al definirse `PROC-OPE-002` (Cumplimiento de pedido)

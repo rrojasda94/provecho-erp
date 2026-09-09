@@ -14,8 +14,14 @@ from src.modules.assets.infrastructure.models.lectura_odometro import (
 from src.modules.assets.infrastructure.models.orden_mantenimiento import (
     OrdenMantenimiento,
 )
+from src.modules.assets.infrastructure.models.orden_mantenimiento_repuesto import (
+    OrdenMantenimientoRepuesto,
+)
 from src.modules.assets.infrastructure.models.plan_mantenimiento import (
     PlanMantenimiento,
+)
+from src.modules.assets.infrastructure.models.repuesto_compatibilidad import (
+    RepuestoCompatibilidad,
 )
 from src.modules.assets.infrastructure.models.vehiculo import Vehiculo
 
@@ -25,6 +31,8 @@ __all__ = [
     "DocumentoVigencia",
     "LecturaOdometro",
     "OrdenMantenimiento",
+    "OrdenMantenimientoRepuesto",
     "PlanMantenimiento",
+    "RepuestoCompatibilidad",
     "Vehiculo",
 ]

@@ -15,9 +15,11 @@ import src.core.models_registry  # noqa: F401
 from src.core.database import Base
 from src.modules.assets.application import avisos
 from src.modules.assets.domain import rules
+from src.modules.inventory.application import listeners as inventory_listeners
 from src.modules.inventory.infrastructure.models import (
     Articulo,
     CategoriaUdm,
+    IncidenciaInventario,
     UnidadMedida,
 )
 from src.modules.reports.application import listeners as reports_listeners
@@ -188,6 +190,7 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
     TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     monkeypatch.setattr(reports_listeners, "session_factory", TestSession)
     monkeypatch.setattr(users_listeners, "session_factory", TestSession)
+    monkeypatch.setattr(inventory_listeners, "session_factory", TestSession)
 
     from src.seeders.seed import seed
 
@@ -214,6 +217,16 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
         s.add(combustible)
         s.flush()
 
+        repuesto = Articulo(
+            empresa_id=empresa.id,
+            id_interno="REP001",
+            nombre="Filtro de aceite",
+            unidad_medida_id=udm.id,
+            tipo="repuesto",
+        )
+        s.add(repuesto)
+        s.flush()
+
         # Un usuario sin ningún permiso `assets.*` (cocinero) para el 403.
         cocinero = Usuario(username="cocinero_assets", pin_hash=hash_pin("111111"), tipo="humano")
         s.add(cocinero)
@@ -226,6 +239,7 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
             empresa_id=str(empresa.id),
             almacen_id=str(almacen.id),
             articulo_combustible_id=str(combustible.id),
+            articulo_repuesto_id=str(repuesto.id),
         )
         s.commit()
 
@@ -646,3 +660,146 @@ def test_barrido_publica_una_sola_vez_por_ventana(env):
             )
         )
         assert len(entregas) > 0  # gerencia/contabilidad/rrhh sembrados como área
+
+
+# =============================================================================
+# Repuestos: compatibilidad y consumo en la orden de mantenimiento.
+# =============================================================================
+
+
+def test_repuesto_compatible_alta_listado_y_baja(env):
+    client, ids, _ = env
+    h = _token(client)
+    activo = client.post(
+        "/api/v1/assets/activos",
+        headers=h,
+        json={"tipo": "equipamiento", "id_interno": "EQ0006", "nombre": "Batidora"},
+    ).json()
+
+    alta = client.post(
+        f"/api/v1/assets/activos/{activo['id']}/repuestos-compatibles",
+        headers=h,
+        json={"articulo_id": ids["articulo_repuesto_id"], "notas": "cambiar cada 6 meses"},
+    )
+    assert alta.status_code == 201
+    repuesto_id = alta.json()["id"]
+
+    duplicado = client.post(
+        f"/api/v1/assets/activos/{activo['id']}/repuestos-compatibles",
+        headers=h,
+        json={"articulo_id": ids["articulo_repuesto_id"]},
+    )
+    assert duplicado.status_code == 409
+
+    listado = client.get(
+        f"/api/v1/assets/activos/{activo['id']}/repuestos-compatibles", headers=h
+    )
+    assert len(listado.json()) == 1
+
+    baja = client.delete(
+        f"/api/v1/assets/activos/{activo['id']}/repuestos-compatibles/{repuesto_id}", headers=h
+    )
+    assert baja.status_code == 204
+    assert (
+        client.get(
+            f"/api/v1/assets/activos/{activo['id']}/repuestos-compatibles", headers=h
+        ).json()
+        == []
+    )
+
+
+def test_realizar_orden_con_repuestos_descuenta_stock_via_evento(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    activo = client.post(
+        "/api/v1/assets/activos",
+        headers=h,
+        json={"tipo": "equipamiento", "id_interno": "EQ0007", "nombre": "Licuadora"},
+    ).json()
+    orden = client.post(
+        "/api/v1/assets/ordenes-mantenimiento",
+        headers=h,
+        json={"activo_id": activo["id"], "tipo": "adelantado", "motivo_adelanto": "desperfecto"},
+    ).json()
+
+    realizar = client.post(
+        f"/api/v1/assets/ordenes-mantenimiento/{orden['id']}/realizar",
+        headers=h,
+        json={
+            "fecha_realizada": str(date.today()),
+            "almacen_id": ids["almacen_id"],
+            "repuestos": [{"articulo_id": ids["articulo_repuesto_id"], "cantidad": "2"}],
+        },
+    )
+    assert realizar.status_code == 200, realizar.text
+    cuerpo = realizar.json()
+    assert cuerpo["estado"] == "realizada"
+    assert len(cuerpo["repuestos"]) == 1
+    assert cuerpo["repuestos"][0]["nombre_articulo"] == "Filtro de aceite"
+    assert Decimal(cuerpo["repuestos"][0]["cantidad"]) == Decimal("2")
+
+    # El repuesto no tiene SKU activo (no se dio de alta uno en el test): el
+    # listener de `inventory` deja constancia en vez de romper la orden —
+    # prueba de que el evento `assets.repuesto_consumido` sí llegó.
+    with TestSession() as s:
+        incidencias = list(
+            s.scalars(
+                select(IncidenciaInventario).where(
+                    IncidenciaInventario.referencia == orden["id"]
+                )
+            )
+        )
+        assert len(incidencias) == 1
+        assert incidencias[0].tipo == "sin_sku"
+
+
+def test_realizar_orden_con_repuestos_sin_almacen_falla(env):
+    client, ids, _ = env
+    h = _token(client)
+    activo = client.post(
+        "/api/v1/assets/activos",
+        headers=h,
+        json={"tipo": "equipamiento", "id_interno": "EQ0008", "nombre": "Sanguchera"},
+    ).json()
+    orden = client.post(
+        "/api/v1/assets/ordenes-mantenimiento",
+        headers=h,
+        json={"activo_id": activo["id"], "tipo": "adelantado", "motivo_adelanto": "desperfecto"},
+    ).json()
+
+    r = client.post(
+        f"/api/v1/assets/ordenes-mantenimiento/{orden['id']}/realizar",
+        headers=h,
+        json={
+            "fecha_realizada": str(date.today()),
+            "repuestos": [{"articulo_id": ids["articulo_repuesto_id"], "cantidad": "1"}],
+        },
+    )
+    assert r.status_code == 409
+
+
+def test_realizar_orden_con_articulo_que_no_es_repuesto_falla(env):
+    client, ids, _ = env
+    h = _token(client)
+    activo = client.post(
+        "/api/v1/assets/activos",
+        headers=h,
+        json={"tipo": "equipamiento", "id_interno": "EQ0009", "nombre": "Vitrina"},
+    ).json()
+    orden = client.post(
+        "/api/v1/assets/ordenes-mantenimiento",
+        headers=h,
+        json={"activo_id": activo["id"], "tipo": "adelantado", "motivo_adelanto": "desperfecto"},
+    ).json()
+
+    r = client.post(
+        f"/api/v1/assets/ordenes-mantenimiento/{orden['id']}/realizar",
+        headers=h,
+        json={
+            "fecha_realizada": str(date.today()),
+            "almacen_id": ids["almacen_id"],
+            # El artículo "Combustible" es tipo=servicio, no repuesto.
+            "repuestos": [{"articulo_id": ids["articulo_combustible_id"], "cantidad": "1"}],
+        },
+    )
+    assert r.status_code == 409

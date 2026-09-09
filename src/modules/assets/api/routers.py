@@ -18,6 +18,10 @@ from src.modules.assets.application import (
     planes,
     vehiculos,
 )
+from src.modules.assets.application import (
+    repuestos as repuestos_uc,
+)
+from src.modules.assets.application.errors import NoEncontrado
 from src.modules.assets.application.scope import (
     exigir_activo,
     exigir_comprobante_recibido,
@@ -30,6 +34,8 @@ from src.modules.assets.application.scope import (
 from src.modules.assets.domain import rules
 from src.modules.assets.infrastructure.repositories import (
     ActivoRepo,
+    OrdenMantenimientoRepuestoRepo,
+    RepuestoCompatibilidadRepo,
     VehiculoRepo,
     q_comprobantes_disponibles,
 )
@@ -68,6 +74,15 @@ def _plan_out(session: Session, plan) -> schemas.PlanMantenimientoOut:
         salida.estado = estado.estado
         salida.proxima_fecha = estado.proxima_fecha
         salida.proximo_km = estado.proximo_km
+    return salida
+
+
+def _orden_out(session: Session, orden) -> schemas.OrdenMantenimientoOut:
+    salida = schemas.OrdenMantenimientoOut.model_validate(orden)
+    salida.repuestos = [
+        schemas.RepuestoUsadoOut.model_validate(r)
+        for r in OrdenMantenimientoRepuestoRepo(session).list_de_orden(orden.id)
+    ]
     return salida
 
 
@@ -332,7 +347,7 @@ def crear_orden_mantenimiento(
     exigir_activo(session, body.activo_id, tenant)
     orden = ordenes.crear_orden(session, reportado_por=actor.id, **body.model_dump())
     session.commit()
-    return orden
+    return _orden_out(session, orden)
 
 
 @router.get("/ordenes-mantenimiento", response_model=Pagina[schemas.OrdenMantenimientoOut])
@@ -346,11 +361,13 @@ def listar_ordenes_mantenimiento(
 ):
     if activo_id is not None:
         exigir_activo(session, activo_id, tenant)
-    return paginar(
+    pagina = paginar(
         session,
         ordenes.q_ordenes(session, tenant.filtro_empresa(), estado=estado, activo_id=activo_id),
         p,
     )
+    pagina["items"] = [_orden_out(session, o) for o in pagina["items"]]
+    return pagina
 
 
 @router.get("/ordenes-mantenimiento/{orden_id}", response_model=schemas.OrdenMantenimientoOut)
@@ -360,7 +377,7 @@ def ver_orden_mantenimiento(
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return exigir_orden_mantenimiento(session, orden_id, tenant)
+    return _orden_out(session, exigir_orden_mantenimiento(session, orden_id, tenant))
 
 
 @router.post(
@@ -376,7 +393,7 @@ def iniciar_orden_mantenimiento(
     orden = exigir_orden_mantenimiento(session, orden_id, tenant)
     ordenes.iniciar_orden(session, orden)
     session.commit()
-    return orden
+    return _orden_out(session, orden)
 
 
 @router.post(
@@ -395,7 +412,7 @@ def realizar_orden_mantenimiento(
         exigir_comprobante_recibido(session, body.comprobante_id, tenant)
     ordenes.realizar_orden(session, orden, actor_id=actor.id, **body.model_dump())
     session.commit()
-    return orden
+    return _orden_out(session, orden)
 
 
 @router.post(
@@ -412,7 +429,59 @@ def cancelar_orden_mantenimiento(
     orden = exigir_orden_mantenimiento(session, orden_id, tenant)
     ordenes.cancelar_orden(session, orden, actor_id=actor.id, motivo=body.motivo)
     session.commit()
-    return orden
+    return _orden_out(session, orden)
+
+
+# --- Repuestos compatibles -------------------------------------------------------
+@router.post(
+    "/activos/{activo_id}/repuestos-compatibles",
+    response_model=schemas.RepuestoCompatibleOut,
+    status_code=201,
+)
+def agregar_repuesto_compatible(
+    activo_id: uuid.UUID,
+    body: schemas.RepuestoCompatibleCreate,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_activo(session, activo_id, tenant)
+    repuesto = repuestos_uc.agregar_compatible(session, activo_id=activo_id, **body.model_dump())
+    session.commit()
+    return repuesto
+
+
+@router.get(
+    "/activos/{activo_id}/repuestos-compatibles",
+    response_model=list[schemas.RepuestoCompatibleOut],
+)
+def listar_repuestos_compatibles(
+    activo_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_activo(session, activo_id, tenant)
+    return repuestos_uc.q_de_activo(session, activo_id)
+
+
+@router.delete(
+    "/activos/{activo_id}/repuestos-compatibles/{repuesto_id}",
+    status_code=204,
+)
+def quitar_repuesto_compatible(
+    activo_id: uuid.UUID,
+    repuesto_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_activo(session, activo_id, tenant)
+    repuesto = RepuestoCompatibilidadRepo(session).get(repuesto_id)
+    if repuesto is None or repuesto.activo_id != activo_id:
+        raise NoEncontrado("repuesto compatible no encontrado")
+    repuestos_uc.quitar_compatible(session, repuesto)
+    session.commit()
 
 
 # --- Documentos con vencimiento -------------------------------------------------

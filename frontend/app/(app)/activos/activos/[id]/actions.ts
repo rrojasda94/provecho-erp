@@ -189,7 +189,13 @@ export async function realizarOrdenAction(
   const ordenId = texto(formData, "orden_id");
   const fecha = texto(formData, "fecha_realizada");
   const kmAlRealizar = texto(formData, "km_al_realizar");
+  const almacenId = texto(formData, "almacen_id");
+  const repuestoArticuloId = texto(formData, "repuesto_articulo_id");
+  const repuestoCantidad = texto(formData, "repuesto_cantidad");
   if (!fecha) return { error: "La fecha de realización es obligatoria.", ok: false };
+  if (repuestoArticuloId && !almacenId) {
+    return { error: "Registrar un repuesto requiere el almacén de salida.", ok: false };
+  }
   return ejecutar(
     texto(formData, "activo_id"),
     async () =>
@@ -201,9 +207,49 @@ export async function realizarOrdenAction(
           km_al_realizar: kmAlRealizar ? Number(kmAlRealizar) : undefined,
           resultado: texto(formData, "resultado") || undefined,
           costo: texto(formData, "costo") || undefined,
+          almacen_id: almacenId || undefined,
+          repuestos: repuestoArticuloId
+            ? [{ articulo_id: repuestoArticuloId, cantidad: repuestoCantidad || "1" }]
+            : undefined,
         },
       }),
     "No se pudo registrar el mantenimiento realizado.",
+  );
+}
+
+export async function agregarRepuestoCompatibleAction(
+  _previo: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const activoId = texto(formData, "activo_id");
+  const articuloId = texto(formData, "articulo_id");
+  if (!articuloId) return { error: "El artículo es obligatorio.", ok: false };
+  return ejecutar(
+    activoId,
+    async () =>
+      apiFetch(`/api/v1/assets/activos/${activoId}/repuestos-compatibles`, {
+        token: await token(),
+        metodo: "POST",
+        cuerpo: { articulo_id: articuloId, notas: texto(formData, "notas") || undefined },
+      }),
+    "No se pudo agregar el repuesto compatible.",
+  );
+}
+
+export async function quitarRepuestoCompatibleAction(
+  _previo: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const activoId = texto(formData, "activo_id");
+  const repuestoId = texto(formData, "repuesto_id");
+  return ejecutar(
+    activoId,
+    async () =>
+      apiFetch(`/api/v1/assets/activos/${activoId}/repuestos-compatibles/${repuestoId}`, {
+        token: await token(),
+        metodo: "DELETE",
+      }),
+    "No se pudo quitar el repuesto compatible.",
   );
 }
 

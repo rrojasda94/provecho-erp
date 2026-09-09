@@ -17389,6 +17389,13 @@
             "title": "Reportado Por",
             "type": "string"
           },
+          "repuestos": {
+            "items": {
+              "$ref": "#/components/schemas/RepuestoUsadoOut"
+            },
+            "title": "Repuestos",
+            "type": "array"
+          },
           "resultado": {
             "anyOf": [
               {
@@ -17427,6 +17434,18 @@
       },
       "OrdenMantenimientoRealizar": {
         "properties": {
+          "almacen_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Id"
+          },
           "comprobante_id": {
             "anyOf": [
               {
@@ -17471,6 +17490,13 @@
               }
             ],
             "title": "Km Al Realizar"
+          },
+          "repuestos": {
+            "items": {
+              "$ref": "#/components/schemas/RepuestoUsadoIn"
+            },
+            "title": "Repuestos",
+            "type": "array"
           },
           "resultado": {
             "anyOf": [
@@ -26673,6 +26699,158 @@
           "monto_lote"
         ],
         "title": "ReportePosIn",
+        "type": "object"
+      },
+      "RepuestoCompatibleCreate": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "notas": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notas"
+          }
+        },
+        "required": [
+          "articulo_id"
+        ],
+        "title": "RepuestoCompatibleCreate",
+        "type": "object"
+      },
+      "RepuestoCompatibleOut": {
+        "properties": {
+          "activo_id": {
+            "format": "uuid",
+            "title": "Activo Id",
+            "type": "string"
+          },
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "notas": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notas"
+          }
+        },
+        "required": [
+          "id",
+          "activo_id",
+          "articulo_id",
+          "notas"
+        ],
+        "title": "RepuestoCompatibleOut",
+        "type": "object"
+      },
+      "RepuestoUsadoIn": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,11}0*$)\\d{0,7}\\.\\d{0,3}0*$)",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad"
+          },
+          "costo_unitario": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Unitario"
+          }
+        },
+        "required": [
+          "articulo_id",
+          "cantidad"
+        ],
+        "title": "RepuestoUsadoIn",
+        "type": "object"
+      },
+      "RepuestoUsadoOut": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "costo_unitario": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Unitario"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre_articulo": {
+            "title": "Nombre Articulo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "nombre_articulo",
+          "cantidad",
+          "costo_unitario"
+        ],
+        "title": "RepuestoUsadoOut",
         "type": "object"
       },
       "ReservaOut": {
@@ -36170,6 +36348,165 @@
           }
         ],
         "summary": "Listar Planes De Activo",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/v1/assets/activos/{activo_id}/repuestos-compatibles": {
+      "get": {
+        "operationId": "listar_repuestos_compatibles_api_v1_assets_activos__activo_id__repuestos_compatibles_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Activo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RepuestoCompatibleOut"
+                  },
+                  "title": "Response Listar Repuestos Compatibles Api V1 Assets Activos  Activo Id  Repuestos Compatibles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Repuestos Compatibles",
+        "tags": [
+          "assets"
+        ]
+      },
+      "post": {
+        "operationId": "agregar_repuesto_compatible_api_v1_assets_activos__activo_id__repuestos_compatibles_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Activo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepuestoCompatibleCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepuestoCompatibleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agregar Repuesto Compatible",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/v1/assets/activos/{activo_id}/repuestos-compatibles/{repuesto_id}": {
+      "delete": {
+        "operationId": "quitar_repuesto_compatible_api_v1_assets_activos__activo_id__repuestos_compatibles__repuesto_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "activo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Activo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "repuesto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Repuesto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quitar Repuesto Compatible",
         "tags": [
           "assets"
         ]

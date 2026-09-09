@@ -222,12 +222,42 @@ class OrdenMantenimientoCreate(BaseModel):
     descripcion: str | None = None
 
 
+class RepuestoUsadoIn(BaseModel):
+    articulo_id: uuid.UUID
+    cantidad: Decimal = Field(gt=0, max_digits=10, decimal_places=3)
+    costo_unitario: Decimal | None = Field(default=None, ge=0)
+
+
 class OrdenMantenimientoRealizar(BaseModel):
     fecha_realizada: date
     km_al_realizar: int | None = Field(default=None, ge=0)
     resultado: str | None = None
     costo: Decimal | None = Field(default=None, ge=0)
     comprobante_id: uuid.UUID | None = None
+    almacen_id: uuid.UUID | None = None
+    repuestos: list[RepuestoUsadoIn] = Field(default_factory=list)
+
+
+class RepuestoUsadoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    articulo_id: uuid.UUID
+    nombre_articulo: str
+    cantidad: Decimal
+    costo_unitario: Decimal | None
+
+
+class RepuestoCompatibleCreate(BaseModel):
+    articulo_id: uuid.UUID
+    notas: str | None = Field(default=None, max_length=255)
+
+
+class RepuestoCompatibleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    activo_id: uuid.UUID
+    articulo_id: uuid.UUID
+    notas: str | None
 
 
 class OrdenMantenimientoCancelar(BaseModel):
@@ -251,6 +281,7 @@ class OrdenMantenimientoOut(BaseModel):
     costo: Decimal | None
     comprobante_id: uuid.UUID | None
     estado: str
+    repuestos: list[RepuestoUsadoOut] = Field(default_factory=list)
 
 
 class DocumentoVigenciaCreate(BaseModel):

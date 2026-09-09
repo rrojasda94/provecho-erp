@@ -23,12 +23,14 @@ vencen.
 vehículo, calcula rendimiento y detecta consumo anómalo — RN-VEH-006/007),
 `plan_mantenimiento` (frecuencia por días y/o km, con anticipación de aviso
 configurable — RN-MNT-001/005), `orden_mantenimiento` (ejecución de un plan
-o adelanto por avería — RN-MNT-002/003/004), `documento_vigencia`
+o adelanto por avería — RN-MNT-002/003/004), `orden_mantenimiento_repuesto`
+(repuestos consumidos al realizar una orden, RN-MNT-006),
+`repuesto_compatibilidad` (qué artículos de `inventory` sirven para un
+activo — catálogo de sugerencias, no bloquea), `documento_vigencia`
 (polimórfico: sujeto `activo`/`sucursal`/`empresa`/`trabajador` — RN-DOC-001..004).
 
-`flota` y `repuesto_compatibilidad` quedan diferidos (deuda declarada,
-`docs/roadmap/deuda/modulo-assets.md`). Detalle completo en
-`docs/architecture/data-model.md` §Recursos.
+`flota` queda diferida (deuda declarada, `docs/roadmap/deuda/modulo-assets.md`).
+Detalle completo en `docs/architecture/data-model.md` §Recursos.
 
 ## Casos de uso
 
@@ -56,15 +58,29 @@ o adelanto por avería — RN-MNT-002/003/004), `documento_vigencia`
 - Barrido diario (`assets.barrer_vencimientos`, Celery beat 06:30) que
   evalúa todos los planes y documentos activos y publica el aviso que
   corresponda, una sola vez por ventana.
+- Marcar qué repuestos de `inventory` son compatibles con un activo (solo
+  sugerencia: registrar un repuesto no listado en la orden igual funciona).
+  Al realizar una orden con repuestos, valida cada `articulo_id` contra
+  `inventory.application.queries_publicas.articulo_resumen` (tipo debe ser
+  `"repuesto"`), congela su nombre en la línea y publica
+  `assets.repuesto_consumido` para que `inventory` descuente stock — nunca
+  importa su dominio.
 
 ## Eventos
 
-Publica (consumidos por `reports`, que se suscribe a todo su catálogo sin
-que `assets` necesite `listeners.py` propio):
+Publica hacia `reports` (se suscribe a todo su catálogo sin que `assets`
+necesite `listeners.py` propio):
 
 - `assets.mantenimiento_proximo` / `assets.mantenimiento_vencido`
 - `assets.documento_por_vencer` / `assets.documento_vencido`
 - `assets.consumo_anomalo`
+
+Publica hacia `inventory` (`on_repuesto_consumido`, calca el criterio de
+`on_consumo_registrado`: el consumo ya ocurrió, el stock teórico no lo
+bloquea — un artículo sin SKU o sin stock deja una `incidencia_inventario`,
+nunca rompe la orden):
+
+- `assets.repuesto_consumido`
 
 Detalle de payload en `docs/architecture/events.md`.
 
@@ -78,9 +94,11 @@ Permisos: `assets.leer`, `assets.gestionar` (activos, planes, documentos),
 - `POST/GET /activos/{id}/lecturas-odometro`.
 - `POST/GET /activos/{id}/cargas-combustible`, `GET /activos/{id}/consumo`.
 - `GET /comprobantes-disponibles`.
+- `POST/GET/DELETE /activos/{id}/repuestos-compatibles[/{repuesto_id}]`.
 - `POST/PATCH /planes`, `GET /planes`, `GET /activos/{id}/planes`.
 - `POST /ordenes-mantenimiento`, `GET /ordenes-mantenimiento[/{id}]`,
-  `POST /ordenes-mantenimiento/{id}/{iniciar|realizar|cancelar}`.
+  `POST /ordenes-mantenimiento/{id}/{iniciar|realizar|cancelar}` (`realizar`
+  acepta `almacen_id` + `repuestos` para descontar stock).
 - `POST/GET/PATCH /documentos`, `GET /documentos/{id}`,
   `POST /documentos/{id}/renovar`, `POST/GET /documentos/{id}/adjuntos`.
 - `GET /cronograma`.
@@ -99,5 +117,9 @@ RN-DOC-001..004 en `docs/domain/business-rules.md`.
   público, nombre/RUC del proveedor de servicio).
 - `rrhh.application.queries_publicas.trabajador_resumen` (contrato público
   nuevo, para validar el sujeto `trabajador` de un documento).
+- `inventory.application.queries_publicas.articulo_resumen` (contrato
+  público existente, para validar el repuesto de una orden).
 
-Nunca al revés: ningún otro módulo importa el dominio de `assets` todavía.
+`inventory.application.listeners.on_repuesto_consumido` consume
+`assets.repuesto_consumido` — la única dirección en la que otro módulo
+reacciona a `assets` hoy, siempre vía evento, nunca importando su dominio.

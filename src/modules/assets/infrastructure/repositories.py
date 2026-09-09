@@ -12,7 +12,9 @@ from src.modules.assets.infrastructure.models import (
     DocumentoVigencia,
     LecturaOdometro,
     OrdenMantenimiento,
+    OrdenMantenimientoRepuesto,
     PlanMantenimiento,
+    RepuestoCompatibilidad,
     Vehiculo,
 )
 from src.shared.models import Comprobante
@@ -211,6 +213,51 @@ class OrdenMantenimientoRepo:
         if activo_id is not None:
             q = q.where(OrdenMantenimiento.activo_id == activo_id)
         return q
+
+
+class RepuestoCompatibilidadRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, repuesto_id: uuid.UUID) -> RepuestoCompatibilidad | None:
+        return self.s.get(RepuestoCompatibilidad, repuesto_id)
+
+    def add(self, repuesto: RepuestoCompatibilidad) -> RepuestoCompatibilidad:
+        self.s.add(repuesto)
+        self.s.flush()
+        return repuesto
+
+    def eliminar(self, repuesto: RepuestoCompatibilidad) -> None:
+        self.s.delete(repuesto)
+
+    def q_de_activo(self, activo_id: uuid.UUID):
+        return (
+            select(RepuestoCompatibilidad)
+            .where(RepuestoCompatibilidad.activo_id == activo_id)
+            .order_by(RepuestoCompatibilidad.created_at)
+        )
+
+    def list_de_activo(self, activo_id: uuid.UUID) -> list[RepuestoCompatibilidad]:
+        return list(self.s.scalars(self.q_de_activo(activo_id)))
+
+
+class OrdenMantenimientoRepuestoRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def add(self, item: OrdenMantenimientoRepuesto) -> OrdenMantenimientoRepuesto:
+        self.s.add(item)
+        self.s.flush()
+        return item
+
+    def list_de_orden(self, orden_id: uuid.UUID) -> list[OrdenMantenimientoRepuesto]:
+        return list(
+            self.s.scalars(
+                select(OrdenMantenimientoRepuesto)
+                .where(OrdenMantenimientoRepuesto.orden_mantenimiento_id == orden_id)
+                .order_by(OrdenMantenimientoRepuesto.created_at)
+            )
+        )
 
 
 class DocumentoVigenciaRepo:

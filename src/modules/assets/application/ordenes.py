@@ -7,17 +7,25 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from src.core.events import event_bus
 from src.modules.assets.application import vehiculos as vehiculos_uc
 from src.modules.assets.application.errors import NoEncontrado, ReglaNegocio
 from src.modules.assets.domain import rules
-from src.modules.assets.infrastructure.models import OrdenMantenimiento
+from src.modules.assets.infrastructure.models import (
+    OrdenMantenimiento,
+    OrdenMantenimientoRepuesto,
+)
 from src.modules.assets.infrastructure.repositories import (
     ActivoRepo,
     OrdenMantenimientoRepo,
+    OrdenMantenimientoRepuestoRepo,
     PlanMantenimientoRepo,
     VehiculoRepo,
 )
+from src.modules.inventory.application.queries_publicas import articulo_resumen
 from src.shared import auditoria
+
+TIPO_ARTICULO_REPUESTO = "repuesto"
 
 
 def crear_orden(
@@ -68,6 +76,53 @@ def iniciar_orden(session: Session, orden: OrdenMantenimiento) -> OrdenMantenimi
     return orden
 
 
+def _registrar_repuestos(
+    session: Session,
+    orden: OrdenMantenimiento,
+    *,
+    empresa_id: uuid.UUID | None,
+    almacen_id: uuid.UUID | None,
+    repuestos: list[dict],
+) -> None:
+    """Deja constancia de los repuestos usados y descuenta stock de
+    `inventory` — vía evento, nunca importando su dominio (RN-MNT-006)."""
+    if almacen_id is None:
+        raise ReglaNegocio("registrar repuestos requiere indicar el almacén de salida")
+    repo = OrdenMantenimientoRepuestoRepo(session)
+    items_evento = []
+    for item in repuestos:
+        articulo_id = item["articulo_id"]
+        cantidad = item["cantidad"]
+        if cantidad <= 0:
+            raise ReglaNegocio("la cantidad de un repuesto debe ser mayor a cero")
+        resumen = articulo_resumen(session, articulo_id)
+        if resumen is None:
+            raise NoEncontrado(f"artículo de repuesto no encontrado: {articulo_id}")
+        if resumen["tipo"] != TIPO_ARTICULO_REPUESTO:
+            raise ReglaNegocio(f"el artículo '{resumen['nombre']}' no es un repuesto")
+        repo.add(
+            OrdenMantenimientoRepuesto(
+                orden_mantenimiento_id=orden.id,
+                articulo_id=articulo_id,
+                nombre_articulo=resumen["nombre"],
+                cantidad=cantidad,
+                costo_unitario=item.get("costo_unitario"),
+            )
+        )
+        items_evento.append({"articulo_id": str(articulo_id), "cantidad": str(cantidad)})
+
+    event_bus.publish(
+        "assets.repuesto_consumido",
+        {
+            "orden_mantenimiento_id": str(orden.id),
+            "almacen_id": str(almacen_id),
+            "empresa_id": str(empresa_id) if empresa_id else None,
+            "items": items_evento,
+        },
+        session=session,
+    )
+
+
 def realizar_orden(
     session: Session,
     orden: OrdenMantenimiento,
@@ -78,6 +133,8 @@ def realizar_orden(
     resultado: str | None = None,
     costo: Decimal | None = None,
     comprobante_id: uuid.UUID | None = None,
+    almacen_id: uuid.UUID | None = None,
+    repuestos: list[dict] | None = None,
 ) -> OrdenMantenimiento:
     if not rules.puede_realizar_orden(orden.estado):
         raise ReglaNegocio(f"la orden está {orden.estado}: no se puede realizar")
@@ -91,6 +148,15 @@ def realizar_orden(
     orden.comprobante_id = comprobante_id
 
     activo = ActivoRepo(session).get(orden.activo_id)
+
+    if repuestos:
+        _registrar_repuestos(
+            session,
+            orden,
+            empresa_id=activo.empresa_id if activo else None,
+            almacen_id=almacen_id,
+            repuestos=repuestos,
+        )
     if activo is not None and activo.estado != "de_baja":
         activo.estado = "operativo"
 

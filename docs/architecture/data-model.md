@@ -145,8 +145,15 @@ erDiagram
   nullable, único), estado (`programada` | `en_curso` | `realizada` |
   `cancelada`). Al realizarse con `plan_id`, actualiza
   `ultima_fecha`/`ultimo_km` del plan y limpia sus avisos.
-  **`repuesto_compatibilidad` queda diferida** (deuda declarada): sin
-  control de repuestos todavía, es una tabla sin quien la use.
+- **orden_mantenimiento_repuesto**: orden_mantenimiento_id, articulo_id (sin
+  FK — `inventory`), nombre_articulo (congelado al consumir), cantidad,
+  costo_unitario (opcional). Al realizarse la orden, publica
+  `assets.repuesto_consumido` para que `inventory` descuente stock
+  (RN-MNT-006).
+- **repuesto_compatibilidad**: activo_id, articulo_id (sin FK —
+  `inventory`), notas. `UniqueConstraint(activo_id, articulo_id)`. Catálogo
+  de sugerencias para la pantalla de alta de una orden (RN-RPT-002): un
+  repuesto no listado igual se puede registrar.
 - **documento_vigencia** — permisos y certificados con fecha de vencimiento
   (SOAT, revisión técnica, licencia de funcionamiento, carné de sanidad,
   licencia de conducir, etc.; ADR-098, pedido del usuario — no existía
