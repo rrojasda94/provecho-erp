@@ -15,6 +15,9 @@ TIPOS_MOVIMIENTO = {
     # personal (RN-COM-025). Separada de `consumo_venta` porque no tiene
     # ingreso detrás y su costo es gasto, no costo de ventas.
     "consumo_interno",
+    # Repuesto usado en una orden de mantenimiento de `assets` (RN-MNT-006).
+    # Mismo criterio que `consumo_interno`: gasto, no costo de ventas.
+    "consumo_mantenimiento",
     "produccion_entrada",
     "ajuste",
     "devolucion",
@@ -83,6 +86,7 @@ TIPOS_SALIDA = {
     "consumo_venta",
     "consumo_produccion",
     "consumo_interno",
+    "consumo_mantenimiento",
 }
 # `ajuste` y `devolucion` admiten signo variable (lo fija el motivo/flujo).
 

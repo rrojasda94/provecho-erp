@@ -15,6 +15,7 @@ from src.modules.purchases.application.scope import (
     exigir_orden_compra,
     exigir_proveedor,
 )
+from src.modules.purchases.infrastructure.repositories import RequerimientoActivoRepo
 from src.modules.users.api.deps import (
     check_permission,
     get_current_user,
@@ -103,6 +104,26 @@ def crear_orden_compra(
     return orden
 
 
+@router.post(
+    "/ordenes-compra-activo", response_model=schemas.OrdenCompraOut, status_code=201
+)
+def crear_orden_compra_activo(
+    body: schemas.OrdenCompraActivoCreate,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_proveedor(session, body.proveedor_id, tenant)
+    orden = ordenes.crear_orden_compra_activo(
+        session,
+        empresa_id=tenant.empresa(),
+        creado_por=actor.id,
+        **body.model_dump(),
+    )
+    session.commit()
+    return _con_items(session, orden)
+
+
 @router.get("/ordenes-compra", response_model=Pagina[schemas.OrdenCompraOut])
 def listar_ordenes_compra(
     empresa_id: uuid.UUID | None = None,
@@ -120,6 +141,13 @@ def listar_ordenes_compra(
 
 def _con_items(session: Session, orden) -> schemas.OrdenCompraOut:
     salida = schemas.OrdenCompraOut.model_validate(orden)
+    if orden.tipo == "activo":
+        requerimiento = RequerimientoActivoRepo(session).get(orden.requerimiento_activo_id)
+        if requerimiento is not None:
+            salida.requerimiento_activo = schemas.RequerimientoActivoOut.model_validate(
+                requerimiento
+            )
+        return salida
     salida.items = [
         schemas.OrdenCompraItemOut.model_validate(it)
         for it in ordenes.items_de_orden_compra(session, orden.id)
@@ -231,6 +259,22 @@ def recibir_orden_compra(
     )
     session.commit()
     return recepcion
+
+
+@router.post(
+    "/ordenes-compra/{orden_compra_id}/recibir-activo",
+    response_model=schemas.OrdenCompraOut,
+)
+def recibir_orden_compra_activo(
+    orden_compra_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(RECEPCIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_orden_compra(session, orden_compra_id, tenant)
+    orden = ordenes.recibir_orden_compra_activo(session, orden_compra_id, recibido_por=actor.id)
+    session.commit()
+    return _con_items(session, orden)
 
 
 @router.post("/ordenes-compra/{orden_compra_id}/anular", response_model=schemas.OrdenCompraOut)
