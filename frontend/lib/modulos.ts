@@ -13,6 +13,7 @@ import {
   Megaphone,
   Package,
   Receipt,
+  Route,
   ScrollText,
   SlidersHorizontal,
   Users,
@@ -97,6 +98,19 @@ export const MODULOS: Modulo[] = [
     prefijoPermiso: "kds.",
     area: "operacion",
     Icono: ChefHat,
+  },
+  {
+    clave: "delivery",
+    nombre: "Reparto",
+    descripcion: "Tablero de despacho, repartidores propios e historial",
+    href: "/delivery",
+    prefijoPermiso: "delivery.",
+    // Exacto y no por prefijo: un repartidor con `delivery.repartir` no
+    // despacha, y con el prefijo vería esta ficha además de "Mi reparto".
+    // `delivery.leer` es lo que tienen cajero, despachador y supervisor.
+    permiso: "delivery.leer",
+    area: "operacion",
+    Icono: Route,
   },
   {
     clave: "reparto",

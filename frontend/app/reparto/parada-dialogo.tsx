@@ -8,13 +8,13 @@ import {
   apiDelivery,
   ETIQUETA_MOTIVO,
   MOTIVOS_FALLO,
-  type MiParada,
   type MotivoFallo,
+  type ParadaReparto,
 } from "@/lib/delivery";
 
 type Props = {
   abierto: boolean;
-  parada: MiParada | null;
+  parada: ParadaReparto | null;
   modo: "entregar" | "fallar";
   onCerrar: () => void;
   onResuelta: () => void;

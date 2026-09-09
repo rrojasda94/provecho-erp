@@ -19,6 +19,11 @@ from src.modules.delivery.application.seguimiento import token_expira_en
 from src.modules.delivery.domain import rules
 from src.modules.delivery.infrastructure.models import Entrega, Repartidor
 from src.modules.delivery.infrastructure.repositories import EntregaRepo
+from src.modules.rrhh.application.queries_publicas import cuenta_de_trabajador
+from src.modules.sales.application.queries_publicas import (
+    contacto_de_cliente,
+    venta_para_reparto,
+)
 from src.shared.auditoria import registrar as auditar
 
 
@@ -241,3 +246,57 @@ def cancelar_por_venta_anulada(session: Session, venta_id: uuid.UUID) -> None:
     entrega.estado = "cancelada"
     entrega.token_expira_at = token_expira_en()
     session.flush()
+
+
+def historial_enriquecido(session: Session, pagina: dict) -> dict:
+    """La misma página que arma `paginar()` para `GET /delivery/entregas`,
+    con la venta y el repartidor ya resueltos — el historial no llama a
+    `sales` ni a `rrhh` por su cuenta (mismo criterio que
+    `mi_reparto.ruta_con_paradas`)."""
+    pagina["items"] = [_con_venta_y_repartidor(session, e) for e in pagina["items"]]
+    return pagina
+
+
+def _nombre_repartidor(session: Session, repartidor_id: uuid.UUID | None) -> str | None:
+    if repartidor_id is None:
+        return None
+    repartidor = session.get(Repartidor, repartidor_id)
+    if repartidor is None:
+        return None
+    cuenta = cuenta_de_trabajador(session, repartidor.trabajador_id)
+    return cuenta["nombre"] if cuenta else None
+
+
+def _con_venta_y_repartidor(session: Session, entrega: Entrega) -> dict:
+    venta = venta_para_reparto(session, entrega.venta_id)
+    contacto = (
+        contacto_de_cliente(session, venta["cliente_id"])
+        if venta and venta["cliente_id"]
+        else None
+    )
+    return {
+        "id": entrega.id,
+        "venta_id": entrega.venta_id,
+        "sucursal_id": entrega.sucursal_id,
+        "ruta_id": entrega.ruta_id,
+        "repartidor_id": entrega.repartidor_id,
+        "repartidor_nombre": _nombre_repartidor(session, entrega.repartidor_id),
+        "orden_parada": entrega.orden_parada,
+        "estado": entrega.estado,
+        "intentos": entrega.intentos,
+        "eta_at": entrega.eta_at,
+        "tramo_distancia_m": entrega.tramo_distancia_m,
+        "tramo_duracion_seg": entrega.tramo_duracion_seg,
+        "destino_lat": entrega.destino_lat,
+        "destino_lng": entrega.destino_lng,
+        "numero_orden": venta["numero_orden"] if venta else None,
+        "direccion_entrega": venta["direccion_entrega"] if venta else None,
+        "cliente_nombre": contacto["nombre"] if contacto else None,
+        "fecha_entrega": entrega.fecha_entrega,
+        "entregado_por": entrega.entregado_por,
+        "motivo_fallo": entrega.motivo_fallo,
+        "motivo_detalle": entrega.motivo_detalle,
+        "resultado_lat": entrega.resultado_lat,
+        "resultado_lng": entrega.resultado_lng,
+        "observacion": entrega.observacion,
+    }

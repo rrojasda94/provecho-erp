@@ -243,6 +243,19 @@ def test_crear_repartidor_duplicado_es_conflicto(env):
     assert r.status_code == 409
 
 
+def test_listar_repartidores_trae_el_nombre_de_la_cuenta(env):
+    client, ids, headers, _ = env
+    r = client.get(
+        "/api/v1/delivery/repartidores",
+        params={"sucursal_id": ids["sucursal_id"]},
+        headers=headers["aprobador1"],
+    )
+    assert r.status_code == 200
+    por_id = {rep["id"]: rep["nombre"] for rep in r.json()}
+    assert por_id[ids["repartidor1_id"]] == "Kevin Test"
+    assert por_id[ids["repartidor2_id"]] == "Ana Test"
+
+
 def test_repartidor_sin_permiso_de_despacho_no_puede_listar_todos(env):
     client, ids, headers, _ = env
     # `kevinrep` solo tiene `delivery.repartir`, ni leer ni despachar.
@@ -296,6 +309,35 @@ def test_tablero_no_muestra_pedido_a_medio_preparar(env):
         headers=headers["aprobador1"],
     )
     assert r.json()["sin_asignar"] == []
+
+
+def test_tablero_muestra_el_repartidor_y_las_paradas_de_cada_ruta(env):
+    client, ids, headers, TestSession = env
+    with TestSession() as s:
+        venta = _crear_venta_delivery(s, ids)
+        venta_id = str(venta.id)
+
+    r1 = client.post(
+        "/api/v1/delivery/rutas",
+        headers=headers["aprobador1"],
+        json={
+            "sucursal_id": ids["sucursal_id"],
+            "repartidor_id": ids["repartidor1_id"],
+            "venta_ids": [venta_id],
+        },
+    )
+    assert r1.status_code == 201, r1.text
+
+    r2 = client.get(
+        "/api/v1/delivery/tablero",
+        params={"sucursal_id": ids["sucursal_id"]},
+        headers=headers["aprobador1"],
+    )
+    assert r2.status_code == 200
+    ruta = next(r for r in r2.json()["rutas"] if r["repartidor_id"] == ids["repartidor1_id"])
+    assert ruta["repartidor_nombre"] == "Kevin Test"
+    assert len(ruta["paradas"]) == 1
+    assert ruta["paradas"][0]["venta_id"] == venta_id
 
 
 # --- Crear ruta ---------------------------------------------------------------
@@ -459,6 +501,29 @@ def test_iniciar_entregar_marca_la_venta_entregada_por_evento(env):
         assert item.estado_preparacion == "entregado"
         venta = s.get(Venta, uuid.UUID(venta_id))
         assert venta.repartidor_externo_plataforma is None
+
+
+def test_historial_de_entregas_trae_la_venta_y_el_repartidor_resueltos(env):
+    client, ids, headers, TestSession = env
+    venta_id, ruta_id, entrega_id = _crear_y_asignar_ruta(client, ids, headers, TestSession)
+    client.post(f"/api/v1/delivery/rutas/{ruta_id}/iniciar", headers=headers["aprobador1"])
+    r = client.post(
+        f"/api/v1/delivery/entregas/{entrega_id}/entregar",
+        headers=headers["kevinrep"],
+        json={"lat": "-6.49", "lng": "-76.36"},
+    )
+    assert r.status_code == 200, r.text
+
+    r2 = client.get(
+        "/api/v1/delivery/entregas",
+        params={"sucursal_id": ids["sucursal_id"]},
+        headers=headers["aprobador1"],
+    )
+    assert r2.status_code == 200
+    fila = next(e for e in r2.json()["items"] if e["venta_id"] == venta_id)
+    assert fila["numero_orden"] is not None
+    assert fila["direccion_entrega"] == "Jr. Amazonas 123"
+    assert fila["repartidor_nombre"] == "Kevin Test"
 
 
 def test_repartidor_ajeno_no_puede_entregar_la_ruta_de_otro(env):

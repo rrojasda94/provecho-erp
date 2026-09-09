@@ -45,3 +45,29 @@ Declarada al construir el slice 4 (PWA del repartidor):
   herramienta de diseño a mano en ese momento) solo para que el manifiesto
   tenga íconos válidos de 192/512 y la PWA sea instalable — cambiarlos por
   el ícono real de Provecho/Majambo es una tarea de diseño, no de código.
+
+Declarada al construir el slice 5 (tablero de despacho):
+
+- ⬜ **El tablero no reordena, agrega ni quita paradas de una ruta ya
+  creada** (`PUT /delivery/rutas/{id}/paradas` existe y lo usa el backend
+  al reintentar, pero no hay diálogo de "editar ruta" en
+  `app/(app)/delivery/`). Hoy, para cambiar una ruta planificada, se
+  cancela y se crea de nuevo.
+- ⬜ **El despacho no puede forzar iniciar/finalizar una ruta desde el
+  tablero**, aunque el permiso lo permite (`delivery.despachar` alcanza
+  para `POST .../iniciar|finalizar`, no solo el repartidor dueño):
+  `tarjeta-ruta.tsx` solo ofrece "Cancelar". Sirve para el caso normal
+  —el repartidor inicia y finaliza desde la PWA— pero no para un
+  teléfono sin batería o una ruta que hay que cerrar a mano.
+- ⬜ **`tablero.rutas_vivas` y `entregas.historial_enriquecido` resuelven
+  la venta y el repartidor de cada fila con una llamada aparte** (N+1):
+  barato con pocas rutas vivas y una página de historial acotada
+  (`page_size` máx. 100), pero una consulta agregada sería más liviana si
+  el volumen crece. Mismo costo que ya aceptó `mi_reparto.ruta_con_paradas`
+  en el slice 4.
+- ⬜ **El mapa de una ruta (`mapa-rutas.tsx`) no dibuja el trazo del
+  ruteo heurístico**, solo el de Google (`ruta.polyline`, que la
+  heurística nunca calcula). Se ven los pines numerados igual, sin la
+  línea entre ellos — una polilínea aproximada por distancia en línea
+  recta sería confusa (no es la calle real) y se prefirió no dibujar
+  nada antes que dibujar algo falso.

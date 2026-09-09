@@ -123,7 +123,7 @@ def crear_repartidor(
         telefono=body.telefono,
     )
     session.commit()
-    return repartidor
+    return repartidores.con_nombre(session, repartidor)
 
 
 @router.get("/repartidores", response_model=list[schemas.RepartidorOut])
@@ -137,12 +137,16 @@ def listar_repartidores(
     check_permission(session, usuario, LEER, DESPACHAR)
     if sucursal_id is not None:
         tenant.exigir_sucursal(sucursal_id)
-        return RepartidorRepo(session).list(sucursal_id, activo=activo)
-    sucursales = None if tenant.superusuario else tenant.sucursal_ids
-    repo = RepartidorRepo(session)
-    if sucursales is None:
-        return repo.list(activo=activo)
-    return [r for r in repo.list(activo=activo) if r.sucursal_id in sucursales]
+        encontrados = RepartidorRepo(session).list(sucursal_id, activo=activo)
+    else:
+        sucursales = None if tenant.superusuario else tenant.sucursal_ids
+        repo = RepartidorRepo(session)
+        encontrados = (
+            repo.list(activo=activo)
+            if sucursales is None
+            else [r for r in repo.list(activo=activo) if r.sucursal_id in sucursales]
+        )
+    return [repartidores.con_nombre(session, r) for r in encontrados]
 
 
 @router.patch("/repartidores/{repartidor_id}", response_model=schemas.RepartidorOut)
@@ -158,7 +162,7 @@ def editar_repartidor(
         tenant.exigir_sucursal(body.sucursal_id)
     repartidor = repartidores.editar(session, repartidor_id, **body.model_dump())
     session.commit()
-    return repartidor
+    return repartidores.con_nombre(session, repartidor)
 
 
 # --- Tablero de despacho -------------------------------------------------------
@@ -314,7 +318,7 @@ def registrar_posicion(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/mi/rutas", response_model=list[schemas.MiRutaOut])
+@router.get("/mi/rutas", response_model=list[schemas.RutaConParadasOut])
 def mis_rutas(
     actor: Usuario = Depends(require_permission(REPARTIR)),
     session: Session = Depends(get_db),
@@ -414,7 +418,7 @@ def listar_entregas(
     sucursales = _sucursales_del_alcance(tenant, sucursal_id)
     desde_dt = fechas.inicio_dia_utc(desde) if desde else None
     hasta_dt = fechas.fin_dia_utc(hasta) if hasta else None
-    return paginar(
+    pagina = paginar(
         session,
         EntregaRepo(session).q_historial(
             sucursales,
@@ -425,6 +429,7 @@ def listar_entregas(
         ),
         p,
     )
+    return entregas.historial_enriquecido(session, pagina)
 
 
 @router.get("/entregas/{entrega_id}/evidencia")

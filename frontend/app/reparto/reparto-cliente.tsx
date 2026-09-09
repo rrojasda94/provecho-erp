@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { RegionDeAviso } from "@/components/estado/region-de-aviso";
 import { ErrorApi } from "@/lib/cliente-api";
-import { apiDelivery, type MiRuta } from "@/lib/delivery";
+import { apiDelivery, type RutaConParadas } from "@/lib/delivery";
 
 import RutaCliente from "./ruta-cliente";
 
@@ -19,11 +19,11 @@ const REFRESCO_MS = 15_000;
  * ninguna, la próxima planificada. Un repartidor casi siempre tiene una
  * sola ruta viva a la vez — si alguna vez tuviera dos, esto elige cuál se
  * ve primero sin obligarlo a un selector que en la práctica no usaría. */
-function rutaActiva(rutas: MiRuta[]): MiRuta | null {
+function rutaActiva(rutas: RutaConParadas[]): RutaConParadas | null {
   return rutas.find((r) => r.estado === "en_curso") ?? rutas[0] ?? null;
 }
 
-export default function RepartoCliente({ inicial }: { inicial: MiRuta[] }) {
+export default function RepartoCliente({ inicial }: { inicial: RutaConParadas[] }) {
   const [rutas, setRutas] = useState(inicial);
   const [aviso, setAviso] = useState<string | null>(null);
 

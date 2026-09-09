@@ -24,7 +24,7 @@ dispara `delivery` por evento, nunca importando el dominio de `sales`
 `posicion_repartidor` (el trazo GPS de una ruta en curso). Detalle en
 `docs/architecture/data-model.md` §6b.
 
-## Estado (slice 4 implementado 2026-09-09, ADR-098)
+## Estado (slice 5 implementado 2026-09-09, ADR-098)
 
 Operativo en `/api/v1/delivery`: alta y edición de repartidores propios,
 tablero de despacho, ciclo completo de una ruta (crear con ruteo real u
@@ -53,19 +53,32 @@ registra cuál de las dos se usó). Cada ping GPS (`POST
 resolver. Los pings y las posiciones expuestas se purgan por Celery beat
 (`delivery_posiciones_retencion_dias`, `delivery_evidencia_retencion_dias`).
 
-`GET /delivery/mi/rutas` no es un espejo de `RutaOut`: es una vista propia
-(`application/mi_reparto.py`, `MiRutaOut`/`MiParadaOut`) con cada parada
-ya resuelta contra la venta (`sales.venta_para_reparto`) y el cliente
+`GET /delivery/mi/rutas` y `GET /delivery/tablero` no son un espejo de
+`RutaOut`: las dos comparten una vista compuesta
+(`application/mi_reparto.py::ruta_con_paradas`, esquema
+`RutaConParadasOut`/`ParadaRepartoOut`) con cada parada ya resuelta contra
+la venta (`sales.venta_para_reparto`) y el cliente
 (`sales.contacto_de_cliente`) — dirección, nombre, teléfono y el monto a
-cobrar si la venta sigue `orden` (sin pagar). La PWA no llama a `sales`
-ni a `rrhh`; todo lo que necesita llega en esa sola respuesta.
+cobrar si la venta sigue `orden` (sin pagar) — y, en el tablero, el
+nombre del repartidor (`rrhh.cuenta_de_trabajador`). Ni la PWA ni el
+tablero llaman a `sales` ni a `rrhh` por su cuenta. `GET
+/delivery/repartidores` y `GET /delivery/entregas` (historial) resuelven
+el mismo tipo de nombre por el mismo camino
+(`repartidores.con_nombre`, `entregas.historial_enriquecido`).
 
 Frontend: `app/reparto/` (pantalla completa fuera del shell, como el PDV
 y el KDS — ADR-013) con `use-gps.ts` (GPS en vivo mientras la ruta está
 en curso, con el mismo throttle 10 s/30 m que el backend acepta) y
 `use-wake-lock.ts` (pantalla encendida durante la ruta). Instalable
 (`public/reparto/manifest.webmanifest`), sin service worker: offline
-queda declarado como deuda (ADR-013).
+queda declarado como deuda (ADR-013). `app/(app)/delivery/` es el
+tablero de despacho, dentro del shell (ADR-013 reserva la pantalla
+completa para lo que se opera de pie): tablero con sondeo cada 10 s
+(`use-tablero.ts`, mismo criterio que `app/kds/use-cola.ts`), crear ruta,
+cancelar una `planificada`, el mapa de cada ruta con su polilínea real
+cuando se optimizó con Google (`mapa-rutas.tsx`), alta y edición de
+repartidores, e historial de entregas paginado con la evidencia
+fotográfica.
 
 **Sin avisos todavía**: no hay plantillas de WhatsApp ni tareas de envío
 — eso es un slice aparte. Ver `docs/roadmap/deuda/modulo-delivery.md` y
@@ -97,6 +110,12 @@ el orden de slices en `docs/roadmap/historial/modulo-delivery.md`.
   cliente, teléfono, monto a cobrar), iniciar la ruta, entregar o fallar
   cada parada con foto y ubicación, y finalizar — todo desde el teléfono,
   con GPS en vivo mientras reparte.
+- **El tablero de despacho**: ver lo sin asignar y las rutas vivas con su
+  repartidor, sus paradas y su mapa; crear una ruta eligiendo repartidor y
+  pedidos; cancelar una que no salió todavía.
+- **Repartidores y su historial**: alta, edición (vehículo, placa,
+  teléfono, sucursal, activo) y el historial de entregas con filtros por
+  estado, repartidor y fecha, con la foto de evidencia cuando la hay.
 - Pendiente de slice: avisar al cliente por WhatsApp.
 
 ### Endpoints
@@ -105,9 +124,9 @@ el orden de slices en `docs/roadmap/historial/modulo-delivery.md`.
 |--------|------|---------|
 | GET | `/delivery/repartidores/candidatos` | `delivery.gestionar_repartidores` |
 | POST | `/delivery/repartidores` | `delivery.gestionar_repartidores` |
-| GET | `/delivery/repartidores` | `delivery.leer` o `delivery.despachar` |
+| GET | `/delivery/repartidores` | `delivery.leer` o `delivery.despachar` — con el nombre resuelto |
 | PATCH | `/delivery/repartidores/{id}` | `delivery.gestionar_repartidores` |
-| GET | `/delivery/tablero` | `delivery.despachar` |
+| GET | `/delivery/tablero` | `delivery.despachar` — con repartidor y paradas resueltos |
 | POST | `/delivery/rutas` | `delivery.despachar` |
 | GET | `/delivery/rutas` | `delivery.leer` |
 | GET | `/delivery/rutas/{id}` | `delivery.leer` (o ruta propia) |
@@ -118,7 +137,7 @@ el orden de slices en `docs/roadmap/historial/modulo-delivery.md`.
 | GET | `/delivery/mi/rutas` | `delivery.repartir` — con paradas ya resueltas |
 | POST | `/delivery/entregas/{id}/entregar\|fallar` | `delivery.repartir` (propia) o `delivery.despachar` |
 | POST | `/delivery/entregas/{id}/reintentar\|cerrar` | `delivery.despachar` |
-| GET | `/delivery/entregas[/{id}/evidencia]` | `delivery.leer` |
+| GET | `/delivery/entregas[/{id}/evidencia]` | `delivery.leer` — el historial trae venta y repartidor resueltos |
 | GET | `/delivery/publico/seguimiento/{token}` | sin autenticación, token anónimo |
 
 Ver `docs/architecture/events.md` para el detalle de payloads.

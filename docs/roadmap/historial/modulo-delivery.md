@@ -1,14 +1,14 @@
 # Historial — Módulo `delivery`
 
-Estado vigente: 🔶 En curso — slices 2 a 4 implementados (2026-09-09,
-ADR-098): repartidores propios, tablero de despacho, el ciclo completo de
-una ruta (crear con ruteo real contra Google o heurístico, editar
-paradas, iniciar, entregar o fallar cada parada, reintentar o cerrar la
-fallida, finalizar o cancelar), GPS del repartidor en ruta, el enlace
-público de seguimiento con mapa en vivo y la PWA instalable del
-repartidor (`/reparto`), con la convergencia por evento hacia y desde
-`sales` en los dos sentidos. Falta el tablero definitivo en el frontend
-del ERP y el aviso automático por WhatsApp (ver
+Estado vigente: 🔶 En curso — slices 2 a 5 implementados (2026-09-09,
+ADR-098): repartidores propios, el ciclo completo de una ruta (crear con
+ruteo real contra Google o heurístico, editar paradas, iniciar, entregar
+o fallar cada parada, reintentar o cerrar la fallida, finalizar o
+cancelar), GPS del repartidor en ruta, el enlace público de seguimiento
+con mapa en vivo, la PWA instalable del repartidor (`/reparto`) y el
+tablero de despacho en el frontend del ERP (`/delivery`), con la
+convergencia por evento hacia y desde `sales` en los dos sentidos. Falta
+el aviso automático por WhatsApp (ver
 `docs/roadmap/deuda/modulo-delivery.md`).
 
 ## Cronología
@@ -204,3 +204,83 @@ original, que necesita el tablero del slice 5 para tener con qué crear
 una ruta desde la UI — se escribe entonces. Suite completa verde en
 SQLite, `ruff`/`eslint`/`tsc` limpios, `npm run build` sin advertencias
 nuevas, contrato OpenAPI regenerado.
+
+### 2026-09-09 — Slice 5: el tablero de despacho en el ERP
+
+`app/(app)/delivery/` — a diferencia de la PWA y del enlace público, este
+sí vive dentro del shell (ADR-013 reserva la pantalla completa para lo
+que se opera de pie; despachar es trabajo de escritorio). Mismo patrón de
+sondeo que el resto de pantallas operativas: `use-tablero.ts` copia el
+criterio de `app/kds/use-cola.ts` (10 s, pausado con la pestaña oculta),
+`tablero-cliente.tsx` arma "sin asignar" y "rutas vivas"
+(`tarjeta-ruta.tsx` por ruta, con el mapa opcional de `mapa-rutas.tsx`),
+`nueva-ruta-dialogo.tsx` crea la ruta eligiendo repartidor y pedidos con
+`Dialog`/`sonner` (no `DialogoFormulario`+Server Action: un tablero en
+vivo con mutaciones frecuentes encaja mejor con el patrón cliente que ya
+usa `components/reportes/tablero.tsx`, no con el de un formulario CRUD
+de una sola pantalla). `repartidores/` y `entregas/` son las otras dos
+pantallas del submenú: alta/edición de repartidores y el historial
+paginado (server-driven, mismo criterio que `app/(app)/auditoria/page.tsx`
+— filtros y paginación por `searchParams`, no `TablaDatos`) con la
+evidencia fotográfica en un diálogo.
+
+Tres endpoints salieron insuficientes al construir la UI y se
+enriquecieron en el mismo cambio, todos con el mismo criterio que ya
+había fijado `mi/rutas` en el slice 4 (no forzar a la pantalla a resolver
+nombres por su cuenta):
+
+- `GET /delivery/tablero` devolvía `rutas: list[RutaOut]`, sin nombre de
+  repartidor ni paradas — inútil para un despachador que necesita saber
+  quién lleva qué. Ahora comparte la misma vista compuesta que
+  `mi/rutas` (`mi_reparto.ruta_con_paradas`, renombrado de
+  `_con_paradas` porque dejó de ser privado de un solo caso de uso), con
+  `repartidor_nombre` sumado. Los esquemas se renombraron en el mismo
+  cambio: `MiRutaOut`/`MiParadaOut` → `RutaConParadasOut`/
+  `ParadaRepartoOut` — nombres que ya no tienen sentido "en primera
+  persona" cuando el tablero de despacho los usa igual.
+- `GET /delivery/repartidores` (y la respuesta de crear/editar) no traía
+  el nombre del repartidor, solo `trabajador_id`/`usuario_id`: elegir
+  repartidor en el diálogo de "nueva ruta" por UUID no es una opción.
+  `repartidores.con_nombre` lo resuelve vía `rrhh.cuenta_de_trabajador`,
+  igual que ya hacía el alta.
+- `GET /delivery/entregas` (historial) tampoco traía número de orden,
+  dirección ni nombre del cliente — `entregas.historial_enriquecido`
+  reenvuelve la página de `paginar()` resolviendo cada fila contra
+  `sales.venta_para_reparto`/`contacto_de_cliente` y el repartidor, mismo
+  patrón. `EntregaRepartoOut` ganó los cuatro campos como opcionales
+  (`None` por defecto): la respuesta inmediata de entregar/fallar/
+  reintentar/cerrar no los resuelve, porque quien la recibe ya sabe a
+  quién le acaba de pasar.
+
+Bug de scanner encontrado al escribir `lib/delivery.ts`: las llamadas con
+filtros opcionales armaban la query string con un helper
+(`` `/delivery/tablero${query({...})}` ``) que no dejaba un `?` literal
+en el código fuente. `lib/contrato.test.ts` corta la ruta escaneada en el
+primer `?` del texto tal cual aparece en el archivo — sin uno literal,
+capturaba la llamada a `query(...)` entera como si fuera la ruta y no
+encontraba nada en el contrato. Se corrigió sacando el `?` del helper y
+escribiéndolo en cada plantilla (`` `/delivery/tablero?${query(...)}` ``).
+
+Test descubierto y esquivado, no arreglado: `lib/rutas.test.ts` asume que
+cualquier `page.tsx` de módulo con un `redirect(` en el cuerpo es un stub
+que solo redirige a `modulo.href` (el patrón de `catalogo`, `compras`,
+`inventario`, `organizacion`, `rrhh`), y falla si ese `href` es la propia
+raíz. El tablero de despacho vive en su propia raíz (`/delivery`) y tenía
+un `redirect("/login")` legítimo para una sesión que vence entre dos
+`apiFetch` — nada que ver con el patrón que el test vigila, pero
+disparaba el mismo aviso. Se sacó ese `redirect` (la sesión vencida cae
+en el mensaje genérico de error, y recargar la página ya pasa por
+`obtenerSesion()`, que redirige sola) en vez de tocar un test compartido
+por una excepción de un solo módulo.
+
+Reutilizado sin duplicar: `ETIQUETA_ESTADO_ENTREGA` (antes triplicado
+entre `app/reparto/ruta-cliente.tsx`, `tarjeta-ruta.tsx` y el historial,
+cada uno con su propio texto) pasó a `lib/delivery.ts`, la misma fuente
+que ya reexporta `apiDelivery`.
+
+Pruebas: `tests/test_delivery.py` ganó tres casos (tablero con repartidor
+y paradas resueltos, `listar_repartidores` con el nombre, historial de
+entregas con venta y repartidor resueltos). Suite completa verde en
+SQLite (2489 pruebas) y contra Postgres real (ADR-097), `ruff`/`eslint`/
+`tsc` limpios, `npm run build` sin advertencias nuevas, contrato OpenAPI
+regenerado.

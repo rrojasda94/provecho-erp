@@ -3,20 +3,16 @@
 import { useCallback, useState } from "react";
 
 import { ErrorApi } from "@/lib/cliente-api";
-import { apiDelivery, type MiParada, type MiRuta } from "@/lib/delivery";
+import {
+  apiDelivery,
+  ETIQUETA_ESTADO_ENTREGA,
+  type ParadaReparto,
+  type RutaConParadas,
+} from "@/lib/delivery";
 
 import ParadaDialogo from "./parada-dialogo";
 import { useGps } from "./use-gps";
 import { useWakeLock } from "./use-wake-lock";
-
-const ETIQUETA_ESTADO_PARADA: Record<string, string> = {
-  pendiente: "Pendiente",
-  asignada: "Por salir",
-  en_ruta: "En camino",
-  entregada: "Entregada",
-  fallida: "No se pudo entregar",
-  cancelada: "Cancelada",
-};
 
 /** Resuelta = ya no hay nada más que hacer con esta parada — es lo que
  * habilita "Finalizar ruta" (RN-DLV, el servidor exige lo mismo: 409 si
@@ -64,7 +60,7 @@ function useAccionesRuta(rutaId: string, onCambio: () => void) {
   };
 }
 
-function ResumenRuta({ ruta, errorGps }: { ruta: MiRuta; errorGps: string | null }) {
+function ResumenRuta({ ruta, errorGps }: { ruta: RutaConParadas; errorGps: string | null }) {
   return (
     <div className="reparto-ruta-resumen">
       <span className={`reparto-chip reparto-chip-${ruta.estado}`}>
@@ -87,7 +83,7 @@ function BotonRuta({
   iniciar,
   finalizar,
 }: {
-  ruta: MiRuta;
+  ruta: RutaConParadas;
   enCurso: boolean;
   ocupado: boolean;
   todasResueltas: boolean;
@@ -123,7 +119,7 @@ function Parada({
   parada,
   onAccion,
 }: {
-  parada: MiParada;
+  parada: ParadaReparto;
   onAccion: (modo: "entregar" | "fallar") => void;
 }) {
   const enlace = urlNavegar(parada.destino_lat, parada.destino_lng);
@@ -132,7 +128,7 @@ function Parada({
       <header>
         <strong>Pedido #{parada.numero_orden ?? "—"}</strong>
         <span className={`reparto-estado-parada reparto-estado-${parada.estado}`}>
-          {ETIQUETA_ESTADO_PARADA[parada.estado] ?? parada.estado}
+          {ETIQUETA_ESTADO_ENTREGA[parada.estado] ?? parada.estado}
         </span>
       </header>
       <p>{parada.direccion_entrega ?? "Sin dirección anotada"}</p>
@@ -169,11 +165,11 @@ export default function RutaCliente({
   ruta,
   onCambio,
 }: {
-  ruta: MiRuta;
+  ruta: RutaConParadas;
   onCambio: () => void;
 }) {
   const [dialogo, setDialogo] = useState<{
-    parada: MiParada;
+    parada: ParadaReparto;
     modo: "entregar" | "fallar";
   } | null>(null);
 

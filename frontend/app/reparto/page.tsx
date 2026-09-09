@@ -12,7 +12,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { ApiError, apiFetch } from "@/lib/api";
-import { type MiRuta } from "@/lib/delivery";
+import { type RutaConParadas } from "@/lib/delivery";
 import { tienePermiso } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -45,9 +45,9 @@ export default async function PaginaReparto() {
     );
   }
 
-  let rutas: MiRuta[];
+  let rutas: RutaConParadas[];
   try {
-    rutas = await apiFetch<MiRuta[]>("/api/v1/delivery/mi/rutas", { token });
+    rutas = await apiFetch<RutaConParadas[]>("/api/v1/delivery/mi/rutas", { token });
   } catch (e) {
     if (e instanceof ApiError && e.status === 401) redirect("/login");
     return (

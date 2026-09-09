@@ -48,6 +48,8 @@ class RepartidorOut(BaseModel):
     sucursal_id: uuid.UUID
     trabajador_id: uuid.UUID
     usuario_id: uuid.UUID
+    #: `None` solo si la cuenta detrás del repartidor ya no existe.
+    nombre: str | None = None
     vehiculo_tipo: str
     placa: str | None
     telefono: str | None
@@ -96,6 +98,10 @@ class EntregaRepartoOut(BaseModel):
     sucursal_id: uuid.UUID
     ruta_id: uuid.UUID | None
     repartidor_id: uuid.UUID | None
+    #: Solo en `GET /delivery/entregas` (`entregas.historial_enriquecido`):
+    #: la respuesta inmediata de entregar/fallar/reintentar/cerrar no lo
+    #: resuelve, porque quien la recibe ya sabe a quién le acaba de pasar.
+    repartidor_nombre: str | None = None
     orden_parada: int | None
     estado: str
     intentos: int
@@ -104,6 +110,10 @@ class EntregaRepartoOut(BaseModel):
     tramo_duracion_seg: int | None
     destino_lat: Decimal | None
     destino_lng: Decimal | None
+    #: Igual que `repartidor_nombre`: solo en el historial.
+    numero_orden: int | None = None
+    direccion_entrega: str | None = None
+    cliente_nombre: str | None = None
     fecha_entrega: datetime | None
     entregado_por: uuid.UUID | None
     motivo_fallo: str | None
@@ -149,14 +159,10 @@ class VentaListaOut(BaseModel):
     distancia_entrega_km: Decimal | None
 
 
-class TableroOut(BaseModel):
-    sin_asignar: list[VentaListaOut]
-    rutas: list[RutaOut]
-
-
-class MiParadaOut(BaseModel):
-    """Una parada de `GET /delivery/mi/rutas`, con la venta y el cliente ya
-    resueltos — la PWA del repartidor no llama a `sales` ni a `rrhh`."""
+class ParadaRepartoOut(BaseModel):
+    """Una parada de `GET /delivery/mi/rutas` o de `GET /delivery/tablero`,
+    con la venta y el cliente ya resueltos: ni la PWA del repartidor ni el
+    tablero de despacho llaman a `sales` ni a `rrhh` por su cuenta."""
 
     entrega_id: uuid.UUID
     venta_id: uuid.UUID
@@ -175,19 +181,32 @@ class MiParadaOut(BaseModel):
     motivo_fallo: str | None
 
 
-class MiRutaOut(BaseModel):
+class RutaConParadasOut(BaseModel):
+    """Una ruta con sus paradas ya resueltas — la misma vista compuesta
+    sirve `GET /delivery/mi/rutas` (acotada a las del repartidor) y
+    `GET /delivery/tablero` (las vivas de la sucursal, con
+    `repartidor_nombre` para que el tablero no tenga que resolverlo)."""
+
     id: uuid.UUID
     sucursal_id: uuid.UUID
+    repartidor_id: uuid.UUID
+    repartidor_nombre: str | None
     estado: str
     hora_salida: datetime | None
     origen_lat: Decimal
     origen_lng: Decimal
     distancia_m: int | None
     duracion_seg: int | None
+    polyline: str | None
     ultima_lat: Decimal | None
     ultima_lng: Decimal | None
     ultima_posicion_at: datetime | None
-    paradas: list[MiParadaOut]
+    paradas: list[ParadaRepartoOut]
+
+
+class TableroOut(BaseModel):
+    sin_asignar: list[VentaListaOut]
+    rutas: list[RutaConParadasOut]
 
 
 class PosicionIn(BaseModel):

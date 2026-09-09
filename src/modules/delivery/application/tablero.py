@@ -10,7 +10,7 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from src.modules.delivery.infrastructure.models import RutaReparto
+from src.modules.delivery.application.mi_reparto import ruta_con_paradas
 from src.modules.delivery.infrastructure.repositories import EntregaRepo, RutaRepo
 from src.modules.sales.application.queries_publicas import ventas_listas_para_reparto
 
@@ -25,5 +25,8 @@ def sin_asignar(
     return [v for v in listas if v["id"] not in abiertas]
 
 
-def rutas_vivas(session: Session, sucursal_ids: Sequence[uuid.UUID]) -> list[RutaReparto]:
-    return RutaRepo(session).vivas_de_sucursales(sucursal_ids)
+def rutas_vivas(session: Session, sucursal_ids: Sequence[uuid.UUID]) -> list[dict]:
+    return [
+        ruta_con_paradas(session, ruta)
+        for ruta in RutaRepo(session).vivas_de_sucursales(sucursal_ids)
+    ]
