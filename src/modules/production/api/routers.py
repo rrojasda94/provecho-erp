@@ -8,8 +8,13 @@ from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.production.api import schemas
-from src.modules.production.application import evidencia, ordenes, planes, tarifas
-from src.modules.production.application.scope import exigir_almacen, exigir_orden, exigir_plan
+from src.modules.production.application import evidencia, inocuidad, ordenes, planes, tarifas
+from src.modules.production.application.scope import (
+    exigir_almacen,
+    exigir_checklist,
+    exigir_orden,
+    exigir_plan,
+)
 from src.modules.rrhh.application import queries_publicas as rrhh_queries
 from src.modules.users.api.deps import client_ip, get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Almacen, Usuario
@@ -21,6 +26,7 @@ CREAR = "production.crear"
 LEER = "production.leer"
 COMPLETAR = "production.completar"
 PLANIFICAR = "production.planificar"
+VERIFICAR_INOCUIDAD = "production.verificar_inocuidad"
 
 
 @router.post("/ordenes", response_model=schemas.OrdenProduccionOut, status_code=201)
@@ -312,3 +318,70 @@ def cerrar_plan(
     plan = planes.cerrar_plan(session, plan_id, actor_id=actor.id, ip=ip)
     session.commit()
     return plan
+
+
+@router.post(
+    "/checklists", response_model=schemas.ChecklistInocuidadTurnoOut, status_code=201
+)
+def crear_checklist(
+    body: schemas.ChecklistInocuidadTurnoCreate,
+    actor: Usuario = Depends(require_permission(VERIFICAR_INOCUIDAD)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    """Registra el checklist de inocuidad del turno (RN-CDP-002/005):
+    `estado` lo calcula el servidor, nunca lo decide quien lo llena."""
+    exigir_almacen(session, body.almacen_id, tenant)
+    checklist = inocuidad.crear_checklist(
+        session,
+        almacen_id=body.almacen_id,
+        fecha=body.fecha,
+        turno=body.turno,
+        verificado_por=actor.id,
+        bioseguridad_ok=body.bioseguridad_ok,
+        superficies_ok=body.superficies_ok,
+        limpieza_intermedia_ok=body.limpieza_intermedia_ok,
+        equipos_frio=[eq.model_dump() for eq in body.equipos_frio],
+        plaga_indicio=body.plaga_indicio,
+        ip=ip,
+    )
+    session.commit()
+    return checklist
+
+
+@router.get("/checklists", response_model=Pagina[schemas.ChecklistInocuidadTurnoOut])
+def listar_checklists(
+    almacen_id: uuid.UUID | None = None,
+    fecha: date | None = None,
+    estado: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
+    return paginar(
+        session,
+        inocuidad.q_checklists(
+            session,
+            empresa_id=tenant.filtro_empresa(),
+            almacen_id=almacen_id,
+            fecha=fecha,
+            estado=estado,
+        ),
+        p,
+    )
+
+
+@router.get(
+    "/checklists/{checklist_id}", response_model=schemas.ChecklistInocuidadTurnoOut
+)
+def ver_checklist(
+    checklist_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return exigir_checklist(session, checklist_id, tenant)

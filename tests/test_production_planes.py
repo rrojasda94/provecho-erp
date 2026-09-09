@@ -25,10 +25,11 @@ from src.modules.inventory.infrastructure.models import (
     UnidadMedida,
 )
 from src.modules.production.application import listeners as production_listeners
-from src.modules.production.infrastructure.models import PlanProduccion
+from src.modules.production.infrastructure.models import ChecklistInocuidadTurno, PlanProduccion
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import Almacen, Empresa, Rol, Usuario, UsuarioRol
 from src.modules.users.infrastructure.security import hash_pin
+from src.shared import fechas
 
 
 @pytest.fixture()
@@ -85,6 +86,19 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
         s.flush()
         rol = s.scalar(select(Rol).where(Rol.nombre == "jefe_cocina"))
         s.add(UsuarioRol(usuario_id=jefe_cocina.id, rol_id=rol.id))
+        s.flush()
+
+        # RN-CDP-005: sin checklist de inocuidad aprobado del día, la cocina
+        # rechaza crear_orden_produccion/registrar_consumo con 409 — no es
+        # lo que estos tests de plan ejercitan, así que arranca habilitada.
+        s.add(
+            ChecklistInocuidadTurno(
+                almacen_id=almacen.id, fecha=fechas.hoy(), turno="mañana",
+                verificado_por=jefe_cocina.id,
+                bioseguridad_ok=True, superficies_ok=True, limpieza_intermedia_ok=True,
+                equipos_frio=[], plaga_indicio=False, estado="aprobado",
+            )
+        )
 
         ids.update(
             empresa_id=str(empresa.id), almacen_id=str(almacen.id),

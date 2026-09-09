@@ -186,3 +186,43 @@ class AgregarOrdenAPlanIn(BaseModel):
     articulo_id: uuid.UUID
     cantidad_planeada: Decimal = Field(gt=0)
     idempotency_key: str = Field(min_length=8, max_length=100)
+
+
+class EquipoFrioIn(BaseModel):
+    """Sin `dentro_rango`: lo calcula el servidor a partir de la
+    temperatura y el rango — nunca lo decide quien registra el checklist."""
+
+    equipo: str = Field(min_length=1, max_length=100)
+    temperatura_c: Decimal
+    rango_min: Decimal
+    rango_max: Decimal
+
+
+class EquipoFrioOut(EquipoFrioIn):
+    dentro_rango: bool
+
+
+class ChecklistInocuidadTurnoCreate(BaseModel):
+    almacen_id: uuid.UUID
+    fecha: date
+    turno: str = Field(min_length=1, max_length=30)
+    bioseguridad_ok: bool
+    superficies_ok: bool
+    limpieza_intermedia_ok: bool
+    equipos_frio: list[EquipoFrioIn] = Field(default_factory=list)
+    plaga_indicio: bool = False
+
+
+class ChecklistInocuidadTurnoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    almacen_id: uuid.UUID
+    fecha: date
+    turno: str
+    verificado_por: uuid.UUID
+    bioseguridad_ok: bool
+    superficies_ok: bool
+    limpieza_intermedia_ok: bool
+    equipos_frio: list[EquipoFrioOut]
+    plaga_indicio: bool
+    estado: str

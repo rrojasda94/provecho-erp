@@ -18,6 +18,7 @@ from src.core.events import event_bus
 from src.modules.inventory.application import queries_publicas as inv_queries
 from src.modules.inventory.application import reservas as reservas_uc
 from src.modules.inventory.infrastructure.models import Articulo, Receta
+from src.modules.production.application import inocuidad
 from src.modules.production.application.errors import (
     Conflicto,
     NoEncontrado,
@@ -150,6 +151,10 @@ def crear_orden_produccion(
     almacen = session.get(Almacen, almacen_id)
     if almacen is None:
         raise NoEncontrado(f"almacén {almacen_id} no encontrado")
+    # RN-CDP-005: solo una cocina de producción exige checklist de inocuidad
+    # — un almacén de otro tipo no tiene equipos de frío que verificar.
+    if almacen.tipo == "produccion":
+        inocuidad.exigir_cocina_habilitada(session, almacen_id)
     if Decimal(str(cantidad_planeada)) <= 0:
         raise ReglaNegocio("cantidad_planeada debe ser > 0")
     if session.scalar(select(Receta).where(Receta.articulo_id == articulo_id)) is None:
@@ -266,6 +271,9 @@ def registrar_consumo(
     # este consumo, no se vuelve a procesar (evita duplicar filas/stock).
     if idempotency_key is not None and orden.consumo_idempotency_key == idempotency_key:
         return orden
+    almacen_orden = session.get(Almacen, orden.almacen_id)
+    if almacen_orden is not None and almacen_orden.tipo == "produccion":
+        inocuidad.exigir_cocina_habilitada(session, orden.almacen_id)
     if not rules.puede_registrar_consumo(orden.estado):
         raise Conflicto(f"la orden está {orden.estado}; no admite registrar consumo")
     if not items:

@@ -527,10 +527,10 @@ errores de consola.
 - ⬜ **Marketing sin pantalla de leads ni de encuestas**: el backend las
   tiene (`/leads`, `/encuestas`, atribución lead→venta) pero la UI cubre
   campañas y contenido. Van cuando haya campañas reales corriendo.
-- ⬜ **Producción sin plan ni checklist de inocuidad**: la pantalla cubre la
-  orden ad-hoc, que es lo único que el backend implementa hoy
-  (`plan_produccion` y `checklist_inocuidad_turno` siguen en deuda del
-  módulo).
+- ✅ 2026-09-09 **Producción con plan y checklist de inocuidad**:
+  `/produccion/plan` (bloque `feat/produccion-plan-de-produccion`) y
+  `/produccion/inocuidad` (bloque `feat/produccion-checklist-inocuidad`)
+  cierran el hueco — la pantalla ya no cubre solo la orden ad-hoc.
 - ✅ 2026-08-06 **Pruebas e2e del flujo del dinero — verdes y en CI.**
   `frontend/e2e/caja.spec.ts` recorre abrir caja → vender → cobrar → cerrar
   contra la API real (SQLite desechable sembrado por `src/seeders/e2e.py`),

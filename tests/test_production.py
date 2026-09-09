@@ -26,7 +26,10 @@ from src.modules.inventory.infrastructure.models import (
     UnidadMedida,
 )
 from src.modules.production.application import listeners as production_listeners
-from src.modules.production.infrastructure.models import OrdenProduccion
+from src.modules.production.infrastructure.models import (
+    ChecklistInocuidadTurno,
+    OrdenProduccion,
+)
 from src.modules.rrhh.infrastructure.models import Asistencia, Trabajador
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
@@ -98,6 +101,20 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
         s.flush()
         rol = s.scalar(select(Rol).where(Rol.nombre == "jefe_cocina"))
         s.add(UsuarioRol(usuario_id=jefe_cocina.id, rol_id=rol.id))
+        s.flush()
+
+        # RN-CDP-005: sin checklist de inocuidad aprobado del día, la cocina
+        # rechaza crear_orden_produccion/registrar_consumo con 409. La
+        # mayoría de los tests de este archivo no ejercitan esa regla, así
+        # que el fixture arranca con la cocina habilitada.
+        s.add(
+            ChecklistInocuidadTurno(
+                almacen_id=almacen.id, fecha=fechas.hoy(), turno="mañana",
+                verificado_por=jefe_cocina.id,
+                bioseguridad_ok=True, superficies_ok=True, limpieza_intermedia_ok=True,
+                equipos_frio=[], plaga_indicio=False, estado="aprobado",
+            )
+        )
 
         # Trabajador con 2 horas asistidas hoy (08:00-10:00), para completar
         # con `trabajadores` en vez del `horas_hombre` tipeado de antes.
