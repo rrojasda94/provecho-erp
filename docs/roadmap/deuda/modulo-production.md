@@ -54,9 +54,30 @@ Plan completo de cómo saldar esta deuda (bloques, orden, decisiones tomadas):
   reciente del almacén ese día, sin distinguir turno — una vez bloqueada
   la cocina, sigue bloqueada hasta que un checklist nuevo (de cualquier
   turno) la reapruebe.
-- ⬜ **`reporte_produccion`** consolidado automático al cierre de jornada
-  (RN-DOC-010), visado por el jefe de cocina, no redactado a mano.
-  Bloque `feat/produccion-reporte-de-jornada`.
+- ✅ 2026-09-09 **`reporte_produccion`** (bloque
+  `feat/produccion-reporte-de-jornada`). Consolida las órdenes que
+  cerraron control de calidad ese día en un almacén (`merma_total`,
+  `desperdicio_total`, `horas_hombre_total`, `costo_total`, snapshot
+  `ordenes` JSONB); único por `almacen_id, jornada`.
+  `generar_reporte_jornada` recalcula el existente mientras no esté
+  visado y deja de tocarlo en cuanto lo está —"se visa, no se redacta"
+  (RN-DOC-010). Nueva columna `orden_produccion.completado_at`: `updated_
+  at` no servía para agrupar por jornada porque cualquier `flush` (p. ej.
+  `registrar_consumo`) lo pisa antes de que la orden cierre. Barrido de
+  Celery `production.generar_reportes_de_jornada_vencidos` (cada 15 min,
+  no un `crontab` fijo) genera el de cada almacén `tipo=produccion`
+  pasada la `hora_cierre_jornada` de su empresa (`parametro_empresa`,
+  semilla `settings.production_hora_cierre_jornada`) — primera tarea
+  periódica del ERP con una hora de corte configurable por empresa en
+  vez de una hora de servidor fija. `POST /reportes-jornada/generar`
+  hace lo mismo a demanda. Publica `production.reporte_produccion_
+  generado` (sin actor, nivel `aviso`, Gerencia y Cocina). Nuevo permiso
+  `production.visar_reporte_jornada` (seeder + `jefe_cocina`) y pantalla
+  `/produccion/reportes`. Simplificación documentada: "jornada" sigue
+  siendo el día de calendario del negocio (`fechas.hoy()`, mismo
+  criterio que el resto del ERP) — `hora_cierre_jornada` decide **cuándo**
+  el barrido cierra el día, no a qué día pertenece cada orden; no se
+  introdujo un concepto de jornada con corte distinto de medianoche.
 - ✅ 2026-09-09 **Merma → `accounting`** (bloque
   `feat/produccion-desecho-a-contabilidad`, ADR-098). No se reusó
   `inventory.merma_registrada` a propósito: esa merma opera sobre una

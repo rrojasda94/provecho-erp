@@ -305,6 +305,7 @@ MODULOS_CON_SESSION_FACTORY = (
     # de desarrollo levantada, el barrido corriendo **contra ella**.
     "src.modules.inventory.application.tasks",
     "src.modules.marketing.application.tasks",
+    "src.modules.production.application.tasks",
     "src.modules.rrhh.purga",
     "src.modules.sales.application.tasks",
 )

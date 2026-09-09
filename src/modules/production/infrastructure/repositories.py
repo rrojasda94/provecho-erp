@@ -11,11 +11,13 @@ from src.modules.production.infrastructure.models import (
     OrdenProduccion,
     OrdenProduccionTrabajador,
     PlanProduccion,
+    ReporteProduccion,
 )
 
 # `Almacen` es organización transversal (data-model §1) y vive en `users`
 # por historia: mismo import de modelo que ya hace `application/scope.py`.
 from src.modules.users.infrastructure.models import Almacen
+from src.shared import fechas
 
 
 class OrdenProduccionRepo:
@@ -95,6 +97,22 @@ class OrdenProduccionRepo:
         return list(
             self.s.scalars(
                 select(OrdenProduccion).where(OrdenProduccion.plan_produccion_id == plan_id)
+            )
+        )
+
+    def completadas_en_jornada(
+        self, almacen_id: uuid.UUID, jornada
+    ) -> list[OrdenProduccion]:
+        """Las que cerraron control de calidad ese día de calendario del
+        negocio (RN-DOC-010): son las únicas con costo/merma definitivos —
+        una orden todavía `en_proceso` no tiene nada que consolidar."""
+        return list(
+            self.s.scalars(
+                select(OrdenProduccion).where(
+                    OrdenProduccion.almacen_id == almacen_id,
+                    OrdenProduccion.completado_at >= fechas.inicio_dia_utc(jornada),
+                    OrdenProduccion.completado_at <= fechas.fin_dia_utc(jornada),
+                )
             )
         )
 
@@ -207,3 +225,42 @@ class ChecklistInocuidadTurnoRepo:
         self.s.add(checklist)
         self.s.flush()
         return checklist
+
+
+class ReporteProduccionRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, reporte_id: uuid.UUID) -> ReporteProduccion | None:
+        return self.s.get(ReporteProduccion, reporte_id)
+
+    def get_por_clave(self, almacen_id: uuid.UUID, jornada) -> ReporteProduccion | None:
+        return self.s.scalar(
+            select(ReporteProduccion).where(
+                ReporteProduccion.almacen_id == almacen_id,
+                ReporteProduccion.jornada == jornada,
+            )
+        )
+
+    def q_list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        almacen_id: uuid.UUID | None = None,
+        jornada=None,
+    ):
+        """La consulta sin ejecutar: el router la pagina (ADR-026)."""
+        q = select(ReporteProduccion)
+        if almacen_id is not None:
+            q = q.where(ReporteProduccion.almacen_id == almacen_id)
+        if jornada is not None:
+            q = q.where(ReporteProduccion.jornada == jornada)
+        if empresa_id is not None:
+            q = q.join(Almacen, Almacen.id == ReporteProduccion.almacen_id).where(
+                Almacen.empresa_id == empresa_id
+            )
+        return q.order_by(ReporteProduccion.jornada.desc(), ReporteProduccion.created_at.desc())
+
+    def add(self, reporte: ReporteProduccion) -> ReporteProduccion:
+        self.s.add(reporte)
+        self.s.flush()
+        return reporte

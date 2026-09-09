@@ -14,6 +14,7 @@ ESPERADAS = {
     "inventory.bloquear_lotes_vencidos",
     "inventory.reportar_conteos_vencidos",
     "marketing.barrer_encuestas_vencidas",
+    "production.generar_reportes_de_jornada_vencidos",
     "core.latido_worker",
 }
 

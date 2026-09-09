@@ -7,10 +7,10 @@ nacer suelta (ad-hoc) o colgar de un `plan_produccion` (cronograma,
 """
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, Enum, ForeignKey, Numeric, String
+from sqlalchemy import CheckConstraint, Date, DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -63,6 +63,14 @@ class OrdenProduccion(Base, UuidPkMixin, TimestampMixin):
         default="borrador",
     )
     horas_hombre: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    # Cuándo cerró control de calidad (`completar_orden_produccion`), no
+    # cuándo se tocó por última vez: `updated_at` se pisa con cada `flush`
+    # (p. ej. `registrar_consumo`), así que no sirve para saber qué jornada
+    # cerró la orden — `reportes_jornada.py` agrupa por esta columna
+    # (bloque `feat/produccion-reporte-de-jornada`, RN-DOC-010).
+    completado_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     # Snapshot al registrar consumo (RN-PRD-018): lo que la receta BOM dice
     # que debería costar, escalada a `cantidad_planeada` — para comparar
     # contra `costo_insumos` (lo que de verdad se consumió) al completar. Sin

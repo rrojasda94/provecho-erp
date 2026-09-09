@@ -24,6 +24,7 @@ celery_app = Celery(
         "src.core.tasks_salud",
         "src.modules.inventory.application.tasks",
         "src.modules.marketing.application.tasks",
+        "src.modules.production.application.tasks",
         "src.modules.rrhh.application.tasks",
         "src.modules.sales.application.tasks",
     ],
@@ -121,6 +122,14 @@ celery_app.conf.beat_schedule = {
     "purgar-borradores-viejos": {
         "task": "sales.purgar_borradores_viejos",
         "schedule": crontab(hour=5, minute=30),
+    },
+    # `hora_cierre_jornada` es configurable por empresa (`parametro_
+    # empresa`, no un horario único de servidor — RN-DOC-010), así que no
+    # se puede programar con un solo `crontab`: cada 15 min alcanza para
+    # que el cierre real quede como mucho un cuarto de hora tarde.
+    "generar-reportes-de-jornada-vencidos": {
+        "task": "production.generar_reportes_de_jornada_vencidos",
+        "schedule": 900.0,
     },
 }
 

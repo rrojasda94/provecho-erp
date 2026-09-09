@@ -125,6 +125,11 @@ class Settings(BaseSettings):
     # Tarifa única de mano de obra para costeo de producción (RN-PRD-018)
     # — valor semilla, ajustar cuando el negocio defina la tarifa real.
     production_costo_hora_mano_obra: Decimal = Decimal("15.00")
+    # Hora del negocio (no UTC, `src/shared/fechas.py`) a partir de la cual
+    # el barrido de cierre de jornada (RN-DOC-010) genera el reporte del día
+    # de cada almacén de producción — valor semilla, ajustar por empresa vía
+    # `parametro_empresa production/hora_cierre_jornada`.
+    production_hora_cierre_jornada: str = "22:00"
     # Monto sobre el cual ejecutar un pago a proveedor exige permiso
     # accounting.pago_aprobar (RN-CTB-005) — valor semilla.
     accounting_umbral_aprobacion_pago: Decimal = Decimal("2000")

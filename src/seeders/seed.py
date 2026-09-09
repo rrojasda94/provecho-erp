@@ -157,6 +157,10 @@ PERMISOS = [
         "Registrar el checklist de inocuidad de turno (bloquea/desbloquea la cocina)",
     ),
     (
+        "production.visar_reporte_jornada",
+        "Generar a demanda y visar el reporte de producción de la jornada (RN-DOC-010)",
+    ),
+    (
         "accounting.cuenta_administrar",
         "Administrar plan de cuentas y mapeo de asientos automáticos",
     ),
@@ -461,6 +465,7 @@ ROLES = {
         "production.completar",
         "production.planificar",
         "production.verificar_inocuidad",
+        "production.visar_reporte_jornada",
     ],
     "contador": [
         "accounting.cuenta_administrar",

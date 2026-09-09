@@ -12,6 +12,7 @@ from src.modules.production.infrastructure.models.orden_produccion_trabajador im
     OrdenProduccionTrabajador,
 )
 from src.modules.production.infrastructure.models.plan_produccion import PlanProduccion
+from src.modules.production.infrastructure.models.reporte_produccion import ReporteProduccion
 
 __all__ = [
     "ChecklistInocuidadTurno",
@@ -19,4 +20,5 @@ __all__ = [
     "OrdenProduccion",
     "OrdenProduccionTrabajador",
     "PlanProduccion",
+    "ReporteProduccion",
 ]

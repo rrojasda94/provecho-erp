@@ -8,12 +8,20 @@ from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.production.api import schemas
-from src.modules.production.application import evidencia, inocuidad, ordenes, planes, tarifas
+from src.modules.production.application import (
+    evidencia,
+    inocuidad,
+    ordenes,
+    planes,
+    reportes_jornada,
+    tarifas,
+)
 from src.modules.production.application.scope import (
     exigir_almacen,
     exigir_checklist,
     exigir_orden,
     exigir_plan,
+    exigir_reporte_jornada,
 )
 from src.modules.rrhh.application import queries_publicas as rrhh_queries
 from src.modules.users.api.deps import client_ip, get_db, get_tenant, require_permission
@@ -27,6 +35,7 @@ LEER = "production.leer"
 COMPLETAR = "production.completar"
 PLANIFICAR = "production.planificar"
 VERIFICAR_INOCUIDAD = "production.verificar_inocuidad"
+VISAR_REPORTE_JORNADA = "production.visar_reporte_jornada"
 
 
 @router.post("/ordenes", response_model=schemas.OrdenProduccionOut, status_code=201)
@@ -385,3 +394,79 @@ def ver_checklist(
     session: Session = Depends(get_db),
 ):
     return exigir_checklist(session, checklist_id, tenant)
+
+
+@router.post(
+    "/reportes-jornada/generar", response_model=schemas.ReporteProduccionOut
+)
+def generar_reporte_jornada(
+    body: schemas.GenerarReporteJornadaIn,
+    _: Usuario = Depends(require_permission(VISAR_REPORTE_JORNADA)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    """Generación manual (RN-DOC-010 también la admite además del barrido
+    automático de cierre): recalcula mientras el reporte no esté visado."""
+    exigir_almacen(session, body.almacen_id, tenant)
+    reporte = reportes_jornada.generar_reporte_jornada(
+        session, almacen_id=body.almacen_id, jornada=body.fecha, ip=ip
+    )
+    session.commit()
+    return reporte
+
+
+@router.get("/reportes-jornada", response_model=Pagina[schemas.ReporteProduccionOut])
+def listar_reportes_jornada(
+    almacen_id: uuid.UUID | None = None,
+    jornada: date | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
+    return paginar(
+        session,
+        reportes_jornada.q_reportes(
+            session,
+            empresa_id=tenant.filtro_empresa(),
+            almacen_id=almacen_id,
+            jornada=jornada,
+        ),
+        p,
+    )
+
+
+@router.get(
+    "/reportes-jornada/{reporte_id}", response_model=schemas.ReporteProduccionOut
+)
+def ver_reporte_jornada(
+    reporte_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return exigir_reporte_jornada(session, reporte_id, tenant)
+
+
+@router.post(
+    "/reportes-jornada/{reporte_id}/visar", response_model=schemas.ReporteProduccionOut
+)
+def visar_reporte_jornada(
+    reporte_id: uuid.UUID,
+    body: schemas.VisarReporteJornadaIn,
+    actor: Usuario = Depends(require_permission(VISAR_REPORTE_JORNADA)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    """El único acto humano sobre el documento (RN-DOC-010): visa, no
+    redacta."""
+    exigir_reporte_jornada(session, reporte_id, tenant)
+    reporte = reportes_jornada.visar_reporte(
+        session, reporte_id, actor_id=actor.id, observaciones=body.observaciones, ip=ip
+    )
+    session.commit()
+    return reporte

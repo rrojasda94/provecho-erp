@@ -526,6 +526,30 @@ CATALOGO: tuple[Emision, ...] = (
         clave_referencia="checklist_id",
         clave_actor="verificado_por",
     ),
+    # `clave_actor=""` a propósito, mismo criterio que `sales.
+    # pedido_demorado`: lo genera el barrido de cierre de jornada (o el
+    # endpoint manual, sin actor tampoco porque generar no es un acto de
+    # autoridad — visar sí lo es, y ese es otro evento si hiciera falta).
+    Emision(
+        codigo="production.reporte_produccion_generado",
+        nombre="Reporte de producción de la jornada",
+        descripcion=(
+            "Se consolidó el reporte de producción al cierre de la jornada "
+            "(RN-DOC-010): órdenes, merma, desperdicio, horas-hombre y costo "
+            "del almacén de producción. Pendiente de visado por el jefe de "
+            "cocina."
+        ),
+        permiso="production.leer",
+        nivel="aviso",
+        ambito="almacen",
+        campos=("reporte_produccion_id", "almacen_id", "jornada", "merma_total",
+                "desperdicio_total"),
+        titulo="Reporte de producción del {jornada}",
+        areas_sugeridas=("gerencia", "cocina"),
+        referencia_tipo="reporte_produccion",
+        clave_referencia="reporte_produccion_id",
+        clave_actor="",
+    ),
     # --- reports (la cadena de escalamiento, RN-CTP-004) ----------------------
     # Ámbito `empresa` y no `sucursal`: un escalamiento puede nacer de un hecho
     # que no tiene local (un pago sobre umbral es de la empresa). El

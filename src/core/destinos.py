@@ -80,6 +80,10 @@ DESTINOS: dict[str, Destino] = {
     "checklist_inocuidad_turno": Destino(
         "/production/checklists/{id}", "production.leer", "Ver el checklist de inocuidad"
     ),
+    "reporte_produccion": Destino(
+        "/production/reportes-jornada/{id}", "production.leer",
+        "Ver el reporte de producción",
+    ),
     # La única entrada cuyo permiso es de `reports`, y con razón: la entidad
     # es de `reports`. No es una segunda matriz de permisos.
     "escalamiento": Destino(
