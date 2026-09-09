@@ -799,14 +799,25 @@ en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
   respuesta, RN-CMP-004; camino simplificado: proveedor `preferente` +
   ítem recurrente emite sin cotización, sustento = requerimiento de
   almacén + factura), requerimiento_activo_id (obligatorio si tipo
-  `activo`), almacen_destino_id, estado (`borrador` | `emitida` |
-  `recibida_parcial` | `recibida` | `anulada`), idempotency_key. Ítems en
-  **orden_compra_item** (articulo, cantidad, costo).
-- **requerimiento_activo**: area_solicitante, especificacion (ficha
-  técnica requerida), aprobado_area (bool + aprobador), aprobado_gerencia
-  (bool + aprobador — dos aprobaciones distintas, ambas registradas,
-  bloqueo a nivel de dominio antes de emitir la OC tipo `activo`),
-  cotizaciones vinculadas (mínimo 2), estado.
+  `activo` — CHECK `(tipo='activo') = (requerimiento_activo_id IS NOT
+  NULL)`), almacen_destino_id (**nulo si tipo `activo`** — un activo no
+  entra a un almacén de `inventory`, ADR-098), estado (`borrador` |
+  `emitida` | `recibida_parcial` | `recibida` | `anulada`; tipo `activo`
+  solo usa `recibida`, nunca `recibida_parcial` — recepción total),
+  idempotency_key. Ítems de tipo `insumo` en **orden_compra_item**
+  (articulo, cantidad, costo); tipo `activo` no tiene ítems, la única
+  "línea" es su `requerimiento_activo`.
+- **requerimiento_activo** (implementada 2026-09-09, ADR-098): empresa_id,
+  sucursal_id (destino, opcional), id_interno (el futuro `activo.id_interno`
+  — se tecleó acá, RN-GEN-005 sigue sin generador), nombre, categoria,
+  marca, modelo, costo_estimado (se vuelve `activo.valor_compra` al
+  recibir), vida_util_meses (opcional, para que `accounting` empiece a
+  depreciar apenas nace el activo), solicitado_por, notas.
+  **`area_solicitante`/`aprobado_area`/`aprobado_gerencia`/cotizaciones
+  vinculadas de la especificación original no se construyeron**: la
+  aprobación de esta OC es la misma de cualquier otra (umbral +
+  `purchases.aprobar`), deuda declarada. Tampoco admite comprar varias
+  unidades del mismo activo en una fila (sin `cantidad`).
 - **recepcion_compra**: orden_compra_id, comprobante_id (sustento,
   RN-CMP-005), asiento_id, movimiento_dinero_id (egreso o crédito con
   plazo, RN-CMP-006/007 — módulo tesorería, ver sección 9), ítems
@@ -2052,10 +2063,11 @@ dos cosas nunca van a ser un módulo.
   activo/equipamiento/vehículo, kilometraje y combustible, mantenimiento y
   documentos con vencimiento. La **depreciación** ✅ vive en `accounting`
   (activo fijo, PROC-CTB-010, resuelto 2026-09-09 — ver §Recursos). El
-  ciclo de **compra** sigue repartido a propósito y pendiente: se compra en
-  `purchases` (`requerimiento_activo`, OC tipo `activo`, deuda declarada) —
-  `assets.activo` queda listo para que ese slice futuro escriba ahí en vez
-  de partir el ciclo en un tercer módulo.
+  ciclo de **compra** ✅ vive en `purchases` (OC tipo `activo` +
+  `requerimiento_activo`, resuelto 2026-09-09 — recepción total publica el
+  evento que `assets` consume para dar de alta el activo solo); la doble
+  aprobación de área/gerencia y las cotizaciones mínimas que la
+  especificación original pedía siguen sin construirse (deuda declarada).
 - **Proyectos** ⬜ sin caso: el grupo no ejecuta obra ni proyectos
   facturables.
 

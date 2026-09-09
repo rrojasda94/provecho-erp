@@ -79,6 +79,71 @@ export async function crearOrdenCompraAction(
   return { error: "", ok: true };
 }
 
+type DatosOCActivo = {
+  proveedorId: string;
+  idInterno: string;
+  nombre: string;
+  costoEstimado: string;
+};
+
+function leerOCActivo(formData: FormData): DatosOCActivo {
+  return {
+    proveedorId: String(formData.get("proveedor_id") ?? ""),
+    idInterno: String(formData.get("id_interno") ?? "").trim(),
+    nombre: String(formData.get("nombre") ?? "").trim(),
+    costoEstimado: String(formData.get("costo_estimado") ?? ""),
+  };
+}
+
+function validarOCActivo(datos: DatosOCActivo): string | null {
+  if (!datos.proveedorId || !datos.idInterno || !datos.nombre || !datos.costoEstimado) {
+    return "Proveedor, código, nombre y costo estimado son obligatorios.";
+  }
+  return null;
+}
+
+function cuerpoOCActivo(formData: FormData, datos: DatosOCActivo) {
+  const vidaUtil = String(formData.get("vida_util_meses") ?? "");
+  return {
+    proveedor_id: datos.proveedorId,
+    idempotency_key: crypto.randomUUID(),
+    id_interno: datos.idInterno,
+    nombre: datos.nombre,
+    categoria: String(formData.get("categoria") ?? "").trim() || undefined,
+    marca: String(formData.get("marca") ?? "").trim() || undefined,
+    modelo: String(formData.get("modelo") ?? "").trim() || undefined,
+    costo_estimado: datos.costoEstimado,
+    vida_util_meses: vidaUtil ? Number(vidaUtil) : undefined,
+  };
+}
+
+export async function crearOrdenCompraActivoAction(
+  _previo: EstadoOrdenCompra,
+  formData: FormData,
+): Promise<EstadoOrdenCompra> {
+  const store = await cookies();
+  const token = store.get(COOKIE_TOKEN)?.value;
+  if (!token) redirect("/login");
+
+  const datos = leerOCActivo(formData);
+  const errorValidacion = validarOCActivo(datos);
+  if (errorValidacion) return { error: errorValidacion, ok: false };
+
+  try {
+    await apiFetch("/api/v1/purchases/ordenes-compra-activo", {
+      token,
+      metodo: "POST",
+      cuerpo: cuerpoOCActivo(formData, datos),
+    });
+  } catch (e) {
+    const mensaje = e instanceof ApiError ? e.message : "No se pudo crear la orden de compra.";
+    return { error: mensaje, ok: false };
+  }
+
+  revalidatePath("/compras/ordenes-compra");
+  return { error: "", ok: true };
+}
+
 export async function editarOrdenCompraAction(
   _previo: EstadoOrdenCompra,
   formData: FormData,
@@ -212,6 +277,20 @@ export async function recibirOrdenCompraAction(
     { idempotency_key: crypto.randomUUID(), items },
     ordenId,
     "No se pudo registrar la recepción.",
+  );
+}
+
+export async function recibirOrdenCompraActivoAction(
+  _previo: EstadoOrdenCompra,
+  formData: FormData,
+): Promise<EstadoOrdenCompra> {
+  const ordenId = String(formData.get("orden_id") ?? "");
+  if (!ordenId) return { error: "Orden de compra inválida.", ok: false };
+  return ejecutar(
+    `/api/v1/purchases/ordenes-compra/${ordenId}/recibir-activo`,
+    undefined,
+    ordenId,
+    "No se pudo registrar la recepción del activo.",
   );
 }
 

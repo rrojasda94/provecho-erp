@@ -303,6 +303,7 @@ MODULOS_CON_SESSION_FACTORY = (
     # producción: 5 s de `connect_timeout` regalados por test y, con la base
     # de desarrollo levantada, el barrido corriendo **contra ella**.
     "src.modules.accounting.application.tasks",
+    "src.modules.assets.application.listeners",
     "src.modules.assets.application.tasks",
     "src.modules.inventory.application.tasks",
     "src.modules.marketing.application.tasks",

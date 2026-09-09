@@ -138,10 +138,16 @@ consulta (no cuando se carga por id y se valida después).
 - **`flota`** y **`repuesto_compatibilidad`**: sin reparto con varias
   unidades por categorizar ni control de repuestos por ahora, son
   formularios que hoy nadie llenaría. `docs/roadmap/deuda/modulo-assets.md`.
-- **Alta automática del activo al recibir una OC tipo `activo`**: sigue
-  bloqueada en `purchases` a la espera de `requerimiento_activo` (deuda ya
-  declarada de ese módulo). Cuando exista, publicará un evento que `assets`
-  puede consumir para dar de alta el activo solo.
+- ~~**Alta automática del activo al recibir una OC tipo `activo`**~~ —
+  resuelto el mismo día: `purchases` construyó `requerimiento_activo` y
+  `crear_orden_compra_activo`/`recibir_orden_compra_activo` (sin ítems de
+  `inventory`, recepción total). `assets.application.listeners` (nuevo,
+  primer listener del módulo) consume `purchases.
+  requerimiento_activo_recibido` y llama a `activos.crear_activo` con
+  `tipo="equipamiento"`. La doble aprobación de área/gerencia y las
+  cotizaciones mínimas que `purchases` tenía especificadas siguen sin
+  construirse (deuda de ese módulo, no de este); comprar un vehículo o
+  varias unidades del mismo activo por esta vía también queda fuera.
 - ~~**Depreciación en `accounting`**~~ — resuelto el mismo día:
   `assets.application.queries_publicas.activos_depreciables` (nueva) le da
   a `accounting` lo que necesita (valor_compra, vida_util_meses,

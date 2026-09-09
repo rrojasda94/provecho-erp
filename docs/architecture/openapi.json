@@ -17031,6 +17031,126 @@
         "title": "OpcionPregunta",
         "type": "object"
       },
+      "OrdenCompraActivoCreate": {
+        "properties": {
+          "categoria": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria"
+          },
+          "costo_estimado": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Costo Estimado"
+          },
+          "id_interno": {
+            "maxLength": 8,
+            "minLength": 1,
+            "title": "Id Interno",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "marca": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca"
+          },
+          "modelo": {
+            "anyOf": [
+              {
+                "maxLength": 60,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo"
+          },
+          "nombre": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "notas": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notas"
+          },
+          "proveedor_id": {
+            "format": "uuid",
+            "title": "Proveedor Id",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "vida_util_meses": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vida Util Meses"
+          }
+        },
+        "required": [
+          "proveedor_id",
+          "idempotency_key",
+          "id_interno",
+          "nombre",
+          "costo_estimado"
+        ],
+        "title": "OrdenCompraActivoCreate",
+        "type": "object"
+      },
       "OrdenCompraCreate": {
         "properties": {
           "almacen_destino_id": {
@@ -17173,9 +17293,16 @@
       "OrdenCompraOut": {
         "properties": {
           "almacen_destino_id": {
-            "format": "uuid",
-            "title": "Almacen Destino Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Almacen Destino Id"
           },
           "estado": {
             "title": "Estado",
@@ -17203,6 +17330,28 @@
             "title": "Proveedor Id",
             "type": "string"
           },
+          "requerimiento_activo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequerimientoActivoOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "requerimiento_activo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requerimiento Activo Id"
+          },
           "tipo": {
             "title": "Tipo",
             "type": "string"
@@ -17219,6 +17368,7 @@
           "tipo",
           "origen",
           "almacen_destino_id",
+          "requerimiento_activo_id",
           "estado",
           "total"
         ],
@@ -26959,6 +27109,109 @@
           "costo_unitario"
         ],
         "title": "RepuestoUsadoOut",
+        "type": "object"
+      },
+      "RequerimientoActivoOut": {
+        "properties": {
+          "categoria": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria"
+          },
+          "costo_estimado": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Estimado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "id_interno": {
+            "title": "Id Interno",
+            "type": "string"
+          },
+          "marca": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca"
+          },
+          "modelo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modelo"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "notas": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notas"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "vida_util_meses": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vida Util Meses"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "id_interno",
+          "nombre",
+          "categoria",
+          "marca",
+          "modelo",
+          "costo_estimado",
+          "vida_util_meses",
+          "notas"
+        ],
+        "title": "RequerimientoActivoOut",
         "type": "object"
       },
       "ReservaOut": {
@@ -49277,6 +49530,52 @@
         ]
       }
     },
+    "/api/v1/purchases/ordenes-compra-activo": {
+      "post": {
+        "operationId": "crear_orden_compra_activo_api_v1_purchases_ordenes_compra_activo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdenCompraActivoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenCompraOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Orden Compra Activo",
+        "tags": [
+          "purchases"
+        ]
+      }
+    },
     "/api/v1/purchases/ordenes-compra/{orden_compra_id}": {
       "get": {
         "operationId": "ver_orden_compra_api_v1_purchases_ordenes_compra__orden_compra_id__get",
@@ -49692,6 +49991,54 @@
           }
         ],
         "summary": "Recibir Orden Compra",
+        "tags": [
+          "purchases"
+        ]
+      }
+    },
+    "/api/v1/purchases/ordenes-compra/{orden_compra_id}/recibir-activo": {
+      "post": {
+        "operationId": "recibir_orden_compra_activo_api_v1_purchases_ordenes_compra__orden_compra_id__recibir_activo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orden_compra_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Orden Compra Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenCompraOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Recibir Orden Compra Activo",
         "tags": [
           "purchases"
         ]

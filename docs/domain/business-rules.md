@@ -1375,6 +1375,10 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-CMP-015** La compra de un activo o equipamiento requiere cotización
   comparativa de mínimo 2 proveedores y validación de especificación y
   precio por el área solicitante y por gerencia antes de emitir la OC.
+  **Sin construir todavía** (2026-09-09, ADR-098): la OC tipo `activo` ya
+  existe (`requerimiento_activo`), pero se aprueba y emite igual que
+  cualquier otra — la cotización comparativa y la doble validación de esta
+  regla quedan como deuda declarada del módulo `purchases`.
 - **RN-CMP-016** El ERP calcula automáticamente el indicador de desempeño
   de cada proveedor (cumplimiento de plazo, conformidad en recepción,
   variación de precio) a partir de las recepciones registradas contra su
@@ -1385,6 +1389,9 @@ producción se hace en cocinas de sucursal. Ver
   aplica el descuento por planilla del monto faltante (extiende
   RN-RRHH-007). Faltante reiterado (2+ veces) del mismo responsable puede
   escalar a carta de amonestación (RN-RRHH-004).
+- **RN-CMP-018** Recibir una OC tipo `activo` es total, nunca parcial —el
+  activo llegó o no llegó— y publica el evento que da de alta el activo en
+  `assets` automáticamente (`purchases`, ADR-098).
 
 ## Ventas
 

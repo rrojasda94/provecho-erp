@@ -1,7 +1,12 @@
-"""Orden de compra: proveedor → OC (borrador → emitida → recepción). Tipo
-`activo` declarado en el esquema pero rechazado en la capa de aplicación
-de este slice (requiere `requerimiento_activo` con doble aprobación,
-deuda técnica — ver ROADMAP).
+"""Orden de compra: proveedor → OC (borrador → emitida → recepción).
+
+Tipo `activo` (ADR-098, 2026-09-09) compra un `requerimiento_activo` en vez
+de artículos de `inventory`: sin `almacen_destino_id` (no hay almacén de
+destino — el activo no entra a stock) y con `requerimiento_activo_id`
+obligatorio. La aprobación y la emisión son las mismas de cualquier OC —
+`emitir_orden_compra` no distingue tipo—; lo que queda fuera de este slice
+es la doble aprobación de área/gerencia y las cotizaciones mínimas que el
+proceso completo (PROC-CTB-010) describe, deuda técnica declarada.
 """
 
 import uuid
@@ -32,6 +37,13 @@ class OrdenCompra(Base, UuidPkMixin, TimestampMixin):
             "'recibida', 'anulada')",
             name="estado_orden_compra",
         ),
+        # Uno exige al otro (RN-CMP nueva): una OC de activo sin su
+        # requerimiento no tendría qué recibir, y una de insumo con uno
+        # apuntaría a un dato que nadie lee.
+        CheckConstraint(
+            "(tipo = 'activo') = (requerimiento_activo_id IS NOT NULL)",
+            name="requerimiento_activo_si_tipo_activo",
+        ),
     )
 
     proveedor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("proveedor.id"))
@@ -46,9 +58,14 @@ class OrdenCompra(Base, UuidPkMixin, TimestampMixin):
     )
     # Origen opcional — entidad `cotizacion` aún sin modelar (deuda técnica).
     cotizacion_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
-    # Obligatorio si tipo=activo — entidad `requerimiento_activo` diferida.
-    requerimiento_activo_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
-    almacen_destino_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))
+    # Obligatorio si tipo=activo.
+    requerimiento_activo_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("requerimiento_activo.id"), nullable=True
+    )
+    # Nulo si tipo=activo: un activo no entra a un almacén de inventory.
+    almacen_destino_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("almacen.id"), nullable=True
+    )
     estado: Mapped[str] = mapped_column(
         Enum(
             "borrador",

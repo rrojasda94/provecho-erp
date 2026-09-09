@@ -24,6 +24,7 @@ from src.core.tenant import FueraDeAlcance
 from src.modules.accounting.api.routers import router as accounting_router
 from src.modules.accounting.application import listeners as accounting_listeners
 from src.modules.assets.api.routers import router as assets_router
+from src.modules.assets.application import listeners as assets_listeners
 from src.modules.inventory.api.routers import router as inventory_router
 from src.modules.inventory.application import listeners as inventory_listeners
 from src.modules.marketing.api.publico_routers import router as marketing_publico_router
@@ -343,6 +344,7 @@ def create_app() -> FastAPI:
     app.include_router(reports_router, prefix="/api/v1")
     inventory_listeners.register()
     accounting_listeners.register()
+    assets_listeners.register()
     marketing_listeners.register()
     sales_listeners.register()
     # `reports` antes que `users`: el primero convierte hechos en reportes y
