@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ETIQUETA_ESTADO_ENTREGA, type RutaConParadas } from "@/lib/delivery";
 
+import AvisoParada from "./aviso-parada";
 import MapaRutas from "./mapa-rutas";
 
 const ETIQUETA_ESTADO_RUTA: Record<string, string> = {
@@ -24,10 +25,12 @@ export default function TarjetaRuta({
   ruta,
   puedeDespachar,
   onCancelar,
+  whatsappHabilitado,
 }: {
   ruta: RutaConParadas;
   puedeDespachar: boolean;
   onCancelar: (rutaId: string) => void;
+  whatsappHabilitado: boolean;
 }) {
   const [verMapa, setVerMapa] = useState(false);
   const resueltas = ruta.paradas.filter((p) => resuelta(p.estado)).length;
@@ -50,13 +53,18 @@ export default function TarjetaRuta({
 
         <ol className="flex flex-col gap-1.5">
           {ruta.paradas.map((p) => (
-            <li key={p.entrega_id} className="flex items-center justify-between gap-2">
-              <span className="truncate">
-                #{p.numero_orden ?? "—"} · {p.direccion_entrega ?? "Sin dirección"}
-              </span>
-              <span className="shrink-0 text-xs text-gray">
-                {ETIQUETA_ESTADO_ENTREGA[p.estado] ?? p.estado}
-              </span>
+            <li key={p.entrega_id} className="flex flex-col gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate">
+                  #{p.numero_orden ?? "—"} · {p.direccion_entrega ?? "Sin dirección"}
+                </span>
+                <span className="shrink-0 text-xs text-gray">
+                  {ETIQUETA_ESTADO_ENTREGA[p.estado] ?? p.estado}
+                </span>
+              </div>
+              {p.estado === "en_ruta" ? (
+                <AvisoParada parada={p} whatsappHabilitado={whatsappHabilitado} />
+              ) : null}
             </li>
           ))}
         </ol>

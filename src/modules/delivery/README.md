@@ -24,23 +24,26 @@ dispara `delivery` por evento, nunca importando el dominio de `sales`
 `posicion_repartidor` (el trazo GPS de una ruta en curso). Detalle en
 `docs/architecture/data-model.md` §6b.
 
-## Estado (slice 5 implementado 2026-09-09, ADR-098)
+## Estado (slice 6 implementado 2026-09-09, ADR-098)
 
 Operativo en `/api/v1/delivery`: alta y edición de repartidores propios,
 tablero de despacho, ciclo completo de una ruta (crear con ruteo real u
 heurístico → editar paradas → iniciar → entregar/fallar cada parada →
 reintentar o cerrar la fallida → finalizar o cancelar), evidencia
-fotográfica, GPS del repartidor en ruta, seguimiento público con mapa, y
-la convergencia por evento con `sales` en los dos sentidos
+fotográfica, GPS del repartidor en ruta, seguimiento público con mapa, la
+convergencia por evento con `sales` en los dos sentidos
 (`delivery.entrega_registrada` marca la venta entregada;
-`sales.venta_entregada`/`venta_anulada` cierran o cancelan la entrega).
+`sales.venta_entregada`/`venta_anulada` cierran o cancelan la entrega), y
+el aviso al cliente por WhatsApp en cada hito (en camino, entregado,
+fallida) con fallback copiable/`wa.me` en el tablero.
 Capas `domain/rules.py`, `application/` (`repartidores.py`, `rutas.py`,
 `ruteo.py`, `posiciones.py`, `entregas.py`, `seguimiento.py`, `tablero.py`,
-`parametros.py`, `listeners.py`, `tasks.py`), `infrastructure/`,
-`api/routers.py`, `api/publico_routers.py`. Migración `69f4ca1d58f4`
-aplicada. Frontend: `app/(publico)/seguimiento/[token]/` (página pública
-con mapa y línea de tiempo, sondeo cada 10 s) y `lib/geo.ts` (Haversine y
-decodificador de polilínea).
+`parametros.py`, `notificaciones.py`, `listeners.py`, `tasks.py`),
+`infrastructure/`, `api/routers.py`, `api/publico_routers.py`. Migración
+`69f4ca1d58f4` aplicada (ya traía las columnas `aviso_*` de la entrega,
+anticipando este slice). Frontend: `app/(publico)/seguimiento/[token]/`
+(página pública con mapa y línea de tiempo, sondeo cada 10 s) y
+`lib/geo.ts` (Haversine y decodificador de polilínea).
 
 `application/ruteo.py` intenta primero `computeRoutes` con
 `optimizeWaypointOrder` (`shared/integrations/google/rutas.py::ruta_optima`)
@@ -80,10 +83,6 @@ cuando se optimizó con Google (`mapa-rutas.tsx`), alta y edición de
 repartidores, e historial de entregas paginado con la evidencia
 fotográfica.
 
-**Sin avisos todavía**: no hay plantillas de WhatsApp ni tareas de envío
-— eso es un slice aparte. Ver `docs/roadmap/deuda/modulo-delivery.md` y
-el orden de slices en `docs/roadmap/historial/modulo-delivery.md`.
-
 ### Casos de uso
 
 - **Alta de repartidor**: elegir un trabajador activo con cuenta propia
@@ -116,7 +115,15 @@ el orden de slices en `docs/roadmap/historial/modulo-delivery.md`.
 - **Repartidores y su historial**: alta, edición (vehículo, placa,
   teléfono, sucursal, activo) y el historial de entregas con filtros por
   estado, repartidor y fecha, con la foto de evidencia cuando la hay.
-- Pendiente de slice: avisar al cliente por WhatsApp.
+- **Avisar al cliente**: en cada hito (`delivery.ruta_iniciada` →
+  "en camino", `entrega_registrada` → "entregado",
+  `entrega_fallida` → "fallida") se encola un mensaje de plantilla por
+  WhatsApp (`application/notificaciones.py` + `tasks.py`); el tablero
+  siempre ofrece el enlace de seguimiento para copiar o mandar por
+  `wa.me`, esté o no configurado el envío automático. También in-app
+  (`users.notificar_a`): al repartidor cuando le asignan una ruta, y a
+  quien despachó la ruta si una entrega falla o si la venta de una
+  entrega ya `en_ruta` se anula.
 
 ### Endpoints
 
@@ -126,7 +133,7 @@ el orden de slices en `docs/roadmap/historial/modulo-delivery.md`.
 | POST | `/delivery/repartidores` | `delivery.gestionar_repartidores` |
 | GET | `/delivery/repartidores` | `delivery.leer` o `delivery.despachar` — con el nombre resuelto |
 | PATCH | `/delivery/repartidores/{id}` | `delivery.gestionar_repartidores` |
-| GET | `/delivery/tablero` | `delivery.despachar` — con repartidor y paradas resueltos |
+| GET | `/delivery/tablero` | `delivery.despachar` — con repartidor y paradas resueltos, enlace de seguimiento por parada y si el envío automático está habilitado |
 | POST | `/delivery/rutas` | `delivery.despachar` |
 | GET | `/delivery/rutas` | `delivery.leer` |
 | GET | `/delivery/rutas/{id}` | `delivery.leer` (o ruta propia) |
@@ -158,28 +165,40 @@ enlace público es una credencial anónima que expira. Hereda RN-CUP-005 a
 máquina de `entrega` (pendiente → asignada → en_ruta → entregada/fallida,
 con reintento) y de `ruta_reparto` (planificada → en_curso → finalizada).
 
-## Plantillas de WhatsApp (pendiente de slice)
+## Plantillas de WhatsApp
 
-Diseño acordado, sin construir: tres plantillas aprobadas en Meta, una por
-hito (parámetros en este orden — el mismo orden que exige la plantilla
-real):
+Tres plantillas aprobadas en Meta, una por hito, con los nombres en
+`WHATSAPP_PLANTILLA_EN_CAMINO`/`_ENTREGADO`/`_ENTREGA_FALLIDA`
+(`.env.example`) y parámetros en este orden — el mismo orden que exige la
+plantilla real:
 
-- `pedido_en_camino` (`delivery.ruta_iniciada`): nombre del cliente,
-  nombre del repartidor, minutos estimados, enlace de seguimiento.
+- `pedido_en_camino` (`delivery.ruta_iniciada`, uno por parada): nombre
+  del cliente, primer nombre del repartidor, minutos estimados al ETA de
+  esa parada, enlace de seguimiento.
 - `pedido_entregado` (`delivery.entrega_registrada`): nombre del cliente,
   número de orden.
 - `entrega_fallida` (`delivery.entrega_fallida`): nombre del cliente,
-  motivo en lenguaje llano, contacto de la sucursal.
+  motivo en lenguaje llano (`notificaciones.MOTIVO_LEGIBLE`), nombre de la
+  sucursal.
 
-Sin WhatsApp configurado (`whatsapp.habilitado()` en falso) el tablero
-mostrará un enlace de seguimiento para copiar y un botón `wa.me` — el
-aviso automático es un atajo, nunca la única vía.
+El envío corre por Celery (`delivery.notificar_cliente`, mismo patrón que
+`marketing.despachar_encuesta`: reintenta un fallo de transporte, nunca un
+rechazo de Meta) y queda registrado en `entrega.aviso_en_camino_at` /
+`aviso_resultado_at` / `aviso_error`. Sin WhatsApp configurado
+(`whatsapp.habilitado()` en falso), en un hub de sucursal (ADR-009, no
+corre Celery ahí) o sin teléfono del cliente, no se encola nada y el
+tablero se apoya solo en el enlace de seguimiento (copiar o `wa.me`) que
+ofrece siempre, esté o no habilitado el envío automático — el aviso
+automático es un atajo, nunca la única vía.
 
 ## Relaciones
 
 **Escucha**: `sales.venta_entregada` (cierra una entrega abierta si la
 venta se marcó entregada desde el KDS), `sales.venta_anulada` (cancela la
-entrega si seguía `pendiente`/`asignada`).
+entrega si seguía `pendiente`/`asignada`; si ya estaba `en_ruta`, avisa
+in-app a quien despachó en vez de cancelar). También sus propios hechos
+(`delivery.ruta_iniciada`, `entrega_registrada`, `entrega_fallida`) para
+encolar el aviso al cliente.
 
 **Publica**: `delivery.ruta_iniciada`, `delivery.entrega_registrada`
 (consumido por `sales` para avanzar la venta a entregada, ADR-098),
@@ -188,7 +207,9 @@ no tiene consumidor todavía.
 
 **Contratos públicos consumidos**: `sales.queries_publicas.venta_para_reparto`,
 `ventas_listas_para_reparto` y `contacto_de_cliente`;
-`rrhh.queries_publicas.trabajadores_con_cuenta` y `cuenta_de_trabajador`.
+`rrhh.queries_publicas.trabajadores_con_cuenta` y `cuenta_de_trabajador`;
+`users.queries_publicas.notificar_a` (bandeja in-app del repartidor y de
+quien despacha).
 
 **Contratos públicos expuestos**: ninguno todavía — nada más consume de
 `delivery` hoy.

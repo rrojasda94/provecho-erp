@@ -37,6 +37,7 @@ from src.modules.users.api.deps import (
 from src.modules.users.application.queries_publicas import tiene_permiso
 from src.modules.users.infrastructure.models import Usuario
 from src.shared import fechas
+from src.shared.integrations import whatsapp
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/delivery", tags=["delivery"])
@@ -178,6 +179,7 @@ def ver_tablero(
     return {
         "sin_asignar": tablero_uc.sin_asignar(session, [sucursal_id], fecha=fecha),
         "rutas": tablero_uc.rutas_vivas(session, [sucursal_id]),
+        "whatsapp_habilitado": whatsapp.habilitado(),
     }
 
 

@@ -9,6 +9,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from src.modules.delivery.application.seguimiento import url_publica
 from src.modules.delivery.infrastructure.models import Entrega, Repartidor, RutaReparto
 from src.modules.delivery.infrastructure.repositories import EntregaRepo, RutaRepo
 from src.modules.rrhh.application.queries_publicas import cuenta_de_trabajador
@@ -75,4 +76,11 @@ def _parada_de(session: Session, entrega: Entrega) -> dict:
         "monto_a_cobrar": venta["total"] if venta and venta["estado"] == "orden" else None,
         "eta_at": entrega.eta_at,
         "motivo_fallo": entrega.motivo_fallo,
+        # Mismo enlace que recibe el cliente por WhatsApp — el tablero lo
+        # ofrece para copiar o mandar por `wa.me` cuando el aviso
+        # automático no está configurado (o como refuerzo si sí lo está).
+        "enlace_seguimiento": (
+            url_publica(entrega.token_publico) if entrega.token_publico else None
+        )
+        or None,
     }

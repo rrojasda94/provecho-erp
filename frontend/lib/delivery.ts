@@ -73,6 +73,9 @@ export type ParadaReparto = {
   monto_a_cobrar: string | number | null;
   eta_at: string | null;
   motivo_fallo: MotivoFallo | null;
+  /** Mismo enlace que recibe el cliente por WhatsApp — `null` sin token o sin
+   * `DELIVERY_URL_PUBLICA` configurada. */
+  enlace_seguimiento: string | null;
 };
 
 export type RutaConParadas = {
@@ -108,9 +111,25 @@ export type VentaLista = {
 export type Tablero = {
   sin_asignar: VentaLista[];
   rutas: RutaConParadas[];
+  /** Si es `false`, el aviso automático por WhatsApp no está configurado:
+   * el tablero solo puede ofrecer copiar el enlace o mandarlo por `wa.me`. */
+  whatsapp_habilitado: boolean;
 };
 
 export type VehiculoTipo = "moto" | "bicicleta" | "auto" | "a_pie";
+
+/**
+ * Enlace `wa.me` para el fallback manual del tablero (ADR-098): mismo
+ * criterio de normalización que `shared.integrations.whatsapp.client.
+ * normalizar_telefono` — deja solo dígitos y antepone "51" si quedó un
+ * móvil local de 9 dígitos. `null` si no queda un número usable.
+ */
+export function enlaceWhatsApp(telefono: string | null, texto: string): string | null {
+  const digitos = (telefono ?? "").replace(/\D/g, "").replace(/^0+/, "");
+  if (!digitos) return null;
+  const numero = digitos.length === 9 ? `51${digitos}` : digitos;
+  return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
+}
 
 export const VEHICULOS: VehiculoTipo[] = ["moto", "bicicleta", "auto", "a_pie"];
 

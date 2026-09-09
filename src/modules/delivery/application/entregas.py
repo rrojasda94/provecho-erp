@@ -17,14 +17,19 @@ from src.core.events import event_bus
 from src.modules.delivery.application.errors import Conflicto, NoEncontrado, ReglaNegocio
 from src.modules.delivery.application.seguimiento import token_expira_en
 from src.modules.delivery.domain import rules
-from src.modules.delivery.infrastructure.models import Entrega, Repartidor
+from src.modules.delivery.infrastructure.models import Entrega, Repartidor, RutaReparto
 from src.modules.delivery.infrastructure.repositories import EntregaRepo
 from src.modules.rrhh.application.queries_publicas import cuenta_de_trabajador
 from src.modules.sales.application.queries_publicas import (
     contacto_de_cliente,
     venta_para_reparto,
 )
+from src.modules.users.application.queries_publicas import notificar_a
 from src.shared.auditoria import registrar as auditar
+
+# Códigos de `notificacion.tipo` (bandeja in-app, `users.notificar_a`).
+TIPO_ENTREGA_FALLIDA = "delivery.entrega_fallida"
+TIPO_VENTA_ANULADA_EN_RUTA = "delivery.venta_anulada_en_ruta"
 
 
 def entregar(
@@ -152,6 +157,13 @@ def fallar(
         },
         session=session,
     )
+    _avisar_a_quien_creo_la_ruta(
+        session,
+        entrega,
+        tipo=TIPO_ENTREGA_FALLIDA,
+        titulo="Una entrega falló",
+        cuerpo=f"El pedido no se pudo entregar. Motivo: {motivo}.",
+    )
     return entrega
 
 
@@ -239,13 +251,44 @@ def cerrar_por_venta_entregada(
 def cancelar_por_venta_anulada(session: Session, venta_id: uuid.UUID) -> None:
     """RN-DLV-006: si la entrega seguía `pendiente`/`asignada`, se cancela
     sola. `en_ruta` no se toca acá — el repartidor puede estar a mitad de
-    camino y lo decide el despacho, no un evento."""
+    camino y lo decide el despacho, no un evento — pero sí avisa in-app a
+    quien despachó la ruta: alguien tiene que decidir qué hacer con un
+    pedido anulado que ya salió a la calle."""
     entrega = EntregaRepo(session).get_por_venta(venta_id)
-    if entrega is None or not rules.cancela_sola_por_anulacion(entrega.estado):
+    if entrega is None:
+        return
+    if entrega.estado == "en_ruta":
+        _avisar_a_quien_creo_la_ruta(
+            session,
+            entrega,
+            tipo=TIPO_VENTA_ANULADA_EN_RUTA,
+            titulo="Una venta en reparto se anuló",
+            cuerpo="El pedido ya salió con el repartidor y su venta se anuló. Decide qué hacer.",
+        )
+        return
+    if not rules.cancela_sola_por_anulacion(entrega.estado):
         return
     entrega.estado = "cancelada"
     entrega.token_expira_at = token_expira_en()
     session.flush()
+
+
+def _avisar_a_quien_creo_la_ruta(
+    session: Session, entrega: Entrega, *, tipo: str, titulo: str, cuerpo: str
+) -> None:
+    if entrega.ruta_id is None:
+        return
+    ruta = session.get(RutaReparto, entrega.ruta_id)
+    if ruta is None:
+        return
+    notificar_a(
+        session,
+        ruta.creada_por,
+        tipo=tipo,
+        titulo=titulo,
+        cuerpo=cuerpo,
+        sucursal_id=entrega.sucursal_id,
+    )
 
 
 def historial_enriquecido(session: Session, pagina: dict) -> dict:

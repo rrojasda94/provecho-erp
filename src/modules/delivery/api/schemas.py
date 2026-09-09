@@ -179,6 +179,10 @@ class ParadaRepartoOut(BaseModel):
     monto_a_cobrar: Decimal | None
     eta_at: datetime | None
     motivo_fallo: str | None
+    #: Mismo enlace que recibe el cliente por WhatsApp — fallback copiable
+    #: cuando el aviso automático no está configurado. `None` sin
+    #: `DELIVERY_URL_PUBLICA` o sin token todavía.
+    enlace_seguimiento: str | None
 
 
 class RutaConParadasOut(BaseModel):
@@ -207,6 +211,9 @@ class RutaConParadasOut(BaseModel):
 class TableroOut(BaseModel):
     sin_asignar: list[VentaListaOut]
     rutas: list[RutaConParadasOut]
+    #: Si el envío automático no está configurado, el tablero no ofrece
+    #: "reenviar" — solo copiar/`wa.me`, que siempre funciona.
+    whatsapp_habilitado: bool
 
 
 class PosicionIn(BaseModel):

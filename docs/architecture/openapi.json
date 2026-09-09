@@ -18069,6 +18069,17 @@
             ],
             "title": "Direccion Entrega"
           },
+          "enlace_seguimiento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enlace Seguimiento"
+          },
           "entrega_id": {
             "format": "uuid",
             "title": "Entrega Id",
@@ -18154,7 +18165,8 @@
           "cliente_telefono",
           "monto_a_cobrar",
           "eta_at",
-          "motivo_fallo"
+          "motivo_fallo",
+          "enlace_seguimiento"
         ],
         "title": "ParadaRepartoOut",
         "type": "object"
@@ -31867,11 +31879,16 @@
             },
             "title": "Sin Asignar",
             "type": "array"
+          },
+          "whatsapp_habilitado": {
+            "title": "Whatsapp Habilitado",
+            "type": "boolean"
           }
         },
         "required": [
           "sin_asignar",
-          "rutas"
+          "rutas",
+          "whatsapp_habilitado"
         ],
         "title": "TableroOut",
         "type": "object"

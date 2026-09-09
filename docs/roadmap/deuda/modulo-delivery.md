@@ -71,3 +71,20 @@ Declarada al construir el slice 5 (tablero de despacho):
   línea entre ellos — una polilínea aproximada por distancia en línea
   recta sería confusa (no es la calle real) y se prefirió no dibujar
   nada antes que dibujar algo falso.
+
+Declarada al construir el slice 6 (notificaciones por WhatsApp):
+
+- ⬜ **El "contacto de la sucursal" de la plantilla `entrega_fallida` es
+  solo su nombre, nunca un teléfono.** `Sucursal` no tiene columna de
+  teléfono ni existe un contrato público que la resuelva — cuando exista,
+  la plantilla puede pasar a un contacto real en vez de "el local".
+- ⬜ **El ETA que viaja en la plantilla `pedido_en_camino` es el mismo
+  heurístico de `entrega.eta_at`** (deuda ya declarada arriba: "no se
+  recotiza contra Google en ruta"), redondeado a minutos enteros contra el
+  momento del envío — no se vuelve a recalcular si el aviso se reintenta
+  varios minutos después.
+- ⬜ **Un rechazo de Meta (`aviso_error`) no tiene pantalla propia.** Queda
+  en la fila de la entrega y se ve en el historial (`GET
+  /delivery/entregas`), pero nada resalta "este aviso falló" en el
+  tablero — el despachador tiene el enlace copiable como red de
+  seguridad, pero no una alerta activa.

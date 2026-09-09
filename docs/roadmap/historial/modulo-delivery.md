@@ -284,3 +284,70 @@ entregas con venta y repartidor resueltos). Suite completa verde en
 SQLite (2489 pruebas) y contra Postgres real (ADR-097), `ruff`/`eslint`/
 `tsc` limpios, `npm run build` sin advertencias nuevas, contrato OpenAPI
 regenerado.
+
+### 2026-09-09 — Slice 6: notificaciones por WhatsApp
+
+`application/notificaciones.py::despachar(session, entrega_id, hito)` —
+mismo patrón que `marketing.application.envios.despachar` sobre el mismo
+adaptador (`shared/integrations/whatsapp`), delivery es su segundo
+consumidor: resuelve el teléfono vía `sales.contacto_de_cliente`, arma
+los parámetros de la plantilla del hito (`en_camino`/`entregado`/
+`fallida`) y manda `WhatsAppClient.enviar_plantilla`. Un
+`WhatsAppRechazo` (4xx de Meta) se absorbe y queda en
+`entrega.aviso_error` sin reintentar — reenviar el mismo payload da el
+mismo rechazo; un fallo de transporte (`WhatsAppError`) propaga para que
+la tarea reintente. `entrega.aviso_en_camino_at`/`aviso_resultado_at`/
+`aviso_error` ya existían en el modelo desde la migración del slice 2:
+se fijaron entonces, a propósito, para no deber una migración nueva acá.
+
+`application/tasks.py` ganó `delivery.notificar_cliente` (bind,
+`autoretry_for=(WhatsAppError,)`, backoff 60 s, 4 reintentos — copia
+literal de `marketing.despachar_encuesta`) y `encolar_aviso(entrega_id,
+hito)`: no hace nada sin WhatsApp configurado o en un hub de sucursal
+(ADR-009, ahí no corre Celery y la mensajería sale siempre de la nube),
+y si el broker no responde manda en línea antes que perder el aviso — el
+llamador ya está fuera del request de nadie. `application/listeners.py`
+se escucha a sí mismo por primera vez en `delivery` (mismo patrón que
+`marketing.on_encuesta_enviada`): `ruta_iniciada` encola "en camino" por
+cada parada, `entrega_registrada` encola "entregado",
+`entrega_fallida` encola "fallida" — los tres después del commit
+(ADR-016), y un fallo acá no puede deshacer lo que ya pasó, solo se
+loguea.
+
+In-app (`users.notificar_a`, sin envío, siempre en la bandeja): al
+repartidor cuando `rutas.crear` le asigna una ruta, y a quien la creó
+(`ruta.creada_por`) si una parada falla o si la venta de una entrega ya
+`en_ruta` se anula (RN-DLV-006) — antes ese caso no avisaba a nadie, la
+entrega simplemente se quedaba `en_ruta` sin que el despacho se enterara
+de que la venta detrás ya no existía.
+
+El tablero ganó el fallback que la spec pedía desde el slice 1:
+`GET /delivery/tablero` ahora resuelve `enlace_seguimiento` por parada
+(`mi_reparto._parada_de`, mismo enlace que recibe el cliente) y
+`whatsapp_habilitado` a nivel de respuesta — `tarjeta-ruta.tsx` muestra,
+en cada parada `en_ruta`, un botón "Copiar enlace" y, si hay teléfono,
+"Enviar por WhatsApp" (`aviso-parada.tsx`, `wa.me` armado con
+`enlaceWhatsApp` en `lib/delivery.ts`, mismo criterio de normalización
+que `whatsapp.client.normalizar_telefono`) con una nota cuando el envío
+automático no está configurado. El enlace siempre está — el aviso
+automático es un atajo, nunca la única vía.
+
+Pruebas: `tests/test_delivery_notificaciones.py` (nuevo, `ClienteWhatsAppFalso`
+de `tests/test_marketing_encuestas.py`, `task_always_eager`): ruta
+asignada notifica in-app al repartidor, cada hito manda su plantilla con
+los parámetros esperados, sin teléfono deja `aviso_error="sin_telefono"`
+sin reventar, un `WhatsAppRechazo` no reintenta y queda escrito, sin
+WhatsApp configurado o en un hub no encola nada, entrega fallida avisa
+por WhatsApp y notifica in-app a quien creó la ruta, y una venta anulada
+con la entrega ya `en_ruta` notifica sin cancelarla. Bug encontrado y
+corregido en el mismo cambio: la primera versión de
+`despachar_notificacion` y `_enviar_en_linea` llamaban a
+`notificaciones.despachar` sin `session.commit()` — el envío funcionaba
+(la plantilla salía) pero `aviso_en_camino_at`/`aviso_error` nunca
+quedaban en la fila porque la sesión de la tarea se cerraba sin guardar;
+lo agarró el propio test de "sin teléfono" al releer la entrega con una
+sesión nueva. Se corrigió con un `_despachar()` interno que comitea,
+mismo patrón que ya usa `marketing.application.tasks`. Suite completa
+verde en SQLite (2499 pruebas) y contra Postgres real (ADR-097),
+`ruff`/`eslint`/`tsc` limpios, `npm run build` y `npm test` (499 casos)
+sin advertencias nuevas, contrato OpenAPI regenerado.

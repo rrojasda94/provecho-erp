@@ -113,6 +113,7 @@ export default function TableroCliente({
                 ruta={ruta}
                 puedeDespachar={puedeDespachar}
                 onCancelar={cancelar}
+                whatsappHabilitado={tablero.whatsapp_habilitado}
               />
             ))}
           </div>
