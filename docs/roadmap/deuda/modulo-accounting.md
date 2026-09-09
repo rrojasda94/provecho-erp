@@ -134,8 +134,16 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `regla_asiento`) — eso sigue pendiente. Tampoco incluye RN-POS-009..013
   completas ni la máquina de estados de `custodia_efectivo` — ver Deuda
   técnica → Dashboard y caja.
-- ⬜ **Activo fijo/depreciación y flujo de caja** (PROC-CTB-007/010,
-  propuestos): sin modelar, dependen de que exista el módulo de activos.
+- ✅ 2026-09-09 **Depreciación de activo fijo** (PROC-CTB-010, ADR-098): ya
+  existe `assets` para depreciar. Barrido mensual (Celery beat, día 1),
+  lineal (`valor_compra / vida_util_meses`), un asiento por activo por mes
+  (debe 6813, haber 3913), idempotente por `<activo_id>:<AAAA-MM>`.
+  `activo_depreciacion` lleva lo acumulado. Se detiene al llegar a
+  `de_baja` o al depreciar el valor completo. Sin frontend de consulta
+  (el asiento se ve como cualquier otro en el libro).
+  **`flujo de caja` (PROC-CTB-007) sigue sin modelar**: es un estado
+  financiero aparte (`domain/estados_financieros.py` no lo cubre todavía),
+  no depende de la depreciación.
 - ⬜ **`declaracion_itan`**: entidad documentada en data-model §8, sin
   slice propio (depende del ciclo tributario anual, RN-IMP-006).
 - ✅ 2026-08-29 **`regla_asiento` de una sola línea debe/haber** (ADR-081):

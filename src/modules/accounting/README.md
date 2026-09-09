@@ -186,6 +186,12 @@ importe.
   Situación Financiera y Estado de Resultados.
 - Pago a proveedor: registrar (cola) → ejecutar (permiso + umbral) →
   asiento automático, o rechazar.
+- Depreciación de activo fijo (PROC-CTB-010, ADR-098): barrido mensual
+  (Celery beat, día 1) sobre `assets.application.queries_publicas.
+  activos_depreciables` — lineal, un asiento por activo por mes (debe
+  `6813`, haber `3913`), idempotente por `<activo_id>:<AAAA-MM>`.
+  `activo_depreciacion` lleva lo acumulado; sin las cuentas 6813/3913
+  importadas, queda como `asiento_omitido` (`sin_cuentas`).
 
 ## Reglas
 
@@ -288,8 +294,9 @@ finanzas documentados en el área:
     conteo) son organizativas — viven en el SOP, no en código.
 - **Conciliación bancaria** (PROC-CTB-004): cuadra movimientos vs. extracto;
   visada por Gerencia, requisito de cierre de periodo (RN-CTB-006).
-- **Flujo de caja** y **activo fijo/depreciación**: pendientes de slice
-  dedicado (PROC-CTB-007/010, propuestos).
+- **Flujo de caja** (PROC-CTB-007): pendiente de slice dedicado, propuesto.
+  **Activo fijo/depreciación** (PROC-CTB-010) resuelto 2026-09-09 — ver
+  Casos de uso arriba.
 
 ## Contrato API — plan contable y estados financieros
 

@@ -1387,6 +1387,13 @@ Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
   (`domain/plantillas.py`), que sí puede expresar el asiento peruano completo
   —N líneas, con IGV desagregado y asiento de destino—, cosa que un par
   debe/haber no puede. La regla sigue ganando cuando existe.
+- **activo_depreciacion** (ADR-098, 2026-09-09): empresa_id, activo_id (sin
+  FK — `assets`), valor_compra/vida_util_meses/fecha_inicio (congelados al
+  primer barrido que ve el activo), depreciado_acumulado. El barrido
+  mensual (PROC-CTB-010) lee `assets.application.queries_publicas.
+  activos_depreciables` y postea un asiento por activo por mes (debe
+  `6813`, haber `3913`) mientras quede algo pendiente; se detiene solo al
+  llegar a `de_baja` o al depreciar el valor completo.
 
 **El IGV vive en el comprobante** (2026-08-29, ADR-081). `comprobante.gravado_igv` (nullable, migración `dfb195b14433`) dice si **esa** operación lleva IGV; `NULL` deja decidir al default de la empresa (`empresa.config_fiscal["igv_por_defecto"]`, y si tampoco está, `zona_tributaria`). Lo resuelve `src/shared/tributos.py`, único lugar del ERP que decide el régimen — antes la misma condición estaba copiada en el asiento contable y en el comprobante electrónico. Está en `comprobante` y no en `venta` ni en `orden_compra` porque el IGV nace con el documento: el crédito fiscal se toma con el comprobante anotado y el débito con el emitido, así que los asientos de venta confirmada y de compra recibida van **sin** IGV y lo reconoce el asiento del comprobante.
 
@@ -2043,10 +2050,10 @@ dos cosas nunca van a ser un módulo.
   `tablero` guardado por usuario y compartido por rol.
 - **Activos: registro operativo** ✅ módulo `assets` (ADR-098, 2026-09-09):
   activo/equipamiento/vehículo, kilometraje y combustible, mantenimiento y
-  documentos con vencimiento. **El ciclo de compra y depreciación sigue
-  repartido a propósito** y pendiente: se compra en `purchases`
-  (`requerimiento_activo`, OC tipo `activo`, deuda declarada) y se depreciará
-  en `accounting` (activo fijo, PROC-CTB-007/010, deuda declarada) —
+  documentos con vencimiento. La **depreciación** ✅ vive en `accounting`
+  (activo fijo, PROC-CTB-010, resuelto 2026-09-09 — ver §Recursos). El
+  ciclo de **compra** sigue repartido a propósito y pendiente: se compra en
+  `purchases` (`requerimiento_activo`, OC tipo `activo`, deuda declarada) —
   `assets.activo` queda listo para que ese slice futuro escriba ahí en vez
   de partir el ciclo en un tercer módulo.
 - **Proyectos** ⬜ sin caso: el grupo no ejecuta obra ni proyectos

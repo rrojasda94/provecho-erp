@@ -142,9 +142,12 @@ consulta (no cuando se carga por id y se valida después).
   bloqueada en `purchases` a la espera de `requerimiento_activo` (deuda ya
   declarada de ese módulo). Cuando exista, publicará un evento que `assets`
   puede consumir para dar de alta el activo solo.
-- **Depreciación en `accounting`**: sigue pendiente (deuda ya declarada de
-  ese módulo); `assets.valor_compra`/`vida_util_meses` quedan ahí como
-  insumo para cuando se construya.
+- ~~**Depreciación en `accounting`**~~ — resuelto el mismo día:
+  `assets.application.queries_publicas.activos_depreciables` (nueva) le da
+  a `accounting` lo que necesita (valor_compra, vida_util_meses,
+  fecha_compra), y `accounting.application.depreciacion` corre el barrido
+  mensual (PROC-CTB-010). `assets` no publica ningún evento para esto — es
+  `accounting` quien pregunta, una vez al mes, no al revés.
 - ~~**`guia_remision.vehiculo_placa`** sigue siendo texto libre~~ — resuelto
   el mismo día (2026-09-09): `guia_remision.vehiculo_id` (sin FK) resuelve
   la placa por `assets.application.queries_publicas.vehiculo_para_guia` y la

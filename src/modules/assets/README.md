@@ -10,9 +10,11 @@ directo del usuario (2026-09-09) — nada de esto existía antes (ADR-098).
 
 **No es dueño del ciclo de compra ni de la depreciación.** Un activo se
 compra en `purchases` (OC tipo `activo`, deuda declarada de ese módulo) y
-se depreciará en `accounting` (deuda declarada). `assets` es lo que pasa
-**después** de comprado: usarlo, mantenerlo, y saber cuándo sus papeles
-vencen.
+se deprecia en `accounting` (`application.depreciacion`, barrido mensual —
+`assets` solo expone `valor_compra`/`vida_util_meses`/`fecha_compra` por
+contrato público, nunca calcula ni asienta nada contable). `assets` es lo
+que pasa **después** de comprado: usarlo, mantenerlo, y saber cuándo sus
+papeles vencen.
 
 ## Entidades
 
@@ -125,6 +127,11 @@ RN-DOC-001..004 en `docs/domain/business-rules.md`.
 - `inventory.application.queries_publicas.articulo_resumen` (contrato
   público existente, para validar el repuesto de una orden).
 
-`inventory.application.listeners.on_repuesto_consumido` consume
-`assets.repuesto_consumido` — la única dirección en la que otro módulo
-reacciona a `assets` hoy, siempre vía evento, nunca importando su dominio.
+Otros módulos leen `assets` por contrato público, nunca importan su
+dominio:
+
+- `inventory.application.listeners.on_repuesto_consumido` consume el evento
+  `assets.repuesto_consumido`.
+- `accounting.application.depreciacion` llama a
+  `assets.application.queries_publicas.activos_depreciables` una vez al mes
+  (no hay evento — es `accounting` quien pregunta).
