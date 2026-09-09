@@ -20,6 +20,7 @@ from src.shared.repositories import ParametroEmpresaRepo
 MODULOS = (
     "accounting",
     "assets",
+    "delivery",
     "inventory",
     "marketing",
     "production",

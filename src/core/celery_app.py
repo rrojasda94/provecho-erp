@@ -24,6 +24,7 @@ celery_app = Celery(
         "src.core.tasks_salud",
         "src.modules.accounting.application.tasks",
         "src.modules.assets.application.tasks",
+        "src.modules.delivery.application.tasks",
         "src.modules.inventory.application.tasks",
         "src.modules.marketing.application.tasks",
         "src.modules.rrhh.application.tasks",
@@ -140,6 +141,18 @@ celery_app.conf.beat_schedule = {
     "purgar-borradores-viejos": {
         "task": "sales.purgar_borradores_viejos",
         "schedule": crontab(hour=5, minute=30),
+    },
+    # Breadcrumb de GPS del reparto propio (ADR-098): retención en días
+    # (30 por defecto), así que una vez al día alcanza de sobra.
+    "purgar-posiciones-de-reparto": {
+        "task": "delivery.purgar_posiciones",
+        "schedule": crontab(hour=4, minute=45),
+    },
+    # Foto de evidencia de una entrega — mismo criterio y misma franja que
+    # `purgar-fotos-de-marcacion`: de madrugada, una vez al día.
+    "purgar-evidencias-de-entrega": {
+        "task": "delivery.purgar_evidencias",
+        "schedule": crontab(hour=4, minute=50),
     },
 }
 
