@@ -1755,6 +1755,53 @@ preparación, despacho y entrega en las tres modalidades.
   propio. Mostrarlo suelto hacía que la comanda y la pantalla dijeran "una
   pizza" y "un peperoni" como si fueran dos preparaciones.
 
+## Reparto propio (módulo delivery, ADR-098)
+
+Rama delivery de `PROC-OPE-002` con ruteo y flota propia — separada como
+módulo aparte de `sales` según ya preveía
+[workflows.md](workflows.md#cumplimiento-de-pedido). Área dueña Operaciones.
+
+- **RN-DLV-001** Una venta tiene como máximo una `entrega` (RN-CUP-005): se
+  crea al asignarla a una `ruta_reparto`, no antes. Solo entran ventas en
+  modalidad delivery, sin `repartidor_externo_plataforma` (RN-PER-003 las
+  excluye — esas no son reparto propio), no anuladas y con todos sus ítems
+  en `listo`.
+- **RN-DLV-002** Toda parada de una ruta necesita coordenadas ancladas
+  (`UbicacionMixin` de la venta, ADR-053): una dirección sin anclar no
+  puede rutearse ni mostrar posición en vivo. El tablero lo rechaza al
+  intentar asignar, nunca en silencio.
+- **RN-DLV-003** Una entrega fallida (cliente ausente, dirección errada,
+  rechazo, no contesta, u otro motivo con detalle obligatorio) se registra
+  con `motivo_fallo` y **no** marca la venta como entregada (hereda
+  RN-CUP-008). El pedido queda visible para reintentar o cerrar; nunca se
+  pierde de la vista del despacho.
+- **RN-DLV-004** Reintentar una entrega fallida vuelve la misma fila a
+  `pendiente` (no crea una entrega nueva) e incrementa `intentos`; el
+  estado anterior queda en `audit_log`. Cerrar una entrega fallida o
+  pendiente (`cancelada`) es una decisión explícita del despacho, distinta
+  de reintentar.
+- **RN-DLV-005** Una ruta se inicia solo con al menos una parada y un
+  repartidor activo; al iniciar, todas sus entregas pasan a `en_ruta` y
+  quedan con la hora de salida real. Una ruta ya iniciada no se cancela:
+  se resuelve parada por parada (RN-CUP-008 aplica a cada una).
+- **RN-DLV-006** Si se anula una venta con entrega `pendiente` o
+  `asignada`, la entrega se cancela sola. Si ya estaba `en_ruta`, no se
+  cancela automáticamente — se notifica a quien creó la ruta para que
+  decida (el repartidor puede estar a mitad de camino).
+- **RN-DLV-007** La posición del repartidor solo se acepta mientras su
+  ruta está `en_curso`, y solo se expone —en el tablero o en el enlace
+  público— mientras la entrega de esa parada sigue `en_ruta`. Terminada la
+  entrega (entregada, fallida o cancelada), la posición deja de
+  publicarse; el trazo (`posicion_repartidor`) se conserva para auditoría
+  y se purga a los 30 días.
+- **RN-DLV-008** El enlace público de seguimiento (`entrega.token_publico`)
+  es una credencial anónima: quien lo tenga ve el estado de esa entrega y
+  nada más — nunca el monto, el teléfono del cliente, la dirección en
+  texto ni las demás paradas de la ruta. Expira 3 horas después de que la
+  entrega llega a un resultado (`entregada`, `fallida` o `cancelada`); un
+  token vencido, cancelado o inexistente responde exactamente igual (404),
+  para no confirmarle a quien lo reenvía que existió.
+
 ## Comercial — estrategia
 
 - **RN-CML-001** Ningún precio se publica sin calcular su margen de

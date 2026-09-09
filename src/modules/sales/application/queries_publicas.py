@@ -541,6 +541,103 @@ def contacto_de_cliente(session: Session, cliente_id: uuid.UUID) -> dict | None:
     return {"id": cliente.id, "nombre": nombre, "telefono": telefono or ""}
 
 
+def venta_para_reparto(session: Session, venta_id: uuid.UUID) -> dict | None:
+    """Lo que `delivery` necesita para asignar y rutear una venta (ADR-098):
+    sucursal, modalidad, canal, dirección/ubicación, la distancia ya
+    cotizada, si tiene plataforma externa (RN-PER-003 la excluye del
+    reparto propio) y si todos sus ítems llegaron a `listo` o ya se
+    entregó. `delivery` no importa `Venta`/`VentaItem` — pasa siempre por
+    acá.
+
+    `None` = la venta no existe.
+    """
+    venta = session.get(Venta, venta_id)
+    if venta is None:
+        return None
+    estados = list(
+        session.scalars(
+            select(VentaItem.estado_preparacion).where(VentaItem.venta_id == venta_id)
+        )
+    )
+    return {
+        "id": venta.id,
+        "sucursal_id": venta.sucursal_id,
+        "numero_orden": venta.numero_orden,
+        "fecha_orden": venta.fecha_orden,
+        "modalidad": venta.modalidad,
+        "canal": venta.canal,
+        "estado": venta.estado,
+        "cliente_id": venta.cliente_id,
+        "direccion_entrega": venta.direccion_entrega,
+        "ubicacion_lat": venta.ubicacion_lat,
+        "ubicacion_lng": venta.ubicacion_lng,
+        "distancia_entrega_km": venta.distancia_entrega_km,
+        "repartidor_externo_plataforma": venta.repartidor_externo_plataforma,
+        "lista": rules.pedido_entregable(estados),
+        "entregada": rules.pedido_entregado(estados),
+    }
+
+
+def ventas_listas_para_reparto(
+    session: Session,
+    sucursal_ids: Sequence[uuid.UUID],
+    *,
+    fecha: date | None = None,
+) -> list[dict]:
+    """Ventas delivery listas para entrar a una ruta: modalidad delivery,
+    sin plataforma externa (RN-PER-003), no anuladas, con todos los ítems
+    en `listo` y ninguno todavía `entregado`.
+
+    `delivery` resuelve así su tablero de "listos sin asignar" en vez de
+    consumir `sales.pedido_listo` (ADR-098): una consulta activa encuentra
+    igual a un pedido que llegó a `listo` antes de que existiera su ruta, o
+    que cambió a delivery después de estar listo — un evento que ya pasó
+    nunca lo habría avisado.
+    """
+    if not sucursal_ids:
+        return []
+    stmt = select(Venta).where(
+        Venta.sucursal_id.in_(list(sucursal_ids)),
+        Venta.modalidad == "delivery",
+        Venta.repartidor_externo_plataforma.is_(None),
+        Venta.estado != "anulada",
+    )
+    if fecha is not None:
+        stmt = stmt.where(Venta.fecha_orden == fecha)
+    ventas = list(session.scalars(stmt.order_by(Venta.created_at)))
+    if not ventas:
+        return []
+
+    estados_por_venta: dict[uuid.UUID, list[str]] = {v.id: [] for v in ventas}
+    filas = session.execute(
+        select(VentaItem.venta_id, VentaItem.estado_preparacion).where(
+            VentaItem.venta_id.in_(list(estados_por_venta))
+        )
+    )
+    for venta_id, estado in filas:
+        estados_por_venta[venta_id].append(estado)
+
+    resultado = []
+    for venta in ventas:
+        estados = estados_por_venta[venta.id]
+        if not rules.pedido_entregable(estados) or rules.pedido_entregado(estados):
+            continue
+        resultado.append(
+            {
+                "id": venta.id,
+                "sucursal_id": venta.sucursal_id,
+                "numero_orden": venta.numero_orden,
+                "fecha_orden": venta.fecha_orden,
+                "cliente_id": venta.cliente_id,
+                "direccion_entrega": venta.direccion_entrega,
+                "ubicacion_lat": venta.ubicacion_lat,
+                "ubicacion_lng": venta.ubicacion_lng,
+                "distancia_entrega_km": venta.distancia_entrega_km,
+            }
+        )
+    return resultado
+
+
 def total_efectivo_cobrado(
     session: Session, punto_venta_id: uuid.UUID, desde: datetime
 ) -> Decimal:
