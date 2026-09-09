@@ -1,6 +1,6 @@
 """requerimiento_activo: qué activo se está comprando en una OC tipo
 `activo` — nombre, categoría y el costo estimado que se vuelve
-`valor_compra` del activo al recibir (ADR-098).
+`valor_compra` del activo al recibir (ADR-099).
 
 Una OC de este tipo compra **un** activo (no un lote de N unidades): cada
 fila de este slice necesita su propio `id_interno` en `assets`, y

@@ -448,6 +448,36 @@ def test_registrar_carga_combustible_calcula_rendimiento(env):
     assert ver.json()["vehiculo"]["kilometraje_actual"] == 1100
 
 
+def test_tolerancia_consumo_lee_parametro_vigente(env):
+    """El parámetro `assets/tolerancia_consumo_pct` (ADR-014) reemplaza el
+    valor semilla cuando Gerencia lo aprueba (`estado="vigente"`)."""
+    from src.modules.assets.application import combustible
+    from src.modules.assets.domain import rules
+    from src.shared.models import ParametroEmpresa
+
+    client, ids, TestSession = env
+    empresa_id = uuid.UUID(ids["empresa_id"])
+    with TestSession() as s:
+        assert combustible.tolerancia_consumo(s, empresa_id) == (
+            rules.TOLERANCIA_CONSUMO_PCT_DEFECTO
+        )
+
+        admin = s.scalar(select(Usuario).where(Usuario.username == "admin"))
+        s.add(
+            ParametroEmpresa(
+                empresa_id=empresa_id,
+                modulo="assets",
+                codigo="tolerancia_consumo_pct",
+                valor={"porcentaje": 10},
+                estado="vigente",
+                propuesto_por_id=admin.id,
+            )
+        )
+        s.commit()
+
+        assert combustible.tolerancia_consumo(s, empresa_id) == 10
+
+
 def test_carga_combustible_con_comprobante_ya_usado_409(env):
     client, ids, _ = env
     h = _token(client)

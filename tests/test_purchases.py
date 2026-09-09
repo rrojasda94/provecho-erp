@@ -359,7 +359,7 @@ def _crear_oc_activo(client, headers, proveedor_id, **overrides):
 
 def test_oc_activo_flujo_completo_da_de_alta_el_activo(env):
     """RN nueva: recibir una OC tipo `activo` publica el evento que `assets`
-    consume para dar de alta el activo solo (ADR-098)."""
+    consume para dar de alta el activo solo (ADR-099)."""
     from src.modules.assets.infrastructure.models import Activo
 
     client, ids, TestSession = env

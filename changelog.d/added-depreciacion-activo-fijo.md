@@ -1,5 +1,5 @@
 - **Depreciación mensual de activo fijo** (2026-09-09, PROC-CTB-010,
-  ADR-098). No estaba modelada en absoluto — bloqueada históricamente
+  ADR-099). No estaba modelada en absoluto — bloqueada históricamente
   porque no existía el módulo de activos. Barrido mensual (Celery beat,
   día 1) lee `assets.application.queries_publicas.activos_depreciables`
   (nuevo contrato público) y postea un asiento lineal por activo por mes

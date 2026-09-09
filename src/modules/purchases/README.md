@@ -75,7 +75,7 @@ flush con un 500 en vez de un 422 legible.
 | POST | `/ordenes-compra/{id}/recepciones` | `purchases.recepcionar` |
 | POST | `/ordenes-compra/{id}/anular` | `purchases.anular` |
 | POST | `/ordenes-compra/{id}/conformidad-comprobante` | `purchases.dar_conformidad` |
-| POST | `/ordenes-compra-activo` | `purchases.crear` — ADR-098, ver §OC tipo `activo` |
+| POST | `/ordenes-compra-activo` | `purchases.crear` — ADR-099, ver §OC tipo `activo` |
 | POST | `/ordenes-compra/{id}/recibir-activo` | `purchases.recepcionar` — recepción total, no parcial |
 
 Eventos: publica `purchases.oc_emitida` y `purchases.compra_recibida`
@@ -130,7 +130,7 @@ incurrido, no un compromiso a aprobar) ni por `caja_chica_movimiento`
 (ese modelo sigue sin existir — el pago sale por cuentas por pagar
 normal). Detalle de la decisión en ADR-082.
 
-**Consumidor nuevo (2026-09-09, ADR-098)**: el módulo `assets` liga el
+**Consumidor nuevo (2026-09-09, ADR-099)**: el módulo `assets` liga el
 comprobante de una carga de combustible con un artículo `tipo="servicio"`
 ("Combustible") registrado por esta vía — el ticket del grifo se compra
 como cualquier otro servicio y `assets` solo consume el id del comprobante
@@ -168,7 +168,7 @@ parte por dirección: el emitido es único por empresa, el recibido por emisor.
 diga otra cosa. `tipo` y `sustento` pasan a `Literal` — eran `str` libres
 contra columnas `Enum` con CHECK, o sea un 500 en vez de un 422.
 
-## OC tipo `activo` (2026-09-09, ADR-098)
+## OC tipo `activo` (2026-09-09, ADR-099)
 
 `POST /ordenes-compra-activo` crea una OC de un `requerimiento_activo`
 (nombre, categoría, marca, modelo, costo estimado, vida útil — su propio

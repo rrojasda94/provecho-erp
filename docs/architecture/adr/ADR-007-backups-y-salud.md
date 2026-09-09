@@ -3,7 +3,7 @@
 - Estado: aceptado
 - Fecha: 2026-07-26
 
-> **Nota (2026-09-09, ADR-098)**: `assets` suma un segundo consumidor de las
+> **Nota (2026-09-09, ADR-099)**: `assets` suma un segundo consumidor de las
 > variables `s3_*` y de `boto3` — `src/shared/integrations/storage/s3.py`
 > genera URLs prefirmadas para que el cliente suba adjuntos de
 > `documento_vigencia` directo a S3. La decisión de acá no cambia: `boto3`

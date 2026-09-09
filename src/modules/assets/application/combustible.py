@@ -28,7 +28,9 @@ CODIGO_TOLERANCIA = "tolerancia_consumo_pct"
 
 def tolerancia_consumo(session: Session, empresa_id: uuid.UUID) -> int:
     valor = parametros.valor_vigente(session, empresa_id, "assets", CODIGO_TOLERANCIA, default=None)
-    return int(valor) if valor is not None else rules.TOLERANCIA_CONSUMO_PCT_DEFECTO
+    if isinstance(valor, dict) and "porcentaje" in valor:
+        return int(valor["porcentaje"])
+    return rules.TOLERANCIA_CONSUMO_PCT_DEFECTO
 
 
 def registrar_carga(

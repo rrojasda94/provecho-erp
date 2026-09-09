@@ -3,7 +3,7 @@
 Fecha: 2026-08-05
 Estado: aceptada
 
-> **Superado en parte (2026-09-09, ADR-098)**: el punto 4 de este ADR
+> **Superado en parte (2026-09-09, ADR-099)**: el punto 4 de este ADR
 > ("No hay entidad `vehiculo`") queda superado — el usuario pidió registrar
 > vehículos de verdad y el módulo `assets` ya los tiene. `guia_remision`
 > ganó un `vehiculo_id` **sin FK** (no una FK cruzada: `inventory` sigue sin

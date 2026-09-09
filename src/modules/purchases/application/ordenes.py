@@ -1,7 +1,7 @@
 """Casos de uso de orden de compra: crear (borrador) → emitir → recibir
 (total/parcial) → anular.
 
-Tipo `activo` (ADR-098) recibe distinto que tipo `insumo`: sin ítems de
+Tipo `activo` (ADR-099) recibe distinto que tipo `insumo`: sin ítems de
 `inventory`, un solo `requerimiento_activo` y una recepción total (no
 parcial) que publica el evento que `assets` consume para dar de alta el
 activo solo. `emitir_orden_compra`/`anular_orden_compra` no distinguen

@@ -1,12 +1,15 @@
 # Historial — Módulo `assets`
 
 Estado vigente: 🔶 En curso — slice core (activos, kilometraje/combustible,
-mantenimiento, documentos con vencimiento) implementado el 2026-09-09; queda
-deuda declarada (`docs/roadmap/deuda/modulo-assets.md`).
+mantenimiento, documentos con vencimiento) implementado el 2026-09-09, y el
+mismo día se cerró toda la deuda declarada al cerrarlo salvo `flota`
+(repuestos, alta automática desde `purchases`, depreciación en
+`accounting`, `guia_remision.vehiculo_id`, adjuntos a S3, canal de alerta
+por email); ver `docs/roadmap/deuda/modulo-assets.md`.
 
 ## Cronología
 
-### 2026-09-09 — Slice core: activos, mantenimiento, combustible y documentos con vencimiento (ADR-098)
+### 2026-09-09 — Slice core: activos, mantenimiento, combustible y documentos con vencimiento (ADR-099)
 
 El usuario pidió directamente lo que faltaba: mantenimiento y cronograma de
 equipos y vehículos, kilometraje, comprobantes de combustible por vehículo
@@ -57,3 +60,55 @@ Migración `30270ac890b1` (nueve tablas). 19 tests en `tests/test_assets.py`
 (dominio puro + API con tenant + integración con `reports`, verificando que
 el barrido publica una sola vez por ventana). Suite completa verde contra
 SQLite y Postgres.
+
+### 2026-09-09 — Cierre de la deuda declarada al abrir el módulo
+
+El mismo día del slice core, con el usuario pidiendo explícitamente "todo,
+incluyendo construir lo que falta en purchases/accounting/reports": seis
+slices más, cada uno con su propia migración, pruebas y documentación.
+
+- **Repuestos**: `repuesto_compatibilidad` (activo↔artículo `tipo=
+  "repuesto"`) y `orden_mantenimiento_repuesto` (líneas de consumo al
+  realizar la orden, evento `inventory.movimiento_registrado` con origen
+  `orden_mantenimiento`). No bloquea registrar un repuesto no listado.
+- **`guia_remision.vehiculo_id`**: FK opcional a `assets.vehiculo` —
+  `inventory` resuelve la placa a mostrar por el vehículo si se registró
+  uno, o cae al texto libre existente si no. ADR-027 §4 queda superado.
+- **Adjuntos con subida real a S3**: `src/shared/integrations/storage/
+  s3.py`, mismo patrón de import perezoso que `src/backups/backup.py`
+  (ADR-007) — URLs prefirmadas de subida y descarga, sin que `boto3` sea
+  obligatorio para correr la API.
+- **Canal de alerta por email**: `reports` sumó `canal`
+  (`campana`/`email`) a `regla_distribucion`/`entrega_reporte` y
+  `src/shared/integrations/email/smtp.py` — deuda de `reports` (ADR-033),
+  `assets` la hereda sin cambios propios.
+- **Depreciación en `accounting`**: `activo_depreciacion` (línea mensual
+  por activo) + barrido `accounting.correr_depreciacion_mensual`
+  (PROC-CTB-010), asiento vía `crear_asiento_automatico` existente
+  (idempotente por `activo_id:YYYY-MM`, respeta periodo cerrado). Consume
+  `assets.application.queries_publicas.activos_depreciables` — el contrato
+  público que evita que `accounting` importe el dominio de `assets`.
+- **OC tipo `activo` + alta automática**: `purchases` construyó
+  `requerimiento_activo` y `crear_orden_compra_activo`/
+  `recibir_orden_compra_activo` (sin ítems de `inventory`, recepción
+  total). `assets.application.listeners` (primer listener del módulo)
+  consume `purchases.requerimiento_activo_recibido` y da de alta el
+  activo. La doble aprobación de área/gerencia y las cotizaciones mínimas
+  que `purchases` tenía especificadas siguen sin construirse (deuda de ese
+  módulo).
+- **`tolerancia_consumo_pct`**: el parámetro nunca llegaba a proponerse
+  (faltaba en `src/seeders/parametros.py`) y `assets` no estaba en el
+  selector de `/gerencia/parametros`. Se corrigieron ambos gaps, y de paso
+  un bug en `combustible.tolerancia_consumo` que leía `int(valor)` sobre
+  un dict en vez de `valor["porcentaje"]` (nunca se había ejercitado con
+  un valor distinto al semilla).
+
+Fusión con `main` el mismo día: `delivery` (reparto propio) se mergeó en
+paralelo y también pidió `ADR-098` — se renumeró el de este módulo a
+`ADR-099` (`docs/engineering/trabajo-en-paralelo.md`: quien mergea después
+renumera). Dos cabezas de Alembic (`e0ef2e91cadc` de este módulo y
+`69f4ca1d58f4` de `delivery`) resueltas re-encadenando el `down_revision`
+de la primera migración de este módulo a la nueva cabeza, sin migración de
+merge — mismo criterio que documenta esa guía.
+
+Queda abierto solo `flota` — ver `docs/roadmap/deuda/modulo-assets.md`.

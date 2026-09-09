@@ -134,7 +134,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   `regla_asiento`) — eso sigue pendiente. Tampoco incluye RN-POS-009..013
   completas ni la máquina de estados de `custodia_efectivo` — ver Deuda
   técnica → Dashboard y caja.
-- ✅ 2026-09-09 **Depreciación de activo fijo** (PROC-CTB-010, ADR-098): ya
+- ✅ 2026-09-09 **Depreciación de activo fijo** (PROC-CTB-010, ADR-099): ya
   existe `assets` para depreciar. Barrido mensual (Celery beat, día 1),
   lineal (`valor_compra / vida_util_meses`), un asiento por activo por mes
   (debe 6813, haber 3913), idempotente por `<activo_id>:<AAAA-MM>`.

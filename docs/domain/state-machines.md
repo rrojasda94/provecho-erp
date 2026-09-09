@@ -204,7 +204,7 @@ stateDiagram-v2
 
 `de_baja` no vuelve a `operativo` — RN-ACT-001/002 (depreciación total +
 acta) siguen pendientes en `accounting`; hoy es un acto administrativo del
-módulo `assets` (ADR-098).
+módulo `assets` (ADR-099).
 
 ## Orden de mantenimiento
 

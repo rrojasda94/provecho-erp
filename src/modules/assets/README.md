@@ -6,7 +6,7 @@ Registro operativo de los equipos y vehículos del grupo: kilometraje y
 consumo de combustible, cronograma de mantenimiento con aviso anticipado, y
 documentos con fecha de vencimiento (SOAT, revisión técnica, licencia de
 funcionamiento, carné de sanidad, licencia de conducir, etc.). Pedido
-directo del usuario (2026-09-09) — nada de esto existía antes (ADR-098).
+directo del usuario (2026-09-09) — nada de esto existía antes (ADR-099).
 
 **No es dueño del ciclo de compra ni de la depreciación.** Un activo se
 compra en `purchases` (OC tipo `activo`, deuda declarada de ese módulo) y

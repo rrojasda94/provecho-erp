@@ -120,7 +120,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     minutos entre dos locales de la misma ciudad. `transportista_id` alcanza
     para saber quién lo llevó, que es la pregunta que sí se hace cuando algo
     no llega. Vuelve a la mesa si aparece reparto propio con flota.
-    **Actualización 2026-09-09 (ADR-098)**: el "si aparece" pasó — el
+    **Actualización 2026-09-09 (ADR-099)**: el "si aparece" pasó — el
     usuario pidió registrar vehículos de verdad, y `vehiculo` ya existe en
     el módulo `assets`. Esto no reabre la transferencia: sigue sin
     `vehiculo_id` ni tracking (nadie lo pidió para el traslado en sí), y

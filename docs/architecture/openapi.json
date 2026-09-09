@@ -8968,6 +8968,7 @@
                 "enum": [
                   "accounting",
                   "assets",
+                  "delivery",
                   "inventory",
                   "marketing",
                   "production",
@@ -11195,6 +11196,231 @@
         "title": "EntregaOut",
         "type": "object"
       },
+      "EntregaRepartoOut": {
+        "properties": {
+          "destino_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino Lat"
+          },
+          "destino_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino Lng"
+          },
+          "entregado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entregado Por"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "eta_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta At"
+          },
+          "fecha_entrega": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Entrega"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "intentos": {
+            "title": "Intentos",
+            "type": "integer"
+          },
+          "motivo_detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Detalle"
+          },
+          "motivo_fallo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Fallo"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "orden_parada": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden Parada"
+          },
+          "repartidor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repartidor Id"
+          },
+          "resultado_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resultado Lat"
+          },
+          "resultado_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resultado Lng"
+          },
+          "ruta_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ruta Id"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "tramo_distancia_m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tramo Distancia M"
+          },
+          "tramo_duracion_seg": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tramo Duracion Seg"
+          },
+          "venta_id": {
+            "format": "uuid",
+            "title": "Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "venta_id",
+          "sucursal_id",
+          "ruta_id",
+          "repartidor_id",
+          "orden_parada",
+          "estado",
+          "intentos",
+          "eta_at",
+          "tramo_distancia_m",
+          "tramo_duracion_seg",
+          "destino_lat",
+          "destino_lng",
+          "fecha_entrega",
+          "entregado_por",
+          "motivo_fallo",
+          "motivo_detalle",
+          "resultado_lat",
+          "resultado_lng",
+          "observacion"
+        ],
+        "title": "EntregaRepartoOut",
+        "type": "object"
+      },
       "EntregaReporteOut": {
         "properties": {
           "canal": {
@@ -11241,6 +11467,70 @@
           "autorizacion"
         ],
         "title": "EntregarCustodiaIn",
+        "type": "object"
+      },
+      "EntregarIn": {
+        "properties": {
+          "foto": {
+            "anyOf": [
+              {
+                "maxLength": 175000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lng"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          }
+        },
+        "title": "EntregarIn",
         "type": "object"
       },
       "ErrorCampo": {
@@ -12060,6 +12350,84 @@
           "producto_comercial_id"
         ],
         "title": "ExtraIn",
+        "type": "object"
+      },
+      "FallarIn": {
+        "properties": {
+          "detalle": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          },
+          "foto": {
+            "anyOf": [
+              {
+                "maxLength": 175000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lng"
+          },
+          "motivo": {
+            "enum": [
+              "cliente_ausente",
+              "direccion_errada",
+              "rechazo",
+              "no_contesta",
+              "otro"
+            ],
+            "title": "Motivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "motivo"
+        ],
+        "title": "FallarIn",
         "type": "object"
       },
       "FiltrosIn": {
@@ -18427,6 +18795,37 @@
         "title": "Pagina[EncuestaOut]",
         "type": "object"
       },
+      "Pagina_EntregaRepartoOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EntregaRepartoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[EntregaRepartoOut]",
+        "type": "object"
+      },
       "Pagina_EscalamientoOut_": {
         "properties": {
           "items": {
@@ -18921,6 +19320,37 @@
           "page_size"
         ],
         "title": "Pagina[ReporteEmitidoOut]",
+        "type": "object"
+      },
+      "Pagina_RutaOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RutaOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[RutaOut]",
         "type": "object"
       },
       "Pagina_SolicitudOut_": {
@@ -19758,6 +20188,7 @@
             "enum": [
               "accounting",
               "assets",
+              "delivery",
               "inventory",
               "marketing",
               "production",
@@ -21704,6 +22135,62 @@
           "pos_tarjeta_id"
         ],
         "title": "PosVerificadoIn",
+        "type": "object"
+      },
+      "PosicionIn": {
+        "properties": {
+          "lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Lng"
+          },
+          "precision_m": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Precision M"
+          },
+          "registrado_at": {
+            "format": "date-time",
+            "title": "Registrado At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lat",
+          "lng",
+          "registrado_at"
+        ],
+        "title": "PosicionIn",
         "type": "object"
       },
       "PostulacionPublica": {
@@ -26555,6 +27042,247 @@
         "title": "ReglaUpdate",
         "type": "object"
       },
+      "RepartidorCandidatoOut": {
+        "properties": {
+          "cargo": {
+            "title": "Cargo",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "trabajador_id": {
+            "format": "uuid",
+            "title": "Trabajador Id",
+            "type": "string"
+          },
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trabajador_id",
+          "usuario_id",
+          "nombre",
+          "cargo",
+          "sucursal_id"
+        ],
+        "title": "RepartidorCandidatoOut",
+        "type": "object"
+      },
+      "RepartidorCreate": {
+        "properties": {
+          "placa": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placa"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "trabajador_id": {
+            "format": "uuid",
+            "title": "Trabajador Id",
+            "type": "string"
+          },
+          "vehiculo_tipo": {
+            "enum": [
+              "moto",
+              "bicicleta",
+              "auto",
+              "a_pie"
+            ],
+            "title": "Vehiculo Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trabajador_id",
+          "sucursal_id",
+          "vehiculo_tipo"
+        ],
+        "title": "RepartidorCreate",
+        "type": "object"
+      },
+      "RepartidorOut": {
+        "properties": {
+          "activo": {
+            "title": "Activo",
+            "type": "boolean"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "placa": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placa"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "trabajador_id": {
+            "format": "uuid",
+            "title": "Trabajador Id",
+            "type": "string"
+          },
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          },
+          "vehiculo_tipo": {
+            "title": "Vehiculo Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "sucursal_id",
+          "trabajador_id",
+          "usuario_id",
+          "vehiculo_tipo",
+          "placa",
+          "telefono",
+          "activo"
+        ],
+        "title": "RepartidorOut",
+        "type": "object"
+      },
+      "RepartidorUpdate": {
+        "description": "Campo ausente = no tocar.",
+        "properties": {
+          "activo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activo"
+          },
+          "placa": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placa"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "vehiculo_tipo": {
+            "anyOf": [
+              {
+                "enum": [
+                  "moto",
+                  "bicicleta",
+                  "auto",
+                  "a_pie"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vehiculo Tipo"
+          }
+        },
+        "title": "RepartidorUpdate",
+        "type": "object"
+      },
       "ReporteEmitidoDetalleOut": {
         "properties": {
           "actor": {
@@ -27571,6 +28299,231 @@
         "title": "RolIdIn",
         "type": "object"
       },
+      "RutaCreate": {
+        "properties": {
+          "optimizar": {
+            "default": true,
+            "title": "Optimizar",
+            "type": "boolean"
+          },
+          "repartidor_id": {
+            "format": "uuid",
+            "title": "Repartidor Id",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "venta_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Venta Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sucursal_id",
+          "repartidor_id",
+          "venta_ids"
+        ],
+        "title": "RutaCreate",
+        "type": "object"
+      },
+      "RutaOut": {
+        "properties": {
+          "creada_por": {
+            "format": "uuid",
+            "title": "Creada Por",
+            "type": "string"
+          },
+          "distancia_m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia M"
+          },
+          "duracion_seg": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duracion Seg"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "hora_fin": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Fin"
+          },
+          "hora_salida": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Salida"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "optimizada_por": {
+            "title": "Optimizada Por",
+            "type": "string"
+          },
+          "origen_lat": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Origen Lat",
+            "type": "string"
+          },
+          "origen_lng": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Origen Lng",
+            "type": "string"
+          },
+          "polyline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Polyline"
+          },
+          "repartidor_id": {
+            "format": "uuid",
+            "title": "Repartidor Id",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "ultima_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Lat"
+          },
+          "ultima_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Lng"
+          },
+          "ultima_posicion_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Posicion At"
+          },
+          "ultima_precision_m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Precision M"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "repartidor_id",
+          "creada_por",
+          "estado",
+          "hora_salida",
+          "hora_fin",
+          "origen_lat",
+          "origen_lng",
+          "distancia_m",
+          "duracion_seg",
+          "polyline",
+          "optimizada_por",
+          "ultima_lat",
+          "ultima_lng",
+          "ultima_precision_m",
+          "ultima_posicion_at"
+        ],
+        "title": "RutaOut",
+        "type": "object"
+      },
+      "RutaParadasUpdate": {
+        "properties": {
+          "optimizar": {
+            "default": true,
+            "title": "Optimizar",
+            "type": "boolean"
+          },
+          "venta_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Venta Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "venta_ids"
+        ],
+        "title": "RutaParadasUpdate",
+        "type": "object"
+      },
       "SaldoCuentaOut": {
         "description": "Cuánto queda por cobrar en una cuenta de la venta (RN-COM-018).\n\nEs la cifra que el diálogo de cobro tiene que mostrar: la calcula el\nmismo `total_a_cobrar` que después valida el pago, así que descuento,\ncupón, promoción y flete no pueden discrepar entre pantalla y servidor.",
         "properties": {
@@ -27638,6 +28591,208 @@
           "total"
         ],
         "title": "SeccionEstadoOut",
+        "type": "object"
+      },
+      "SeguimientoDestinoOut": {
+        "properties": {
+          "lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lng"
+          }
+        },
+        "required": [
+          "lat",
+          "lng"
+        ],
+        "title": "SeguimientoDestinoOut",
+        "type": "object"
+      },
+      "SeguimientoHitoOut": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "hito": {
+            "title": "Hito",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hito",
+          "at"
+        ],
+        "title": "SeguimientoHitoOut",
+        "type": "object"
+      },
+      "SeguimientoOut": {
+        "description": "Lo mínimo que ve el cliente por el enlace público (RN-DLV-008):\nnunca monto, teléfono, dirección en texto ni las demás paradas de la\nruta.",
+        "properties": {
+          "destino": {
+            "$ref": "#/components/schemas/SeguimientoDestinoOut"
+          },
+          "estado_publico": {
+            "enum": [
+              "preparando",
+              "en_camino",
+              "entregado",
+              "no_entregado"
+            ],
+            "title": "Estado Publico",
+            "type": "string"
+          },
+          "eta_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta At"
+          },
+          "linea_tiempo": {
+            "items": {
+              "$ref": "#/components/schemas/SeguimientoHitoOut"
+            },
+            "title": "Linea Tiempo",
+            "type": "array"
+          },
+          "numero_orden": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Orden"
+          },
+          "posicion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeguimientoPosicionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "repartidor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeguimientoRepartidorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sucursal": {
+            "$ref": "#/components/schemas/SeguimientoSucursalOut"
+          }
+        },
+        "required": [
+          "estado_publico",
+          "numero_orden",
+          "sucursal",
+          "repartidor",
+          "eta_at",
+          "posicion",
+          "destino",
+          "linea_tiempo"
+        ],
+        "title": "SeguimientoOut",
+        "type": "object"
+      },
+      "SeguimientoPosicionOut": {
+        "properties": {
+          "lat": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Lat",
+            "type": "string"
+          },
+          "lng": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Lng",
+            "type": "string"
+          },
+          "registrado_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registrado At"
+          }
+        },
+        "required": [
+          "lat",
+          "lng",
+          "registrado_at"
+        ],
+        "title": "SeguimientoPosicionOut",
+        "type": "object"
+      },
+      "SeguimientoRepartidorOut": {
+        "properties": {
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "SeguimientoRepartidorOut",
+        "type": "object"
+      },
+      "SeguimientoSucursalOut": {
+        "properties": {
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "SeguimientoSucursalOut",
         "type": "object"
       },
       "SemaforoOut": {
@@ -29520,70 +30675,6 @@
           "nombre"
         ],
         "title": "TableroIn",
-        "type": "object"
-      },
-      "TableroOut": {
-        "properties": {
-          "compartido_por": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Compartido Por"
-          },
-          "filtros": {
-            "additionalProperties": true,
-            "title": "Filtros",
-            "type": "object"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "nombre": {
-            "title": "Nombre",
-            "type": "string"
-          },
-          "predeterminado": {
-            "title": "Predeterminado",
-            "type": "boolean"
-          },
-          "propio": {
-            "default": true,
-            "title": "Propio",
-            "type": "boolean"
-          },
-          "rol_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Rol Id"
-          },
-          "tarjetas": {
-            "items": {},
-            "title": "Tarjetas",
-            "type": "array"
-          }
-        },
-        "required": [
-          "id",
-          "nombre",
-          "predeterminado",
-          "tarjetas",
-          "filtros"
-        ],
-        "title": "TableroOut",
         "type": "object"
       },
       "TarjetaIn": {
@@ -32373,6 +33464,101 @@
         "title": "VentaItemSyncIn",
         "type": "object"
       },
+      "VentaListaOut": {
+        "properties": {
+          "cliente_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Id"
+          },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
+          "distancia_entrega_km": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia Entrega Km"
+          },
+          "fecha_orden": {
+            "format": "date",
+            "title": "Fecha Orden",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "numero_orden": {
+            "title": "Numero Orden",
+            "type": "integer"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "numero_orden",
+          "fecha_orden",
+          "cliente_id",
+          "direccion_entrega",
+          "ubicacion_lat",
+          "ubicacion_lng",
+          "distancia_entrega_km"
+        ],
+        "title": "VentaListaOut",
+        "type": "object"
+      },
       "VentaOut": {
         "properties": {
           "canal": {
@@ -32971,6 +34157,70 @@
         "title": "RolOut",
         "type": "object"
       },
+      "src__core__reportes__router__TableroOut": {
+        "properties": {
+          "compartido_por": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compartido Por"
+          },
+          "filtros": {
+            "additionalProperties": true,
+            "title": "Filtros",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "predeterminado": {
+            "title": "Predeterminado",
+            "type": "boolean"
+          },
+          "propio": {
+            "default": true,
+            "title": "Propio",
+            "type": "boolean"
+          },
+          "rol_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rol Id"
+          },
+          "tarjetas": {
+            "items": {},
+            "title": "Tarjetas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "predeterminado",
+          "tarjetas",
+          "filtros"
+        ],
+        "title": "TableroOut",
+        "type": "object"
+      },
       "src__modules__accounting__api__schemas__CajaAbiertaOut": {
         "properties": {
           "abierta_desde": {
@@ -33019,6 +34269,30 @@
           "abierta_desde"
         ],
         "title": "CajaAbiertaOut",
+        "type": "object"
+      },
+      "src__modules__delivery__api__schemas__TableroOut": {
+        "properties": {
+          "rutas": {
+            "items": {
+              "$ref": "#/components/schemas/RutaOut"
+            },
+            "title": "Rutas",
+            "type": "array"
+          },
+          "sin_asignar": {
+            "items": {
+              "$ref": "#/components/schemas/VentaListaOut"
+            },
+            "title": "Sin Asignar",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sin_asignar",
+          "rutas"
+        ],
+        "title": "TableroOut",
         "type": "object"
       },
       "src__modules__inventory__api__schemas__ResultadoImportacionOut": {
@@ -38737,6 +40011,1239 @@
         "summary": "Ver Decision Gerencial",
         "tags": [
           "gerencia"
+        ]
+      }
+    },
+    "/api/v1/delivery/entregas": {
+      "get": {
+        "operationId": "listar_entregas_api_v1_delivery_entregas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "in": "query",
+            "name": "repartidor_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Repartidor Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_EntregaRepartoOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Entregas",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/entregas/{entrega_id}/cerrar": {
+      "post": {
+        "operationId": "cerrar_api_v1_delivery_entregas__entrega_id__cerrar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entrega_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entrega Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntregaRepartoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cerrar",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/entregas/{entrega_id}/entregar": {
+      "post": {
+        "operationId": "entregar_api_v1_delivery_entregas__entrega_id__entregar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entrega_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entrega Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EntregarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntregaRepartoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Entregar",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/entregas/{entrega_id}/evidencia": {
+      "get": {
+        "operationId": "evidencia_de_entrega_api_v1_delivery_entregas__entrega_id__evidencia_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entrega_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entrega Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Evidencia De Entrega",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/entregas/{entrega_id}/fallar": {
+      "post": {
+        "operationId": "fallar_api_v1_delivery_entregas__entrega_id__fallar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entrega_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entrega Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FallarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntregaRepartoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Fallar",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/entregas/{entrega_id}/reintentar": {
+      "post": {
+        "operationId": "reintentar_api_v1_delivery_entregas__entrega_id__reintentar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entrega_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entrega Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntregaRepartoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Reintentar",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/mi/rutas": {
+      "get": {
+        "operationId": "mis_rutas_api_v1_delivery_mi_rutas_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RutaOut"
+                  },
+                  "title": "Response Mis Rutas Api V1 Delivery Mi Rutas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Mis Rutas",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/publico/seguimiento/{token}": {
+      "get": {
+        "operationId": "ver_seguimiento_api_v1_delivery_publico_seguimiento__token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeguimientoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Ver Seguimiento",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/repartidores": {
+      "get": {
+        "operationId": "listar_repartidores_api_v1_delivery_repartidores_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "activo",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Activo"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RepartidorOut"
+                  },
+                  "title": "Response Listar Repartidores Api V1 Delivery Repartidores Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Repartidores",
+        "tags": [
+          "delivery"
+        ]
+      },
+      "post": {
+        "operationId": "crear_repartidor_api_v1_delivery_repartidores_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepartidorCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepartidorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Repartidor",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/repartidores/candidatos": {
+      "get": {
+        "operationId": "listar_candidatos_api_v1_delivery_repartidores_candidatos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RepartidorCandidatoOut"
+                  },
+                  "title": "Response Listar Candidatos Api V1 Delivery Repartidores Candidatos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Candidatos",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/repartidores/{repartidor_id}": {
+      "patch": {
+        "operationId": "editar_repartidor_api_v1_delivery_repartidores__repartidor_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "repartidor_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Repartidor Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepartidorUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepartidorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Repartidor",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/rutas": {
+      "get": {
+        "operationId": "listar_rutas_api_v1_delivery_rutas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_RutaOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Rutas",
+        "tags": [
+          "delivery"
+        ]
+      },
+      "post": {
+        "operationId": "crear_ruta_api_v1_delivery_rutas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RutaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RutaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Ruta",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/rutas/{ruta_id}": {
+      "get": {
+        "operationId": "ver_ruta_api_v1_delivery_rutas__ruta_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ruta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Ruta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RutaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Ruta",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/rutas/{ruta_id}/cancelar": {
+      "post": {
+        "operationId": "cancelar_ruta_api_v1_delivery_rutas__ruta_id__cancelar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ruta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Ruta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RutaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cancelar Ruta",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/rutas/{ruta_id}/finalizar": {
+      "post": {
+        "operationId": "finalizar_ruta_api_v1_delivery_rutas__ruta_id__finalizar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ruta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Ruta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RutaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Finalizar Ruta",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/rutas/{ruta_id}/iniciar": {
+      "post": {
+        "operationId": "iniciar_ruta_api_v1_delivery_rutas__ruta_id__iniciar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ruta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Ruta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RutaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Iniciar Ruta",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/rutas/{ruta_id}/paradas": {
+      "put": {
+        "operationId": "editar_paradas_api_v1_delivery_rutas__ruta_id__paradas_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ruta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Ruta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RutaParadasUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RutaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Paradas",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/rutas/{ruta_id}/posiciones": {
+      "post": {
+        "operationId": "registrar_posicion_api_v1_delivery_rutas__ruta_id__posiciones_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ruta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Ruta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PosicionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Posicion",
+        "tags": [
+          "delivery"
+        ]
+      }
+    },
+    "/api/v1/delivery/tablero": {
+      "get": {
+        "operationId": "ver_tablero_api_v1_delivery_tablero_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fecha",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fecha"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__delivery__api__schemas__TableroOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Tablero",
+        "tags": [
+          "delivery"
         ]
       }
     },
@@ -60586,7 +63093,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/TableroOut"
+                    "$ref": "#/components/schemas/src__core__reportes__router__TableroOut"
                   },
                   "title": "Response Listar Tableros Api V1 Tableros Get",
                   "type": "array"
@@ -60633,7 +63140,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TableroOut"
+                  "$ref": "#/components/schemas/src__core__reportes__router__TableroOut"
                 }
               }
             },
@@ -60771,7 +63278,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TableroOut"
+                  "$ref": "#/components/schemas/src__core__reportes__router__TableroOut"
                 }
               }
             },
@@ -61945,6 +64452,10 @@
     {
       "description": "Activos (equipamiento y vehículos): kilometraje y consumo de combustible, cronograma de mantenimiento y documentos con fecha de vencimiento (SOAT, licencias, certificados).",
       "name": "assets"
+    },
+    {
+      "description": "Reparto propio (ADR-098): repartidores, rutas con varias paradas, GPS en ruta y registro de entrega o fallo con motivo. El seguimiento público del cliente vive en su propio tag/slice.",
+      "name": "delivery"
     },
     {
       "description": "Emisión y distribución: qué hechos del ERP generan un reporte, a qué áreas y usuarios llega cada uno, y qué se entregó. No confundir con `reportes`, que es la consulta bajo demanda.",

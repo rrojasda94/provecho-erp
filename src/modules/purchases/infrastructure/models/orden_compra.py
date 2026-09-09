@@ -1,6 +1,6 @@
 """Orden de compra: proveedor → OC (borrador → emitida → recepción).
 
-Tipo `activo` (ADR-098, 2026-09-09) compra un `requerimiento_activo` en vez
+Tipo `activo` (ADR-099, 2026-09-09) compra un `requerimiento_activo` en vez
 de artículos de `inventory`: sin `almacen_destino_id` (no hay almacén de
 destino — el activo no entra a stock) y con `requerimiento_activo_id`
 obligatorio. La aprobación y la emisión son las mismas de cualquier OC —

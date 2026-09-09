@@ -1,4 +1,4 @@
-# ADR-098 — Módulo `assets`: activos, mantenimiento, combustible y documentos con vencimiento
+# ADR-099 — Módulo `assets`: activos, mantenimiento, combustible y documentos con vencimiento
 
 Fecha: 2026-09-09
 Estado: aceptada

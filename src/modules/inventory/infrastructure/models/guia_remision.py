@@ -12,7 +12,7 @@ numeraciones que SUNAT lleva por separado.
 
 Los datos del chofer viajan acá, tecleados: `inventory` no tiene ni tendrá
 un padrón de choferes. El vehículo, desde que existe `assets.Vehiculo`
-(ADR-098), se puede elegir por `vehiculo_id` — sin FK, `assets` es otro
+(ADR-099), se puede elegir por `vehiculo_id` — sin FK, `assets` es otro
 módulo — y su placa se congela en `vehiculo_placa` al emitir, igual que
 `lugar_origen`/`lugar_destino`. `vehiculo_id` es opcional y `vehiculo_placa`
 sigue aceptando texto libre por compatibilidad con guías ya emitidas antes

@@ -1,5 +1,5 @@
 - **Módulo `assets`: activos, mantenimiento, combustible y documentos con
-  vencimiento** (2026-09-09, ADR-098). Nada de esto tenía código —solo
+  vencimiento** (2026-09-09, ADR-099). Nada de esto tenía código —solo
   especificación desde julio y una decisión explícita de no crear
   `vehiculo` (ADR-027 §4)—, y el usuario lo pidió directamente: registro de
   equipos y vehículos, kilometraje y consumo de combustible con detección

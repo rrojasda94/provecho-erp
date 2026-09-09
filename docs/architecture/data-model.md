@@ -99,7 +99,7 @@ erDiagram
   `activos` es virtual (sin ubicación física ni stock de SKUs). Equipamiento
   y política FEFO/FIFO por tipo — ver
   [domain-model.md](../domain/domain-model.md#almacenes).
-- **activo** — módulo `assets` (ADR-098): empresa_id, sucursal_id (opcional),
+- **activo** — módulo `assets` (ADR-099): empresa_id, sucursal_id (opcional),
   tipo (`equipamiento` | `vehiculo`), id_interno (hasta 8 alfanuméricos,
   único por empresa — **lo teclea quien da de alta**, igual que
   `articulo.id_interno`; pese a RN-GEN-005 hoy nada en el ERP lo
@@ -126,7 +126,7 @@ erDiagram
 - **carga_combustible**: vehiculo_id, fecha, galones, monto,
   tipo_combustible (opcional), km_odometro, comprobante_id (FK
   `comprobante`, **NOT NULL + UNIQUE** — RN-VEH-006, el comprobante nace en
-  `purchases` vía compra directa sobre un artículo `tipo="servicio"`, ADR-098),
+  `purchases` vía compra directa sobre un artículo `tipo="servicio"`, ADR-099),
   km_recorridos y rendimiento_km_gal (derivados y congelados al registrar),
   anomalo (bool, RN-VEH-007), registrado_por.
 - **plan_mantenimiento**: activo_id, nombre, descripcion, cada_dias y/o
@@ -156,7 +156,7 @@ erDiagram
   repuesto no listado igual se puede registrar.
 - **documento_vigencia** — permisos y certificados con fecha de vencimiento
   (SOAT, revisión técnica, licencia de funcionamiento, carné de sanidad,
-  licencia de conducir, etc.; ADR-098, pedido del usuario — no existía
+  licencia de conducir, etc.; ADR-099, pedido del usuario — no existía
   ninguna entidad para esto): empresa_id, sujeto_tipo (`activo` |
   `sucursal` | `empresa` | `trabajador`) + sujeto_id (sin FK — polimórfico
   entre tres módulos, mismo patrón que `notificacion`), tipo_documento
@@ -755,7 +755,7 @@ en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
   no opcional como decía la especificación de julio: el único emisor de hoy
   es un traslado entre almacenes. La guía de una venta con reparto lo
   volverá nullable cuando exista reparto propio.
-  **`vehiculo_id`** (agregado 2026-09-09, ADR-098): sin FK — `vehiculo` es
+  **`vehiculo_id`** (agregado 2026-09-09, ADR-099): sin FK — `vehiculo` es
   dominio de `assets`—, opcional. Si viene, su placa se resuelve por
   `assets.application.queries_publicas.vehiculo_para_guia` y se congela en
   `vehiculo_placa` al emitir; si no, `vehiculo_placa` sigue aceptando texto
@@ -801,13 +801,13 @@ en la línea. Misma forma y mismas razones que `sin_articulo_ids`.
   almacén + factura), requerimiento_activo_id (obligatorio si tipo
   `activo` — CHECK `(tipo='activo') = (requerimiento_activo_id IS NOT
   NULL)`), almacen_destino_id (**nulo si tipo `activo`** — un activo no
-  entra a un almacén de `inventory`, ADR-098), estado (`borrador` |
+  entra a un almacén de `inventory`, ADR-099), estado (`borrador` |
   `emitida` | `recibida_parcial` | `recibida` | `anulada`; tipo `activo`
   solo usa `recibida`, nunca `recibida_parcial` — recepción total),
   idempotency_key. Ítems de tipo `insumo` en **orden_compra_item**
   (articulo, cantidad, costo); tipo `activo` no tiene ítems, la única
   "línea" es su `requerimiento_activo`.
-- **requerimiento_activo** (implementada 2026-09-09, ADR-098): empresa_id,
+- **requerimiento_activo** (implementada 2026-09-09, ADR-099): empresa_id,
   sucursal_id (destino, opcional), id_interno (el futuro `activo.id_interno`
   — se tecleó acá, RN-GEN-005 sigue sin generador), nombre, categoria,
   marca, modelo, costo_estimado (se vuelve `activo.valor_compra` al
@@ -1450,7 +1450,7 @@ Implementado (2026-07-25) — libro contable núcleo, además del ciclo de caja
   (`domain/plantillas.py`), que sí puede expresar el asiento peruano completo
   —N líneas, con IGV desagregado y asiento de destino—, cosa que un par
   debe/haber no puede. La regla sigue ganando cuando existe.
-- **activo_depreciacion** (ADR-098, 2026-09-09): empresa_id, activo_id (sin
+- **activo_depreciacion** (ADR-099, 2026-09-09): empresa_id, activo_id (sin
   FK — `assets`), valor_compra/vida_util_meses/fecha_inicio (congelados al
   primer barrido que ve el activo), depreciado_acumulado. El barrido
   mensual (PROC-CTB-010) lee `assets.application.queries_publicas.
@@ -2111,7 +2111,7 @@ dos cosas nunca van a ser un módulo.
   `movimiento_dinero`, caja, `custodia_efectivo`.
 - **BI/reportes** ✅ en `core/reportes` (ADR-024): catálogo de reportes +
   `tablero` guardado por usuario y compartido por rol.
-- **Activos: registro operativo** ✅ módulo `assets` (ADR-098, 2026-09-09):
+- **Activos: registro operativo** ✅ módulo `assets` (ADR-099, 2026-09-09):
   activo/equipamiento/vehículo, kilometraje y combustible, mantenimiento y
   documentos con vencimiento. La **depreciación** ✅ vive en `accounting`
   (activo fijo, PROC-CTB-010, resuelto 2026-09-09 — ver §Recursos). El

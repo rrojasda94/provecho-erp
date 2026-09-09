@@ -186,7 +186,7 @@ importe.
   Situación Financiera y Estado de Resultados.
 - Pago a proveedor: registrar (cola) → ejecutar (permiso + umbral) →
   asiento automático, o rechazar.
-- Depreciación de activo fijo (PROC-CTB-010, ADR-098): barrido mensual
+- Depreciación de activo fijo (PROC-CTB-010, ADR-099): barrido mensual
   (Celery beat, día 1) sobre `assets.application.queries_publicas.
   activos_depreciables` — lineal, un asiento por activo por mes (debe
   `6813`, haber `3913`), idempotente por `<activo_id>:<AAAA-MM>`.

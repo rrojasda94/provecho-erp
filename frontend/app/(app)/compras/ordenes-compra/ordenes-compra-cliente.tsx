@@ -285,7 +285,7 @@ function BotonEditarOC({ orden, articulos }: { orden: OrdenCompra; articulos: Ar
 }
 
 /** OC de un activo: sin ítems de inventario, un solo formulario descriptivo
- * (ADR-098). Comprar varias unidades del mismo activo en una OC queda fuera
+ * (ADR-099). Comprar varias unidades del mismo activo en una OC queda fuera
  * de este slice. */
 function DialogoNuevaOCActivo({ proveedores }: { proveedores: Proveedor[] }) {
   return (
