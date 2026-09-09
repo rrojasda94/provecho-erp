@@ -264,7 +264,7 @@ nombre del archivo.
 | Módulo inventory (slices siguientes) | [`modulo-inventory.md`](docs/roadmap/deuda/modulo-inventory.md) | 1 | 55 |
 | Módulo sales (slices siguientes) | [`modulo-sales.md`](docs/roadmap/deuda/modulo-sales.md) | 51 | 28 |
 | Módulo purchases (slices siguientes) | [`modulo-purchases.md`](docs/roadmap/deuda/modulo-purchases.md) | 7 | 3 |
-| Módulo production (slices siguientes) | [`modulo-production.md`](docs/roadmap/deuda/modulo-production.md) | 8 | 1 |
+| Módulo production (slices siguientes) | [`modulo-production.md`](docs/roadmap/deuda/modulo-production.md) | 17 | 3 |
 | Módulo accounting (slices siguientes) | [`modulo-accounting.md`](docs/roadmap/deuda/modulo-accounting.md) | 8 | 3 |
 | Módulo rrhh (slice completo — deuda declarada) | [`modulo-rrhh.md`](docs/roadmap/deuda/modulo-rrhh.md) | 11 | 4 |
 | Módulo marketing (slice core — deuda declarada) | [`modulo-marketing.md`](docs/roadmap/deuda/modulo-marketing.md) | 5 | 2 |
