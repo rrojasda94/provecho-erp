@@ -113,6 +113,16 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       TEST_DATABASE_URL: postgresql+psycopg://provecho:provecho@localhost:5432/provecho_tests
+      # `-n auto` (pyproject.toml) reparte un worker por núcleo del runner. Contra
+      # SQLite (job `backend`) cada worker es autónomo; acá todos comparten un
+      # único Postgres con los límites por defecto (`max_connections=100`,
+      # `max_locks_per_transaction=64`), y un runner con más núcleos que eso
+      # tira la corrida entera con "too many clients already" u "out of shared
+      # memory" al dropear los schemas — un fallo de capacidad de CI, no del
+      # código que cambia el PR de turno. Se tapa la fuga acá en vez de subir
+      # los límites del contenedor: menos superficie, mismo Postgres que usa
+      # cualquiera en dev.
+      PYTEST_XDIST_AUTO_NUM_WORKERS: "8"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
