@@ -201,6 +201,116 @@ def costo_unitario_de_recetas(
     return costos
 
 
+def costo_promedio_de_articulos(
+    session: Session, articulo_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, Decimal]:
+    """`articulo_id` → `costo_promedio` vigente.
+
+    Lo usa `production` para costear el consumo real sin que quien lo
+    registra lo tipee a mano (RN-PRD-018): sin `costo_unitario` explícito en
+    la línea, el costeo automático lee este valor.
+    """
+    ids = {i for i in articulo_ids if i is not None}
+    if not ids:
+        return {}
+    return {
+        art.id: art.costo_promedio
+        for art in session.scalars(select(Articulo).where(Articulo.id.in_(ids)))
+    }
+
+
+def consumo_sugerido_de_receta(
+    session: Session, articulo_producido_id: uuid.UUID, cantidad_planeada: Decimal
+) -> dict | None:
+    """Explota la receta BOM que produce `articulo_producido_id`, escalada a
+    `cantidad_planeada` (RN-PRD-018): cuánto insumo hace falta según la ficha
+    técnica —merma esperada de cada línea ya aplicada, costeado al
+    `costo_promedio` vigente. `None` si el artículo no tiene una receta de
+    subreceta que lo produzca (nada que sugerir).
+
+    Reusa `recetas.costo_linea`/`domain.rules.consumo_de_linea`, la misma
+    cuenta que ya usa la ficha de receta (`detalle_receta`): costear el
+    consumo sugerido con una fórmula distinta a la de la ficha es cómo el
+    margen de una subreceta deja de cuadrar con lo que dice su BOM, sin que
+    ninguna de las dos parezca estar mal.
+    """
+    receta = session.scalar(
+        select(Receta).where(Receta.articulo_id == articulo_producido_id)
+    )
+    if receta is None or not receta.rendimiento_cantidad:
+        return None
+    factor = Decimal(str(cantidad_planeada)) / receta.rendimiento_cantidad
+    items = list(
+        session.scalars(select(RecetaItem).where(RecetaItem.receta_id == receta.id))
+    )
+    lineas: list[dict] = []
+    costo_total = Decimal(0)
+    for item in items:
+        articulo = session.get(Articulo, item.articulo_id)
+        if articulo is None:
+            continue
+        udm = session.get(UnidadMedida, articulo.unidad_medida_id)
+        ratio_linea, ratio_articulo = recetas_uc.ratios_de_linea(session, item, articulo)
+        cantidad_base = item.cantidad * factor
+        # Sin merma primero, para aislar cuánto de lo sugerido es desperdicio
+        # esperado y cuánto es lo que de verdad llega al producto.
+        cantidad_sin_merma = rules.consumo_de_linea(
+            cantidad_base, Decimal(0), ratio_linea, ratio_articulo
+        )
+        cantidad_sugerida = rules.consumo_de_linea(
+            cantidad_base, item.merma_pct, ratio_linea, ratio_articulo
+        )
+        costo_linea_valor = cantidad_sugerida * articulo.costo_promedio
+        costo_total += costo_linea_valor
+        lineas.append(
+            {
+                "articulo_id": articulo.id,
+                "articulo_nombre": articulo.nombre,
+                "unidad_medida_id": articulo.unidad_medida_id,
+                "unidad_medida_nombre": udm.nombre if udm else None,
+                "merma_pct": item.merma_pct,
+                "cantidad_sugerida": cantidad_sugerida,
+                "desperdicio_esperado": cantidad_sugerida - cantidad_sin_merma,
+                "costo_unitario": articulo.costo_promedio,
+                "costo_linea": costo_linea_valor,
+            }
+        )
+    return {
+        "receta_id": receta.id,
+        "rendimiento_cantidad": receta.rendimiento_cantidad,
+        "factor": factor,
+        "items": lineas,
+        "costo_total": costo_total,
+    }
+
+
+def convertir_a_udm_de_articulo(
+    session: Session,
+    articulo_id: uuid.UUID,
+    cantidad: Decimal,
+    unidad_medida_id: uuid.UUID,
+) -> Decimal | None:
+    """`cantidad` expresada en `unidad_medida_id`, pasada a la UdM del
+    artículo (RN-UDM-005) — para que un consumo real se pueda teclear en la
+    unidad que el cocinero tiene a mano (gramos) y se guarde/descuente en la
+    que lleva el almacén (kilos), igual criterio que `receta_item` con sus
+    líneas. `None`: la unidad no existe o es de otra categoría — no hay
+    conversión posible y quien llama decide qué error mostrar.
+    """
+    articulo = session.get(Articulo, articulo_id)
+    if articulo is None:
+        return None
+    udm_destino = session.get(UnidadMedida, articulo.unidad_medida_id)
+    udm_origen = session.get(UnidadMedida, unidad_medida_id)
+    if udm_destino is None or udm_origen is None:
+        return None
+    if udm_origen.id == udm_destino.id:
+        return Decimal(str(cantidad))
+    if udm_origen.categoria_udm_id != udm_destino.categoria_udm_id:
+        return None
+    return rules.convertir_cantidad(Decimal(str(cantidad)), udm_origen.ratio, udm_destino.ratio)
+
+
 def solicitudes_resumen_para_negociacion(
     session: Session,
     empresa_id: uuid.UUID | None,

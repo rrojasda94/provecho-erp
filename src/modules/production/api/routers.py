@@ -5,13 +5,12 @@ import uuid
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from src.config.settings import settings
 from src.core.tenant import Tenant
 from src.modules.production.api import schemas
-from src.modules.production.application import ordenes
+from src.modules.production.application import ordenes, tarifas
 from src.modules.production.application.scope import exigir_almacen, exigir_orden
 from src.modules.users.api.deps import client_ip, get_db, get_tenant, require_permission
-from src.modules.users.infrastructure.models import Usuario
+from src.modules.users.infrastructure.models import Almacen, Usuario
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
 router = APIRouter(prefix="/production", tags=["production"])
@@ -71,14 +70,31 @@ def listar_ordenes(
     )
 
 
-@router.get("/ordenes/{orden_id}", response_model=schemas.OrdenProduccionOut)
+@router.get("/ordenes/{orden_id}", response_model=schemas.OrdenProduccionDetalleOut)
 def ver_orden(
     orden_id: uuid.UUID,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
-    return exigir_orden(session, orden_id, tenant)
+    exigir_orden(session, orden_id, tenant)
+    return ordenes.detalle_orden(session, orden_id)
+
+
+@router.get(
+    "/ordenes/{orden_id}/consumo-sugerido", response_model=schemas.ConsumoSugeridoOut
+)
+def ver_consumo_sugerido(
+    orden_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Cuánto insumo sugiere la receta BOM para la cantidad planeada de la
+    orden (RN-PRD-018), para prellenar el consumo real en vez de calcularlo
+    a mano."""
+    exigir_orden(session, orden_id, tenant)
+    return ordenes.consumo_sugerido(session, orden_id)
 
 
 @router.post("/ordenes/{orden_id}/consumo", response_model=schemas.OrdenProduccionOut)
@@ -112,12 +128,16 @@ def completar_orden(
     session: Session = Depends(get_db),
     ip: str | None = Depends(client_ip),
 ):
-    exigir_orden(session, orden_id, tenant)
+    orden_actual = exigir_orden(session, orden_id, tenant)
+    almacen = session.get(Almacen, orden_actual.almacen_id)
+    costo_hora_mano_obra = tarifas.costo_hora_mano_obra_de(
+        session, almacen.empresa_id if almacen else None
+    )
     orden = ordenes.completar_orden_produccion(
         session,
         orden_id,
         resultado=body.resultado,
-        costo_hora_mano_obra=settings.production_costo_hora_mano_obra,
+        costo_hora_mano_obra=costo_hora_mano_obra,
         cantidad_producida=body.cantidad_producida,
         horas_hombre=body.horas_hombre,
         merma_cantidad=body.merma_cantidad,

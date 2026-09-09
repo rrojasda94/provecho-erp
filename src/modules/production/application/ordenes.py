@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
+from src.modules.inventory.application import queries_publicas as inv_queries
 from src.modules.inventory.infrastructure.models import Articulo, Receta
 from src.modules.production.application.errors import (
     Conflicto,
@@ -39,6 +40,76 @@ def q_ordenes(
 ):
     """La consulta sin ejecutar, para que el router la pagine (ADR-026)."""
     return OrdenProduccionRepo(session).q_list(empresa_id, almacen_id, estado)
+
+
+def consumo_sugerido(session: Session, orden_id: uuid.UUID) -> dict:
+    """Explota la receta BOM de la orden escalada a `cantidad_planeada`
+    (RN-PRD-018): cuánto insumo hace falta según la ficha técnica, para
+    prellenar el consumo real en vez de que la cocina lo calcule a mano."""
+    orden = OrdenProduccionRepo(session).get(orden_id)
+    if orden is None:
+        raise NoEncontrado("orden de producción no encontrada")
+    sugerido = inv_queries.consumo_sugerido_de_receta(
+        session, orden.articulo_id, orden.cantidad_planeada
+    )
+    if sugerido is None:
+        raise ReglaNegocio(f"artículo {orden.articulo_id} no tiene receta de subreceta definida")
+    return sugerido
+
+
+def detalle_orden(session: Session, orden_id: uuid.UUID) -> dict:
+    """La orden con sus consumos reales, cada uno con la desviación de
+    desperdicio (real vs. lo que la receta espera por `merma_pct`,
+    RN-PRD-018) — sin esto, `peso_desperdicio_real` se guardaba y nunca se
+    contrastaba contra nada."""
+    orden = OrdenProduccionRepo(session).get(orden_id)
+    if orden is None:
+        raise NoEncontrado("orden de producción no encontrada")
+    sugerido = inv_queries.consumo_sugerido_de_receta(
+        session, orden.articulo_id, orden.cantidad_planeada
+    )
+    merma_esperada = (
+        {linea["articulo_id"]: linea["merma_pct"] for linea in sugerido["items"]}
+        if sugerido
+        else {}
+    )
+    consumos = []
+    for item in OrdenProduccionRepo(session).consumos(orden.id):
+        merma_pct = merma_esperada.get(item.articulo_id)
+        desviacion = None
+        if merma_pct is not None:
+            esperado = item.cantidad * merma_pct / Decimal(100)
+            desviacion = item.peso_desperdicio_real - esperado
+        consumos.append(
+            {
+                "id": item.id,
+                "articulo_id": item.articulo_id,
+                "cantidad": item.cantidad,
+                "unidad_medida_id": item.unidad_medida_id,
+                "costo_unitario": item.costo_unitario,
+                "peso_desperdicio_real": item.peso_desperdicio_real,
+                "tipo_desperdicio": item.tipo_desperdicio,
+                "desviacion_desperdicio": desviacion,
+            }
+        )
+    return {
+        "id": orden.id,
+        "articulo_id": orden.articulo_id,
+        "almacen_id": orden.almacen_id,
+        "cantidad_planeada": orden.cantidad_planeada,
+        "cantidad_producida": orden.cantidad_producida,
+        "estado": orden.estado,
+        "costo_teorico_insumos": orden.costo_teorico_insumos,
+        "costo_insumos": orden.costo_insumos,
+        "costo_mano_obra": orden.costo_mano_obra,
+        "costo_real_unitario": orden.costo_real_unitario,
+        "merma_cantidad": orden.merma_cantidad,
+        "merma_motivo": orden.merma_motivo,
+        "fecha_vencimiento": orden.fecha_vencimiento,
+        "lote_codigo": orden.lote_codigo,
+        "trazabilidad": orden.trazabilidad,
+        "consumos": consumos,
+    }
 
 
 def crear_orden_produccion(
@@ -100,7 +171,8 @@ def registrar_consumo(
     session: Session,
     orden_id: uuid.UUID,
     *,
-    # [{articulo_id, cantidad, costo_unitario, peso_desperdicio_real, tipo_desperdicio}]
+    # [{articulo_id, cantidad, costo_unitario?, unidad_medida_id?,
+    #   peso_desperdicio_real, tipo_desperdicio}]
     items: list[dict],
     actor_id: uuid.UUID | None = None,
     idempotency_key: str | None = None,
@@ -120,25 +192,68 @@ def registrar_consumo(
 
     evento_items = []
     for it in items:
-        if session.get(Articulo, it["articulo_id"]) is None:
+        articulo = session.get(Articulo, it["articulo_id"])
+        if articulo is None:
             raise NoEncontrado(f"artículo {it['articulo_id']} no encontrado")
         cantidad = Decimal(str(it["cantidad"]))
+        unidad_medida_id = it.get("unidad_medida_id")
+        # RN-UDM-005: se puede teclear en otra UdM de la misma categoría (los
+        # gramos que el cocinero tiene a mano); se guarda ya convertida a la
+        # del artículo, que es la que `costo_insumos` y el stock necesitan.
+        if unidad_medida_id is not None and unidad_medida_id != articulo.unidad_medida_id:
+            convertida = inv_queries.convertir_a_udm_de_articulo(
+                session, it["articulo_id"], cantidad, unidad_medida_id
+            )
+            if convertida is None:
+                raise ReglaNegocio(
+                    "la unidad de medida del ítem no es de la misma categoría "
+                    "que la del artículo"
+                )
+            cantidad = convertida
+        else:
+            unidad_medida_id = None
         if cantidad <= 0:
             raise ReglaNegocio("cantidad de consumo debe ser > 0")
-        costo_unitario = Decimal(str(it["costo_unitario"]))
+        # Sin costo_unitario explícito, se costea al costo_promedio vigente
+        # del artículo (RN-PRD-018): antes lo tipeaba siempre quien registraba
+        # el consumo, sin ninguna referencia contra la que contrastarlo.
+        costo_unitario = it.get("costo_unitario")
+        costo_unitario = (
+            Decimal(str(costo_unitario)) if costo_unitario is not None else articulo.costo_promedio
+        )
         session.add(
             ConsumoProduccionItem(
                 orden_produccion_id=orden.id,
                 articulo_id=it["articulo_id"],
                 cantidad=cantidad,
+                unidad_medida_id=unidad_medida_id,
                 costo_unitario=costo_unitario,
                 peso_desperdicio_real=Decimal(str(it.get("peso_desperdicio_real", 0))),
                 tipo_desperdicio=it.get("tipo_desperdicio"),
             )
         )
         evento_items.append(
-            {"articulo_id": str(it["articulo_id"]), "cantidad": str(cantidad)}
+            {
+                "articulo_id": str(it["articulo_id"]),
+                "cantidad": str(cantidad),
+                "costo_unitario": str(costo_unitario),
+            }
         )
+
+    # Snapshot de lo que la receta BOM dice que debería costar, para comparar
+    # contra `costo_insumos` (lo real) al completar (RN-PRD-018). `None` si el
+    # artículo no tiene receta que lo produzca: no hay contra qué comparar.
+    sugerido = inv_queries.consumo_sugerido_de_receta(
+        session, orden.articulo_id, orden.cantidad_planeada
+    )
+    # Cuantizado a la escala de la columna (Numeric(12, 4)): sin esto, el
+    # valor recién calculado en memoria y el que vuelve de releer la fila
+    # difieren en cómo Decimal representa el mismo número (`0E-10` vs
+    # `0.0000`), y un reintento idempotente dejaba de ser byte a byte igual
+    # al original.
+    orden.costo_teorico_insumos = (
+        sugerido["costo_total"].quantize(Decimal("0.0001")) if sugerido else None
+    )
 
     estado_previo = orden.estado
     orden.estado = "en_proceso"

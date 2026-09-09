@@ -515,6 +515,226 @@ def test_completar_reprocesado_no_publica_orden_desechada(env):
     assert eventos == []
 
 
+# --- Costeo real (feat/produccion-costeo-real) ---
+def test_consumo_sugerido_explota_la_receta_bom(env):
+    client, ids, _ = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-sugerido-1").json()["id"]
+    r = client.get(
+        f"/api/v1/production/ordenes/{orden_id}/consumo-sugerido", headers=h
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert Decimal(body["factor"]) == Decimal("1")  # 10 planeada / 10 rendimiento
+    (linea,) = body["items"]
+    assert linea["articulo_id"] == ids["harina_id"]
+    assert Decimal(linea["cantidad_sugerida"]) == Decimal("1")  # 1 harina * factor 1, sin merma
+
+
+def test_consumo_sugerido_sin_receta_404(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    # Un almacén de producción con una orden ad-hoc sobre un artículo sin
+    # receta no puede darse (crear_orden ya lo rechaza), así que se fuerza
+    # el escenario escribiendo la orden directo.
+    with TestSession() as s:
+        from src.modules.production.infrastructure.models import OrdenProduccion
+
+        orden = OrdenProduccion(
+            articulo_id=uuid.UUID(ids["masa_id"]),
+            almacen_id=uuid.UUID(ids["almacen_id"]),
+            cantidad_planeada=Decimal(5),
+            creado_por=s.scalar(select(Usuario).where(Usuario.username == "admin")).id,
+            idempotency_key="op-sin-receta-forzada",
+        )
+        s.add(orden)
+        s.commit()
+        orden_id = str(orden.id)
+        # Borra la receta que producía la masa: ya no hay qué explotar.
+        receta = s.scalar(select(Receta).where(Receta.articulo_id == uuid.UUID(ids["masa_id"])))
+        for item in s.scalars(
+            select(RecetaItem).where(RecetaItem.receta_id == receta.id)
+        ):
+            s.delete(item)
+        s.flush()
+        s.delete(receta)
+        s.commit()
+
+    r = client.get(
+        f"/api/v1/production/ordenes/{orden_id}/consumo-sugerido", headers=h
+    )
+    assert r.status_code == 409
+
+
+def test_registrar_consumo_sin_costo_unitario_usa_costo_promedio(env):
+    """Sin `costo_unitario` explícito, se costea al `costo_promedio` vigente
+    del artículo (RN-PRD-018) en vez de que quien registra el consumo lo
+    tipee sin ninguna referencia."""
+    client, ids, TestSession = env
+    h = _token(client)
+    with TestSession() as s:
+        harina = s.get(Articulo, uuid.UUID(ids["harina_id"]))
+        harina.costo_promedio = Decimal("3.50")
+        s.commit()
+
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-sin-costo-1").json()["id"]
+    r = client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json={
+            "items": [{"articulo_id": ids["harina_id"], "cantidad": "10"}],
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    with TestSession() as s:
+        from src.modules.production.infrastructure.models import ConsumoProduccionItem
+
+        item = s.scalar(
+            select(ConsumoProduccionItem).where(
+                ConsumoProduccionItem.orden_produccion_id == uuid.UUID(orden_id)
+            )
+        )
+        assert item.costo_unitario == Decimal("3.5000")
+
+
+def test_registrar_consumo_convierte_otra_udm_de_la_misma_categoria(env):
+    """RN-UDM-005: se puede teclear en gramos un insumo que se lleva en
+    kilos — se guarda ya convertido a la unidad del artículo."""
+    client, ids, TestSession = env
+    h = _token(client)
+    with TestSession() as s:
+        harina = s.get(Articulo, uuid.UUID(ids["harina_id"]))
+        udm_kilo = s.get(UnidadMedida, harina.unidad_medida_id)
+        gramo = UnidadMedida(
+            categoria_udm_id=udm_kilo.categoria_udm_id, nombre="Gramo", ratio=Decimal("0.001"),
+        )
+        s.add(gramo)
+        s.commit()
+        gramo_id = str(gramo.id)
+
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-udm-1").json()["id"]
+    r = client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json={
+            "items": [{
+                "articulo_id": ids["harina_id"], "cantidad": "2000",
+                "unidad_medida_id": gramo_id, "costo_unitario": "2.00",
+            }],
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    with TestSession() as s:
+        from src.modules.production.infrastructure.models import ConsumoProduccionItem
+
+        item = s.scalar(
+            select(ConsumoProduccionItem).where(
+                ConsumoProduccionItem.orden_produccion_id == uuid.UUID(orden_id)
+            )
+        )
+        assert item.cantidad == Decimal("2.0000")  # 2000 g convertidos a 2 kg
+        assert str(item.unidad_medida_id) == gramo_id
+
+
+def test_registrar_consumo_udm_de_otra_categoria_409(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    with TestSession() as s:
+        harina = s.get(Articulo, uuid.UUID(ids["harina_id"]))
+        udm_kilo = s.get(UnidadMedida, harina.unidad_medida_id)
+        otra_categoria = CategoriaUdm(nombre="Volumen")
+        s.add(otra_categoria)
+        s.flush()
+        litro = UnidadMedida(categoria_udm_id=otra_categoria.id, nombre="Litro", ratio=Decimal(1))
+        s.add(litro)
+        s.commit()
+        litro_id = str(litro.id)
+        assert udm_kilo.categoria_udm_id != otra_categoria.id
+
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-udm-2").json()["id"]
+    r = client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json={
+            "items": [{
+                "articulo_id": ids["harina_id"], "cantidad": "10",
+                "unidad_medida_id": litro_id, "costo_unitario": "2.00",
+            }],
+        },
+    )
+    assert r.status_code == 409
+
+
+def test_completar_usa_tarifa_de_parametro_empresa_sobre_la_semilla(env):
+    """RN-PRD-018/ADR-014: la tarifa la fija Gerencia en `parametro_empresa`,
+    no el `.env` — la semilla solo aplica mientras nadie la aprobó."""
+    client, ids, TestSession = env
+    h = _token(client)
+    with TestSession() as s:
+        from src.shared.models.parametro_empresa import ParametroEmpresa
+
+        admin = s.scalar(select(Usuario).where(Usuario.username == "admin"))
+        s.add(ParametroEmpresa(
+            empresa_id=uuid.UUID(ids["empresa_id"]), modulo="production",
+            codigo="costo_hora_mano_obra", valor={"monto": "25.00"}, estado="vigente",
+            propuesto_por_id=admin.id,
+        ))
+        s.commit()
+
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-tarifa-1").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+    r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
+        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+    })
+    assert r.status_code == 200, r.text
+    # 2 horas * 25.00 (parámetro aprobado, no la semilla de 15.00) = 50;
+    # (20 insumos + 50 MO) / 10 producido = 7.
+    assert Decimal(r.json()["costo_real_unitario"]) == Decimal("7.0000000000")
+
+
+def test_registrar_consumo_deja_snapshot_de_costo_teorico(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    with TestSession() as s:
+        harina = s.get(Articulo, uuid.UUID(ids["harina_id"]))
+        harina.costo_promedio = Decimal("2.00")
+        s.commit()
+
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-teorico-1").json()["id"]
+    r = client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+    assert r.status_code == 200
+    # La receta pide 1 kg de harina por cada 10 de rendimiento; la orden
+    # planea 10, factor 1: 1 kg sugerido * 2.00 de costo_promedio = 2.00.
+    assert Decimal(r.json()["costo_teorico_insumos"]) == Decimal("2.0000")
+
+
+def test_ver_orden_incluye_consumos_con_desviacion_de_desperdicio(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    with TestSession() as s:
+        receta = s.scalar(
+            select(Receta).where(Receta.articulo_id == uuid.UUID(ids["masa_id"]))
+        )
+        item = s.scalar(select(RecetaItem).where(RecetaItem.receta_id == receta.id))
+        item.merma_pct = Decimal("10.00")
+        s.commit()
+
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-desviacion-1").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json={
+            "items": [{
+                "articulo_id": ids["harina_id"], "cantidad": "10", "costo_unitario": "2.00",
+                "peso_desperdicio_real": "1.5",
+            }],
+        },
+    )
+    r = client.get(f"/api/v1/production/ordenes/{orden_id}", headers=h)
+    assert r.status_code == 200, r.text
+    (consumo,) = r.json()["consumos"]
+    # Esperado por receta: 10 * 10% = 1.0; real 1.5 → desvío +0.5.
+    assert Decimal(consumo["desviacion_desperdicio"]) == Decimal("0.5000")
+
+
 def test_completar_conforme_no_publica_orden_desechada(env):
     client, ids, _ = env
     h = _token(client)
