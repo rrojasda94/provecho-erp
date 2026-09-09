@@ -49,7 +49,7 @@ class ReglaDistribucion(Base, UuidPkMixin, TimestampMixin):
             name="nivel_regla",
         ),
         CheckConstraint(
-            "canal IN ('bandeja')",
+            "canal IN ('bandeja', 'email')",
             name="canal_regla",
         ),
     )
@@ -73,5 +73,5 @@ class ReglaDistribucion(Base, UuidPkMixin, TimestampMixin):
         default="aviso",
     )
     canal: Mapped[str] = mapped_column(
-        Enum("bandeja", name="canal_regla", native_enum=False), default="bandeja"
+        Enum("bandeja", "email", name="canal_regla", native_enum=False), default="bandeja"
     )

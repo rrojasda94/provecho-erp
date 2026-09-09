@@ -910,7 +910,11 @@ class GuiaRemisionCreate(BaseModel):
     chofer_apellidos: str = Field(min_length=2, max_length=120)
     chofer_num_doc: str = Field(min_length=8, max_length=15)
     chofer_licencia: str = Field(min_length=6, max_length=20)
-    vehiculo_placa: str = Field(min_length=6, max_length=10)
+    # Uno de los dos: `vehiculo_id` (registrado en Activos) tiene prioridad y
+    # congela su placa; `vehiculo_placa` sigue aceptando texto libre por
+    # compatibilidad con quien todavía no registra sus vehículos ahí.
+    vehiculo_id: uuid.UUID | None = None
+    vehiculo_placa: str | None = Field(default=None, min_length=6, max_length=10)
     peso_bruto_kg: Decimal = Field(gt=0)
     fecha_inicio_traslado: date | None = None
     # Catálogo 20 de SUNAT; `04` = traslado entre establecimientos propios,
@@ -939,7 +943,8 @@ class GuiaDevolucionCreate(BaseModel):
     chofer_apellidos: str = Field(min_length=2, max_length=120)
     chofer_num_doc: str = Field(min_length=8, max_length=15)
     chofer_licencia: str = Field(min_length=6, max_length=20)
-    vehiculo_placa: str = Field(min_length=6, max_length=10)
+    vehiculo_id: uuid.UUID | None = None
+    vehiculo_placa: str | None = Field(default=None, min_length=6, max_length=10)
     peso_bruto_kg: Decimal = Field(gt=0)
     fecha_inicio_traslado: date | None = None
     modalidad_traslado: str = Field(default="02", pattern="^(01|02)$")
@@ -1058,6 +1063,7 @@ class GuiaRemisionOut(BaseModel):
     chofer_num_doc: str
     chofer_licencia: str
     vehiculo_placa: str
+    vehiculo_id: uuid.UUID | None
     estado_emision: str
     detalle_emision: str | None
     observacion: str | None

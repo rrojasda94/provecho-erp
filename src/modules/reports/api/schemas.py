@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 TipoDestinatario = Literal["area", "rol", "usuario", "dinamico"]
 Nivel = Literal["info", "aviso", "urgente"]
-Canal = Literal["bandeja"]
+Canal = Literal["bandeja", "email"]
 
 # Cómo se nombra al actor de un hecho que no provocó nadie. Se muestra igual
 # que un nombre de usuario para que la ficha nunca tenga un hueco (RN-REP-009).

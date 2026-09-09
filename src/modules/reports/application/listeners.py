@@ -17,6 +17,7 @@ from src.core.database import SessionLocal
 from src.core.events import event_bus
 from src.modules.reports.application import emision as emision_uc
 from src.modules.reports.domain import catalogo
+from src.modules.reports.infrastructure.models import ReglaDistribucion
 
 log = logging.getLogger("provecho.app")
 
@@ -37,10 +38,16 @@ def _handler(codigo: str):
                     return
                 reporte, destinatarios = resultado
                 if destinatarios:
-                    # `users` lo consume y llena la bandeja. El salto extra
-                    # existe para que `reports` no importe `notificacion`:
-                    # el usuario tiene una sola campana y `users` sigue
-                    # siendo su dueño.
+                    regla = (
+                        session.get(ReglaDistribucion, reporte.regla_id)
+                        if reporte.regla_id
+                        else None
+                    )
+                    # `users` lo consume y llena la bandeja (y, si el canal
+                    # es `email`, despacha el correo). El salto extra existe
+                    # para que `reports` no importe `notificacion`: el
+                    # usuario tiene una sola campana y `users` sigue siendo
+                    # su dueño.
                     event_bus.publish(
                         "reports.reporte_emitido",
                         {
@@ -49,6 +56,7 @@ def _handler(codigo: str):
                             "titulo": reporte.titulo,
                             "cuerpo": reporte.cuerpo,
                             "nivel": reporte.nivel,
+                            "canal": regla.canal if regla else "bandeja",
                             "sucursal_id": (
                                 str(reporte.sucursal_id) if reporte.sucursal_id else None
                             ),
