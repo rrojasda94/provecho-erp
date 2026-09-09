@@ -969,17 +969,14 @@ Solicitud.
   solapan a propósito —la revisión agendada al confirmar la venta y el
   barrido periódico de Celery beat— y es lo que hace que converjan en una
   sola fila. Ver `src/modules/sales/README.md`.
-- **entrega** (pendiente de slice — rama delivery de `PROC-OPE-002`):
-  venta_id (único: una entrega por venta, RN-CUP-005), entregado_por
-  (usuario_id de quien registra), fecha_entrega,
-  repartidor_trabajador_id (opcional, repartidor propio) |
-  repartidor_externo_plataforma (opcional, `rappi`|`ubereats`|... —
-  RN-PER-003; ambos nulos en mesa y takeout), hora_salida (opcional),
-  resultado (`entregado` | `fallido`), motivo_fallo (opcional, obligatorio
-  si `fallido` — RN-CUP-008), evidencia_id (opcional, foto/firma).
-  Mientras no exista esta tabla, la entrega se registra solo como avance
-  de los ítems a `entregado` + evento `sales.venta_entregada`, sin
+- **entrega**: movida a §6b (módulo `delivery`, ADR-098) — el reparto propio
+  con ruteo y flota se separó como módulo, tal como preveía
+  `docs/domain/workflows.md#cumplimiento-de-pedido`. Mientras ese módulo no
+  esté implementado, la entrega se sigue registrando solo como avance de
+  los ítems a `entregado` + evento `sales.venta_entregada`, sin
   trazabilidad del repartidor ni del intento fallido.
+  `repartidor_externo_plataforma` (RN-PER-003) sigue en `venta`, no en
+  `entrega`: no es un recurso propio del reparto.
 - **medio_pago**: empresa_id (catálogo por empresa, no global del grupo —
   decisión 2026-07-20: cada empresa pacta su propia pasarela/comisión),
   nombre, direccion (`cobro` | `pago` | `ambos`), tipo
@@ -1260,6 +1257,61 @@ capacitación— viven en §8b y el motivo está explicado allá.
   `precio`, `producto_comercial` y `campana` referencian el hallazgo que
   las sustenta (nullable — una apuesta declarada sigue siendo válida, solo
   queda dicho que lo es).
+
+## 6b. Reparto propio (módulo delivery, ADR-098)
+
+Todas con `UuidPkMixin`/`TimestampMixin`; los `Enum` van `native_enum=False`
+**con su `CheckConstraint`** (ADR-097).
+
+- **repartidor** (+ `SoftDeleteMixin`): empresa_id, sucursal_id (base),
+  trabajador_id (FK, único — un trabajador es como máximo un repartidor),
+  usuario_id (FK, único, resuelto por `persona_id` ya que `trabajador` no
+  tiene cuenta propia — ADR-070), vehiculo_tipo (`moto` | `bicicleta` |
+  `auto` | `a_pie`), placa (opcional), telefono (opcional), activo.
+  Índice `(sucursal_id, activo)`.
+- **ruta_reparto**: sucursal_id, repartidor_id, creada_por (usuario_id),
+  estado (`planificada` | `en_curso` | `finalizada` | `cancelada`),
+  hora_salida, hora_fin (null hasta finalizar), origen_lat/lng
+  `NUMERIC(9,6)` (copia de la sucursal al crear), distancia_m,
+  duracion_seg, polyline (texto, opcional — vacío si se optimizó por
+  heurística), optimizada_por (`google` | `heuristica` | `manual`),
+  ultima_lat/lng, ultima_precision_m, ultima_posicion_at (denormalizado
+  desde el último `posicion_repartidor`, para no leer el breadcrumb en
+  cada consulta del tablero). Índices `(sucursal_id, estado)`,
+  `(repartidor_id, estado)`.
+- **entrega**: venta_id (FK **único** — una entrega por venta, RN-CUP-005),
+  sucursal_id (denormalizado del scope), ruta_id (opcional), repartidor_id
+  (opcional), orden_parada (opcional), estado (`pendiente` | `asignada` |
+  `en_ruta` | `entregada` | `fallida` | `cancelada`), intentos (default 1),
+  eta_at, tramo_distancia_m, tramo_duracion_seg, destino_lat/lng (copia de
+  la venta al asignar — la venta puede seguir editándose después),
+  fecha_entrega, entregado_por (usuario_id), motivo_fallo
+  (`cliente_ausente` | `direccion_errada` | `rechazo` | `no_contesta` |
+  `otro`, obligatorio si `fallida` — RN-CUP-008), motivo_detalle
+  (obligatorio si `motivo_fallo = otro`), resultado_lat/lng, evidencia_foto
+  (`LargeBinary`, `deferred`, mismo tratamiento que `marcacion.foto`:
+  base64 acotado, purga por Celery beat), observacion, token_publico
+  (`VARCHAR(64)`, único, `secrets.token_urlsafe(32)`), token_expira_at,
+  aviso_en_camino_at, aviso_resultado_at, aviso_error. Índices
+  `(sucursal_id, estado)`, `(ruta_id, orden_parada)`.
+
+  Reemplaza a la fila `entrega` descrita en la sección de Ventas (§6): el
+  campo `resultado` de esa especificación original queda absorbido en
+  `estado` (`entregada`/`fallida` ya son valores de la máquina de estados
+  completa, no hace falta una columna aparte). `repartidor_externo_plataforma`
+  sigue viviendo en `venta` — no es un recurso propio, RN-PER-003.
+- **posicion_repartidor** (breadcrumb, sin agregación): ruta_id,
+  repartidor_id, lat/lng, precision_m (opcional), registrado_at (reloj del
+  teléfono, no del servidor — es lo que ordena el trazo cuando la red
+  entrega los pings fuera de orden). Índice `(ruta_id, registrado_at)`.
+  Se purga a los 30 días (`delivery_posiciones_retencion_dias`); no hay
+  agregación en Redis — a la escala de una flota de un grupo de
+  restaurantes (~10 repartidores, un ping cada 10 s) escribir cada ping en
+  Postgres es más simple que dos fuentes de verdad para la misma posición.
+
+Ver `docs/domain/state-machines.md#reparto-propio` y
+`docs/architecture/events.md` para las transiciones y los eventos que
+publica cada una.
 
 ## 7. Producción (módulo futuro production)
 

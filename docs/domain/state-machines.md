@@ -121,6 +121,49 @@ Lo que **no** es un estado de esta máquina, a propósito:
   atención (RN-CUP-009) — el "servicio terminado" que antes no tenía dueño
   es hoy la salida de este proceso.
 
+## Reparto propio (módulo delivery, ADR-098)
+
+Dos máquinas nuevas, ninguna reemplaza a `venta_item.estado_preparacion`
+de arriba: el ítem sigue `listo` mientras la venta no tenga una `entrega`
+en `entregada` — «entregado» del KDS y «entregada» de reparto son el mismo
+hecho visto desde dos módulos distintos, conectados por evento
+(`delivery.entrega_registrada`, ver [events.md](../architecture/events.md)).
+
+### Entrega
+
+```mermaid
+stateDiagram-v2
+    [*] --> pendiente: asignar venta lista a una ruta (RN-DLV-001)
+    pendiente --> asignada: crear ruta / agregar parada
+    asignada --> pendiente: quitar de la ruta, o cancelar la ruta (planificada)
+    asignada --> en_ruta: iniciar ruta (RN-DLV-005)
+    en_ruta --> entregada: entregar (delivery.entrega_registrada)
+    en_ruta --> fallida: fallar, con motivo (RN-CUP-008/RN-DLV-003)
+    fallida --> pendiente: reintentar (RN-DLV-004, intentos+1)
+    fallida --> cancelada: cerrar
+    pendiente --> cancelada: cerrar, o venta anulada (RN-DLV-006)
+    asignada --> cancelada: venta anulada (RN-DLV-006)
+```
+
+`en_ruta` no vuelve directo a `cancelada`: una salida que ya ocurrió se
+cierra por sus resultados (entregada o fallida), nunca se borra a mitad de
+camino. La posición del repartidor solo se acepta y se expone mientras la
+entrega de esa parada está `en_ruta` (RN-DLV-007).
+
+### Ruta de reparto
+
+```mermaid
+stateDiagram-v2
+    [*] --> planificada: crear ruta con ≥1 parada
+    planificada --> en_curso: iniciar (RN-DLV-005; delivery.ruta_iniciada)
+    planificada --> cancelada: cancelar (entregas vuelven a pendiente)
+    en_curso --> finalizada: todas las paradas resueltas (delivery.ruta_finalizada)
+```
+
+Sin `en_curso → cancelada`, por la misma razón que la entrega: una ruta
+que ya salió no se cancela, se termina con lo que haya pasado en cada
+parada.
+
 ## Custodia de efectivo
 
 ```mermaid
