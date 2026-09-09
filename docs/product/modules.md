@@ -17,12 +17,16 @@ catálogo: [../architecture/events.md](../architecture/events.md).
 | accounting | [src/modules/accounting/README.md](../../src/modules/accounting/README.md) | Abierto parcialmente (ciclo de caja), spec completa pendiente |
 | rrhh | [src/modules/rrhh/README.md](../../src/modules/rrhh/README.md) | Abierto parcialmente (solo `trabajador`), spec completa pendiente |
 | reports | [src/modules/reports/README.md](../../src/modules/reports/README.md) | Slice core implementado 2026-08-08 (ADR-033): emisión por evento, distribución por área/rol/usuario y matriz de gobierno. No confundir con `core/reportes`, que es la consulta bajo demanda (ADR-024) |
+| assets | [src/modules/assets/README.md](../../src/modules/assets/README.md) | Slice core implementado 2026-09-09 (ADR-098): activo/vehículo, kilometraje/combustible, mantenimiento y documentos con vencimiento. El ciclo de compra sigue en `purchases` y la depreciación en `accounting`, a propósito |
 
 ## Futuros (se especifican antes de construirse)
 
-production (fabricación), requests/logistics (solicitudes, picking,
-transporte), caja, rrhh, crm, tesorería, activos, proyectos, bi/reportes,
-supervisión, settings (ajustes/branding por marca).
+requests/logistics (solicitudes, picking, transporte — parte ya vive en
+`inventory`), crm, proyectos, bi/reportes, supervisión, settings
+(ajustes/branding por marca). `production`, `rrhh` y `activos` (`assets`)
+ya están construidos — esta lista quedó desactualizada respecto a la
+decisión de 2026-08-05 sobre módulos transversales y a este mismo slice;
+corregirla es deuda transversal, no de este módulo.
 
 ## Reglas
 

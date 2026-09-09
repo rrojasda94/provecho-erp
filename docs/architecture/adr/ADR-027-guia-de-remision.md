@@ -3,6 +3,14 @@
 Fecha: 2026-08-05
 Estado: aceptada
 
+> **Superado en parte (2026-09-09, ADR-098)**: el punto 4 de este ADR
+> ("No hay entidad `vehiculo`") queda superado — el usuario pidió registrar
+> vehículos de verdad y el módulo `assets` ya los tiene. El resto de este
+> ADR sigue vigente: `guia_remision.vehiculo_placa` sigue siendo texto
+> libre (reemplazarla por la FK a `assets.vehiculo` es deuda nueva, no
+> automática) y las decisiones sobre numeración, líneas por SKU e idempotencia
+> de la guía no cambian.
+
 ## Contexto
 
 Charlie's Pizzas mueve mercadería todos los días: del almacén central a CH1

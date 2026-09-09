@@ -76,6 +76,14 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Mermas", href: "/inventario/mermas" },
     { label: "Reservas", href: "/inventario/reservas" },
   ],
+  activos: [
+    // La pregunta con la que se abre el módulo: qué se me viene, no la
+    // tabla de planes — mismo criterio que "Stock" en inventario.
+    { label: "Cronograma", href: "/activos/cronograma" },
+    { label: "Activos", href: "/activos/activos" },
+    { label: "Mantenimientos", href: "/activos/mantenimientos" },
+    { label: "Documentos", href: "/activos/documentos" },
+  ],
   marketing: [
     { label: "Campañas", href: "/marketing" },
     { label: "Contenido", href: "/marketing/contenido" },

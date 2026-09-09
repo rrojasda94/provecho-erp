@@ -94,6 +94,13 @@ SIN_ACTOR = {
     # llega a él por su propia bandeja; ponerlo como actor de un reporte que
     # leen su encargado y RRHH lo convertiría en un cargo (RN-RRHH-021).
     "rrhh.salida_sin_marcar",
+    # Los cuatro de `assets` los detecta el barrido diario de vencimientos
+    # (RN-MNT-005): un plan que cruza a "próximo" o un documento que vence no
+    # lo provoca nadie, así que no hay a quién ponerle de actor.
+    "assets.mantenimiento_proximo",
+    "assets.mantenimiento_vencido",
+    "assets.documento_por_vencer",
+    "assets.documento_vencido",
 }
 
 

@@ -123,6 +123,12 @@ incurrido, no un compromiso a aprobar) ni por `caja_chica_movimiento`
 (ese modelo sigue sin existir — el pago sale por cuentas por pagar
 normal). Detalle de la decisión en ADR-082.
 
+**Consumidor nuevo (2026-09-09, ADR-098)**: el módulo `assets` liga el
+comprobante de una carga de combustible con un artículo `tipo="servicio"`
+("Combustible") registrado por esta vía — el ticket del grifo se compra
+como cualquier otro servicio y `assets` solo consume el id del comprobante
+ya recibido, sin importar el ORM de `purchases`.
+
 ## El ciclo completo en pantalla (2026-08-30, ADR-085)
 
 Todos los casos de uso del módulo tenían endpoint y test verde desde el

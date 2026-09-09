@@ -1051,6 +1051,15 @@ producción se hace en cocinas de sucursal. Ver
   trabajador como beneficio laboral durante su estadía en la empresa.
 - **RN-VEH-004** El registro de kilometraje de un vehículo da fe del buen
   uso y del cumplimiento de las rutas establecidas.
+- **RN-VEH-005** El kilometraje registrado de un vehículo nunca retrocede:
+  una lectura menor a la última conocida se rechaza (`assets`, ADR-098).
+- **RN-VEH-006** Toda carga de combustible sustenta su propio comprobante
+  recibido; ningún comprobante se reutiliza en dos cargas ni en una orden
+  de mantenimiento (`assets`, ADR-098).
+- **RN-VEH-007** Una carga cuyo rendimiento cae muy por debajo del promedio
+  reciente del vehículo se marca como consumo anómalo y se reporta a
+  Gerencia y Contabilidad — puede ser una fuga, una manipulación o un mal
+  uso (`assets`, ADR-098).
 
 ## Mantenimiento
 
@@ -1062,6 +1071,10 @@ producción se hace en cocinas de sucursal. Ver
   reporta desperfectos o baja de productividad del equipo.
 - **RN-MNT-004** El reporte que adelanta un mantenimiento se dirige al
   área de compras y al área contable, para coordinar.
+- **RN-MNT-005** El aviso de un mantenimiento próximo se dispara con una
+  anticipación configurable por plan (días y/o kilometraje) y otra vez al
+  vencer si nadie lo atendió — una vez por cada uno de los dos avisos, no
+  repetido mientras la ventana no cambie (`assets`, ADR-098).
 
 ## Repuesto
 
@@ -1086,6 +1099,23 @@ producción se hace en cocinas de sucursal. Ver
   la gravedad, se eleva un reporte a RRHH, que notifica con memorándum o
   sanción.
 - **RN-EQP-004** El equipamiento se audita de manera rutinaria.
+
+## Documento de vigencia
+
+- **RN-DOC-001** Un permiso, certificado o licencia con fecha de
+  vencimiento (SOAT, revisión técnica, licencia de funcionamiento,
+  certificado de Defensa Civil, fumigación, registro sanitario, carné de
+  sanidad, licencia de conducir) se registra ligado a su sujeto: un activo,
+  una sucursal, la empresa, o un trabajador (`assets`, ADR-098).
+- **RN-DOC-002** El aviso de un documento próximo a vencer se dispara con
+  una anticipación configurable por documento, y otra vez al vencer —una
+  vez por cada uno de los dos avisos, no repetido mientras la ventana no
+  cambie.
+- **RN-DOC-003** Renovar un documento no reescribe su fecha de vencimiento:
+  crea un documento nuevo y encadena el anterior como renovado. El vencido
+  sigue disponible para consulta (una inspección puede pedirlo).
+- **RN-DOC-004** Un documento ya renovado no admite una segunda renovación
+  sobre la misma fila; la cadena avanza siempre desde la punta vigente.
 
 ## Almacén virtual de activos
 
