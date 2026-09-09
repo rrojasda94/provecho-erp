@@ -34,7 +34,14 @@ general del despliegue.
   desarrollo (`FACTILIZA_BASE_URL` de QA). Los comprobantes emitidos en
   staging no son reales ante SUNAT.
 - **WhatsApp: en espera.** `WHATSAPP_TOKEN` queda vacío por ahora — la
-  encuesta de satisfacción sigue funcionando por enlace público, sin envío.
+  encuesta de satisfacción y los avisos de `delivery` siguen funcionando
+  por enlace público (copiar/`wa.me`), sin envío automático. Cuando se
+  active: las tres plantillas de `delivery`
+  (`WHATSAPP_PLANTILLA_EN_CAMINO`/`_ENTREGADO`/`_ENTREGA_FALLIDA`,
+  `.env.example`) tienen que estar **aprobadas en Meta con ese mismo
+  nombre** antes de encender el token — un nombre sin aprobar rechaza el
+  envío entero (`WhatsAppRechazo`, sin reintento) y la fila queda con
+  `aviso_error` en vez de mandarse.
 - **Base de datos:** Postgres dentro del propio droplet (no gestionado). Para
   staging los datos son desechables; no vale la pena pagar un Postgres
   gestionado aparte. Ver `docker-compose.staging.yml`.

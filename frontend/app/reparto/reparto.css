@@ -1,0 +1,280 @@
+/* PWA del repartidor (ADR-098). Misma paleta oscura del KDS y del PDV y por
+   la misma razón: se usa al sol, con guantes, caminando — tipografía
+   grande, objetivos táctiles gordos, cero hover-only. A diferencia de esas
+   dos, es de un solo dedo y una sola columna: la pantalla es un teléfono,
+   no una tablet apoyada en el mostrador. */
+
+.reparto,
+.reparto-vacio {
+    --rep-bg: #0d0d0f;
+    --rep-surface: #18181b;
+    --rep-surface-alta: #202024;
+    --rep-borde: rgba(255, 255, 255, 0.1);
+    --rep-texto: #f4f4f2;
+    --rep-muted: #9a9a9f;
+    --rep-primario: #f4511e;
+    --rep-verde: #22c55e;
+    --rep-rojo: #f87171;
+    --rep-ambar: #fbbf24;
+
+    background: var(--rep-bg);
+    color: var(--rep-texto);
+}
+
+.reparto {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    /* El teléfono cabecea al caminar: sin esto un toque de más selecciona
+       texto en vez de tocar el botón de abajo. */
+    user-select: none;
+}
+
+.reparto-vacio {
+    padding: 3rem 1.5rem;
+    display: grid;
+    gap: 0.75rem;
+    align-content: center;
+    min-height: 100dvh;
+    text-align: center;
+}
+
+.reparto-top {
+    display: flex;
+    align-items: center;
+    padding: 1rem 1.125rem;
+    border-bottom: 1px solid var(--rep-borde);
+    font-size: 1rem;
+}
+
+.reparto-nada {
+    margin: auto;
+    padding: 2rem;
+    text-align: center;
+    color: var(--rep-muted);
+}
+
+.reparto-ruta {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    padding: 1rem 1rem 6rem;
+    overflow-y: auto;
+}
+
+.reparto-ruta-resumen {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+    color: var(--rep-muted);
+    font-size: 0.875rem;
+}
+
+.reparto-chip {
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: var(--rep-surface-alta);
+}
+
+.reparto-chip-en_curso {
+    background: color-mix(in srgb, var(--rep-verde) 22%, var(--rep-surface-alta));
+    color: var(--rep-verde);
+}
+
+.reparto-error-gps {
+    color: var(--rep-ambar);
+}
+
+.reparto-boton-primario {
+    width: 100%;
+    padding: 0.9375rem;
+    border-radius: 12px;
+    background: var(--rep-primario);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.reparto-boton-primario:disabled {
+    opacity: 0.45;
+}
+
+.reparto-paradas {
+    display: grid;
+    gap: 0.75rem;
+    list-style: none;
+}
+
+.reparto-parada {
+    background: var(--rep-surface);
+    border: 1px solid var(--rep-borde);
+    border-radius: 14px;
+    padding: 0.875rem;
+    display: grid;
+    gap: 0.375rem;
+}
+
+.reparto-parada header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.reparto-estado-parada {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--rep-muted);
+}
+
+.reparto-estado-en_ruta {
+    color: var(--rep-ambar);
+}
+
+.reparto-estado-entregada {
+    color: var(--rep-verde);
+}
+
+.reparto-estado-fallida {
+    color: var(--rep-rojo);
+}
+
+.reparto-monto {
+    font-weight: 700;
+}
+
+.reparto-parada-acciones {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.375rem;
+}
+
+.reparto-parada-acciones a,
+.reparto-parada-acciones button {
+    flex: 1;
+    min-width: 6rem;
+    text-align: center;
+    padding: 0.625rem;
+    border-radius: 10px;
+    background: var(--rep-surface-alta);
+    color: var(--rep-texto);
+    font-size: 0.875rem;
+    text-decoration: none;
+}
+
+.reparto-error {
+    color: var(--rep-rojo);
+    font-size: 0.875rem;
+}
+
+.reparto-aviso {
+    position: fixed;
+    left: 50%;
+    bottom: 1.25rem;
+    transform: translateX(-50%);
+    background: var(--rep-surface-alta);
+    border: 1px solid var(--rep-borde);
+    border-radius: 999px;
+    padding: 0.625rem 1.125rem;
+    font-size: 0.875rem;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* --- El diálogo de entregar / no se pudo, mismo criterio que app/pdv/pdv.css */
+.reparto-dialogo {
+    border: none;
+    border-radius: 16px;
+    padding: 0;
+    max-width: min(94vw, 28rem);
+    width: 100%;
+    background: var(--rep-surface);
+    color: var(--rep-texto);
+}
+
+.reparto-dialogo::backdrop {
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.reparto-dialogo header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.125rem 1.25rem 0.875rem;
+}
+
+.reparto-dialogo header h3 {
+    font-size: 0.9375rem;
+    font-style: normal;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+}
+
+.reparto-dialogo header button {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 8px;
+    background: var(--rep-surface-alta);
+    color: var(--rep-texto);
+    font-size: 1.0625rem;
+    line-height: 1;
+}
+
+.reparto-dialogo-cuerpo {
+    padding: 0 1.25rem 1rem;
+    display: grid;
+    gap: 0.875rem;
+    max-height: min(calc(100dvh - 9rem), 32rem);
+    overflow-y: auto;
+}
+
+.reparto-dialogo-direccion {
+    color: var(--rep-muted);
+    font-size: 0.875rem;
+}
+
+.reparto-campo {
+    display: grid;
+    gap: 0.375rem;
+    font-size: 0.875rem;
+}
+
+.reparto-campo select,
+.reparto-campo textarea {
+    background: var(--rep-surface-alta);
+    border: 1px solid var(--rep-borde);
+    border-radius: 8px;
+    padding: 0.625rem;
+    color: var(--rep-texto);
+    font: inherit;
+}
+
+.reparto-foto-previa {
+    width: 100%;
+    max-height: 12rem;
+    object-fit: cover;
+    border-radius: 10px;
+}
+
+.reparto-dialogo footer {
+    display: flex;
+    gap: 0.625rem;
+    padding: 0 1.25rem 1.25rem;
+}
+
+.reparto-dialogo footer button {
+    flex: 1;
+    padding: 0.75rem;
+    border-radius: 10px;
+    background: var(--rep-surface-alta);
+    color: var(--rep-texto);
+}

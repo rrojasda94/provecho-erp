@@ -100,21 +100,44 @@ jobs:
   # aparte, no un olvido de este cambio.
   backend-postgres:
     runs-on: ubuntu-latest
-    services:
-      db:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: provecho
-          POSTGRES_PASSWORD: provecho
-          POSTGRES_DB: provecho_tests
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U provecho"
-          --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       TEST_DATABASE_URL: postgresql+psycopg://provecho:provecho@localhost:5432/provecho_tests
+      # `-n auto` (pyproject.toml) reparte un worker por núcleo del runner. Contra
+      # SQLite (job `backend`) cada worker es autónomo; acá todos comparten un
+      # único Postgres, y cada test crea con `Base.metadata.create_all` el
+      # esquema ENTERO de la app (todos los módulos, no solo el que ese test
+      # ejercita) en un schema propio y lo dropea al terminar — a esta altura
+      # (18 módulos, cientos de tablas) un solo `DROP SCHEMA ... CASCADE`
+      # pide un lock por objeto. Con varios workers dropeando a la vez contra
+      # los límites de fábrica de la imagen (`max_connections=100`,
+      # `max_locks_per_transaction=64`) la corrida entera se cae con "too
+      # many clients already" u "out of shared memory" — un fallo de
+      # capacidad de CI, no del código que cambia el PR de turno. Confirmado
+      # con dos PRs sin relación entre sí (uno solo agrega funciones puras a
+      # `rrhh`, el otro es documentación) reproduciendo el mismo fallo, y con
+      # que ya no alcanzaba con solo topar la concurrencia de workers (ver
+      # `changelog.d/fixed-ci-backend-postgres-workers.md`).
+      PYTEST_XDIST_AUTO_NUM_WORKERS: "8"
     steps:
       - uses: actions/checkout@v7
+      # `services:` no deja pasarle flags de arranque a Postgres — la imagen
+      # corre con los límites de fábrica sin forma de subirlos desde el YAML
+      # del job. Se levanta a mano para poder pedirle más capacidad de la que
+      # trae por defecto.
+      - name: Levantar Postgres con más cupo de conexiones y locks
+        run: |
+          docker run -d --name provecho-tests-db \
+            -e POSTGRES_USER=provecho -e POSTGRES_PASSWORD=provecho -e POSTGRES_DB=provecho_tests \
+            -p 5432:5432 \
+            postgres:16-alpine \
+            postgres -c max_connections=300 -c max_locks_per_transaction=256
+          for intento in $(seq 1 30); do
+            if docker exec provecho-tests-db pg_isready -U provecho -d provecho_tests; then exit 0; fi
+            sleep 1
+          done
+          echo "Postgres no respondió a tiempo"
+          docker logs provecho-tests-db
+          exit 1
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
