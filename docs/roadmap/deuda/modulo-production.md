@@ -122,15 +122,22 @@ hasta ahora:
   (`asistencia`, `marcacion`); falta el contrato público de lectura.
   Bloques `feat/rrhh-horas-asistidas-contrato-publico` +
   `feat/produccion-horas-hombre-desde-rrhh`.
-- ⬜ **Seeder sin datos de producción**: ningún seeder (`seed.py`, `e2e.py`,
-  `pdv_demo.py`, `pizzas_demo.py`) crea un usuario con rol `jefe_cocina`,
-  un almacén tipo `produccion`, ni una receta con `articulo_id` — sin esa
-  receta, crear una orden se rechaza con 409. El módulo no se puede
-  ejercitar en dev/staging sin el comodín de `admin`. Bloque
-  `feat/produccion-semilla-y-pantalla-con-permisos`.
-- ⬜ **Frontend sin gates de permiso ni ficha de detalle**: la pantalla
-  `/produccion` no distingue `production.crear` de `production.completar`
-  al mostrar botones, no recibe `usuario.permisos`, no tiene ficha `[id]`
-  pese a que `GET /ordenes/{id}` existe, y pagina en el cliente en vez de
-  con `page_size`. Bloques `feat/produccion-semilla-y-pantalla-con-permisos`
-  y `feat/produccion-ficha-y-consumo-sugerido`.
+- ✅ 2026-09-09 **Seeder sin datos de producción** (bloque
+  `feat/produccion-semilla-y-pantalla-con-permisos`). `seed()` ahora crea
+  `jefecocina1` (PIN 123456, rol `jefe_cocina`) y el almacén `WH-PROD`
+  (tipo `produccion`, abastecido por el central). La receta BOM (insumo +
+  subreceta con `articulo_id`) no se agregó a `seed()` sino a
+  `python -m src.seeders.e2e`: un artículo real en el catálogo de la
+  empresa de `seed()` rompía 21 tests de una docena de suites que asumen
+  ese catálogo vacío salvo lo que cada una crea (colisión de
+  `categoria_udm.nombre`, que es UNIQUE, y de conteos exactos de
+  artículos/stock). `pdv_demo.py`/`pizzas_demo.py` siguen sin receta de
+  producción — quedan fuera porque son seeders de demo, no de desarrollo
+  ni de CI.
+- ✅ 2026-09-09 **Frontend sin gates de permiso ni paginación server**
+  (mismo bloque). `/produccion` ahora recibe `permisos={usuario.permisos}`
+  y gatea "+ Nueva orden"/Consumo detrás de `production.crear` y
+  Completar detrás de `production.completar` (patrón de
+  `inventario/transferencias`); pagina con `?page=`/`page_size` en vez de
+  pedir solo la primera página. La **ficha de detalle** sigue pendiente:
+  bloque `feat/produccion-ficha-y-consumo-sugerido`.
