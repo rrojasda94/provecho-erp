@@ -560,6 +560,21 @@ def renovar_documento(
 
 
 @router.post(
+    "/documentos/{documento_id}/adjuntos/presign-upload",
+    response_model=schemas.PresignAdjuntoOut,
+)
+def presignar_adjunto_documento(
+    documento_id: uuid.UUID,
+    body: schemas.PresignAdjuntoIn,
+    _: Usuario = Depends(require_permission(GESTIONAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    exigir_documento(session, documento_id, tenant)
+    return documentos.presignar_adjunto(session, documento_id, **body.model_dump())
+
+
+@router.post(
     "/documentos/{documento_id}/adjuntos",
     response_model=schemas.ArchivoOut,
     status_code=201,

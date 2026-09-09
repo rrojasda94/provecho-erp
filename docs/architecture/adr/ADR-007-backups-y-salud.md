@@ -3,6 +3,15 @@
 - Estado: aceptado
 - Fecha: 2026-07-26
 
+> **Nota (2026-09-09, ADR-098)**: `assets` suma un segundo consumidor de las
+> variables `s3_*` y de `boto3` — `src/shared/integrations/storage/s3.py`
+> genera URLs prefirmadas para que el cliente suba adjuntos de
+> `documento_vigencia` directo a S3. La decisión de acá no cambia: `boto3`
+> sigue siendo dependencia opcional (`[backups]`) e importada adentro de la
+> función que la usa, así que la imagen de la API sigue sin cargarla salvo
+> que alguien la instale explícitamente. Mismo bucket y credenciales que los
+> backups, distinto solo por prefijo de clave.
+
 ## Contexto
 
 El ERP no tenía copias de seguridad de ningún tipo, y la documentación

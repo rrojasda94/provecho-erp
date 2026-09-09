@@ -11,6 +11,7 @@ from src.modules.assets.application.errors import Conflicto, NoEncontrado, Regla
 from src.modules.assets.domain import rules
 from src.modules.assets.infrastructure.models import DocumentoVigencia
 from src.modules.assets.infrastructure.repositories import DocumentoVigenciaRepo
+from src.shared.integrations.storage import s3
 from src.shared.models import Archivo
 
 ENTIDAD_ADJUNTO = "documento_vigencia"
@@ -105,6 +106,29 @@ def renovar_documento(
     )
     documento.renovado_por_id = nuevo.id
     return nuevo
+
+
+def presignar_adjunto(
+    session: Session,
+    documento_id: uuid.UUID,
+    *,
+    nombre: str,
+    mime_type: str,
+) -> dict:
+    """URL prefirmada para que el cliente suba el binario directo a S3
+    (`s3.presigned_put_url`); el metadato se guarda después, en `adjuntar`,
+    con la `url_storage` que esta función ya devuelve."""
+    if DocumentoVigenciaRepo(session).get(documento_id) is None:
+        raise NoEncontrado("documento no encontrado")
+    if not mime_type.startswith(MIME_PERMITIDOS):
+        raise Conflicto(f"tipo de archivo no admitido para un documento: {mime_type}")
+    if not s3.configurado():
+        raise ReglaNegocio("el almacenamiento S3 no está configurado (variables S3_*)")
+    clave = f"{ENTIDAD_ADJUNTO}/{documento_id}/{uuid.uuid4()}-{nombre}"
+    return {
+        "upload_url": s3.presigned_put_url(clave, content_type=mime_type),
+        "url_storage": s3.url_publica(clave),
+    }
 
 
 def adjuntar(

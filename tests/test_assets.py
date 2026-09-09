@@ -614,6 +614,88 @@ def test_crear_documento_y_renovar_encadena(env):
     assert otra_vez.status_code == 409
 
 
+def test_presign_adjunto_sin_s3_configurado_409(env):
+    client, ids, _ = env
+    h = _token(client)
+    activo = client.post(
+        "/api/v1/assets/activos",
+        headers=h,
+        json={"tipo": "equipamiento", "id_interno": "EQ0010", "nombre": "Extractor"},
+    ).json()
+    doc = client.post(
+        "/api/v1/assets/documentos",
+        headers=h,
+        json={
+            "sujeto_tipo": "activo",
+            "sujeto_id": activo["id"],
+            "tipo_documento": "otro",
+            "fecha_vencimiento": str(date.today() + timedelta(days=30)),
+        },
+    ).json()
+    r = client.post(
+        f"/api/v1/assets/documentos/{doc['id']}/adjuntos/presign-upload",
+        headers=h,
+        json={"nombre": "poliza.pdf", "mime_type": "application/pdf"},
+    )
+    assert r.status_code == 409
+
+
+def test_presign_adjunto_y_registro_completo(env, monkeypatch):
+    from src.shared.integrations.storage import s3
+
+    monkeypatch.setattr(s3, "configurado", lambda: True)
+    monkeypatch.setattr(
+        s3,
+        "presigned_put_url",
+        lambda clave, *, content_type, expira_segundos=300: f"https://s3.test/{clave}?firma=x",
+    )
+    monkeypatch.setattr(s3, "url_publica", lambda clave: f"https://s3.test/{clave}")
+
+    client, ids, _ = env
+    h = _token(client)
+    activo = client.post(
+        "/api/v1/assets/activos",
+        headers=h,
+        json={"tipo": "equipamiento", "id_interno": "EQ0011", "nombre": "Congelador"},
+    ).json()
+    doc = client.post(
+        "/api/v1/assets/documentos",
+        headers=h,
+        json={
+            "sujeto_tipo": "activo",
+            "sujeto_id": activo["id"],
+            "tipo_documento": "otro",
+            "fecha_vencimiento": str(date.today() + timedelta(days=30)),
+        },
+    ).json()
+
+    presign = client.post(
+        f"/api/v1/assets/documentos/{doc['id']}/adjuntos/presign-upload",
+        headers=h,
+        json={"nombre": "poliza.pdf", "mime_type": "application/pdf"},
+    )
+    assert presign.status_code == 200, presign.text
+    cuerpo = presign.json()
+    assert cuerpo["upload_url"].startswith("https://s3.test/documento_vigencia/")
+    assert cuerpo["url_storage"] == cuerpo["upload_url"].split("?")[0]
+
+    adjunto = client.post(
+        f"/api/v1/assets/documentos/{doc['id']}/adjuntos",
+        headers=h,
+        json={
+            "nombre": "poliza.pdf",
+            "mime_type": "application/pdf",
+            "tamano_bytes": 1024,
+            "url_storage": cuerpo["url_storage"],
+        },
+    )
+    assert adjunto.status_code == 201, adjunto.text
+
+    listado = client.get(f"/api/v1/assets/documentos/{doc['id']}/adjuntos", headers=h)
+    assert len(listado.json()) == 1
+    assert listado.json()[0]["url_storage"] == cuerpo["url_storage"]
+
+
 def test_barrido_publica_una_sola_vez_por_ventana(env):
     client, ids, TestSession = env
     h = _token(client)
@@ -691,9 +773,7 @@ def test_repuesto_compatible_alta_listado_y_baja(env):
     )
     assert duplicado.status_code == 409
 
-    listado = client.get(
-        f"/api/v1/assets/activos/{activo['id']}/repuestos-compatibles", headers=h
-    )
+    listado = client.get(f"/api/v1/assets/activos/{activo['id']}/repuestos-compatibles", headers=h)
     assert len(listado.json()) == 1
 
     baja = client.delete(
@@ -701,9 +781,7 @@ def test_repuesto_compatible_alta_listado_y_baja(env):
     )
     assert baja.status_code == 204
     assert (
-        client.get(
-            f"/api/v1/assets/activos/{activo['id']}/repuestos-compatibles", headers=h
-        ).json()
+        client.get(f"/api/v1/assets/activos/{activo['id']}/repuestos-compatibles", headers=h).json()
         == []
     )
 
@@ -744,9 +822,7 @@ def test_realizar_orden_con_repuestos_descuenta_stock_via_evento(env):
     with TestSession() as s:
         incidencias = list(
             s.scalars(
-                select(IncidenciaInventario).where(
-                    IncidenciaInventario.referencia == orden["id"]
-                )
+                select(IncidenciaInventario).where(IncidenciaInventario.referencia == orden["id"])
             )
         )
         assert len(incidencias) == 1

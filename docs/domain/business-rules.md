@@ -1129,6 +1129,10 @@ producción se hace en cocinas de sucursal. Ver
   sigue disponible para consulta (una inspección puede pedirlo).
 - **RN-DOC-004** Un documento ya renovado no admite una segunda renovación
   sobre la misma fila; la cadena avanza siempre desde la punta vigente.
+- **RN-DOC-005** Un documento admite adjuntar su escaneo (PDF o imagen,
+  máx. 20 MB): el binario se sube directo a S3 con una URL prefirmada que
+  el backend genera (`assets`, 2026-09-09); el ERP solo guarda el vínculo y
+  los metadatos (mismo patrón que `marketing.application.adjuntos`).
 
 ## Almacén virtual de activos
 

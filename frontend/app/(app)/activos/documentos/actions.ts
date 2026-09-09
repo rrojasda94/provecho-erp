@@ -54,6 +54,55 @@ export async function crearDocumentoAction(
   return { error: "", ok: true };
 }
 
+export async function adjuntarArchivoAction(
+  _previo: EstadoFormulario,
+  formData: FormData,
+): Promise<EstadoFormulario> {
+  const documentoId = texto(formData, "documento_id");
+  const archivo = formData.get("archivo");
+  if (!(archivo instanceof File) || archivo.size === 0) {
+    return { error: "Elige un archivo.", ok: false };
+  }
+
+  try {
+    const t = await token();
+    const presign = await apiFetch<{ upload_url: string; url_storage: string }>(
+      `/api/v1/assets/documentos/${documentoId}/adjuntos/presign-upload`,
+      {
+        token: t,
+        metodo: "POST",
+        cuerpo: { nombre: archivo.name, mime_type: archivo.type || "application/octet-stream" },
+      },
+    );
+
+    const subida = await fetch(presign.upload_url, {
+      method: "PUT",
+      headers: { "Content-Type": archivo.type || "application/octet-stream" },
+      body: await archivo.arrayBuffer(),
+    });
+    if (!subida.ok) {
+      return { error: "No se pudo subir el archivo al almacenamiento.", ok: false };
+    }
+
+    await apiFetch(`/api/v1/assets/documentos/${documentoId}/adjuntos`, {
+      token: t,
+      metodo: "POST",
+      cuerpo: {
+        nombre: archivo.name,
+        mime_type: archivo.type || "application/octet-stream",
+        tamano_bytes: archivo.size,
+        url_storage: presign.url_storage,
+      },
+    });
+  } catch (e) {
+    const mensaje = e instanceof ApiError ? e.message : "No se pudo adjuntar el archivo.";
+    return { error: mensaje, ok: false };
+  }
+
+  revalidatePath(RUTA);
+  return { error: "", ok: true };
+}
+
 export async function renovarDocumentoAction(
   _previo: EstadoFormulario,
   formData: FormData,

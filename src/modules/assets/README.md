@@ -50,8 +50,12 @@ Detalle completo en `docs/architecture/data-model.md` §Recursos.
   plan y el odómetro si trae km, el activo vuelve a `operativo`) o
   cancelarla.
 - Crear un documento con vencimiento, editarlo, renovarlo (crea uno nuevo y
-  encadena el viejo — nunca sobrescribe la fecha), adjuntarle un archivo
-  (metadata, mismo patrón que `marketing.application.adjuntos`).
+  encadena el viejo — nunca sobrescribe la fecha), adjuntarle un archivo:
+  `presign-upload` da una URL prefirmada de S3
+  (`src/shared/integrations/storage/s3.py`), el cliente sube el binario
+  directo ahí, y recién entonces se registra el metadato (mismo patrón que
+  `marketing.application.adjuntos`, ahora con una forma real de conseguir
+  esa URL).
 - `GET /cronograma`: agenda unificada de mantenimientos y documentos
   próximos/vencidos, ordenada por fecha — la pantalla de entrada del
   módulo.
@@ -100,7 +104,8 @@ Permisos: `assets.leer`, `assets.gestionar` (activos, planes, documentos),
   `POST /ordenes-mantenimiento/{id}/{iniciar|realizar|cancelar}` (`realizar`
   acepta `almacen_id` + `repuestos` para descontar stock).
 - `POST/GET/PATCH /documentos`, `GET /documentos/{id}`,
-  `POST /documentos/{id}/renovar`, `POST/GET /documentos/{id}/adjuntos`.
+  `POST /documentos/{id}/renovar`, `POST /documentos/{id}/adjuntos/presign-upload`,
+  `POST/GET /documentos/{id}/adjuntos`.
 - `GET /cronograma`.
 
 ## Reglas

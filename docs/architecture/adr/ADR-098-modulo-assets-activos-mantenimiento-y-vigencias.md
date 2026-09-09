@@ -150,9 +150,11 @@ consulta (no cuando se carga por id y se valida después).
   la placa por `assets.application.queries_publicas.vehiculo_para_guia` y la
   congela al emitir (RN-VEH-008, ADR-027 actualizado). `vehiculo_placa`
   sigue aceptando texto libre cuando no se elige un vehículo.
-- **Adjuntos de `documento_vigencia`** son solo metadata (mismo patrón que
-  `marketing.application.adjuntos`): la subida binaria a S3 la hace el
-  cliente directo contra el storage, no este módulo.
+- ~~**Adjuntos de `documento_vigencia`** son solo metadata~~ — resuelto el
+  mismo día: `POST .../adjuntos/presign-upload` genera una URL prefirmada de
+  S3 (`src/shared/integrations/storage/s3.py`, mismo bucket/credenciales que
+  `src.backups.backup`, boto3 opcional `[backups]` ADR-007) y el cliente
+  sube el binario directo a ella antes de registrar los metadatos.
 
 ## Consecuencias
 

@@ -336,6 +336,16 @@ class ArchivoAdjuntoCreate(BaseModel):
     url_storage: str = Field(min_length=1, max_length=500)
 
 
+class PresignAdjuntoIn(BaseModel):
+    nombre: str = Field(min_length=1, max_length=255)
+    mime_type: str = Field(min_length=1, max_length=100)
+
+
+class PresignAdjuntoOut(BaseModel):
+    upload_url: str
+    url_storage: str
+
+
 class ArchivoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID

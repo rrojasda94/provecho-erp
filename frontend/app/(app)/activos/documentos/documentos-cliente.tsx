@@ -8,7 +8,7 @@ import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 
-import { crearDocumentoAction, renovarDocumentoAction } from "./actions";
+import { adjuntarArchivoAction, crearDocumentoAction, renovarDocumentoAction } from "./actions";
 
 export type Documento = {
   id: string;
@@ -148,6 +148,18 @@ export function DocumentosCliente({
                 <label className="flex flex-col gap-1 text-sm font-semibold">
                   Nueva fecha de vencimiento
                   <input name="fecha_vencimiento" type="date" required />
+                </label>
+              </DialogoFormulario>
+              <DialogoFormulario
+                titulo="Adjuntar archivo"
+                disparador="Adjuntar"
+                claseDisparador="rounded-md border border-border px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                accion={adjuntarArchivoAction}
+              >
+                <input type="hidden" name="documento_id" value={d.id} />
+                <label className="flex flex-col gap-1 text-sm font-semibold">
+                  Archivo (PDF o imagen, máx. 20 MB)
+                  <input name="archivo" type="file" accept="application/pdf,image/*" required />
                 </label>
               </DialogoFormulario>
               {d.sujeto_tipo === "activo" && (

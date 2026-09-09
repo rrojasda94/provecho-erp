@@ -22655,6 +22655,46 @@
         "title": "PreguntaPublicaOut",
         "type": "object"
       },
+      "PresignAdjuntoIn": {
+        "properties": {
+          "mime_type": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "mime_type"
+        ],
+        "title": "PresignAdjuntoIn",
+        "type": "object"
+      },
+      "PresignAdjuntoOut": {
+        "properties": {
+          "upload_url": {
+            "title": "Upload Url",
+            "type": "string"
+          },
+          "url_storage": {
+            "title": "Url Storage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_url",
+          "url_storage"
+        ],
+        "title": "PresignAdjuntoOut",
+        "type": "object"
+      },
       "ProductoCreate": {
         "properties": {
           "categoria_id": {
@@ -37052,6 +37092,64 @@
           }
         ],
         "summary": "Adjuntar Documento",
+        "tags": [
+          "assets"
+        ]
+      }
+    },
+    "/api/v1/assets/documentos/{documento_id}/adjuntos/presign-upload": {
+      "post": {
+        "operationId": "presignar_adjunto_documento_api_v1_assets_documentos__documento_id__adjuntos_presign_upload_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "documento_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Documento Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignAdjuntoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignAdjuntoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Presignar Adjunto Documento",
         "tags": [
           "assets"
         ]
