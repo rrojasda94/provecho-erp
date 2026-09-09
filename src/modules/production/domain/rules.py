@@ -14,6 +14,14 @@ def puede_completar(estado: str) -> bool:
     return estado == "en_proceso"
 
 
+def puede_iniciar_plan(estado: str) -> bool:
+    return estado == "planificado"
+
+
+def puede_cerrar_plan(estado: str) -> bool:
+    return estado == "en_ejecucion"
+
+
 def costo_real_unitario(
     costo_insumos: Decimal, costo_mano_obra: Decimal, cantidad_producida: Decimal
 ) -> Decimal:

@@ -9,6 +9,7 @@ from src.modules.production.infrastructure.models import (
     ConsumoProduccionItem,
     OrdenProduccion,
     OrdenProduccionTrabajador,
+    PlanProduccion,
 )
 
 # `Almacen` es organización transversal (data-model §1) y vive en `users`
@@ -88,3 +89,58 @@ class OrdenProduccionRepo:
                 )
             )
         )
+
+    def de_plan(self, plan_id: uuid.UUID) -> list[OrdenProduccion]:
+        return list(
+            self.s.scalars(
+                select(OrdenProduccion).where(OrdenProduccion.plan_produccion_id == plan_id)
+            )
+        )
+
+
+class PlanProduccionRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, plan_id: uuid.UUID) -> PlanProduccion | None:
+        return self.s.get(PlanProduccion, plan_id)
+
+    def get_por_clave(
+        self, almacen_id: uuid.UUID, fecha, turno: str, linea_produccion: str
+    ) -> PlanProduccion | None:
+        """RN-PRD-012: una línea, un tipo de receta por turno — la clave
+        natural que reemplaza a una `idempotency_key` explícita."""
+        return self.s.scalar(
+            select(PlanProduccion).where(
+                PlanProduccion.almacen_id == almacen_id,
+                PlanProduccion.fecha == fecha,
+                PlanProduccion.turno == turno,
+                PlanProduccion.linea_produccion == linea_produccion,
+            )
+        )
+
+    def q_list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        almacen_id: uuid.UUID | None = None,
+        fecha=None,
+        estado: str | None = None,
+    ):
+        """La consulta sin ejecutar: el router la pagina (ADR-026)."""
+        q = select(PlanProduccion)
+        if almacen_id is not None:
+            q = q.where(PlanProduccion.almacen_id == almacen_id)
+        if fecha is not None:
+            q = q.where(PlanProduccion.fecha == fecha)
+        if estado is not None:
+            q = q.where(PlanProduccion.estado == estado)
+        if empresa_id is not None:
+            q = q.join(Almacen, Almacen.id == PlanProduccion.almacen_id).where(
+                Almacen.empresa_id == empresa_id
+            )
+        return q.order_by(PlanProduccion.fecha.desc(), PlanProduccion.created_at.desc())
+
+    def add(self, plan: PlanProduccion) -> PlanProduccion:
+        self.s.add(plan)
+        self.s.flush()
+        return plan

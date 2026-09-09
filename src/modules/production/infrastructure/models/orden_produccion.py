@@ -1,9 +1,9 @@
 """Orden de producción: crear (borrador) → registrar consumo (en_proceso)
 → completar (conforme | no_conforme_reprocesado | no_conforme_desechado).
 
-Costeo (RN-PRD-018) se calcula al completar, nunca a mano.
-`plan_produccion`/cronograma queda diferido — la orden se crea sin plan
-(ad-hoc) en este slice (deuda técnica, ver ROADMAP).
+Costeo (RN-PRD-018) se calcula al completar, nunca a mano. La orden puede
+nacer suelta (ad-hoc) o colgar de un `plan_produccion` (cronograma,
+`plan_produccion_id`, bloque `feat/produccion-plan-de-produccion`).
 """
 
 import uuid
@@ -34,6 +34,12 @@ class OrdenProduccion(Base, UuidPkMixin, TimestampMixin):
 
     articulo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("articulo.id"))
     almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))
+    # Nullable: la mayoría de las órdenes de hoy siguen siendo ad-hoc, sin
+    # plan. `application/planes.py::agregar_orden` la liga a un plan
+    # `planificado`; al `iniciar` el plan se reservan sus insumos.
+    plan_produccion_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("plan_produccion.id"), nullable=True
+    )
     # `manual` (default, vía API) | `ajuste_por_necesidad` (la crea sola
     # `application/listeners.py` al cruzar `inventory.stock_bajo_minimo`,
     # RN-PRD-007/011) | `plan` (cronograma, diferido — ver ROADMAP).

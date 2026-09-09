@@ -264,6 +264,41 @@
         "title": "AgregarLineasCreate",
         "type": "object"
       },
+      "AgregarOrdenAPlanIn": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad_planeada": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad Planeada"
+          },
+          "idempotency_key": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "articulo_id",
+          "cantidad_planeada",
+          "idempotency_key"
+        ],
+        "title": "AgregarOrdenAPlanIn",
+        "type": "object"
+      },
       "AjusteCreate": {
         "properties": {
           "almacen_id": {
@@ -16240,6 +16275,18 @@
             "title": "Origen",
             "type": "string"
           },
+          "plan_produccion_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Produccion Id"
+          },
           "trabajadores": {
             "items": {
               "$ref": "#/components/schemas/TrabajadorHorasOut"
@@ -16441,6 +16488,18 @@
             "default": "manual",
             "title": "Origen",
             "type": "string"
+          },
+          "plan_produccion_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Produccion Id"
           },
           "trazabilidad": {
             "anyOf": [
@@ -17326,6 +17385,37 @@
           "page_size"
         ],
         "title": "Pagina[PiezaOut]",
+        "type": "object"
+      },
+      "Pagina_PlanProduccionOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlanProduccionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[PlanProduccionOut]",
         "type": "object"
       },
       "Pagina_PlantillaOut_": {
@@ -19547,6 +19637,86 @@
           "pin_nuevo"
         ],
         "title": "PinPropioChange",
+        "type": "object"
+      },
+      "PlanProduccionCreate": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "linea_produccion": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Linea Produccion",
+            "type": "string"
+          },
+          "turno": {
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Turno",
+            "type": "string"
+          }
+        },
+        "required": [
+          "almacen_id",
+          "fecha",
+          "turno",
+          "linea_produccion"
+        ],
+        "title": "PlanProduccionCreate",
+        "type": "object"
+      },
+      "PlanProduccionOut": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "linea_produccion": {
+            "title": "Linea Produccion",
+            "type": "string"
+          },
+          "origen": {
+            "title": "Origen",
+            "type": "string"
+          },
+          "turno": {
+            "title": "Turno",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "fecha",
+          "turno",
+          "linea_produccion",
+          "origen",
+          "estado"
+        ],
+        "title": "PlanProduccionOut",
         "type": "object"
       },
       "PlantillaCreate": {
@@ -45329,6 +45499,369 @@
           }
         ],
         "summary": "Adjuntar Evidencia",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/planes": {
+      "get": {
+        "operationId": "listar_planes_api_v1_production_planes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fecha",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fecha"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_PlanProduccionOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Planes",
+        "tags": [
+          "production"
+        ]
+      },
+      "post": {
+        "operationId": "crear_plan_api_v1_production_planes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanProduccionCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanProduccionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Plan",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/planes/{plan_id}": {
+      "get": {
+        "operationId": "ver_plan_api_v1_production_planes__plan_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanProduccionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Plan",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/planes/{plan_id}/cerrar": {
+      "post": {
+        "description": "Libera lo que ninguna orden del plan llegó a consumir.",
+        "operationId": "cerrar_plan_api_v1_production_planes__plan_id__cerrar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanProduccionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cerrar Plan",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/planes/{plan_id}/iniciar": {
+      "post": {
+        "description": "Reserva los insumos de todas las órdenes del plan (RN-PRD-007);\nfalla entero si algo no alcanza (`StockInsuficiente`, 409).",
+        "operationId": "iniciar_plan_api_v1_production_planes__plan_id__iniciar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanProduccionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Iniciar Plan",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/planes/{plan_id}/ordenes": {
+      "post": {
+        "operationId": "agregar_orden_a_plan_api_v1_production_planes__plan_id__ordenes_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgregarOrdenAPlanIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenProduccionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agregar Orden A Plan",
         "tags": [
           "production"
         ]

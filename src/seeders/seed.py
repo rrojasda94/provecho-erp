@@ -149,6 +149,10 @@ PERMISOS = [
     ("production.leer", "Consultar órdenes de producción"),
     ("production.completar", "Registrar control de calidad y completar la orden"),
     (
+        "production.planificar",
+        "Crear y gestionar el plan de producción (planes, iniciar, cerrar)",
+    ),
+    (
         "accounting.cuenta_administrar",
         "Administrar plan de cuentas y mapeo de asientos automáticos",
     ),
@@ -451,6 +455,7 @@ ROLES = {
         "production.crear",
         "production.leer",
         "production.completar",
+        "production.planificar",
     ],
     "contador": [
         "accounting.cuenta_administrar",

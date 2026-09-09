@@ -19,6 +19,7 @@ class OrdenProduccionOut(BaseModel):
     id: uuid.UUID
     articulo_id: uuid.UUID
     almacen_id: uuid.UUID
+    plan_produccion_id: uuid.UUID | None = None
     origen: str = "manual"
     cantidad_planeada: Decimal
     cantidad_producida: Decimal | None
@@ -161,3 +162,27 @@ class CompletarOrdenIn(BaseModel):
     trazabilidad: dict | None = None
     # Mismo criterio que en `ConsumoCreate`.
     idempotency_key: str | None = Field(default=None, min_length=8, max_length=100)
+
+
+class PlanProduccionCreate(BaseModel):
+    almacen_id: uuid.UUID
+    fecha: date
+    turno: str = Field(min_length=1, max_length=30)
+    linea_produccion: str = Field(min_length=1, max_length=100)
+
+
+class PlanProduccionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    almacen_id: uuid.UUID
+    fecha: date
+    turno: str
+    linea_produccion: str
+    origen: str
+    estado: str
+
+
+class AgregarOrdenAPlanIn(BaseModel):
+    articulo_id: uuid.UUID
+    cantidad_planeada: Decimal = Field(gt=0)
+    idempotency_key: str = Field(min_length=8, max_length=100)
