@@ -306,6 +306,12 @@ MODULOS_CON_SESSION_FACTORY = (
     "src.modules.marketing.application.tasks",
     "src.modules.rrhh.purga",
     "src.modules.sales.application.tasks",
+    # `delivery` cierra/cancela una entrega al escuchar `sales.venta_entregada`/
+    # `venta_anulada`, y `sales` marca la venta entregada al escuchar
+    # `delivery.entrega_registrada` (ADR-098): los dos lados de esa cadena
+    # abren su propia sesión y hay que blanquearlos igual que a los demás.
+    "src.modules.delivery.application.listeners",
+    "src.modules.sales.application.listeners",
 )
 
 

@@ -211,6 +211,14 @@ class Settings(BaseSettings):
     # viene en la respuesta de Google y resuelve el caso real sin traer
     # geometría (ni PostGIS) al proyecto.
     delivery_distritos_restringidos: Annotated[list[str], NoDecode] = []
+    # --- Reparto propio (módulo delivery, ADR-098) ---------------------------
+    # Techo de paradas por ruta si la empresa no fijó su propio valor en
+    # `parametro_empresa` (`delivery/max_paradas_ruta`, ADR-014).
+    delivery_max_paradas_ruta: int = 10
+    # Velocidad media para estimar cuánto tarda un tramo cuando no hay ruteo
+    # real contra Google (heurística, RN-DLV-002) — o su propio valor en
+    # `parametro_empresa` (`delivery/velocidad_media_kmh`).
+    delivery_velocidad_media_kmh: Decimal = Decimal("25")
     # --- Encuesta de satisfacción (marketing) --------------------------------
     # Vigencia de la encuesta enviada. Pasado el plazo, el barrido la expira:
     # una respuesta de dos semanas después no mide la experiencia de ese

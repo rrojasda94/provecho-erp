@@ -1,8 +1,13 @@
 # Historial — Módulo `delivery`
 
-Estado vigente: ⏳ Pendiente — solo especificación (ADR-098, 2026-09-09):
-README, modelo de datos, eventos, reglas de negocio y máquinas de estado
-escritos; sin código, sin migración, sin endpoints.
+Estado vigente: 🔶 En curso — slice core implementado (2026-09-09,
+ADR-098): repartidores propios, tablero de despacho y el ciclo completo de
+una ruta (crear con ruteo heurístico, editar paradas, iniciar, entregar o
+fallar cada parada, reintentar o cerrar la fallida, finalizar o cancelar
+la ruta), con la convergencia por evento hacia y desde `sales` en los dos
+sentidos. Falta ruteo real contra Google Routes, GPS de flota, el enlace
+público de seguimiento y el aviso automático por WhatsApp (ver
+`docs/roadmap/deuda/modulo-delivery.md`).
 
 ## Cronología
 
@@ -45,3 +50,45 @@ modelos, migración, repartidores/rutas/entregas, listeners con `sales`, 7
 registros de activación; (3) ruteo real contra Google, GPS y el enlace
 público de seguimiento; (4) PWA del repartidor; (5) tablero de despacho en
 el ERP; (6) notificaciones por WhatsApp.
+
+### 2026-09-09 — Slice core: repartidores, tablero y ciclo de ruta/entrega
+
+Backend del slice 2 completo: cuatro tablas (`repartidor`, `ruta_reparto`,
+`entrega`, `posicion_repartidor` — esta última sin uso todavía, reservada
+para el GPS del slice siguiente), migración `69f4ca1d58f4` generada por
+autogenerate y verificada con `alembic check` + ciclo `downgrade base` /
+`upgrade head` contra Postgres real.
+
+Los dos contratos de lectura de `sales` (`venta_para_reparto`,
+`ventas_listas_para_reparto`) y de `rrhh` (`trabajadores_con_cuenta`,
+`cuenta_de_trabajador`) quedaron implementados tal como los especificó
+ADR-098. La convergencia por evento funciona en los dos sentidos:
+`sales/application/listeners.py` ganó `session_factory` y un handler de
+`delivery.entrega_registrada` que llama a la misma
+`cumplimiento.registrar_entrega` del botón "Entregar" del KDS;
+`delivery/application/listeners.py` escucha `sales.venta_entregada` (cierra
+una entrega abierta si el KDS se adelantó) y `sales.venta_anulada`
+(RN-DLV-006).
+
+Decisión de implementación no anticipada en el ADR: el ruteo se apoya en
+`Coordenada` de `shared/integrations/google` en vez de un tipo propio —
+son el mismo punto (lat, lng), y así el slice de ruteo real no tiene que
+traducir nada al conectar `computeRoutes`. También se prefirió mapear
+"dirección sin anclar" y demás violaciones de RN-DLV a `ReglaNegocio`
+(409), no a un 422 aparte: es el mismo criterio HTTP que ya usa el resto
+del ERP para una regla de negocio (422 queda reservado para lo que
+rechaza Pydantic antes de llegar al caso de uso).
+
+Colisión de nombre resuelta antes de exportar el contrato: el schema
+`EntregaOut` de `delivery` chocaba con el ya existente de `sales`
+(la respuesta de `POST /sales/ventas/{id}/entrega`); se renombró a
+`EntregaRepartoOut` en vez de dejar que FastAPI recalifique el de `sales`
+con su ruta completa — mover el nombre de un contrato ya publicado es más
+disruptivo que nombrar bien el nuevo.
+
+Pruebas: `tests/test_delivery_rules.py` (18 casos, dominio puro) y
+`tests/test_delivery.py` (23 casos de integración vía `TestClient`,
+incluida la cadena completa iniciar → entregar → `sales.venta_entregada`,
+y el camino inverso KDS → cierra la entrega de `delivery`). Suite completa
+verde en SQLite (2453 pruebas), `ruff` limpio, `alembic check` sin
+diferencias, contrato OpenAPI regenerado.

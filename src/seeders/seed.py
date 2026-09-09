@@ -145,6 +145,21 @@ PERMISOS = [
         "purchases.dar_conformidad",
         "Dar conformidad al comprobante recibido (dispara el pago)",
     ),
+    ("delivery.leer", "Consultar repartidores, rutas y entregas"),
+    (
+        "delivery.despachar",
+        "Armar y llevar rutas de reparto propio: asignar, iniciar, "
+        "finalizar, cancelar y registrar el resultado de cualquier entrega",
+    ),
+    (
+        "delivery.gestionar_repartidores",
+        "Dar de alta y editar repartidores propios (ADR-098)",
+    ),
+    (
+        "delivery.repartir",
+        "Ver las rutas propias y registrar la entrega o el fallo de sus "
+        "propias paradas — no las de otro repartidor",
+    ),
     ("production.crear", "Crear orden de producción y registrar consumo"),
     ("production.leer", "Consultar órdenes de producción"),
     ("production.completar", "Registrar control de calidad y completar la orden"),
@@ -372,6 +387,11 @@ ROLES = {
         "inventory.aprobar_solicitud",
         "inventory.liberar_reserva",
         "sales.leer_clientes_externos",
+        # Puede dar de alta repartidores propios; también despacha y ve el
+        # reparto cuando le toca cubrir el turno (ADR-098).
+        "delivery.leer",
+        "delivery.despachar",
+        "delivery.gestionar_repartidores",
         "accounting.pago_aprobar",
         "accounting.arqueo_registrar",
         "accounting.caja_retirar",
@@ -405,10 +425,24 @@ ROLES = {
         "sales.entregar_pedido",
         "kds.operar",
         "accounting.caja_operar",
+        # Ve el tablero para saber si un pedido delivery ya salió, no
+        # despacha (eso es del encargado/despachador).
+        "delivery.leer",
     ],
     # Cocina avanza la preparación pero NO cierra la entrega (RN-CUP-006).
     "cocinero": ["kds.operar", "sales.leer"],
-    "despachador": ["kds.operar", "sales.leer", "sales.entregar_pedido"],
+    "despachador": [
+        "kds.operar",
+        "sales.leer",
+        "sales.entregar_pedido",
+        "delivery.leer",
+        "delivery.despachar",
+    ],
+    # Repartidor propio (ADR-098): solo ve y resuelve sus propias rutas —
+    # `delivery.repartir` sin `delivery.despachar` no alcanza la de nadie
+    # más (`scope.exigir_ruta_propia`). No es ni cajero ni cocina: entra y
+    # sale del ERP solo por su PWA de reparto.
+    "repartidor": ["delivery.repartir"],
     # Cuenta y solicita el ajuste, pero no lo aprueba ni ve el stock
     # esperado mientras cuenta: el conteo es a ciegas (RN-INV-005/006).
     "almacenero": [
@@ -591,6 +625,11 @@ USUARIOS_SEMILLA = (
     # `supervisor1` con otro PIN y sembrarlo acá les rompe el alta. El nombre
     # dice además para qué existe — ser el segundo par de ojos.
     ("aprobador1", "supervisor"),
+    # Cuenta de prueba del reparto propio (ADR-098). No es todavía un
+    # `repartidor` de `delivery` —esa fila exige un `trabajador`, que este
+    # seeder no crea— así que sirve para probar el permiso y el login de la
+    # PWA, no para que aparezca en un tablero de despacho.
+    ("repartidor1", "repartidor"),
 )
 
 
