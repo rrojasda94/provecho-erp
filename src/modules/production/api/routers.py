@@ -10,7 +10,7 @@ from src.core.tenant import Tenant
 from src.modules.production.api import schemas
 from src.modules.production.application import ordenes
 from src.modules.production.application.scope import exigir_almacen, exigir_orden
-from src.modules.users.api.deps import get_db, get_tenant, require_permission
+from src.modules.users.api.deps import client_ip, get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Usuario
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
 
@@ -27,6 +27,7 @@ def crear_orden(
     actor: Usuario = Depends(require_permission(CREAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
 ):
     exigir_almacen(session, body.almacen_id, tenant)
     orden = ordenes.crear_orden_produccion(
@@ -36,6 +37,7 @@ def crear_orden(
         cantidad_planeada=body.cantidad_planeada,
         creado_por=actor.id,
         idempotency_key=body.idempotency_key,
+        ip=ip,
     )
     session.commit()
     return orden
@@ -83,13 +85,19 @@ def ver_orden(
 def registrar_consumo(
     orden_id: uuid.UUID,
     body: schemas.ConsumoCreate,
-    _: Usuario = Depends(require_permission(CREAR)),
+    actor: Usuario = Depends(require_permission(CREAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
 ):
     exigir_orden(session, orden_id, tenant)
     orden = ordenes.registrar_consumo(
-        session, orden_id, items=[it.model_dump() for it in body.items]
+        session,
+        orden_id,
+        items=[it.model_dump() for it in body.items],
+        actor_id=actor.id,
+        idempotency_key=body.idempotency_key,
+        ip=ip,
     )
     session.commit()
     return orden
@@ -102,6 +110,7 @@ def completar_orden(
     actor: Usuario = Depends(require_permission(COMPLETAR)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
 ):
     exigir_orden(session, orden_id, tenant)
     orden = ordenes.completar_orden_produccion(
@@ -114,7 +123,12 @@ def completar_orden(
         merma_cantidad=body.merma_cantidad,
         merma_motivo=body.merma_motivo,
         evidencia_destruccion_url=body.evidencia_destruccion_url,
+        fecha_vencimiento=body.fecha_vencimiento,
+        lote_codigo=body.lote_codigo,
+        trazabilidad=body.trazabilidad,
         registrado_por=actor.id,
+        idempotency_key=body.idempotency_key,
+        ip=ip,
     )
     session.commit()
     return orden

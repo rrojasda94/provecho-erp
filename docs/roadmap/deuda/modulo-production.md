@@ -39,17 +39,16 @@ Plan completo de cómo saldar esta deuda (bloques, orden, decisiones tomadas):
   `feat/produccion-desecho-a-contabilidad`). Reproceso
   (`no_conforme_reprocesado`) correctamente no genera merma ni asiento
   (RN-PRD — solo detalle en el reporte de escalamiento).
-- 🔶 **Lote/trazabilidad del producto terminado**: desde 2026-07-27
-  (ADR-015) el ingreso por `orden_completada` **sí** genera `lote`
-  (`origen=produccion`, referencia a la orden) cuando el artículo controla
-  lote — **no está bloqueado por `inventory`**, el listener ya sabe leer
-  `fecha_vencimiento`/`lote_codigo` del payload (`_lote_del_ingreso`,
-  `src/modules/inventory/application/listeners.py`). Lo que falta es que
-  `production` los mande: hoy el payload de `orden_completada` no lleva
-  ninguno de los dos, así que el lote nace sin vencimiento y FEFO lo trata
-  como FIFO. Falta también la trazabilidad fina de fabricación —
-  manipulador, envasador, línea, variables de proceso, QR (RN-PRD,
-  RN-LOT-002/003). Bloque `feat/produccion-lote-trazabilidad-auditoria`.
+- ✅ 2026-09-09 **Lote/trazabilidad del producto terminado** (bloque
+  `feat/produccion-lote-trazabilidad-auditoria`). `CompletarOrdenIn` acepta
+  `fecha_vencimiento`, `lote_codigo` y `trazabilidad` (JSONB libre:
+  manipulador, envasador, línea, variables de proceso — RN-LOT-002/003);
+  se persisten en la orden y, cuando el resultado es `conforme`, viajan en
+  el payload de `production.orden_completada` — el listener de `inventory`
+  ya sabía leerlos (ADR-015), solo faltaba que `production` los mandara.
+  Sin ellos, el lote sigue naciendo sin vencimiento (FEFO cae a FIFO), que
+  sigue siendo válido para quien no los declare. QR queda fuera de este
+  bloque: no hay todavía dónde imprimirlo.
 - ⬜ **Subrecetas anidadas**: una orden que consume otra subreceta (con su
   propia orden de producción) no está resuelta — hoy `registrar_consumo`
   espera insumos ya disponibles en stock. Bloque
@@ -86,14 +85,16 @@ hasta ahora:
   teórico y no se usa); `peso_desperdicio_real`/`tipo_desperdicio` se
   guardan pero nunca se contrastan contra `receta_item.merma_pct`, que es
   literalmente lo que exige RN-PRD-018. Bloque `feat/produccion-costeo-real`.
-- ⬜ **Sin auditoría**: cero llamadas a `auditoria.registrar` en todo el
-  módulo, incluido completar una orden con desecho (acto de plata y de
-  autoridad por definición). Bloque
-  `feat/produccion-lote-trazabilidad-auditoria`.
-- ⬜ **Idempotencia parcial**: solo `crear_orden_produccion` tiene
-  `idempotency_key`; `registrar_consumo` y `completar_orden_produccion`
-  no, así que un reintento de red puede duplicar consumo o completar dos
-  veces. Bloque `feat/produccion-lote-trazabilidad-auditoria`.
+- ✅ 2026-09-09 **Sin auditoría** (mismo bloque). `crear_orden_produccion`,
+  `registrar_consumo` y `completar_orden_produccion` llaman a
+  `auditoria.registrar` (ADR-031), con `datos_antes`/`datos_despues` y la
+  IP del request (`Depends(client_ip)`, patrón de `reports`) — incluido el
+  desecho, que es acto de plata y de autoridad por definición.
+- ✅ 2026-09-09 **Idempotencia parcial** (mismo bloque). `registrar_consumo`
+  y `completar_orden_produccion` aceptan `idempotency_key` opcional
+  (columnas `consumo_idempotency_key`/`cierre_idempotency_key`, únicas y
+  nullable): un reintento de red con la misma clave devuelve la orden tal
+  como quedó, sin duplicar el consumo ni volver a cerrar la orden.
 - ⬜ **Tarifa de mano de obra global, no por empresa**:
   `production_costo_hora_mano_obra` vive en `.env`
   (`src/config/settings.py`) en vez de `parametro_empresa`, a diferencia

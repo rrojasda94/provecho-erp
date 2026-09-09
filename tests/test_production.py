@@ -17,6 +17,7 @@ from src.modules.inventory.application import listeners
 from src.modules.inventory.infrastructure.models import (
     Articulo,
     CategoriaUdm,
+    Lote,
     Receta,
     RecetaItem,
     Sku,
@@ -25,6 +26,7 @@ from src.modules.inventory.infrastructure.models import (
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import Almacen, Empresa, Rol, Usuario, UsuarioRol
 from src.modules.users.infrastructure.security import hash_pin
+from src.shared.models.audit_log import AuditLog
 
 
 @pytest.fixture()
@@ -54,7 +56,7 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
         )
         masa = Articulo(
             empresa_id=empresa.id, id_interno="M001", nombre="Masa madre",
-            unidad_medida_id=udm.id, tipo="subreceta",
+            unidad_medida_id=udm.id, tipo="subreceta", controla_lote=True,
         )
         s.add_all([harina, masa])
         s.flush()
@@ -315,3 +317,149 @@ def test_listar_ordenes_de_un_almacen_ajeno_403(env):
         f"/api/v1/production/ordenes?almacen_id={almacen_ajeno}", headers=h
     )
     assert r.status_code == 403
+
+
+# --- Lote/trazabilidad, auditoría e idempotencia (feat/produccion-lote-trazabilidad-auditoria) ---
+def test_completar_conforme_con_vencimiento_genera_lote_con_esa_fecha(env):
+    """Sin esto el lote nacía sin vencimiento y FEFO lo trataba como FIFO
+    (RN-VNC-001) — el listener de `inventory` ya sabía leerlo, solo faltaba
+    que `production` lo mandara."""
+    client, ids, TestSession = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-lote-1").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+    r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
+        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+        "fecha_vencimiento": "2026-12-31", "lote_codigo": "LOTE-PRD-001",
+        "trazabilidad": {"linea": "L1", "manipulador_id": "u-123"},
+    })
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["fecha_vencimiento"] == "2026-12-31"
+    assert body["lote_codigo"] == "LOTE-PRD-001"
+    assert body["trazabilidad"] == {"linea": "L1", "manipulador_id": "u-123"}
+
+    with TestSession() as s:
+        lote = s.scalar(
+            select(Lote).where(
+                Lote.articulo_id == uuid.UUID(ids["masa_id"]),
+                Lote.codigo == "LOTE-PRD-001",
+            )
+        )
+        assert lote is not None
+        assert lote.origen == "produccion"
+        assert lote.fecha_vencimiento.isoformat() == "2026-12-31"
+        assert lote.referencia == orden_id
+
+
+def test_completar_conforme_sin_vencimiento_el_lote_nace_sin_el(env):
+    """Sigue siendo válido no mandarlo — FEFO cae a FIFO, como siempre."""
+    client, ids, TestSession = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-lote-2").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+    r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
+        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+    })
+    assert r.status_code == 200
+    assert r.json()["fecha_vencimiento"] is None
+
+    with TestSession() as s:
+        lote = s.scalar(
+            select(Lote).where(
+                Lote.articulo_id == uuid.UUID(ids["masa_id"]), Lote.referencia == orden_id,
+            )
+        )
+        assert lote is not None
+        assert lote.fecha_vencimiento is None
+
+
+def test_idempotencia_registrar_consumo(env):
+    """Un reintento de red con la misma clave no duplica el consumo."""
+    client, ids, TestSession = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-key-idem-consumo").json()["id"]
+    body = _consumo_body(ids)
+    body["idempotency_key"] = "consumo-key-1"
+
+    r1 = client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=body
+    )
+    assert r1.status_code == 200
+    r2 = client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=body
+    )
+    assert r2.status_code == 200
+    assert r2.json() == r1.json()
+
+    with TestSession() as s:
+        from src.modules.production.infrastructure.models import ConsumoProduccionItem
+        filas = s.scalars(
+            select(ConsumoProduccionItem).where(
+                ConsumoProduccionItem.orden_produccion_id == uuid.UUID(orden_id)
+            )
+        ).all()
+        assert len(filas) == 1  # no se duplicó
+
+
+def test_idempotencia_completar_orden(env):
+    """Un reintento de red con la misma clave no vuelve a cerrar la orden
+    ni duplica el lote/asiento — devuelve la orden tal como quedó."""
+    client, ids, TestSession = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-key-idem-completar").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+    cuerpo = {
+        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+        "idempotency_key": "completar-key-1",
+    }
+    r1 = client.post(
+        f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json=cuerpo
+    )
+    assert r1.status_code == 200
+    r2 = client.post(
+        f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json=cuerpo
+    )
+    assert r2.status_code == 200
+    # Comparación por valor, no por string: la primera respuesta viene del
+    # objeto recién calculado en memoria y la segunda de una fila releída de
+    # la base, que normaliza los decimales a la escala de la columna.
+    b1, b2 = r1.json(), r2.json()
+    assert b2["id"] == b1["id"] == orden_id
+    assert b2["estado"] == b1["estado"] == "conforme"
+    assert Decimal(b2["costo_real_unitario"]) == Decimal(b1["costo_real_unitario"])
+    assert Decimal(b2["cantidad_producida"]) == Decimal(b1["cantidad_producida"])
+
+    with TestSession() as s:
+        masa = s.get(Articulo, uuid.UUID(ids["masa_id"]))
+        # El costo promedio no se recalculó dos veces (seguiría en 5 si se
+        # hubiera vuelto a sumar 10 unidades a 5 de costo).
+        assert masa.costo_promedio == Decimal("5.0000")
+
+
+def test_auditoria_registra_crear_consumo_y_completar(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    orden = _crear_orden(client, h, ids, idempotency_key="op-key-auditoria")
+    orden_id = orden.json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+    client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
+        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+    })
+
+    with TestSession() as s:
+        acciones = s.scalars(
+            select(AuditLog.accion).where(
+                AuditLog.entidad == "orden_produccion",
+                AuditLog.entidad_id == uuid.UUID(orden_id),
+            )
+        ).all()
+    assert set(acciones) == {"crear", "registrar_consumo", "completar"}
