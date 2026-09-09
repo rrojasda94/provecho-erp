@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bike,
   BookOpen,
   Building2,
   Calculator,
@@ -96,6 +97,21 @@ export const MODULOS: Modulo[] = [
     prefijoPermiso: "kds.",
     area: "operacion",
     Icono: ChefHat,
+  },
+  {
+    clave: "reparto",
+    nombre: "Mi reparto",
+    descripcion: "Tus rutas, tus entregas y el GPS de tu recorrido",
+    // Pantalla completa fuera del shell, igual que el PDV y el KDS
+    // (ADR-013): se opera en la calle, no en el mostrador.
+    href: "/reparto",
+    prefijoPermiso: "delivery.repartir",
+    // Permiso exacto y no por prefijo: un despachador con `delivery.despachar`
+    // no reparte, y con el prefijo `delivery.` vería igual esta ficha —el
+    // tablero de despacho (ADR-098, slice siguiente) es un módulo aparte.
+    permiso: "delivery.repartir",
+    area: "operacion",
+    Icono: Bike,
   },
   {
     clave: "produccion",

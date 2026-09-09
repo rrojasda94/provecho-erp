@@ -37,3 +37,11 @@ MVP, para que no se descubran a mitad de una auditoría:
 - ⬜ **Un repartidor propio no puede llevar la ruta de otra sucursal en el
   mismo turno.** El scope de `delivery.repartir` es por ruta propia, no
   hay reparto cruzado entre locales cercanos. No es un caso pedido hoy.
+
+Declarada al construir el slice 4 (PWA del repartidor):
+
+- ⬜ **Los íconos de `public/reparto/manifest.webmanifest` son un
+  cuadrado de color, no diseño de marca.** Se generaron localmente (sin
+  herramienta de diseño a mano en ese momento) solo para que el manifiesto
+  tenga íconos válidos de 192/512 y la PWA sea instalable — cambiarlos por
+  el ícono real de Provecho/Majambo es una tarea de diseño, no de código.

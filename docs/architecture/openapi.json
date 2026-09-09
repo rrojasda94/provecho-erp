@@ -14621,6 +14621,277 @@
         "title": "MetricaCampanaOut",
         "type": "object"
       },
+      "MiParadaOut": {
+        "description": "Una parada de `GET /delivery/mi/rutas`, con la venta y el cliente ya\nresueltos — la PWA del repartidor no llama a `sales` ni a `rrhh`.",
+        "properties": {
+          "cliente_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Nombre"
+          },
+          "cliente_telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cliente Telefono"
+          },
+          "destino_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino Lat"
+          },
+          "destino_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destino Lng"
+          },
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
+          "entrega_id": {
+            "format": "uuid",
+            "title": "Entrega Id",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "eta_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta At"
+          },
+          "monto_a_cobrar": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monto A Cobrar"
+          },
+          "motivo_fallo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo Fallo"
+          },
+          "numero_orden": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Orden"
+          },
+          "orden_parada": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden Parada"
+          },
+          "venta_id": {
+            "format": "uuid",
+            "title": "Venta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entrega_id",
+          "venta_id",
+          "orden_parada",
+          "estado",
+          "numero_orden",
+          "direccion_entrega",
+          "destino_lat",
+          "destino_lng",
+          "cliente_nombre",
+          "cliente_telefono",
+          "monto_a_cobrar",
+          "eta_at",
+          "motivo_fallo"
+        ],
+        "title": "MiParadaOut",
+        "type": "object"
+      },
+      "MiRutaOut": {
+        "properties": {
+          "distancia_m": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia M"
+          },
+          "duracion_seg": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duracion Seg"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "hora_salida": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Salida"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "origen_lat": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Origen Lat",
+            "type": "string"
+          },
+          "origen_lng": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Origen Lng",
+            "type": "string"
+          },
+          "paradas": {
+            "items": {
+              "$ref": "#/components/schemas/MiParadaOut"
+            },
+            "title": "Paradas",
+            "type": "array"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "ultima_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Lat"
+          },
+          "ultima_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Lng"
+          },
+          "ultima_posicion_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ultima Posicion At"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "estado",
+          "hora_salida",
+          "origen_lat",
+          "origen_lng",
+          "distancia_m",
+          "duracion_seg",
+          "ultima_lat",
+          "ultima_lng",
+          "ultima_posicion_at",
+          "paradas"
+        ],
+        "title": "MiRutaOut",
+        "type": "object"
+      },
       "MiembroCreate": {
         "properties": {
           "rol_id": {
@@ -35770,7 +36041,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/RutaOut"
+                    "$ref": "#/components/schemas/MiRutaOut"
                   },
                   "title": "Response Mis Rutas Api V1 Delivery Mi Rutas Get",
                   "type": "array"

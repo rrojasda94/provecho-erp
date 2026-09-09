@@ -154,6 +154,42 @@ class TableroOut(BaseModel):
     rutas: list[RutaOut]
 
 
+class MiParadaOut(BaseModel):
+    """Una parada de `GET /delivery/mi/rutas`, con la venta y el cliente ya
+    resueltos — la PWA del repartidor no llama a `sales` ni a `rrhh`."""
+
+    entrega_id: uuid.UUID
+    venta_id: uuid.UUID
+    orden_parada: int | None
+    estado: str
+    numero_orden: int | None
+    direccion_entrega: str | None
+    destino_lat: Decimal | None
+    destino_lng: Decimal | None
+    cliente_nombre: str | None
+    cliente_telefono: str | None
+    #: Solo si la venta sigue `orden` (sin pagar): lo que el repartidor
+    #: cobra en la puerta. `None` si ya se pagó en caja.
+    monto_a_cobrar: Decimal | None
+    eta_at: datetime | None
+    motivo_fallo: str | None
+
+
+class MiRutaOut(BaseModel):
+    id: uuid.UUID
+    sucursal_id: uuid.UUID
+    estado: str
+    hora_salida: datetime | None
+    origen_lat: Decimal
+    origen_lng: Decimal
+    distancia_m: int | None
+    duracion_seg: int | None
+    ultima_lat: Decimal | None
+    ultima_lng: Decimal | None
+    ultima_posicion_at: datetime | None
+    paradas: list[MiParadaOut]
+
+
 class PosicionIn(BaseModel):
     lat: Decimal = Field(ge=-90, le=90)
     lng: Decimal = Field(ge=-180, le=180)

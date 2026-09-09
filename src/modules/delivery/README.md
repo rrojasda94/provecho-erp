@@ -24,7 +24,7 @@ dispara `delivery` por evento, nunca importando el dominio de `sales`
 `posicion_repartidor` (el trazo GPS de una ruta en curso). Detalle en
 `docs/architecture/data-model.md` §6b.
 
-## Estado (slice 3 implementado 2026-09-09, ADR-098)
+## Estado (slice 4 implementado 2026-09-09, ADR-098)
 
 Operativo en `/api/v1/delivery`: alta y edición de repartidores propios,
 tablero de despacho, ciclo completo de una ruta (crear con ruteo real u
@@ -53,11 +53,23 @@ registra cuál de las dos se usó). Cada ping GPS (`POST
 resolver. Los pings y las posiciones expuestas se purgan por Celery beat
 (`delivery_posiciones_retencion_dias`, `delivery_evidencia_retencion_dias`).
 
+`GET /delivery/mi/rutas` no es un espejo de `RutaOut`: es una vista propia
+(`application/mi_reparto.py`, `MiRutaOut`/`MiParadaOut`) con cada parada
+ya resuelta contra la venta (`sales.venta_para_reparto`) y el cliente
+(`sales.contacto_de_cliente`) — dirección, nombre, teléfono y el monto a
+cobrar si la venta sigue `orden` (sin pagar). La PWA no llama a `sales`
+ni a `rrhh`; todo lo que necesita llega en esa sola respuesta.
+
+Frontend: `app/reparto/` (pantalla completa fuera del shell, como el PDV
+y el KDS — ADR-013) con `use-gps.ts` (GPS en vivo mientras la ruta está
+en curso, con el mismo throttle 10 s/30 m que el backend acepta) y
+`use-wake-lock.ts` (pantalla encendida durante la ruta). Instalable
+(`public/reparto/manifest.webmanifest`), sin service worker: offline
+queda declarado como deuda (ADR-013).
+
 **Sin avisos todavía**: no hay plantillas de WhatsApp ni tareas de envío
-— eso es un slice aparte. **Sin PWA del repartidor**: el GPS y la
-evidencia se prueban por API, todavía no hay pantalla de reparto
-(`app/reparto/`). Ver `docs/roadmap/deuda/modulo-delivery.md` y el orden
-de slices en `docs/roadmap/historial/modulo-delivery.md`.
+— eso es un slice aparte. Ver `docs/roadmap/deuda/modulo-delivery.md` y
+el orden de slices en `docs/roadmap/historial/modulo-delivery.md`.
 
 ### Casos de uso
 
@@ -81,6 +93,10 @@ de slices en `docs/roadmap/historial/modulo-delivery.md`.
 - **Seguir el pedido por el enlace público**: el cliente ve el estado, el
   ETA, el nombre del repartidor y su posición en vivo mientras está en
   camino — nunca monto, teléfono ni las demás paradas (RN-DLV-008).
+- **La PWA del repartidor**: ver sus rutas vivas con cada parada (dirección,
+  cliente, teléfono, monto a cobrar), iniciar la ruta, entregar o fallar
+  cada parada con foto y ubicación, y finalizar — todo desde el teléfono,
+  con GPS en vivo mientras reparte.
 - Pendiente de slice: avisar al cliente por WhatsApp.
 
 ### Endpoints
@@ -99,7 +115,7 @@ de slices en `docs/roadmap/historial/modulo-delivery.md`.
 | POST | `/delivery/rutas/{id}/iniciar\|finalizar` | `delivery.despachar` o repartidor dueño de la ruta |
 | POST | `/delivery/rutas/{id}/cancelar` | `delivery.despachar` |
 | POST | `/delivery/rutas/{id}/posiciones` | repartidor dueño de la ruta, `en_curso` |
-| GET | `/delivery/mi/rutas` | `delivery.repartir` |
+| GET | `/delivery/mi/rutas` | `delivery.repartir` — con paradas ya resueltas |
 | POST | `/delivery/entregas/{id}/entregar\|fallar` | `delivery.repartir` (propia) o `delivery.despachar` |
 | POST | `/delivery/entregas/{id}/reintentar\|cerrar` | `delivery.despachar` |
 | GET | `/delivery/entregas[/{id}/evidencia]` | `delivery.leer` |
@@ -151,9 +167,9 @@ entrega si seguía `pendiente`/`asignada`).
 `delivery.entrega_fallida`, `delivery.ruta_finalizada`. `ruta_finalizada`
 no tiene consumidor todavía.
 
-**Contratos públicos consumidos**: `sales.queries_publicas.venta_para_reparto`
-y `ventas_listas_para_reparto`; `rrhh.queries_publicas.trabajadores_con_cuenta`
-y `cuenta_de_trabajador`.
+**Contratos públicos consumidos**: `sales.queries_publicas.venta_para_reparto`,
+`ventas_listas_para_reparto` y `contacto_de_cliente`;
+`rrhh.queries_publicas.trabajadores_con_cuenta` y `cuenta_de_trabajador`.
 
 **Contratos públicos expuestos**: ninguno todavía — nada más consume de
 `delivery` hoy.

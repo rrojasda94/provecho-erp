@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from src.core.rate_limit import consumir
 from src.core.tenant import Tenant
 from src.modules.delivery.api import schemas
-from src.modules.delivery.application import entregas, posiciones, repartidores
+from src.modules.delivery.application import entregas, mi_reparto, posiciones, repartidores
 from src.modules.delivery.application import rutas as rutas_uc
 from src.modules.delivery.application import tablero as tablero_uc
 from src.modules.delivery.application.scope import (
@@ -314,7 +314,7 @@ def registrar_posicion(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/mi/rutas", response_model=list[schemas.RutaOut])
+@router.get("/mi/rutas", response_model=list[schemas.MiRutaOut])
 def mis_rutas(
     actor: Usuario = Depends(require_permission(REPARTIR)),
     session: Session = Depends(get_db),
@@ -322,7 +322,7 @@ def mis_rutas(
     repartidor = RepartidorRepo(session).get_por_usuario(actor.id)
     if repartidor is None:
         return []
-    return rutas_uc.mis_rutas(session, repartidor.id)
+    return mi_reparto.rutas_vivas(session, repartidor.id)
 
 
 # --- Entregas -------------------------------------------------------------------

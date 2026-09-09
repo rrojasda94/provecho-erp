@@ -1,14 +1,15 @@
 # Historial — Módulo `delivery`
 
-Estado vigente: 🔶 En curso — slices 2 y 3 implementados (2026-09-09,
+Estado vigente: 🔶 En curso — slices 2 a 4 implementados (2026-09-09,
 ADR-098): repartidores propios, tablero de despacho, el ciclo completo de
 una ruta (crear con ruteo real contra Google o heurístico, editar
 paradas, iniciar, entregar o fallar cada parada, reintentar o cerrar la
-fallida, finalizar o cancelar), GPS del repartidor en ruta y el enlace
-público de seguimiento con mapa en vivo, con la convergencia por evento
-hacia y desde `sales` en los dos sentidos. Falta la PWA del repartidor, el
-tablero definitivo en el frontend del ERP y el aviso automático por
-WhatsApp (ver `docs/roadmap/deuda/modulo-delivery.md`).
+fallida, finalizar o cancelar), GPS del repartidor en ruta, el enlace
+público de seguimiento con mapa en vivo y la PWA instalable del
+repartidor (`/reparto`), con la convergencia por evento hacia y desde
+`sales` en los dos sentidos. Falta el tablero definitivo en el frontend
+del ERP y el aviso automático por WhatsApp (ver
+`docs/roadmap/deuda/modulo-delivery.md`).
 
 ## Cronología
 
@@ -148,3 +149,58 @@ casos nuevos en `tests/test_delivery.py` (ping GPS, fallback de Google) y
 frontend. Suite completa verde en SQLite y contra Postgres real
 (ADR-097), `ruff` y `eslint` limpios, `alembic check` sin diferencias,
 contrato OpenAPI regenerado.
+
+### 2026-09-09 — Slice 4: la PWA del repartidor
+
+`GET /delivery/mi/rutas` cambió de forma: antes devolvía `RutaOut` sin
+paradas (útil para el tablero, inútil para un repartidor que necesita
+saber a qué puerta va y con quién habla). Ahora es una vista propia
+(`application/mi_reparto.py`, `MiRutaOut`/`MiParadaOut`) que arma, para
+cada ruta viva del repartidor, sus paradas ya resueltas contra la venta
+(`sales.venta_para_reparto`) y el contacto del cliente
+(`sales.venta_para_reparto` no traía nombre ni teléfono — se sumó
+`contacto_de_cliente`, ya existente para la encuesta de `marketing`, y
+un campo `total` nuevo en `venta_para_reparto` para el "monto a cobrar"
+cuando la venta sigue `orden`, sin pagar). Es la única llamada que hace
+la PWA: no le pide nada aparte a `sales` ni a `rrhh`.
+
+Frontend nuevo: `app/reparto/` (pantalla completa fuera del shell, mismo
+criterio ADR-013 que el PDV y el KDS) con `page.tsx` (sesión y permiso
+`delivery.repartir` en el servidor), `reparto-cliente.tsx` (sondeo de
+`mi/rutas` cada 15 s, pausado con la pestaña oculta), `ruta-cliente.tsx`
+(iniciar/finalizar la ruta, lista de paradas con "Llamar"/"Navegar"/
+"Entregado"/"No se pudo"), `parada-dialogo.tsx` (confirmar entrega o
+registrar el motivo del fallo, con foto y ubicación opcionales),
+`use-gps.ts` (`watchPosition` con el mismo throttle que exige el
+servidor: un ping cada 10 s como mínimo, y solo si se movió 30 m) y
+`use-wake-lock.ts` (pantalla encendida mientras la ruta está en curso,
+se libera y se vuelve a pedir sola al volver de segundo plano).
+
+Instalable: `public/reparto/manifest.webmanifest`, con dos íconos
+PNG generados localmente (no hay diseño de marca para la PWA todavía —
+un cuadrado con el color primario del ERP, deuda de diseño declarada)
+y `metadata.manifest` en `page.tsx`. Sin service worker (ADR-013): offline
+sigue como deuda declarada desde la especificación del módulo.
+
+Reutilizado sin duplicar: `lib/camara.ts` ganó un parámetro
+(`camara: "user" | "environment"`) para que `capturarFoto` sirva también
+para la evidencia de una entrega —cámara trasera, la puerta y no la cara
+de quien entrega— sin bifurcar el código que ya usaba `rrhh.marcacion`;
+`lib/geo.ts::distanciaMetros` (slice 3) resuelve el throttle de
+`use-gps.ts`; `RegionDeAviso` y el `<dialog>` nativo (mismo patrón que
+`app/pdv/dialogos.tsx`) evitan reinventar el aviso pasajero y el diálogo
+modal de una tercera pantalla táctil.
+
+Se agregó `lib/modulos.ts`: ficha "Mi reparto" (`/reparto`, ícono `Bike`)
+con permiso exacto `delivery.repartir` — no por prefijo `delivery.`, para
+que un despachador con `delivery.despachar` no la vea también.
+
+Pruebas: `tests/test_delivery.py` ganó dos casos de integración para
+`mi/rutas` (paradas con venta y cliente resueltos, monto en `None` cuando
+la venta ya se pagó). El flujo completo de la PWA (tablero → asignar →
+iniciar desde el teléfono → entregar/fallar → enlace público) queda para
+el Playwright `uso/delivery-reparto.spec.ts` de la especificación
+original, que necesita el tablero del slice 5 para tener con qué crear
+una ruta desde la UI — se escribe entonces. Suite completa verde en
+SQLite, `ruff`/`eslint`/`tsc` limpios, `npm run build` sin advertencias
+nuevas, contrato OpenAPI regenerado.

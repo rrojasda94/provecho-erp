@@ -368,7 +368,3 @@ def q_list(
     estado: str | None = None,
 ):
     return RutaRepo(session).q_list(sucursal_ids, estado=estado)
-
-
-def mis_rutas(session: Session, repartidor_id: uuid.UUID) -> list[RutaReparto]:
-    return RutaRepo(session).vivas_de_repartidor(repartidor_id)
