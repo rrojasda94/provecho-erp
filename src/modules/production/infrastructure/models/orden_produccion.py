@@ -27,7 +27,7 @@ class OrdenProduccion(Base, UuidPkMixin, TimestampMixin):
             name="estado_orden_produccion",
         ),
         CheckConstraint(
-            "origen IN ('manual', 'ajuste_por_necesidad', 'plan')",
+            "origen IN ('manual', 'ajuste_por_necesidad', 'plan', 'subreceta_anidada')",
             name="origen_orden_produccion",
         ),
     )
@@ -40,12 +40,24 @@ class OrdenProduccion(Base, UuidPkMixin, TimestampMixin):
     plan_produccion_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("plan_produccion.id"), nullable=True
     )
+    # Nullable: solo la tienen las órdenes hijas (RN-PRD-020,
+    # `feat/produccion-subrecetas-anidadas`) — una orden cuya subreceta es a
+    # su vez insumo de otra orden (la padre) que no tenía stock suficiente
+    # para consumirla directo. Autorreferencia indexada, mismo patrón que
+    # `categoria.padre_id`/`producto_comercial.producto_padre_id`: sin ciclo
+    # posible porque una fila nueva no puede referenciarse a sí misma al
+    # crearse, y sin tope de niveles — una subreceta puede colgar de otra.
+    orden_padre_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("orden_produccion.id"), nullable=True, index=True
+    )
     # `manual` (default, vía API) | `ajuste_por_necesidad` (la crea sola
     # `application/listeners.py` al cruzar `inventory.stock_bajo_minimo`,
-    # RN-PRD-007/011) | `plan` (cronograma, diferido — ver ROADMAP).
+    # RN-PRD-007/011) | `plan` (cronograma, diferido — ver ROADMAP) |
+    # `subreceta_anidada` (la crea `application/ordenes.py::crear_orden_hija`
+    # desde la ficha de la orden padre).
     origen: Mapped[str] = mapped_column(
-        Enum("manual", "ajuste_por_necesidad", "plan", name="origen_orden_produccion",
-             native_enum=False),
+        Enum("manual", "ajuste_por_necesidad", "plan", "subreceta_anidada",
+             name="origen_orden_produccion", native_enum=False),
         default="manual",
     )
     cantidad_planeada: Mapped[Decimal] = mapped_column(Numeric(12, 4))

@@ -20,6 +20,7 @@ class OrdenProduccionOut(BaseModel):
     articulo_id: uuid.UUID
     almacen_id: uuid.UUID
     plan_produccion_id: uuid.UUID | None = None
+    orden_padre_id: uuid.UUID | None = None
     origen: str = "manual"
     cantidad_planeada: Decimal
     cantidad_producida: Decimal | None
@@ -84,9 +85,27 @@ class TrabajadorDisponibleOut(BaseModel):
     cargo: str
 
 
+class OrdenHijaResumenOut(BaseModel):
+    """Lo mínimo para el árbol padre/hijas de la ficha — no la orden
+    entera, que ya se puede pedir aparte por `GET /ordenes/{id}`."""
+
+    id: uuid.UUID
+    articulo_id: uuid.UUID
+    estado: str
+    cantidad_planeada: Decimal
+    cantidad_producida: Decimal | None
+
+
 class OrdenProduccionDetalleOut(OrdenProduccionOut):
     consumos: list[ConsumoProduccionItemOut]
     trabajadores: list[TrabajadorHorasOut]
+    hijas: list[OrdenHijaResumenOut]
+
+
+class OrdenHijaCreate(BaseModel):
+    articulo_id: uuid.UUID
+    cantidad_planeada: Decimal = Field(gt=0)
+    idempotency_key: str = Field(min_length=8, max_length=100)
 
 
 class ConsumoSugeridoLineaOut(BaseModel):
@@ -99,6 +118,10 @@ class ConsumoSugeridoLineaOut(BaseModel):
     desperdicio_esperado: Decimal
     costo_unitario: Decimal
     costo_linea: Decimal
+    # RN-PRD-020: el artículo tiene receta BOM propia y el almacén no tiene
+    # disponible para cubrir `cantidad_sugerida` — hay que fabricarlo antes
+    # con `POST /ordenes/{id}/ordenes-hijas`.
+    requiere_orden_hija: bool
 
 
 class ConsumoSugeridoOut(BaseModel):

@@ -100,6 +100,29 @@ class OrdenProduccionRepo:
             )
         )
 
+    def hijas_de(self, orden_id: uuid.UUID) -> list[OrdenProduccion]:
+        return list(
+            self.s.scalars(
+                select(OrdenProduccion).where(OrdenProduccion.orden_padre_id == orden_id)
+            )
+        )
+
+    def tiene_hija_pendiente(self, orden_id: uuid.UUID) -> bool:
+        """RN-PRD-020: la orden padre no admite consumo mientras tenga una
+        hija que no llegó a `conforme` — mismo patrón que
+        `accounting.CuentaContableRepo.tiene_hijas`, existencia, no lista."""
+        return (
+            self.s.scalar(
+                select(OrdenProduccion.id)
+                .where(
+                    OrdenProduccion.orden_padre_id == orden_id,
+                    OrdenProduccion.estado != "conforme",
+                )
+                .limit(1)
+            )
+            is not None
+        )
+
     def completadas_en_jornada(
         self, almacen_id: uuid.UUID, jornada
     ) -> list[OrdenProduccion]:

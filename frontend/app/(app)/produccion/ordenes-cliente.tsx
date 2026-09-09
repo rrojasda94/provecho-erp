@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
@@ -421,15 +422,24 @@ export function OrdenesCliente({
         header: "",
         cell: ({ row }) => {
           const orden = row.original;
-          // El ciclo es lineal: se consume en borrador, se completa en
-          // proceso. Mostrar el botón que no aplica solo invita al 409.
-          if (orden.estado === "borrador") {
-            return <DialogoConsumo orden={orden} articulos={articulos} />;
-          }
-          if (orden.estado === "en_proceso") {
-            return <DialogoCompletar orden={orden} trabajadores={trabajadores} />;
-          }
-          return <span className="text-xs text-gray">—</span>;
+          return (
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/produccion/ordenes/${orden.id}`}
+                className="text-xs font-bold text-primary hover:underline"
+              >
+                Ver
+              </Link>
+              {/* El ciclo es lineal: se consume en borrador, se completa en
+                  proceso. Mostrar el botón que no aplica solo invita al 409. */}
+              {orden.estado === "borrador" && (
+                <DialogoConsumo orden={orden} articulos={articulos} />
+              )}
+              {orden.estado === "en_proceso" && (
+                <DialogoCompletar orden={orden} trabajadores={trabajadores} />
+              )}
+            </div>
+          );
         },
       },
     ],
