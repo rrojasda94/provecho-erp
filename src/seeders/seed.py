@@ -64,6 +64,15 @@ SUCURSALES = {
 # de ninguna sucursal (`sucursal_id` NULL).
 ALMACEN_CENTRAL = ("WH1", SEDE_CASTILLA)
 
+# Cocina de producción: se abastece del central y nunca despacha directo a
+# sucursal (RN-CDP-001) — tampoco cuelga de ninguna sucursal. Sin este
+# almacén el módulo `production` no tiene dónde crear una orden. La receta
+# BOM que fabrica algo en este almacén vive en `python -m src.seeders.e2e`
+# y no acá: un insumo/subreceta real en el catálogo de esta empresa rompía
+# más de una decena de tests que asumen ese catálogo vacío salvo lo que
+# cada uno crea (ver `docs/roadmap/deuda/modulo-production.md`).
+ALMACEN_PRODUCCION = "WH-PROD"
+
 # Matriz semilla (authorization.md). "*" = todo (solo admin, entornos internos).
 PERMISOS = [
     ("*", "Acceso total (solo entornos internos)"),
@@ -591,6 +600,10 @@ USUARIOS_SEMILLA = (
     # `supervisor1` con otro PIN y sembrarlo acá les rompe el alta. El nombre
     # dice además para qué existe — ser el segundo par de ojos.
     ("aprobador1", "supervisor"),
+    # Sin este usuario, el módulo `production` solo se podía probar como
+    # `admin` (el comodín "*"), que nunca ejerce el permiso real que exige
+    # cada endpoint.
+    ("jefecocina1", "jefe_cocina"),
 )
 
 
@@ -717,12 +730,24 @@ def _seed_organizacion(session: Session) -> None:
         )
 
     nombre_almacen, direccion_almacen = ALMACEN_CENTRAL
-    _get_or_create(
+    central, _ = _get_or_create(
         session,
         Almacen,
         empresa_id=empresa.id,
         nombre=nombre_almacen,
         defaults=dict(tipo="central", sucursal_id=None, direccion=direccion_almacen),
+    )
+
+    _get_or_create(
+        session,
+        Almacen,
+        empresa_id=empresa.id,
+        nombre=ALMACEN_PRODUCCION,
+        defaults=dict(
+            tipo="produccion",
+            sucursal_id=None,
+            almacen_abastecedor_id=central.id,
+        ),
     )
 
 
