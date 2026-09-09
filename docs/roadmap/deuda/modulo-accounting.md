@@ -95,15 +95,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   Eventos `accounting.pago_ejecutado`/`pago_requiere_aprobacion` ya se
   publican, pero sin consumidor todavía (ver pendiente de `purchases`
   arriba y de `users`/alertas abajo).
-- ⬜ **Resto de eventos → asiento automático**: `sales.pago_registrado`,
-  `sales.comprobante_emitido`, `purchases.caja_chica_rendida`,
-  `inventory.transferencia_recibida`, `inventory.merma_registrada`,
-  `inventory.ajuste_fuera_margen` están documentados en `events.md` pero
-  sus módulos de origen aún no los publican en código (o, en el caso de
-  `sales`, el evento real ya publicado se llama `sales.venta_pagada`, no
+- ⬜ **Resto de eventos → asiento automático**: `sales.pago_registrado` y
+  `purchases.caja_chica_rendida` están documentados en `events.md` pero sus
+  módulos de origen aún no los publican en código (en el caso de `sales`,
+  el evento real ya publicado se llama `sales.venta_pagada`, no
   `sales.pago_registrado` — desalineación de nombre entre spec y código,
-  revisar). Cuando existan, agregar su extractor de monto/empresa en
-  `accounting/application/listeners.py`.
+  revisar). `inventory.ajuste_fuera_margen` sí se publica pero `accounting`
+  todavía no lo suscribe. Cuando existan/se suscriban, agregar su extractor
+  de monto/empresa en `accounting/application/listeners.py`. Corregido
+  2026-09-09: esta entrada incluía `sales.comprobante_emitido`,
+  `inventory.transferencia_recibida` e `inventory.merma_registrada`, que
+  **ya** se publican, se escuchan (`listeners.py:register()`) y asientan
+  desde 2026-08-06/2026-08-31 — el doc no se había actualizado.
 - ⬜ **Detracción SPOT sin cuenta propia**: `movimiento_dinero.monto_detraccion`
   se calcula (RN-IMP-003) pero el asiento de `pago_ejecutado` no la
   desglosa — el debe/haber usa el monto total, no separa la cuenta de

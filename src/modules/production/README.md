@@ -63,13 +63,19 @@ y recalcula su `costo_promedio` — mismo listener/patrón que
 `purchases.compra_recibida`) y `production.no_conformidad_detectada`
 (sin consumidor todavía). Rol semilla `jefe_cocina`.
 
-Deuda del slice (ver ROADMAP): `plan_produccion`/cronograma (hoy la
-orden se crea sin plan), `checklist_inocuidad_turno` (bloqueo de cocina
-por fallo de inocuidad), `reporte_produccion` consolidado,
-`inventory.merma_registrada` → `accounting` en desecho (bloqueado
-por `stock_merma`, deuda de inventory), lote/trazabilidad del producto
-terminado (bloqueado por lote/FEFO, deuda de inventory), subrecetas
-anidadas (una orden que consume otra subreceta con su propia orden).
+Deuda del slice (ver
+[plan de deuda](../../../docs/roadmap/deuda-production-2026-09-09.md) y
+[`docs/roadmap/deuda/modulo-production.md`](../../../docs/roadmap/deuda/modulo-production.md)):
+`plan_produccion`/cronograma (hoy la orden se crea sin plan),
+`checklist_inocuidad_turno` (bloqueo de cocina por fallo de inocuidad),
+`reporte_produccion` consolidado, asiento contable propio para el desecho
+(la merma de `inventory` no aplica: el producto terminado de una orden
+desechada nunca entró a inventario), lote/trazabilidad del producto
+terminado (el listener de `inventory` ya sabe leer `fecha_vencimiento`;
+falta que `production` la mande), subrecetas anidadas (una orden que
+consume otra subreceta con su propia orden), costeo real (hoy
+`costo_unitario` lo tipea el cliente), auditoría e idempotencia
+incompletas.
 
 ## Casos de uso
 
@@ -127,16 +133,21 @@ reproceso o desecho con evidencia → reporte de escalamiento).
 
 ## Relaciones
 
-- Escucha: `inventory.stock_bajo_minimo` (dispara orden por necesidad,
-  RN-PRD-007).
-- Publica: `production.orden_completada` (consumido por `inventory` para
-  descontar insumos y sumar producto terminado),
-  `production.no_conformidad_detectada` (consumido por Comercial/Gerencia
-  ante reincidencia; no notifica directo a `accounting` — un solo asiento
-  contable por lote: si el resultado es `no_conforme_desechado` la orden
-  registra merma_cantidad/merma_motivo, que dispara
-  `inventory.merma_registrada` hacia `accounting`; si es
-  `no_conforme_reprocesado` no hay merma ni asiento, solo el detalle de la
-  corrección en el reporte de escalamiento),
+- Escucha: nada todavía. **`inventory.stock_bajo_minimo` está pendiente**
+  (RN-PRD-007) — el evento se publica desde 2026-08-06 pero `production`
+  no tiene `listeners.py` ni lo consume (deuda técnica, ver ROADMAP).
+- Publica: `production.consumo_registrado` (consumido por `inventory` para
+  descontar insumos vía FEFO), `production.orden_completada` (consumido
+  por `inventory` para sumar producto terminado y recalcular
+  `costo_promedio`), `production.no_conformidad_detectada` (consumido por
+  `reports`, que abre el `reporte_escalamiento`; consumido por
+  Comercial/Gerencia ante reincidencia). El desecho (`merma_cantidad`/
+  `merma_motivo` en la orden) todavía **no** dispara ningún asiento
+  contable — es deuda pendiente, no se reusa `inventory.merma_registrada`
+  porque el producto terminado de una orden desechada nunca ingresó a
+  inventory (ver ROADMAP). Reproceso (`no_conforme_reprocesado`)
+  correctamente no genera merma ni asiento, solo el detalle de la
+  corrección en el reporte de escalamiento.
   `production.equipo_frio_fuera_rango` (alerta inmediata a Gerencia,
-  RN-CDP-005).
+  RN-CDP-005) está documentado en `events.md` pero aún no se publica
+  (depende de `checklist_inocuidad_turno`, deuda técnica).
