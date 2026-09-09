@@ -9,6 +9,7 @@ from src.core.tenant import Tenant
 from src.modules.production.api import schemas
 from src.modules.production.application import evidencia, ordenes, tarifas
 from src.modules.production.application.scope import exigir_almacen, exigir_orden
+from src.modules.rrhh.application import queries_publicas as rrhh_queries
 from src.modules.users.api.deps import client_ip, get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Almacen, Usuario
 from src.shared.paginacion import Pagina, Paginacion, paginacion, paginar
@@ -68,6 +69,22 @@ def listar_ordenes(
         ),
         p,
     )
+
+
+@router.get(
+    "/trabajadores-disponibles", response_model=list[schemas.TrabajadorDisponibleOut]
+)
+def trabajadores_disponibles(
+    area: str | None = None,
+    _: Usuario = Depends(require_permission(COMPLETAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Trabajadores activos para elegir a quién imputar horas-hombre al
+    completar una orden (RN-PRD-018) — vía `rrhh.queries_publicas.
+    trabajadores_activos`, el contrato público de RRHH; `production` no
+    conoce su ORM."""
+    return rrhh_queries.trabajadores_activos(session, tenant.empresa(), area=area)
 
 
 @router.get("/ordenes/{orden_id}", response_model=schemas.OrdenProduccionDetalleOut)
@@ -168,7 +185,7 @@ def completar_orden(
         resultado=body.resultado,
         costo_hora_mano_obra=costo_hora_mano_obra,
         cantidad_producida=body.cantidad_producida,
-        horas_hombre=body.horas_hombre,
+        trabajadores=[t.model_dump() for t in body.trabajadores],
         merma_cantidad=body.merma_cantidad,
         merma_motivo=body.merma_motivo,
         fecha_vencimiento=body.fecha_vencimiento,

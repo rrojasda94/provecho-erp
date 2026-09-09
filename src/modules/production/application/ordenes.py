@@ -25,10 +25,12 @@ from src.modules.production.domain import rules
 from src.modules.production.infrastructure.models import (
     ConsumoProduccionItem,
     OrdenProduccion,
+    OrdenProduccionTrabajador,
 )
 from src.modules.production.infrastructure.repositories import OrdenProduccionRepo
+from src.modules.rrhh.application import queries_publicas as rrhh_queries
 from src.modules.users.infrastructure.models import Almacen
-from src.shared import auditoria
+from src.shared import auditoria, fechas
 
 
 def q_ordenes(
@@ -92,6 +94,10 @@ def detalle_orden(session: Session, orden_id: uuid.UUID) -> dict:
                 "desviacion_desperdicio": desviacion,
             }
         )
+    trabajadores = [
+        {"trabajador_id": t.trabajador_id, "horas": t.horas}
+        for t in OrdenProduccionRepo(session).trabajadores(orden.id)
+    ]
     return {
         "id": orden.id,
         "articulo_id": orden.articulo_id,
@@ -101,6 +107,7 @@ def detalle_orden(session: Session, orden_id: uuid.UUID) -> dict:
         "estado": orden.estado,
         "costo_teorico_insumos": orden.costo_teorico_insumos,
         "costo_insumos": orden.costo_insumos,
+        "horas_hombre": orden.horas_hombre,
         "costo_mano_obra": orden.costo_mano_obra,
         "costo_real_unitario": orden.costo_real_unitario,
         "merma_cantidad": orden.merma_cantidad,
@@ -110,6 +117,7 @@ def detalle_orden(session: Session, orden_id: uuid.UUID) -> dict:
         "lote_codigo": orden.lote_codigo,
         "trazabilidad": orden.trazabilidad,
         "consumos": consumos,
+        "trabajadores": trabajadores,
     }
 
 
@@ -397,6 +405,45 @@ def _cerrar_no_conforme(
     return extra
 
 
+def _horas_hombre_de_trabajadores(
+    session: Session, orden: OrdenProduccion, trabajadores: list[dict]
+) -> Decimal:
+    """Reemplaza el `horas_hombre` tipeado a mano: cada trabajador imputado
+    aporta lo que de verdad asistió hoy (RN-RRHH-022, vía `rrhh.
+    queries_publicas.horas_asistidas`), tope su propia asistencia — no se
+    puede imputar más horas de las que marcó — y sin asistencia ese día no
+    se puede imputar nada (RN-RRHH-009: lo que no se marcó no cuenta).
+    `horas_hombre = Σ horas` es lo único que sigue viviendo en la orden."""
+    if not trabajadores:
+        return Decimal(0)
+    trabajador_ids = [t["trabajador_id"] for t in trabajadores]
+    asistidas = rrhh_queries.horas_asistidas(session, trabajador_ids, fechas.hoy())
+    total = Decimal(0)
+    for t in trabajadores:
+        trabajador_id = t["trabajador_id"]
+        asistida = asistidas.get(trabajador_id)
+        if asistida is None:
+            raise ReglaNegocio(
+                f"el trabajador {trabajador_id} no tiene asistencia registrada "
+                "hoy (RN-RRHH-009)"
+            )
+        horas = Decimal(str(t["horas"])) if t.get("horas") is not None else asistida
+        if horas <= 0:
+            raise ReglaNegocio("las horas imputadas deben ser > 0")
+        if horas > asistida:
+            raise ReglaNegocio(
+                f"el trabajador {trabajador_id} solo asistió {asistida} horas "
+                f"hoy: no se le puede imputar {horas}"
+            )
+        session.add(
+            OrdenProduccionTrabajador(
+                orden_produccion_id=orden.id, trabajador_id=trabajador_id, horas=horas
+            )
+        )
+        total += horas
+    return total
+
+
 def completar_orden_produccion(
     session: Session,
     orden_id: uuid.UUID,
@@ -404,7 +451,7 @@ def completar_orden_produccion(
     resultado: str,
     costo_hora_mano_obra: Decimal,
     cantidad_producida: Decimal | None = None,
-    horas_hombre: Decimal | None = None,
+    trabajadores: list[dict] | None = None,
     merma_cantidad: Decimal | None = None,
     merma_motivo: str | None = None,
     fecha_vencimiento: date | None = None,
@@ -430,7 +477,7 @@ def completar_orden_produccion(
         (c.cantidad * c.costo_unitario for c in OrdenProduccionRepo(session).consumos(orden.id)),
         Decimal(0),
     )
-    horas_hombre = Decimal(str(horas_hombre)) if horas_hombre is not None else Decimal(0)
+    horas_hombre = _horas_hombre_de_trabajadores(session, orden, trabajadores or [])
     costo_mano_obra = horas_hombre * costo_hora_mano_obra
     estado_previo = orden.estado
     orden.horas_hombre = horas_hombre

@@ -134,11 +134,17 @@ hasta ahora:
   existía) sin que el usuario lo vuelva a pegar a mano al abrir el
   escalamiento. Migración con datos: toda `evidencia_destruccion_url` no
   nula se convierte en `Archivo` antes de borrar la columna.
-- ⬜ **Horas-hombre tipeadas a mano**: `CompletarOrdenIn.horas_hombre` es un
-  número libre pese a que RRHH ya tiene asistencia/marcación real
-  (`asistencia`, `marcacion`); falta el contrato público de lectura.
-  Bloques `feat/rrhh-horas-asistidas-contrato-publico` +
-  `feat/produccion-horas-hombre-desde-rrhh`.
+- ✅ 2026-09-09 **Horas-hombre tipeadas a mano** (bloques `feat/rrhh-horas-
+  asistidas-contrato-publico` + `feat/produccion-horas-hombre-desde-rrhh`).
+  `CompletarOrdenIn.horas_hombre` (número libre) se reemplaza por
+  `trabajadores[]` (`trabajador_id` + horas opcionales): sin horas
+  explícitas se imputa toda la asistencia real del día
+  (`rrhh.queries_publicas.horas_asistidas`); con ellas, tope lo asistido
+  (409 si se excede, 409 si no marcó ese día — RN-RRHH-009).
+  `orden_produccion.horas_hombre` pasa a ser el agregado (`Σ horas` de la
+  nueva `orden_produccion_trabajador`). Nuevo `GET
+  /production/trabajadores-disponibles` (`rrhh.queries_publicas.
+  trabajadores_activos`) alimenta el picker del diálogo de completar.
 - ⬜ **Seeder sin datos de producción**: ningún seeder (`seed.py`, `e2e.py`,
   `pdv_demo.py`, `pizzas_demo.py`) crea un usuario con rol `jefe_cocina`,
   un almacén tipo `produccion`, ni una receta con `articulo_id` — sin esa

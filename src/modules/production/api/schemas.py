@@ -24,6 +24,7 @@ class OrdenProduccionOut(BaseModel):
     estado: str
     costo_teorico_insumos: Decimal | None = None
     costo_insumos: Decimal | None
+    horas_hombre: Decimal | None = None
     costo_mano_obra: Decimal | None
     costo_real_unitario: Decimal | None
     merma_cantidad: Decimal | None
@@ -67,8 +68,23 @@ class ConsumoProduccionItemOut(BaseModel):
     desviacion_desperdicio: Decimal | None
 
 
+class TrabajadorHorasOut(BaseModel):
+    trabajador_id: uuid.UUID
+    horas: Decimal
+
+
+class TrabajadorDisponibleOut(BaseModel):
+    """Para el picker del diálogo de completar — mismo shape que devuelve
+    `rrhh.queries_publicas.trabajadores_activos`."""
+
+    id: uuid.UUID
+    nombre: str
+    cargo: str
+
+
 class OrdenProduccionDetalleOut(OrdenProduccionOut):
     consumos: list[ConsumoProduccionItemOut]
+    trabajadores: list[TrabajadorHorasOut]
 
 
 class ConsumoSugeridoLineaOut(BaseModel):
@@ -114,10 +130,22 @@ class ConsumoCreate(BaseModel):
     idempotency_key: str | None = Field(default=None, min_length=8, max_length=100)
 
 
+class TrabajadorHorasIn(BaseModel):
+    trabajador_id: uuid.UUID
+    # Opcional: sin ella, se imputan todas las horas que el trabajador
+    # asistió hoy (`rrhh.queries_publicas.horas_asistidas`). Si viene, no
+    # puede superar lo asistido (RN-RRHH-009, 409).
+    horas: Decimal | None = Field(default=None, gt=0)
+
+
 class CompletarOrdenIn(BaseModel):
     resultado: str
     cantidad_producida: Decimal | None = Field(default=None, gt=0)
-    horas_hombre: Decimal | None = Field(default=None, ge=0)
+    # Reemplaza al `horas_hombre` tipeado a mano (RN-PRD-018): cada
+    # trabajador imputado aporta su asistencia real del día, no un número
+    # que nadie podía contrastar contra nada. Vacío = sin mano de obra
+    # imputada (`horas_hombre` de la orden queda en 0), igual que antes.
+    trabajadores: list[TrabajadorHorasIn] = Field(default_factory=list)
     merma_cantidad: Decimal | None = Field(default=None, gt=0)
     merma_motivo: str | None = None
     # Ya no viaja acá: la evidencia de destrucción (RN-PRD-015) se sube

@@ -90,6 +90,20 @@ function opcional(formData: FormData, campo: string): string | undefined {
   return String(formData.get(campo) ?? "").trim() || undefined;
 }
 
+type TrabajadorHoras = { trabajador_id: string; horas?: string };
+
+/** Reemplaza al `horas_hombre` tipeado: cada línea del picker es un
+ * trabajador imputado, con horas opcionales (sin ellas, el backend imputa
+ * toda la asistencia real de hoy — RN-RRHH-009). */
+function leerTrabajadores(formData: FormData): TrabajadorHoras[] {
+  const ids = formData.getAll("trabajador_id").map(String);
+  const horas = formData.getAll("trabajador_horas").map(String);
+  return ids
+    .map((trabajadorId, i) => ({ trabajador_id: trabajadorId, horas: horas[i]?.trim() }))
+    .filter((t) => t.trabajador_id)
+    .map((t) => (t.horas ? t : { trabajador_id: t.trabajador_id }));
+}
+
 export async function completarOrdenAction(
   _previo: EstadoOrden,
   formData: FormData,
@@ -105,7 +119,7 @@ export async function completarOrdenAction(
       cuerpo: {
         resultado,
         cantidad_producida: opcional(formData, "cantidad_producida"),
-        horas_hombre: opcional(formData, "horas_hombre"),
+        trabajadores: leerTrabajadores(formData),
         merma_cantidad: opcional(formData, "merma_cantidad"),
         merma_motivo: opcional(formData, "merma_motivo"),
         evidencia_destruccion_url: opcional(formData, "evidencia_destruccion_url"),
