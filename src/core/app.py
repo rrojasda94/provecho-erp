@@ -30,6 +30,7 @@ from src.modules.marketing.api.routers import router as marketing_router
 from src.modules.marketing.api.webhook_routers import router as marketing_webhook_router
 from src.modules.marketing.application import listeners as marketing_listeners
 from src.modules.production.api.routers import router as production_router
+from src.modules.production.application import listeners as production_listeners
 from src.modules.purchases.api.routers import router as purchases_router
 from src.modules.reports.api.routers import router as reports_router
 from src.modules.reports.application import listeners as reports_listeners
@@ -335,6 +336,7 @@ def create_app() -> FastAPI:
     accounting_listeners.register()
     marketing_listeners.register()
     sales_listeners.register()
+    production_listeners.register()
     # `reports` antes que `users`: el primero convierte hechos en reportes y
     # el segundo convierte reportes en bandeja. El orden de `subscribe` no
     # decide el de despacho entre eventos distintos, pero leerlo en este

@@ -16235,6 +16235,11 @@
             ],
             "title": "Merma Motivo"
           },
+          "origen": {
+            "default": "manual",
+            "title": "Origen",
+            "type": "string"
+          },
           "trabajadores": {
             "items": {
               "$ref": "#/components/schemas/TrabajadorHorasOut"
@@ -16431,6 +16436,11 @@
               }
             ],
             "title": "Merma Motivo"
+          },
+          "origen": {
+            "default": "manual",
+            "title": "Origen",
+            "type": "string"
           },
           "trazabilidad": {
             "anyOf": [

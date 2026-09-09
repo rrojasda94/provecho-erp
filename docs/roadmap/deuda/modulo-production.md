@@ -110,12 +110,18 @@ hasta ahora:
   mismo patrón que `sales.application.tarifa_delivery`), con
   `settings.production_costo_hora_mano_obra` como semilla mientras
   Gerencia no apruebe ninguna propuesta.
-- ⬜ **`production` no escucha `inventory.stock_bajo_minimo`**: el README
-  del módulo dice "Escucha: `inventory.stock_bajo_minimo` (dispara orden
-  por necesidad, RN-PRD-007)" pero no existe
-  `production/application/listeners.py` ni se registra ningún handler en
-  `src/core/app.py`. El evento sí se publica desde 2026-08-06. Bloque
-  `feat/produccion-orden-por-necesidad`.
+- ✅ 2026-09-09 **`production` no escuchaba `inventory.stock_bajo_minimo`**
+  (bloque `feat/produccion-orden-por-necesidad`). Nuevo `production/
+  application/listeners.py::on_stock_bajo_minimo`, registrado en
+  `src/core/app.py`: si el artículo tiene receta BOM y la empresa tiene
+  **una sola** cocina de producción, crea sola una orden `borrador`
+  `origen=ajuste_por_necesidad` (columna nueva; `creado_por` pasa a
+  nullable porque esta orden no tiene humano detrás), `cantidad_planeada`
+  redondeada al rendimiento de la receta sobre `stock_minimo ×
+  parametro_empresa production/factor_reposicion (semilla 2) − cantidad`,
+  idempotente por SKU y día. No crea nada con cero o más de una cocina, ni
+  si ya hay una orden del mismo artículo sin cerrar control de calidad en
+  ese almacén (RN-PRD-007/011).
 - ⬜ **RN-CDP-001 sin enforcement**: "una cocina de producción nunca
   despacha a un almacén de sucursal directamente" no tiene ningún control
   en `inventory.application.transferencias._validar_almacenes` — hoy nada

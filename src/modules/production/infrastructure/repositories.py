@@ -57,6 +57,20 @@ class OrdenProduccionRepo:
         self.s.flush()
         return orden
 
+    def abierta_de(
+        self, articulo_id: uuid.UUID, almacen_id: uuid.UUID
+    ) -> OrdenProduccion | None:
+        """Una orden del mismo artículo en ese almacén que todavía no cerró
+        control de calidad (RN-PRD-007/011): el listener de necesidad no crea
+        una segunda mientras la primera siga abierta."""
+        return self.s.scalar(
+            select(OrdenProduccion).where(
+                OrdenProduccion.articulo_id == articulo_id,
+                OrdenProduccion.almacen_id == almacen_id,
+                OrdenProduccion.estado.in_(("borrador", "en_proceso")),
+            )
+        )
+
     def consumos(self, orden_id: uuid.UUID) -> list[ConsumoProduccionItem]:
         return list(
             self.s.scalars(

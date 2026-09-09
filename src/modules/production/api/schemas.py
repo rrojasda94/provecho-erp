@@ -19,6 +19,7 @@ class OrdenProduccionOut(BaseModel):
     id: uuid.UUID
     articulo_id: uuid.UUID
     almacen_id: uuid.UUID
+    origen: str = "manual"
     cantidad_planeada: Decimal
     cantidad_producida: Decimal | None
     estado: str

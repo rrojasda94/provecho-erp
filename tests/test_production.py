@@ -9,7 +9,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
 import src.core.models_registry  # noqa: F401
@@ -25,6 +25,8 @@ from src.modules.inventory.infrastructure.models import (
     Sku,
     UnidadMedida,
 )
+from src.modules.production.application import listeners as production_listeners
+from src.modules.production.infrastructure.models import OrdenProduccion
 from src.modules.rrhh.infrastructure.models import Asistencia, Trabajador
 from src.modules.users.api.deps import get_db
 from src.modules.users.infrastructure.models import (
@@ -46,6 +48,7 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
     Base.metadata.create_all(engine)
     TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     monkeypatch.setattr(listeners, "session_factory", TestSession)
+    monkeypatch.setattr(production_listeners, "session_factory", TestSession)
 
     from src.seeders.seed import seed
 
@@ -408,6 +411,154 @@ def test_completar_trabajador_sin_asistencia_hoy_409(env):
     assert r.status_code == 409
 
 
+# --- Orden por necesidad (feat/produccion-orden-por-necesidad) ---
+def _publicar_stock_bajo_minimo(session, *, almacen_id, sku_id, cantidad="2", stock_minimo="5"):
+    event_bus.publish(
+        "inventory.stock_bajo_minimo",
+        {
+            "almacen_id": str(almacen_id), "sku_id": str(sku_id),
+            "cantidad": cantidad, "stock_minimo": stock_minimo, "usuario_id": None,
+        },
+        session=session,
+    )
+
+
+def test_stock_bajo_minimo_crea_orden_ajuste_por_necesidad(env):
+    """RN-PRD-007/011: sin nadie tipeando nada, la cocina ve una orden lista
+    apenas el central cruza el mínimo de una subreceta."""
+    client, ids, TestSession = env
+    with TestSession() as s:
+        empresa_id = uuid.UUID(ids["empresa_id"])
+        almacen_sucursal = Almacen(
+            empresa_id=empresa_id, nombre="Sucursal Test", tipo="sucursal"
+        )
+        s.add(almacen_sucursal)
+        s.flush()
+        sku_masa = s.scalar(select(Sku).where(Sku.articulo_id == uuid.UUID(ids["masa_id"])))
+        _publicar_stock_bajo_minimo(
+            s, almacen_id=almacen_sucursal.id, sku_id=sku_masa.id,
+            cantidad="2", stock_minimo="5",
+        )
+        s.commit()
+
+    with TestSession() as s:
+        orden = s.scalar(
+            select(OrdenProduccion).where(
+                OrdenProduccion.articulo_id == uuid.UUID(ids["masa_id"]),
+                OrdenProduccion.almacen_id == uuid.UUID(ids["almacen_id"]),
+            )
+        )
+        assert orden is not None
+        assert orden.origen == "ajuste_por_necesidad"
+        assert orden.creado_por is None
+        # factor semilla 2: 5*2 - 2 = 8, redondeado al rendimiento (10) → 10.
+        assert orden.cantidad_planeada == Decimal("10.0000")
+        assert orden.estado == "borrador"
+
+
+def test_stock_bajo_minimo_sin_almacen_produccion_no_crea_nada(env):
+    client, ids, TestSession = env
+    with TestSession() as s:
+        empresa_base = s.get(Empresa, uuid.UUID(ids["empresa_id"]))
+        otra = Empresa(
+            grupo_id=empresa_base.grupo_id, ruc="20600000010",
+            razon_social="Sin Cocina EIRL", domicilio_fiscal="Lima",
+            tipo="operativa", zona_tributaria="amazonia_ley27037",
+        )
+        s.add(otra)
+        s.flush()
+        almacen_sucursal = Almacen(
+            empresa_id=otra.id, nombre="Sucursal Sin Cocina", tipo="sucursal"
+        )
+        s.add(almacen_sucursal)
+        s.flush()
+        sku_masa = s.scalar(select(Sku).where(Sku.articulo_id == uuid.UUID(ids["masa_id"])))
+        _publicar_stock_bajo_minimo(s, almacen_id=almacen_sucursal.id, sku_id=sku_masa.id)
+        s.commit()
+        otra_id = otra.id
+
+    with TestSession() as s:
+        assert s.scalar(
+            select(OrdenProduccion)
+            .join(Almacen, Almacen.id == OrdenProduccion.almacen_id)
+            .where(Almacen.empresa_id == otra_id)
+        ) is None
+
+
+def test_stock_bajo_minimo_articulo_sin_receta_no_crea_nada(env):
+    """La harina es insumo, no una subreceta con BOM propia: nada que producir."""
+    client, ids, TestSession = env
+    with TestSession() as s:
+        empresa_id = uuid.UUID(ids["empresa_id"])
+        almacen_sucursal = Almacen(empresa_id=empresa_id, nombre="Sucursal 2", tipo="sucursal")
+        s.add(almacen_sucursal)
+        s.flush()
+        sku_harina = s.scalar(
+            select(Sku).where(Sku.articulo_id == uuid.UUID(ids["harina_id"]))
+        )
+        _publicar_stock_bajo_minimo(s, almacen_id=almacen_sucursal.id, sku_id=sku_harina.id)
+        s.commit()
+
+    with TestSession() as s:
+        assert s.scalar(
+            select(OrdenProduccion).where(
+                OrdenProduccion.articulo_id == uuid.UUID(ids["harina_id"])
+            )
+        ) is None
+
+
+def test_stock_bajo_minimo_no_duplica_con_orden_ya_abierta(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    _crear_orden(client, h, ids, idempotency_key="op-necesidad-previa")
+
+    with TestSession() as s:
+        empresa_id = uuid.UUID(ids["empresa_id"])
+        almacen_sucursal = Almacen(empresa_id=empresa_id, nombre="Sucursal 3", tipo="sucursal")
+        s.add(almacen_sucursal)
+        s.flush()
+        sku_masa = s.scalar(select(Sku).where(Sku.articulo_id == uuid.UUID(ids["masa_id"])))
+        _publicar_stock_bajo_minimo(s, almacen_id=almacen_sucursal.id, sku_id=sku_masa.id)
+        s.commit()
+
+    with TestSession() as s:
+        total = s.scalar(
+            select(func.count())
+            .select_from(OrdenProduccion)
+            .where(OrdenProduccion.articulo_id == uuid.UUID(ids["masa_id"]))
+        )
+        assert total == 1  # la que ya estaba abierta, no una segunda
+
+
+def test_stock_bajo_minimo_es_idempotente_por_dia(env):
+    client, ids, TestSession = env
+    with TestSession() as s:
+        empresa_id = uuid.UUID(ids["empresa_id"])
+        almacen_sucursal = Almacen(empresa_id=empresa_id, nombre="Sucursal 4", tipo="sucursal")
+        s.add(almacen_sucursal)
+        s.flush()
+        sku_masa = s.scalar(select(Sku).where(Sku.articulo_id == uuid.UUID(ids["masa_id"])))
+        _publicar_stock_bajo_minimo(s, almacen_id=almacen_sucursal.id, sku_id=sku_masa.id)
+        s.commit()
+
+    # Segundo reintento: no está "abierta" en el sentido de RN-PRD-007 (bien
+    # podría haber cerrado), pero la misma clave de idempotencia del mismo
+    # día no debe crear una segunda fila.
+    with TestSession() as s:
+        almacen_sucursal = s.scalar(select(Almacen).where(Almacen.nombre == "Sucursal 4"))
+        sku_masa = s.scalar(select(Sku).where(Sku.articulo_id == uuid.UUID(ids["masa_id"])))
+        _publicar_stock_bajo_minimo(s, almacen_id=almacen_sucursal.id, sku_id=sku_masa.id)
+        s.commit()
+
+    with TestSession() as s:
+        total = s.scalar(
+            select(func.count())
+            .select_from(OrdenProduccion)
+            .where(OrdenProduccion.articulo_id == uuid.UUID(ids["masa_id"]))
+        )
+        assert total == 1
+
+
 def test_registrar_consumo_estado_invalido_409(env):
     client, ids, _ = env
     h = _token(client)
@@ -757,8 +908,6 @@ def test_consumo_sugerido_sin_receta_404(env):
     # receta no puede darse (crear_orden ya lo rechaza), así que se fuerza
     # el escenario escribiendo la orden directo.
     with TestSession() as s:
-        from src.modules.production.infrastructure.models import OrdenProduccion
-
         orden = OrdenProduccion(
             articulo_id=uuid.UUID(ids["masa_id"]),
             almacen_id=uuid.UUID(ids["almacen_id"]),

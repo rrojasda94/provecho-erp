@@ -111,8 +111,10 @@ asiento contable del desecho (ADR-098) (2026-09-09), el costeo real
 —`costo_promedio` por defecto, consumo sugerido desde la BOM, tarifa de
 mano de obra por empresa y desviación de desperdicio real vs. esperado
 (2026-09-09)—, la evidencia de destrucción como `Archivo` en vez de
-string libre (2026-09-09), y las horas-hombre imputadas desde la
-asistencia real de RRHH en vez de tipeadas a mano (2026-09-09).
+string libre (2026-09-09), las horas-hombre imputadas desde la
+asistencia real de RRHH en vez de tipeadas a mano (2026-09-09), y la
+orden por ajuste de necesidad al cruzar `inventory.stock_bajo_minimo`
+en vez de que alguien la cree a mano (2026-09-09).
 
 Pendiente de frontend: el diálogo de completar todavía manda
 `evidencia_destruccion_url` como texto libre (`ordenes-cliente.tsx`) en
@@ -178,9 +180,18 @@ reproceso o desecho con evidencia → reporte de escalamiento).
 
 ## Relaciones
 
-- Escucha: nada todavía. **`inventory.stock_bajo_minimo` está pendiente**
-  (RN-PRD-007) — el evento se publica desde 2026-08-06 pero `production`
-  no tiene `listeners.py` ni lo consume (deuda técnica, ver ROADMAP).
+- Escucha: `inventory.stock_bajo_minimo` (`application/listeners.py::
+  on_stock_bajo_minimo`, bloque `feat/produccion-orden-por-necesidad`,
+  2026-09-09, RN-PRD-007/011): si el SKU es de un artículo con receta BOM y
+  la empresa tiene **una sola** cocina de producción (almacén `tipo=
+  produccion`), crea sola una orden `borrador` con `origen=ajuste_por_
+  necesidad`, `cantidad_planeada = stock_minimo × factor_reposicion −
+  cantidad` redondeada al rendimiento de la receta (factor en
+  `parametro_empresa production/factor_reposicion`, semilla `2`) e
+  `idempotency_key=f"necesidad:{sku_id}:{fecha}"`. No crea nada si ya hay
+  una orden del mismo artículo sin cerrar control de calidad en ese
+  almacén, ni si hay cero o más de una cocina (ahí sigue quedando solo el
+  aviso de `reports`, para que Gerencia decida a mano).
 - Publica: `production.consumo_registrado` (consumido por `inventory` para
   descontar insumos vía FEFO), `production.orden_completada` (consumido
   por `inventory` para sumar producto terminado y recalcular
