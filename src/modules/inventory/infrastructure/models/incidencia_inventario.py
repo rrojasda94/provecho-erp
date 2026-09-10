@@ -31,6 +31,8 @@ ORIGEN_INCIDENCIA = Enum(
     "venta",
     "orden_compra",
     "orden_produccion",
+    # Repuesto consumido en una orden de mantenimiento de `assets`.
+    "orden_mantenimiento",
     name="origen_incidencia_inventario",
     native_enum=False,
 )
@@ -52,7 +54,7 @@ class IncidenciaInventario(Base, UuidPkMixin, TimestampMixin):
 
     __table_args__ = (
         CheckConstraint(
-            "origen IN ('venta', 'orden_compra', 'orden_produccion')",
+            "origen IN ('venta', 'orden_compra', 'orden_produccion', 'orden_mantenimiento')",
             name="origen_incidencia_inventario",
         ),
         CheckConstraint(

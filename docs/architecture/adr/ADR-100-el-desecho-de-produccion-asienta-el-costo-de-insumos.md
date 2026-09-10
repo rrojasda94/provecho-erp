@@ -1,4 +1,4 @@
-# ADR-098: El desecho de producción asienta contra el costo de insumos, no como merma de `inventory`
+# ADR-100: El desecho de producción asienta contra el costo de insumos, no como merma de `inventory`
 
 ## Estado
 

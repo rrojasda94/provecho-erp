@@ -15,7 +15,7 @@ solo asienta cuando el traslado llegó con faltante— y
 `inventory.consumo_personal_valorizado`, la comida del personal llevada a
 gasto (RN-COM-025), que se reversa con
 `inventory.consumo_personal_reversado` si el consumo se anula, e
-`inventory.merma_registrada`/`production.orden_desechada` (ADR-098) —
+`inventory.merma_registrada`/`production.orden_desechada` (ADR-100) —
 merma de mercadería y desecho de producción, mismo circuito (D 6599 / H
 201). El resto de los documentados en `events.md` (pago registrado,
 comprobante emitido de venta, ajuste, caja chica...) no se generan aún
@@ -117,7 +117,7 @@ def _desglose_de_compra(session, items: list[dict]) -> list[dict]:
 
 def _desglose_de_produccion(session, articulo_id: str, monto: Decimal) -> list[dict]:
     """De qué categoría es el artículo producido que se desechó (ADR-086,
-    ADR-098) — un solo ítem, no una lista de líneas como en una compra."""
+    ADR-100) — un solo ítem, no una lista de líneas como en una compra."""
     clasificacion = clasificacion_de_articulos(session, [uuid.UUID(articulo_id)])
     datos = clasificacion.get(uuid.UUID(articulo_id))
     return [
@@ -519,7 +519,7 @@ def on_merma_registrada(payload: dict) -> None:
 
 
 def on_orden_desechada(payload: dict) -> None:
-    """Desecho de producción (ADR-098): el costo de los insumos ya
+    """Desecho de producción (ADR-100): el costo de los insumos ya
     consumidos, que `registrar_consumo` descontó del almacén sin que
     ningún asiento lo reflejara todavía — es la pérdida real del hallazgo.
 

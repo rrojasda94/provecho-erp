@@ -382,7 +382,7 @@ def _cerrar_no_conforme(
     se haya adjuntado evidencia de destrucción (RN-PRD-015, `POST
     /ordenes/{id}/evidencia` — `orden.evidencia_archivo_id`) antes de
     aceptar la merma, y dispara el asiento contable por el costo de insumos
-    ya consumidos (ADR-098 — no se reusa `inventory.merma_registrada`: el
+    ya consumidos (ADR-100 — no se reusa `inventory.merma_registrada`: el
     producto terminado de una orden desechada nunca llegó a existir como
     stock)."""
     extra: dict = {}
