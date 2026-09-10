@@ -2,8 +2,9 @@
 consumo (en_proceso) → completar (conforme | no_conforme_reprocesado |
 no_conforme_desechado).
 
-`plan_produccion` (cronograma) queda diferido — la orden se crea ad-hoc,
-sin plan (deuda técnica, ver ROADMAP).
+La orden puede nacer ad-hoc o colgar de un `plan_produccion`
+(`application/planes.py`); si viene de un plan, `registrar_consumo` cierra
+la reserva de insumos que `planes.iniciar_plan` dejó abierta por SKU.
 """
 
 import uuid
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
 from src.modules.inventory.application import queries_publicas as inv_queries
+from src.modules.inventory.application import reservas as reservas_uc
 from src.modules.inventory.infrastructure.models import Articulo, Receta
 from src.modules.production.application.errors import (
     Conflicto,
@@ -102,6 +104,7 @@ def detalle_orden(session: Session, orden_id: uuid.UUID) -> dict:
         "id": orden.id,
         "articulo_id": orden.articulo_id,
         "almacen_id": orden.almacen_id,
+        "plan_produccion_id": orden.plan_produccion_id,
         "origen": orden.origen,
         "cantidad_planeada": orden.cantidad_planeada,
         "cantidad_producida": orden.cantidad_producida,
@@ -182,6 +185,69 @@ def crear_orden_produccion(
     return orden
 
 
+def _registrar_item_consumo(session: Session, orden: OrdenProduccion, it: dict) -> dict:
+    """Guarda un ítem de `ConsumoProduccionItem` y devuelve su forma para el
+    evento. Extraído de `registrar_consumo` para no repetir la conversión
+    de UdM (RN-UDM-005) y el costeo por defecto (RN-PRD-018) en cada línea."""
+    articulo = session.get(Articulo, it["articulo_id"])
+    if articulo is None:
+        raise NoEncontrado(f"artículo {it['articulo_id']} no encontrado")
+    cantidad = Decimal(str(it["cantidad"]))
+    unidad_medida_id = it.get("unidad_medida_id")
+    # RN-UDM-005: se puede teclear en otra UdM de la misma categoría (los
+    # gramos que el cocinero tiene a mano); se guarda ya convertida a la
+    # del artículo, que es la que `costo_insumos` y el stock necesitan.
+    if unidad_medida_id is not None and unidad_medida_id != articulo.unidad_medida_id:
+        convertida = inv_queries.convertir_a_udm_de_articulo(
+            session, it["articulo_id"], cantidad, unidad_medida_id
+        )
+        if convertida is None:
+            raise ReglaNegocio(
+                "la unidad de medida del ítem no es de la misma categoría "
+                "que la del artículo"
+            )
+        cantidad = convertida
+    else:
+        unidad_medida_id = None
+    if cantidad <= 0:
+        raise ReglaNegocio("cantidad de consumo debe ser > 0")
+    # Sin costo_unitario explícito, se costea al costo_promedio vigente del
+    # artículo (RN-PRD-018): antes lo tipeaba siempre quien registraba el
+    # consumo, sin ninguna referencia contra la que contrastarlo.
+    costo_unitario = it.get("costo_unitario")
+    costo_unitario = (
+        Decimal(str(costo_unitario)) if costo_unitario is not None else articulo.costo_promedio
+    )
+    session.add(
+        ConsumoProduccionItem(
+            orden_produccion_id=orden.id,
+            articulo_id=it["articulo_id"],
+            cantidad=cantidad,
+            unidad_medida_id=unidad_medida_id,
+            costo_unitario=costo_unitario,
+            peso_desperdicio_real=Decimal(str(it.get("peso_desperdicio_real", 0))),
+            tipo_desperdicio=it.get("tipo_desperdicio"),
+        )
+    )
+    return {
+        "articulo_id": str(it["articulo_id"]),
+        "cantidad": str(cantidad),
+        "costo_unitario": str(costo_unitario),
+    }
+
+
+def _consumir_reservas_del_plan(
+    session: Session, orden: OrdenProduccion, items: list[dict]
+) -> None:
+    """La reserva que `planes.iniciar_plan` dejó abierta por SKU se cierra
+    acá: el insumo ya salió de verdad, y dejarla activa descontaría el
+    disponible dos veces (una por la reserva, otra por el movimiento real
+    que dispara `production.consumo_registrado`)."""
+    for sku_id in {inv_queries.sku_de_articulo(session, it["articulo_id"]) for it in items}:
+        if sku_id is not None:
+            reservas_uc.consumir_por_referencia(session, orden.id, sku_id)
+
+
 def registrar_consumo(
     session: Session,
     orden_id: uuid.UUID,
@@ -205,55 +271,10 @@ def registrar_consumo(
     if not items:
         raise ReglaNegocio("una orden requiere al menos un ítem de consumo")
 
-    evento_items = []
-    for it in items:
-        articulo = session.get(Articulo, it["articulo_id"])
-        if articulo is None:
-            raise NoEncontrado(f"artículo {it['articulo_id']} no encontrado")
-        cantidad = Decimal(str(it["cantidad"]))
-        unidad_medida_id = it.get("unidad_medida_id")
-        # RN-UDM-005: se puede teclear en otra UdM de la misma categoría (los
-        # gramos que el cocinero tiene a mano); se guarda ya convertida a la
-        # del artículo, que es la que `costo_insumos` y el stock necesitan.
-        if unidad_medida_id is not None and unidad_medida_id != articulo.unidad_medida_id:
-            convertida = inv_queries.convertir_a_udm_de_articulo(
-                session, it["articulo_id"], cantidad, unidad_medida_id
-            )
-            if convertida is None:
-                raise ReglaNegocio(
-                    "la unidad de medida del ítem no es de la misma categoría "
-                    "que la del artículo"
-                )
-            cantidad = convertida
-        else:
-            unidad_medida_id = None
-        if cantidad <= 0:
-            raise ReglaNegocio("cantidad de consumo debe ser > 0")
-        # Sin costo_unitario explícito, se costea al costo_promedio vigente
-        # del artículo (RN-PRD-018): antes lo tipeaba siempre quien registraba
-        # el consumo, sin ninguna referencia contra la que contrastarlo.
-        costo_unitario = it.get("costo_unitario")
-        costo_unitario = (
-            Decimal(str(costo_unitario)) if costo_unitario is not None else articulo.costo_promedio
-        )
-        session.add(
-            ConsumoProduccionItem(
-                orden_produccion_id=orden.id,
-                articulo_id=it["articulo_id"],
-                cantidad=cantidad,
-                unidad_medida_id=unidad_medida_id,
-                costo_unitario=costo_unitario,
-                peso_desperdicio_real=Decimal(str(it.get("peso_desperdicio_real", 0))),
-                tipo_desperdicio=it.get("tipo_desperdicio"),
-            )
-        )
-        evento_items.append(
-            {
-                "articulo_id": str(it["articulo_id"]),
-                "cantidad": str(cantidad),
-                "costo_unitario": str(costo_unitario),
-            }
-        )
+    evento_items = [_registrar_item_consumo(session, orden, it) for it in items]
+
+    if orden.plan_produccion_id is not None:
+        _consumir_reservas_del_plan(session, orden, items)
 
     # Snapshot de lo que la receta BOM dice que debería costar, para comparar
     # contra `costo_insumos` (lo real) al completar (RN-PRD-018). `None` si el

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.production.application.errors import NoEncontrado
-from src.modules.production.infrastructure.models import OrdenProduccion
+from src.modules.production.infrastructure.models import OrdenProduccion, PlanProduccion
 from src.modules.users.infrastructure.models import Almacen
 
 
@@ -30,3 +30,11 @@ def exigir_orden(
         raise NoEncontrado("orden de producción no encontrada")
     exigir_almacen(session, orden.almacen_id, tenant)
     return orden
+
+
+def exigir_plan(session: Session, plan_id: uuid.UUID, tenant: Tenant) -> PlanProduccion:
+    plan = session.get(PlanProduccion, plan_id)
+    if plan is None:
+        raise NoEncontrado("plan de producción no encontrado")
+    exigir_almacen(session, plan.almacen_id, tenant)
+    return plan

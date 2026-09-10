@@ -14,9 +14,23 @@ Plan completo de cómo saldar esta deuda (bloques, orden, decisiones tomadas):
   el reporte** que emite `production.no_conformidad_detectada`.
   `registrado_por` se agregó al payload para que el reporte diga quién
   cerró la orden.
-- ⬜ **`plan_produccion`** (cronograma fijo por tipo de receta/turno,
-  evita contaminación cruzada): hoy toda orden se crea ad-hoc, sin plan.
-  Bloque `feat/produccion-plan-de-produccion`.
+- ✅ 2026-09-09 **`plan_produccion`** (bloque `feat/produccion-plan-de-
+  produccion`). Cronograma fijo por línea/turno (RN-PRD-007/012, único
+  por `almacen_id, fecha, turno, linea_produccion` — `turno`/
+  `linea_produccion` texto libre, no FK a `turno_sucursal`: una cocina de
+  producción central no siempre tiene sucursal). `crear` (`planificado`)
+  → `agregar_orden` liga una `orden_produccion` nueva (`origen="plan"`)
+  → `iniciar` reserva los insumos de **todas** sus órdenes en `inventory`
+  (`reserva_stock.tipo="produccion"`, referenciada por
+  `orden_produccion.id` — el tipo de reserva que existía desde ADR-028
+  sin ningún productor) y pasa a `en_ejecucion`; si algo no alcanza,
+  `StockInsuficiente` interrumpe `iniciar` entero (la sesión hace
+  rollback sola, sin reservas a medias) → `registrar_consumo` cierra la
+  reserva de la orden al salir el insumo de verdad → `cerrar` libera lo
+  que ninguna orden llegó a consumir. Pendiente: el listener de
+  `inventory.stock_bajo_minimo` (`feat/produccion-orden-por-necesidad`)
+  todavía no vincula la orden que crea al plan del día si existe — sigue
+  naciendo suelta.
 - ⬜ **`checklist_inocuidad_turno`**: bioseguridad, superficies, equipos
   de frío (JSONB), indicio de plaga — bloquea la cocina si algo falla
   (RN-CDP-005), igual criterio que falla de frío en apertura de sucursal.
@@ -173,3 +187,18 @@ hasta ahora:
   `inventario/transferencias`); pagina con `?page=`/`page_size` en vez de
   pedir solo la primera página. La **ficha de detalle** sigue pendiente:
   bloque `feat/produccion-ficha-y-consumo-sugerido`.
+- ⬜ **Frontend del diálogo de completar sigue mandando
+  `evidencia_destruccion_url`**: `ordenes-cliente.tsx` no llama a `POST
+  /ordenes/{id}/evidencia` antes de completar — `feat/produccion-
+  evidencia-como-archivo` (2026-09-09) fue backend-only. El campo viaja y
+  el backend lo ignora en silencio; el desecho queda bloqueado en 409
+  hasta que se suba la evidencia por otro medio (Swagger, `curl`). Bloque
+  `feat/produccion-ficha-y-consumo-sugerido` o uno dedicado.
+- ⬜ **La orden por ajuste de necesidad no se vincula al plan del día**:
+  `production/application/listeners.py::on_stock_bajo_minimo`
+  (`feat/produccion-orden-por-necesidad`) crea la orden suelta; con
+  `plan_produccion` ya modelado (`feat/produccion-plan-de-produccion`,
+  2026-09-09) falta que la ligue al plan `planificado`/`en_ejecucion` de
+  ese almacén y esa fecha si existe uno solo, para que la reposición
+  automática entre al mismo cronograma y no aparezca como un plan
+  independiente en el tablero del jefe de cocina.

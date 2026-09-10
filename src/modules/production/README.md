@@ -35,8 +35,9 @@ reporte** que emite `production.no_conformidad_detectada`, no desde la orden.
 
 ## Estado (slice core implementado 2026-07-25)
 
-Operativo en `/api/v1/production`: `orden_produccion` ad-hoc (sin
-`plan_produccion`/cronograma — diferido) crear (borrador) → registrar
+Operativo en `/api/v1/production`: `orden_produccion`, ad-hoc o colgada de
+un `plan_produccion` (bloque `feat/produccion-plan-de-produccion`,
+2026-09-09), crear (borrador) → registrar
 consumo real de insumos (`consumo_produccion_item`, transición a
 `en_proceso`) → completar con resultado de control de calidad
 (`conforme` | `no_conforme_reprocesado` | `no_conforme_desechado`).
@@ -77,6 +78,26 @@ snapshot al registrar el consumo, para comparar contra `costo_insumos`
 | POST | `/ordenes/{id}/consumo` | `production.crear` |
 | POST | `/ordenes/{id}/evidencia` | `production.completar` |
 | POST | `/ordenes/{id}/completar` | `production.completar` |
+| POST | `/planes` | `production.planificar` |
+| GET | `/planes` | `production.leer` |
+| GET | `/planes/{id}` | `production.leer` |
+| POST | `/planes/{id}/ordenes` | `production.planificar` |
+| POST | `/planes/{id}/iniciar` | `production.planificar` |
+| POST | `/planes/{id}/cerrar` | `production.planificar` |
+
+`plan_produccion` (`application/planes.py`, bloque `feat/produccion-plan-
+de-produccion`, 2026-09-09) es el cronograma fijo por línea/turno
+(RN-PRD-007/012, único por `almacen_id, fecha, turno, linea_produccion`):
+`crear` (`planificado`) → `agregar_orden` liga una `orden_produccion` con
+`origen="plan"` → `iniciar` reserva los insumos de todas sus órdenes en
+`inventory` (`reserva_stock.tipo="produccion"`, referenciada por
+`orden_produccion.id` — un tipo de reserva que existía desde ADR-028 sin
+ningún productor) y pasa a `en_ejecucion`; `StockInsuficiente` interrumpe
+`iniciar` entero, sin reservas a medias → `registrar_consumo` cierra la
+reserva de la orden cuando el insumo sale de verdad → `cerrar` libera lo
+que ninguna orden llegó a consumir. `turno`/`linea_produccion` son texto
+libre, no un catálogo con FK: `turno_sucursal` (RRHH) está atado a una
+sucursal y una cocina de producción central no siempre tiene una.
 
 `GET /trabajadores-disponibles` (`?area=`) lista los trabajadores activos
 de la empresa vía `rrhh.queries_publicas.trabajadores_activos` — el picker
@@ -102,7 +123,6 @@ y recalcula su `costo_promedio` — mismo listener/patrón que
 Deuda del slice (ver
 [plan de deuda](../../../docs/roadmap/deuda-production-2026-09-09.md) y
 [`docs/roadmap/deuda/modulo-production.md`](../../../docs/roadmap/deuda/modulo-production.md)):
-`plan_produccion`/cronograma (hoy la orden se crea sin plan),
 `checklist_inocuidad_turno` (bloqueo de cocina por fallo de inocuidad),
 `reporte_produccion` consolidado, subrecetas anidadas (una orden que
 consume otra subreceta con su propia orden). Ya saldado: lote/trazabilidad
@@ -112,9 +132,10 @@ asiento contable del desecho (ADR-100) (2026-09-09), el costeo real
 mano de obra por empresa y desviación de desperdicio real vs. esperado
 (2026-09-09)—, la evidencia de destrucción como `Archivo` en vez de
 string libre (2026-09-09), las horas-hombre imputadas desde la
-asistencia real de RRHH en vez de tipeadas a mano (2026-09-09), y la
-orden por ajuste de necesidad al cruzar `inventory.stock_bajo_minimo`
-en vez de que alguien la cree a mano (2026-09-09).
+asistencia real de RRHH en vez de tipeadas a mano (2026-09-09), la orden
+por ajuste de necesidad al cruzar `inventory.stock_bajo_minimo` en vez de
+que alguien la cree a mano (2026-09-09), y el plan de producción con
+reserva de insumos al iniciar (2026-09-09).
 
 Pendiente de frontend: el diálogo de completar todavía manda
 `evidencia_destruccion_url` como texto libre (`ordenes-cliente.tsx`) en
@@ -124,10 +145,12 @@ vez de subir la evidencia vía `POST .../evidencia` antes de completar —
 
 ## Casos de uso
 
-- Definir plan de producción del periodo (cronograma fijo por tipo de
-  receta/proceso, evita contaminación cruzada).
-- Generar orden de producción, desde el plan o por ajuste ante alerta de
-  stock mínimo de `inventory` (RN-PRD-007/011).
+- Definir plan de producción del periodo (cronograma fijo por línea/turno,
+  evita contaminación cruzada — `POST /planes`); iniciarlo reserva los
+  insumos de todas sus órdenes, cerrarlo libera lo que no se consumió.
+- Generar orden de producción, desde el plan (`POST /planes/{id}/ordenes`)
+  o por ajuste ante alerta de stock mínimo de `inventory` (RN-PRD-007/011),
+  o suelta, ad-hoc.
 - Ejecutar orden: consumir insumos/subrecetas, producir lote(s) con
   código y trazabilidad completa (manipulador, envasador, variables de
   proceso).

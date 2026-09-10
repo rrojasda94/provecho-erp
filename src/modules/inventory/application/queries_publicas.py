@@ -201,6 +201,23 @@ def costo_unitario_de_recetas(
     return costos
 
 
+def sku_de_articulo(session: Session, articulo_id: uuid.UUID) -> uuid.UUID | None:
+    """El SKU activo de mayor prioridad de un artículo (elección por lote
+    llega con FEFO). `None` si no tiene ninguno activo.
+
+    Reservar stock (`application.reservas`) y todo lo que descuenta
+    almacén trabaja por `sku_id`, no por `articulo_id` — lo mismo que ya
+    resuelve `inventory.application.listeners._sku_de_articulo` puertas
+    adentro, acá promovido a contrato público para que `production` no
+    reimplemente la misma consulta al reservar insumos de un plan.
+    """
+    return session.scalar(
+        select(Sku.id)
+        .where(Sku.articulo_id == articulo_id, Sku.activo.is_(True))
+        .order_by(Sku.prioridad)
+    )
+
+
 def costo_promedio_de_articulos(
     session: Session, articulo_ids: Sequence[uuid.UUID]
 ) -> dict[uuid.UUID, Decimal]:

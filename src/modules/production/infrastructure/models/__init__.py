@@ -8,5 +8,11 @@ from src.modules.production.infrastructure.models.orden_produccion import OrdenP
 from src.modules.production.infrastructure.models.orden_produccion_trabajador import (
     OrdenProduccionTrabajador,
 )
+from src.modules.production.infrastructure.models.plan_produccion import PlanProduccion
 
-__all__ = ["ConsumoProduccionItem", "OrdenProduccion", "OrdenProduccionTrabajador"]
+__all__ = [
+    "ConsumoProduccionItem",
+    "OrdenProduccion",
+    "OrdenProduccionTrabajador",
+    "PlanProduccion",
+]

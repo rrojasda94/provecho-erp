@@ -1,14 +1,15 @@
 """Routers FastAPI del módulo production: orden de producción."""
 
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.production.api import schemas
-from src.modules.production.application import evidencia, ordenes, tarifas
-from src.modules.production.application.scope import exigir_almacen, exigir_orden
+from src.modules.production.application import evidencia, ordenes, planes, tarifas
+from src.modules.production.application.scope import exigir_almacen, exigir_orden, exigir_plan
 from src.modules.rrhh.application import queries_publicas as rrhh_queries
 from src.modules.users.api.deps import client_ip, get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Almacen, Usuario
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/production", tags=["production"])
 CREAR = "production.crear"
 LEER = "production.leer"
 COMPLETAR = "production.completar"
+PLANIFICAR = "production.planificar"
 
 
 @router.post("/ordenes", response_model=schemas.OrdenProduccionOut, status_code=201)
@@ -197,3 +199,116 @@ def completar_orden(
     )
     session.commit()
     return orden
+
+
+@router.post("/planes", response_model=schemas.PlanProduccionOut, status_code=201)
+def crear_plan(
+    body: schemas.PlanProduccionCreate,
+    actor: Usuario = Depends(require_permission(PLANIFICAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    exigir_almacen(session, body.almacen_id, tenant)
+    plan = planes.crear_plan(
+        session,
+        almacen_id=body.almacen_id,
+        fecha=body.fecha,
+        turno=body.turno,
+        linea_produccion=body.linea_produccion,
+        creado_por=actor.id,
+        ip=ip,
+    )
+    session.commit()
+    return plan
+
+
+@router.get("/planes", response_model=Pagina[schemas.PlanProduccionOut])
+def listar_planes(
+    almacen_id: uuid.UUID | None = None,
+    fecha: date | None = None,
+    estado: str | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    p: Paginacion = Depends(paginacion),
+    session: Session = Depends(get_db),
+):
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
+    return paginar(
+        session,
+        planes.q_planes(
+            session,
+            empresa_id=tenant.filtro_empresa(),
+            almacen_id=almacen_id,
+            fecha=fecha,
+            estado=estado,
+        ),
+        p,
+    )
+
+
+@router.get("/planes/{plan_id}", response_model=schemas.PlanProduccionOut)
+def ver_plan(
+    plan_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    return exigir_plan(session, plan_id, tenant)
+
+
+@router.post(
+    "/planes/{plan_id}/ordenes", response_model=schemas.OrdenProduccionOut, status_code=201
+)
+def agregar_orden_a_plan(
+    plan_id: uuid.UUID,
+    body: schemas.AgregarOrdenAPlanIn,
+    actor: Usuario = Depends(require_permission(PLANIFICAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    exigir_plan(session, plan_id, tenant)
+    orden = planes.agregar_orden(
+        session,
+        plan_id,
+        articulo_id=body.articulo_id,
+        cantidad_planeada=body.cantidad_planeada,
+        creado_por=actor.id,
+        idempotency_key=body.idempotency_key,
+        ip=ip,
+    )
+    session.commit()
+    return orden
+
+
+@router.post("/planes/{plan_id}/iniciar", response_model=schemas.PlanProduccionOut)
+def iniciar_plan(
+    plan_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(PLANIFICAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    """Reserva los insumos de todas las órdenes del plan (RN-PRD-007);
+    falla entero si algo no alcanza (`StockInsuficiente`, 409)."""
+    exigir_plan(session, plan_id, tenant)
+    plan = planes.iniciar_plan(session, plan_id, actor_id=actor.id, ip=ip)
+    session.commit()
+    return plan
+
+
+@router.post("/planes/{plan_id}/cerrar", response_model=schemas.PlanProduccionOut)
+def cerrar_plan(
+    plan_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(PLANIFICAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    """Libera lo que ninguna orden del plan llegó a consumir."""
+    exigir_plan(session, plan_id, tenant)
+    plan = planes.cerrar_plan(session, plan_id, actor_id=actor.id, ip=ip)
+    session.commit()
+    return plan
