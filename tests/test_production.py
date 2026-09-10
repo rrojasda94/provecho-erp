@@ -60,9 +60,14 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
         s.add(udm_cat)
         s.flush()
         udm = UnidadMedida(categoria_udm_id=udm_cat.id, nombre="Kilo", ratio=Decimal(1))
-        almacen = Almacen(empresa_id=empresa.id, nombre="Producción", tipo="produccion")
-        s.add_all([udm, almacen])
+        s.add(udm)
         s.flush()
+        # `seed()` ya crea el almacén `produccion` (WH-PROD, bloque
+        # `feat/produccion-semilla-y-pantalla-con-permisos`): crear uno propio
+        # acá dejaba dos almacenes `tipo=produccion` en la misma empresa, y
+        # `on_stock_bajo_minimo` exige exactamente uno (RN-PRD-007/011) — con
+        # dos, no crea nada y los tests de este bloque fallaban en silencio.
+        almacen = s.scalar(select(Almacen).where(Almacen.tipo == "produccion"))
 
         harina = Articulo(
             empresa_id=empresa.id, id_interno="H001", nombre="Harina",
