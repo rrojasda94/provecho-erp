@@ -12,6 +12,632 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.11.0] - 2026-09-10
+
+### Added
+
+- **Adjuntos de `documento_vigencia` con subida binaria real a S3**
+  (2026-09-09, RN-DOC-005). Hasta ahora `Archivo` solo guardaba metadata sin
+  ninguna forma real de conseguir la URL — `POST
+  /assets/documentos/{id}/adjuntos/presign-upload` genera una URL prefirmada
+  de subida (`src/shared/integrations/storage/s3.py`, mismo bucket y
+  credenciales que `src.backups.backup`, `boto3` sigue opcional `[backups]`,
+  ADR-007) y el cliente sube el binario directo ahí antes de registrar el
+  metadato. Frontend: diálogo de adjuntar en la pantalla de Documentos.
+
+- **Canal de alerta por correo en `reports`** (2026-09-09, ADR-033). El
+  campo `canal` de `regla_distribucion`/`entrega_reporte` existía desde el
+  principio sin nada más que la bandeja detrás; `email` es el primer canal
+  real, despachado por `src/shared/integrations/email/smtp.py` (SMTP puro
+  stdlib, sin dependencia nueva). El correo se **suma** a la bandeja, nunca
+  la reemplaza — sin `SMTP_HOST` configurado el envío se omite en silencio y
+  el resto de la distribución sigue igual que antes.
+
+- **`editar_sku` existe** (ADR-091). `PATCH /inventory/skus/{id}` corrige
+  `codigo`, `codigo_barras` y `activo` con las mismas reglas de unicidad
+  que `crear_sku` — un código de barras mal tecleado solo se corregía por
+  SQL. El importador no cambia: sigue informando un código repetido como
+  omitido, corregirlo sigue siendo la pantalla de a uno.
+- **`id_interno` pasa de 4 a 8 caracteres**, en `articulo` y en
+  `producto_comercial`. Sigue único en todo el grupo, no por empresa — un
+  catálogo de trescientos artículos agotaba rápido el espacio de códigos
+  de 4 caracteres compartido entre todas las empresas. Los códigos ya
+  asignados no se tocan.
+
+- **La condición de una línea de receta se valida contra el producto que la
+  usa** (ADR-092). `agregar_item`/`editar_item` rechazan con 409 un valor
+  que ningún producto de la receta ofrece — antes el único guardarraíl era
+  la lectura conservadora de `aplica_a_variante`, que alcanzaba para no
+  descontar de más pero dejaba pasar una receta mal armada sin avisar.
+  Nuevo `sales.valores_ofrecidos_de_receta`. No retroactivo: lo ya guardado
+  sigue leyéndose igual, y una receta que ningún producto usa acepta
+  cualquier valor porque no hay contra qué compararlo.
+
+- **El repartidor propio tiene su PWA** (ADR-098, slice 4): en `/reparto`
+  ve sus rutas vivas con cada parada ya resuelta (dirección, cliente,
+  teléfono, monto a cobrar si la venta sigue sin pagar), inicia la ruta,
+  llama o navega a cada parada, confirma la entrega o registra por qué no
+  se pudo —con foto y ubicación opcionales— y finaliza cuando todo quedó
+  resuelto. El GPS se manda solo mientras la ruta está en curso (throttle
+  de 10 s/30 m) y la pantalla se mantiene encendida con la Wake Lock API.
+  Instalable, sin service worker: offline queda como deuda ya declarada
+  en la especificación del módulo. `GET /delivery/mi/rutas` cambió de
+  forma para traer las paradas resueltas en la misma respuesta — la PWA
+  no llama a `sales` ni a `rrhh` por su cuenta.
+
+- **El reparto propio tiene código** (ADR-098): repartidores con cuenta y
+  vehículo, tablero de despacho, y el ciclo completo de una ruta —crear
+  con ruteo heurístico, editar paradas, iniciar, entregar o fallar cada
+  parada, reintentar o cerrar la fallida, finalizar o cancelar la ruta.
+  `delivery` nunca importa el dominio de `sales`: marca la venta entregada
+  publicando `delivery.entrega_registrada`, que un listener nuevo de
+  `sales` traduce a la misma `cumplimiento.registrar_entrega` del botón
+  "Entregar" del KDS, y al revés escucha `sales.venta_entregada`/
+  `venta_anulada` para cerrar o cancelar su entrega sola. Costo aceptado:
+  sin ruteo real contra Google, sin GPS, sin enlace público de seguimiento
+  y sin avisos por WhatsApp todavía — quedan para los próximos slices
+  (`docs/roadmap/deuda/modulo-delivery.md`).
+
+- **El reparto propio calcula rutas de verdad y el cliente las sigue en un
+  mapa** (ADR-098, slice 3): crear una ruta con `optimizar=true` ahora le
+  pide el orden y la ruta —con polilínea— a Google Routes
+  (`computeRoutes` + `optimizeWaypointOrder`), y cae sola a la heurística
+  vecino-más-cercano si no hay clave o Google falla, sin romper la
+  creación. El repartidor manda su posición en ruta
+  (`POST /rutas/{id}/posiciones`), que actualiza el trazo GPS y el ETA de
+  la siguiente parada. El cliente ve todo eso por un enlace público sin
+  cuenta (`GET /delivery/publico/seguimiento/{token}`): estado, ETA,
+  primer nombre del repartidor, su posición mientras está en camino y una
+  línea de tiempo — nunca monto, teléfono, dirección en texto ni las
+  demás paradas de la salida (RN-DLV-008). Token anónimo con expiración a
+  las pocas horas de resolverse la entrega, 404 uniforme para inexistente
+  o vencido, purga de posiciones y evidencia por Celery beat. Costo
+  aceptado: el ETA en ruta no se recotiza contra Google (solo la parada
+  siguiente, por haversine); la PWA del repartidor y el tablero del ERP
+  quedan para los próximos slices (`docs/roadmap/deuda/modulo-delivery.md`).
+
+- **El tablero de despacho de reparto propio vive en el ERP** (ADR-098,
+  slice 5): en `/delivery` se ve lo sin asignar y las rutas vivas con su
+  repartidor, sus paradas y un mapa con la polilínea real cuando la ruta
+  se optimizó con Google; se crea una ruta eligiendo repartidor y
+  pedidos, y se cancela una que no salió todavía. `/delivery/repartidores`
+  da de alta y edita repartidores propios; `/delivery/entregas` es el
+  historial paginado, con filtros y la foto de evidencia. `GET
+  /delivery/tablero`, `GET /delivery/repartidores` y `GET
+  /delivery/entregas` ahora resuelven venta, cliente y repartidor en la
+  misma respuesta — ninguna de las tres pantallas llama a `sales` ni a
+  `rrhh` por su cuenta, mismo criterio que ya fijó `GET /delivery/mi/rutas`
+  en la PWA del repartidor. Costo aceptado: el tablero no reordena
+  paradas de una ruta ya creada ni fuerza iniciar/finalizarla a mano —
+  eso lo sigue haciendo el repartidor desde su teléfono
+  (`docs/roadmap/deuda/modulo-delivery.md`).
+
+- **El reparto propio avisa al cliente por WhatsApp** (ADR-098, slice 6):
+  cuando la ruta sale (`pedido_en_camino`), cuando entrega
+  (`pedido_entregado`) y cuando falla (`entrega_fallida`) se manda una
+  plantilla aprobada por Meta con el mismo adaptador que ya usa la
+  encuesta de satisfacción de `marketing`
+  (`shared/integrations/whatsapp`); un fallo de transporte reintenta
+  (Celery, hasta 4 veces con backoff), un rechazo de Meta no — queda
+  escrito en `entrega.aviso_error` sin volver a intentar el mismo envío.
+  Sin teléfono del cliente, sin WhatsApp configurado o en un hub de
+  sucursal (que no corre Celery, ADR-009) no se encola nada: el tablero
+  de despacho siempre ofrece el enlace de seguimiento para copiar o
+  mandar por `wa.me`, esté o no habilitado el envío automático. También
+  quedó la notificación in-app (`users.notificar_a`): al repartidor
+  cuando le asignan una ruta, y a quien despachó si una entrega falla o
+  si la venta de una entrega ya `en_ruta` se anula (RN-DLV-006). Costo
+  aceptado: el "contacto de la sucursal" de la plantilla de fallo es solo
+  su nombre — `Sucursal` no tiene teléfono propio
+  (`docs/roadmap/deuda/modulo-delivery.md`).
+
+- **Depreciación mensual de activo fijo** (2026-09-09, PROC-CTB-010,
+  ADR-099). No estaba modelada en absoluto — bloqueada históricamente
+  porque no existía el módulo de activos. Barrido mensual (Celery beat,
+  día 1) lee `assets.application.queries_publicas.activos_depreciables`
+  (nuevo contrato público) y postea un asiento lineal por activo por mes
+  (debe `6813`, haber `3913`), idempotente por `<activo_id>:<AAAA-MM>`.
+  `activo_depreciacion` lleva lo acumulado; se detiene solo al llegar a
+  `de_baja` o al depreciar el valor completo. Sin las cuentas 6813/3913
+  importadas, queda como `asiento_omitido` (no bloquea nada).
+
+- **El reparto propio se especificó como módulo aparte** (ADR-098): rutas
+  con varias paradas optimizadas contra Google Routes (fallback
+  heurístico), GPS del repartidor, enlace público de seguimiento con mapa
+  en vivo, aviso automático por WhatsApp y entrega fallida con motivo y
+  evidencia — todo separado de `sales`, que solo se entera por evento
+  (`delivery.entrega_registrada`) y nunca se importa desde `delivery`. Este
+  cambio es solo documentación y contratos (README, `data-model.md` §6b,
+  `events.md`, RN-DLV-001 a 008, máquinas de estado); el código llega en
+  los slices siguientes.
+
+- **La guía de remisión ya tiene pantalla** (2026-09-06, ADR-090). Cuatro
+  endpoints con ADR (ADR-027) y catorce pruebas llevaban desde el
+  2026-08-05 sin un solo llamador desde el frontend. Se emite con el botón
+  «Guía» desde Traslados y desde Devoluciones (`origen=proveedor`), no
+  desde una pantalla propia — RN-TRP-002 exige que lo transportado
+  coincida con lo declarado, y un formulario aparte sería la forma de que
+  no coincida. Al abrir pregunta si ya existe una y muestra su estado, o el
+  formulario si no hay ninguna; lista `/inventario/guias-remision` de solo
+  lectura para revisar lo ya emitido. Sumó `GET
+  /devoluciones/{id}/guia-remision`, que faltaba, simétrico al de
+  transferencia.
+- **Descarga de PDF/XML/CDR de una guía aceptada**
+  (`GET /guias-remision/{id}/descargar/{formato}`). `FactilizaClient.descargar`
+  gana `recurso: "invoice" | "despatch"` en vez de duplicar el cliente —
+  mismo verbo, mismo formato de respuesta, solo cambia el prefijo de la
+  ruta. La anulación por comunicación de baja queda fuera de este cambio:
+  su payload no se verificó contra el sandbox de QA de Factiliza y
+  construirla a ciegas es el error que ADR-005 ya evitó una vez con la
+  boleta.
+- **`unidad_medida.codigo_sunat`** (migración `4466bd44b238`), editable
+  desde Catálogo. Antes la guía traducía toda unidad con un diccionario de
+  doce entradas y caía en `NIU` sin avisar — una "Doypack 2kg" salía mal
+  en la GRE. La columna manda sobre el diccionario cuando está configurada;
+  el diccionario sigue de valor de siembra y de fallback para lo que nadie
+  configuró todavía.
+
+- **Módulo `assets`: activos, mantenimiento, combustible y documentos con
+  vencimiento** (2026-09-09, ADR-099). Nada de esto tenía código —solo
+  especificación desde julio y una decisión explícita de no crear
+  `vehiculo` (ADR-027 §4)—, y el usuario lo pidió directamente: registro de
+  equipos y vehículos, kilometraje y consumo de combustible con detección
+  de anomalía (RN-VEH-006/007), cronograma de mantenimiento con aviso
+  anticipado por días y/o kilometraje (RN-MNT-005), y permisos/certificados
+  con fecha de vencimiento (SOAT, revisión técnica, licencia de
+  funcionamiento, Defensa Civil, fumigación, carné de sanidad, licencia de
+  conducir — RN-DOC-001..004). El combustible se compra en `purchases`
+  (compra directa sobre un artículo `tipo="servicio"`, ADR-082) y `assets`
+  solo liga el comprobante ya recibido al vehículo — sin flujo de gasto
+  propio. Las alertas usan el catálogo cerrado de `reports` que ya existía
+  (ADR-033): cinco emisiones nuevas, un barrido diario idempotente por
+  ventana, cero mecanismo nuevo. `flota`, el alta automática desde una OC
+  tipo `activo` y la depreciación en `accounting` quedan declaradas como
+  deuda, a propósito.
+
+### Added
+
+- `purchases`: nueva orden de compra tipo `activo` (`crear_orden_compra_activo`)
+  con `requerimiento_activo` (sin ítems de `inventory`, recepción total vía
+  `recibir_orden_compra_activo`).
+- `assets`: primer listener del módulo — consume
+  `purchases.requerimiento_activo_recibido` y da de alta el activo
+  (`tipo="equipamiento"`) automáticamente al recibir la OC.
+
+- **Producción no verificaba la inocuidad de turno antes de operar**
+  (2026-09-09, bloque `feat/produccion-checklist-inocuidad` del plan de
+  deuda de producción, RN-CDP-002/005). Nueva tabla
+  `checklist_inocuidad_turno`: bioseguridad, superficies, limpieza
+  intermedia, equipos de frío (JSONB `[{equipo, temperatura_c, rango_min,
+  rango_max, dentro_rango}]` — `dentro_rango` lo calcula el servidor, nunca
+  el cliente) e indicio de plaga; único por `almacen_id, fecha, turno`.
+  `POST /production/checklists` calcula `estado` (`aprobado`|`bloqueado`):
+  cualquier falla bloquea la cocina entera, no solo el equipo puntual (más
+  estricto que la letra de RN-CDP-005, mismo criterio que el resto del
+  modelo de datos y el SOP de inocuidad). Sin un checklist `aprobado`
+  vigente del día en un almacén `tipo=produccion`, `crear_orden_produccion`
+  y `registrar_consumo` rechazan con 409 `cocina_bloqueada`. Publica
+  `production.equipo_frio_fuera_rango` (por cada equipo fuera de rango) y
+  `production.cocina_bloqueada`, ambos nivel `urgente` en el catálogo de
+  `reports` (alerta a Gerencia y Cocina) — el primero estaba documentado en
+  `events.md` desde antes pero el código nunca llegó a publicarlo. Nuevo
+  permiso `production.verificar_inocuidad` (seeder + `jefe_cocina`) y
+  pantalla `/produccion/inocuidad`. Simplificación documentada:
+  `orden_produccion` no registra en qué turno se creó, así que "vigente" es
+  el checklist más reciente del almacén ese día, sin distinguir turno — una
+  vez bloqueada la cocina, sigue bloqueada hasta que un checklist nuevo (de
+  cualquier turno) la reapruebe.
+
+- **El costeo "automático" de producción lo tipeaba el cliente** (2026-09-09,
+  bloque `feat/produccion-costeo-real` del plan de deuda de producción,
+  RN-PRD-018). `registrar_consumo` recibía `costo_unitario` desde el cliente
+  en vez de leer `articulo.costo_promedio`, y `peso_desperdicio_real` se
+  guardaba sin contrastarlo nunca contra `receta_item.merma_pct` — la
+  comparación que la regla exige literalmente. Ahora: sin `costo_unitario`
+  explícito, la línea se costea al `costo_promedio` vigente
+  (`inventory.application.queries_publicas.costo_promedio_de_articulos`);
+  nuevo `GET /ordenes/{id}/consumo-sugerido` explota la receta BOM del
+  artículo escalada a `cantidad_planeada` (misma cuenta que
+  `recetas.costo_linea`, para que "cuánto sugiere producción" y "cuánto
+  cuesta la receta" nunca puedan divergir); `GET /ordenes/{id}` devuelve los
+  consumos reales con `desviacion_desperdicio`; `orden.costo_teorico_insumos`
+  queda de snapshot al registrar el consumo para esa comparación al
+  completar. `consumo_produccion_item.unidad_medida_id` (nullable, mismo
+  criterio que `receta_item`) permite teclear la cantidad en otra UdM de la
+  misma categoría (RN-UDM-005) — se guarda ya convertida a la del artículo.
+- **La tarifa de mano de obra de producción era global en el `.env`**
+  (mismo bloque, ADR-014/068). `production_costo_hora_mano_obra` vivía en
+  `src/config/settings.py` en vez de `parametro_empresa`, a diferencia del
+  resto del ERP — Gerencia no podía cambiarla sin un redespliegue. Nuevo
+  `production/application/tarifas.py::costo_hora_mano_obra_de` lee
+  `parametro_empresa` `production/costo_hora_mano_obra` (mismo patrón que
+  `sales.application.tarifa_delivery`), con el valor del `.env` como semilla
+  mientras nadie apruebe una propuesta.
+
+- **Desechar un lote no conforme no dejaba ningún rastro contable**
+  (2026-09-09, bloque `feat/produccion-desecho-a-contabilidad` del plan de
+  deuda de producción, ADR-100). `completar_orden_produccion` con resultado
+  `no_conforme_desechado` registraba `merma_cantidad`/`merma_motivo` en la
+  orden pero nunca disparaba un asiento — el balance nunca se enteraba de la
+  pérdida. No se reusó `inventory.merma_registrada`: esa merma opera sobre
+  una reserva de stock de un artículo que ya está en el almacén, y el
+  producto terminado de una orden desechada nunca llegó a existir como
+  stock (solo se publica `orden_completada` en el caso `conforme`). Nuevo
+  evento propio `production.orden_desechada` con su plantilla PCGE
+  (`6599`/`201`, mismo circuito que la merma de mercadería): el monto es el
+  costo de los insumos que la orden ya había consumido — la mano de obra
+  queda afuera porque ya se reconoce aparte, como gasto de planilla.
+  Reproceso sigue sin generar merma ni asiento, como siempre.
+
+- **Dos mecanismos de evidencia para la misma regla, y ninguno llenaba al
+  otro** (2026-09-09, bloque `feat/produccion-evidencia-como-archivo` del
+  plan de deuda de producción, RN-PRD-015). `orden_produccion.
+  evidencia_destruccion_url` era un string libre que quien completaba la
+  orden tecleaba en el mismo `POST .../completar`, sin que nadie pudiera
+  verificar que apuntara a algo real ni listar qué se subió; mientras tanto
+  `reporte_escalamiento.evidencia_id` (ADR-036) ya era una FK a `archivo`
+  con storage S3 real, pedida aparte al abrir el escalamiento. Ahora la
+  evidencia se sube una sola vez, vía `POST /production/ordenes/{id}/
+  evidencia`, como `Archivo` (`orden.evidencia_archivo_id`); `completar`
+  con `no_conforme_desechado` exige que ya exista, y el mismo id viaja en
+  `production.no_conformidad_detectada.evidencia_id` para que
+  `reports.application.escalamientos.abrir` lo use como default de
+  `reporte_escalamiento.evidencia_id` — el usuario no la vuelve a pegar a
+  mano. Migración con datos: toda `evidencia_destruccion_url` existente se
+  convierte en `Archivo` antes de borrar la columna vieja.
+- **La validación de MIME/tamaño de un adjunto solo existía en
+  `marketing`** (mismo bloque). Extraída a `src/shared/adjuntos.py`
+  (`crear_archivo`, con MIME permitidos y tamaño máximo por módulo);
+  `marketing.application.adjuntos.adjuntar` y el nuevo `production.
+  application.evidencia.adjuntar_evidencia` la reusan en vez de cada uno
+  con su propia copia.
+
+- **Las horas-hombre de una orden de producción se tipeaban a mano**
+  (2026-09-09, bloque `feat/produccion-horas-hombre-desde-rrhh` del plan de
+  deuda de producción, RN-PRD-018). `CompletarOrdenIn.horas_hombre` era un
+  número libre pese a que RRHH ya tiene asistencia/marcación real. Ahora se
+  imputan trabajadores concretos (`trabajadores[]: {trabajador_id, horas?}`):
+  sin horas explícitas se imputa toda la asistencia real de hoy
+  (`rrhh.queries_publicas.horas_asistidas`); con ellas, no pueden superar lo
+  asistido (409), y un trabajador sin asistencia ese día tampoco se puede
+  imputar (409, RN-RRHH-009). `orden_produccion.horas_hombre` pasa a ser el
+  agregado (`Σ horas`) de la nueva tabla `orden_produccion_trabajador`, no
+  el dato tipeado. Nuevo `GET /production/trabajadores-disponibles`
+  (`rrhh.queries_publicas.trabajadores_activos`) alimenta el picker de
+  trabajadores del diálogo de completar en el frontend, reemplazando el
+  campo numérico de "horas hombre".
+
+- **El lote de una orden de producción nacía siempre sin vencimiento**
+  (2026-09-09, bloque `feat/produccion-lote-trazabilidad-auditoria` del plan
+  de deuda de producción). El listener de `inventory` sabía leer
+  `fecha_vencimiento`/`lote_codigo` del payload de `production.orden_
+  completada` desde ADR-015 — `production` simplemente nunca los mandaba, así
+  que FEFO trataba todo lote de fabricación propia como FIFO (RN-VNC-001).
+  `POST /production/ordenes/{id}/completar` ahora acepta `fecha_vencimiento`,
+  `lote_codigo` y `trazabilidad` (JSONB libre: manipulador, envasador, línea,
+  variables de proceso — RN-LOT-002/003), que se persisten en la orden y
+  viajan en el evento cuando el resultado es `conforme`.
+- **El módulo no dejaba rastro de quién hacía qué.** Cero llamadas a
+  `auditoria.registrar` en todo `production`, incluido cerrar una orden con
+  desecho — acto de plata y de autoridad por definición. Las tres
+  operaciones (crear, registrar consumo, completar) ahora auditan con
+  `datos_antes`/`datos_despues` y la IP del request.
+- **Un reintento de red podía duplicar el consumo o cerrar la orden dos
+  veces.** Solo `crear_orden_produccion` era idempotente; `registrar_consumo`
+  y `completar_orden_produccion` ahora aceptan una `idempotency_key` opcional
+  — con la misma clave, la segunda llamada devuelve la orden tal como quedó
+  en vez de volver a procesarla.
+  Costo aceptado: la ficha de detalle y el formulario de completar en el
+  frontend todavía no ofrecen estos campos (queda en
+  `feat/produccion-ficha-y-consumo-sugerido`); por ahora son capacidad de
+  API, usable por integraciones o por curl.
+
+- **`production` prometía escuchar `inventory.stock_bajo_minimo` desde
+  2026-07-25 y nunca lo hizo** (2026-09-09, bloque `feat/produccion-orden-
+  por-necesidad` del plan de deuda de producción, RN-PRD-007/011). El
+  README del módulo decía "Escucha: `inventory.stock_bajo_minimo` (dispara
+  orden por necesidad)", pero no existía `production/application/
+  listeners.py` ni ningún registro en `src/core/app.py` — el evento se
+  publicaba desde 2026-08-06 y nadie del lado de producción lo procesaba.
+  Ahora, al cruzar el mínimo de un artículo con receta BOM, si la empresa
+  tiene **una sola** cocina de producción (almacén `tipo=produccion`) se
+  crea sola una orden `borrador` con `origen=ajuste_por_necesidad` (columna
+  nueva en `orden_produccion`; `creado_por` pasa a nullable porque esta
+  orden no tiene ningún humano detrás — mismo criterio que `usuario_id`
+  nulo en el propio evento, que el reporte muestra como «Sistema»).
+  `cantidad_planeada` sale de `stock_minimo × factor_reposicion − cantidad`
+  redondeado al rendimiento de la receta (produce en lotes completos, no
+  una fracción de tanda); el factor vive en `parametro_empresa
+  production/factor_reposicion` (semilla `2`, ADR-014/068). Es idempotente
+  por SKU y día, y no crea una segunda orden mientras la primera siga sin
+  cerrar control de calidad. Con cero o más de una cocina de producción no
+  crea nada — ahí sigue quedando solo el aviso de `reports`, que es donde
+  Gerencia decide a mano cuál de las cocinas produce.
+
+- **Toda orden de producción se creaba suelta, sin plan** (2026-09-09,
+  bloque `feat/produccion-plan-de-produccion` del plan de deuda de
+  producción, RN-PRD-007/012). Nueva tabla `plan_produccion` (cronograma
+  fijo por línea/turno, única por `almacen_id, fecha, turno,
+  linea_produccion` — sin dos planes compitiendo por la misma línea al
+  mismo turno del mismo día). `turno`/`linea_produccion` son texto libre,
+  no un catálogo con FK: `turno_sucursal` (RRHH) está atado a una
+  sucursal y una cocina de producción central no siempre tiene una.
+  `POST /production/planes` crea el plan (`planificado`); `POST
+  /planes/{id}/ordenes` le liga una `orden_produccion` nueva
+  (`origen="plan"`); `POST /planes/{id}/iniciar` reserva los insumos de
+  **todas** sus órdenes en `inventory` (`reserva_stock.tipo="produccion"`,
+  el tipo que existía desde ADR-028 sin ningún productor, referenciada
+  por `orden_produccion.id`) y pasa a `en_ejecucion` — si algo no
+  alcanza, `StockInsuficiente` interrumpe `iniciar` entero, sin dejar
+  reservas a medias; `registrar_consumo` cierra la reserva de la orden
+  cuando el insumo sale de verdad; `POST /planes/{id}/cerrar` libera lo
+  que ninguna orden llegó a consumir. Nuevo `GET/POST /production/planes`,
+  `GET /planes/{id}`, permiso `production.planificar` (seeder + `jefe_
+  cocina`), y `/produccion/plan` en el frontend. Pendiente: el listener
+  de `inventory.stock_bajo_minimo` (`feat/produccion-orden-por-necesidad`)
+  todavía no vincula la orden que crea al plan del día si existe uno.
+
+- **Producción no consolidaba un reporte de la jornada** (2026-09-09,
+  bloque `feat/produccion-reporte-de-jornada` del plan de deuda de
+  producción, RN-DOC-010). Nueva tabla `reporte_produccion`: consolida las
+  órdenes que cerraron control de calidad ese día en un almacén
+  (`merma_total`, `desperdicio_total`, `horas_hombre_total`,
+  `costo_total`, snapshot `ordenes` JSONB); única por `almacen_id,
+  jornada`. `generar_reporte_jornada` recalcula el existente mientras no
+  esté visado (`visado_por`/`visado_at`) y deja de tocarlo en cuanto lo
+  está — se visa, no se redacta. Nueva columna `orden_produccion.
+  completado_at` (`updated_at` no servía: cualquier `flush` lo pisa antes
+  de que la orden cierre). Barrido de Celery
+  `production.generar_reportes_de_jornada_vencidos` (cada 15 min) genera
+  el de cada almacén de producción pasada la `hora_cierre_jornada` de su
+  empresa (`parametro_empresa`, semilla configurable) — la primera tarea
+  periódica del ERP con hora de corte por empresa en vez de una hora de
+  servidor fija. `POST /production/reportes-jornada/generar` hace lo
+  mismo a demanda; `POST .../{id}/visar` es el único acto humano sobre el
+  documento. Publica `production.reporte_produccion_generado` (sin actor,
+  nivel `aviso`, distribuido a Gerencia y Cocina). Nuevo permiso
+  `production.visar_reporte_jornada` (seeder + `jefe_cocina`) y pantalla
+  `/produccion/reportes`.
+
+- **`registrar_consumo` esperaba insumos ya disponibles en stock, sin
+  resolver BOM de varios niveles** (2026-09-09, bloque
+  `feat/produccion-subrecetas-anidadas` del plan de deuda de producción,
+  RN-PRD-020). Nueva columna `orden_produccion.orden_padre_id`
+  (autorreferencia nullable e indexada, sin tope de niveles — una
+  subreceta puede colgar de otra, sin riesgo de ciclo porque una fila
+  nueva no puede referenciarse a sí misma al crearse). `GET /ordenes/{id}/
+  consumo-sugerido` marca `requiere_orden_hija` en la línea cuyo artículo
+  tiene receta BOM propia y el almacén no tiene disponible suficiente
+  (`inventory.application.reservas.disponible`); `POST /ordenes/{id}/
+  ordenes-hijas` crea esa orden en el mismo almacén, con
+  `origen="subreceta_anidada"`. La orden padre rechaza
+  `registrar_consumo` con 409 mientras tenga una hija que no llegó a
+  `conforme` — el insumo que la hija fabrica todavía no existe como stock
+  real. Nueva ficha de detalle `/produccion/ordenes/[id]` (no existía
+  ninguna): árbol padre/hijas y consumo sugerido con el aviso de orden
+  hija requerida.
+
+- **Repuestos compatibles y consumo en la orden de mantenimiento** (2026-09-09,
+  `assets`). RN-RPT-002 estaba especificada desde siempre sin código:
+  `repuesto_compatibilidad` liga un artículo de `inventory` a un activo como
+  sugerencia (no bloquea registrar uno no listado), y `realizar` una orden de
+  mantenimiento acepta ahora una lista de repuestos usados — se congela el
+  nombre del artículo en la línea y se publica `assets.repuesto_consumido`
+  para que `inventory` descuente stock, con el mismo criterio no bloqueante
+  que el consumo de producción (RN-MNT-006): sin SKU activo o sin stock
+  suficiente queda una `incidencia_inventario`, la orden no se frena.
+
+- **RRHH ya puede decir cuántas horas trabajó alguien, sin exponer su ficha**
+  (2026-09-09, bloque `feat/rrhh-horas-asistidas-contrato-publico` del plan de
+  deuda de producción). `rrhh.application.queries_publicas` solo tenía
+  `nombres_por_usuario`; se agregan `horas_asistidas` (`trabajador_id` → horas
+  reales de una fecha, restando `hora_salida − hora_entrada` y sumando
+  `horas_extra`, siempre 0 si la salida no está marcada — nunca una hora
+  parcial que nadie puede reconstruir después) y `trabajadores_activos`
+  (lista de `{id, nombre, cargo}` de la empresa, con filtro opcional por
+  área). Ninguna expone remuneración, contrato ni sanciones — mismo criterio
+  que el resto del contrato.
+  Costo aceptado: todavía no hay ningún consumidor. Es la pieza previa a que
+  `production` deje de tipear `horas_hombre` a mano (RN-PRD-018), que va en
+  `feat/produccion-horas-hombre-desde-rrhh`.
+
+- **Aprobar un requerimiento recorta por SKU, con pantalla** (ADR visto en
+  `docs/architecture/adr/`). `SolicitudAprobar.aprobadas` existía desde
+  ADR-020 sin llamador — el diálogo «Aprobar» arranca con lo pedido en cada
+  línea y deja bajarlo antes de enviar; en 0 la línea queda fuera y no
+  reserva nada.
+- **Cerrar un conteo cíclico arma o pone al día el borrador del
+  requerimiento del almacén contado** (RN-INV-026, ADR-093). Todo cierre,
+  no solo el general — el refresco es aditivo y no pisa lo que el turno ya
+  tecleó. Un almacén sin abastecedor propio (el central) no rompe el
+  cierre.
+
+- La suite de tests puede correr contra Postgres, no sólo SQLite (ADR-097):
+  `TEST_DATABASE_URL` hace que cada test reciba su propio schema en un
+  Postgres real, con el mismo aislamiento que el SQLite en memoria de
+  siempre. Nuevo job `backend-postgres` en CI (no forma parte de los seis
+  obligatorios).
+- `create_app()` se comparte por sesión de pytest en vez de reconstruirse en
+  cada uno de los ~50 archivos de test que la llamaban — quitaba ~200 ms por
+  test de puro re-análisis de rutas de FastAPI.
+- 114 columnas `Enum(native_enum=False)` en 65 tablas ganan su
+  `CheckConstraint` (antes sólo `persona.tipo_documento` lo tenía): un valor
+  fuera del vocabulario ahora se **rechaza al escribir**, en vez de guardarse
+  sin ruido y reventar con `LookupError` → 500 en cada lectura posterior de
+  esa fila. Nuevo test guardián que impide que la lista vuelva a crecer sin
+  su CHECK.
+
+- **La guía de remisión puede declarar un vehículo registrado en Activos**
+  (2026-09-09, RN-VEH-008). `guia_remision.vehiculo_id` (sin FK — `assets`
+  es otro módulo) resuelve la placa por el contrato público
+  `assets.application.queries_publicas.vehiculo_para_guia` y la congela en
+  `vehiculo_placa` al emitir, igual que el lugar de origen/destino. Sin
+  `vehiculo_id`, `vehiculo_placa` sigue aceptando texto libre — guías
+  emitidas antes de que `assets` existiera, o quien todavía no registra sus
+  vehículos ahí, no cambian de flujo.
+
+### Fixed
+
+- **Una cocina de producción podía despachar directo a una sucursal** (2026-09-09,
+  bloque `fix/inventario-cdp-001-y-conteo-produccion` del plan de deuda de
+  producción). RN-CDP-001 dice que una cocina de producción solo entrega al
+  almacén central, nunca directo a un local — la regla estaba en tres
+  documentos y en ningún código: `inventory.application.transferencias.
+  _validar_almacenes` no distinguía ningún `tipo` de almacén. Ahora un
+  despacho de un almacén `produccion` a uno `sucursal` responde 409; el mismo
+  origen sigue pudiendo despachar al central, que es el tramo real.
+- **El conteo cíclico del almacén de producción no tenía ni una prueba**
+  (mismo bloque). El caso de uso siempre fue genérico por `almacen_id` — nunca
+  miró `almacen.tipo` — así que no había nada que arreglar, solo que probar:
+  `test_conteo_ciclico_funciona_igual_en_almacen_de_produccion` abre, cuenta
+  y cierra un conteo sobre un almacén `produccion` con el mismo resultado
+  (ajuste por diferencia) que sobre el central, cerrando RN-PRD-016.
+
+- **`backend-postgres` se caía con "too many clients already" / "out of shared
+  memory" al crecer el esquema de la app** (2026-09-09). Cada test aísla su
+  propio schema con `Base.metadata.create_all`/`DROP SCHEMA ... CASCADE`
+  sobre el esquema ENTERO de la app (todos los módulos, no solo el que ese
+  test ejercita) — a esta altura (18 módulos, cientos de tablas) un solo
+  `DROP SCHEMA CASCADE` pide un lock por objeto, y con varios workers de
+  `pytest-xdist` dropeando a la vez contra los límites de fábrica de la
+  imagen `postgres:16-alpine` (`max_connections=100`,
+  `max_locks_per_transaction=64`) la corrida se caía entera. No era un fallo
+  de ningún PR puntual — se reprodujo igual en dos PRs sin relación entre sí
+  (uno solo agrega funciones puras a `rrhh`, el otro es documentación).
+  Topar la concurrencia de `pytest-xdist` (`PYTEST_XDIST_AUTO_NUM_WORKERS=8`)
+  no alcanzó por sí solo. `services:` de GitHub Actions no deja pasarle
+  flags de arranque a Postgres, así que el job levanta el contenedor a mano
+  (`docker run`) con `max_connections=300` y `max_locks_per_transaction=256`
+  en vez de los valores de fábrica.
+
+- `docs/roadmap/deuda/transversal.md` y `docs/roadmap/deuda/modulo-inventory.md`
+  quedan al día: dos entradas que decían "sigue pendiente" ya estaban hechas
+  (`agente_ia` por token, ADR-032; accesibilidad, ADR-037) y una decía "sigue
+  sin pantalla" cuando la nota de crédito existe desde el 2026-08-06 —las
+  tres eran el doc mintiendo, no deuda real. Siete pendientes más se cierran
+  por decisión escrita, con la razón y cuándo reabrirlos si el caso de uso
+  aparece. Queda una sola entrada abierta por archivo (antes 6 y 4): las dos
+  que de verdad son una verificación pendiente contra infraestructura externa
+  (CSP contra el mapa real, el sandbox de anulación de guía), no código.
+
+- **La deuda de `production` decía estar bloqueada por `inventory`, y ya no lo
+  estaba** (2026-09-09). `docs/roadmap/deuda/modulo-production.md` marcaba la merma
+  del desecho, el lote/FEFO del producto terminado y el conteo cíclico del almacén
+  de producción como "bloqueados por deuda de inventory". Los tres bloqueos se
+  saldaron en `inventory` entre el 2026-07-27 y el 2026-08-06 (ADR-015, ADR-028, el
+  conteo siempre fue genérico por `almacen_id`) y nadie actualizó el doc de
+  `production`: quien lo leyera creía que el trabajo estaba del otro lado. Se
+  reescribe con la causa real (los tres son trabajo pendiente **dentro** de
+  `production`, no de `inventory`) y se agregan ocho ítems de deuda que existían en
+  el código pero no en ningún doc: costeo tipeado en vez de calculado desde
+  `articulo.costo_promedio`, cero auditoría, idempotencia solo en crear la orden,
+  tarifa de mano de obra global en `.env` en vez de `parametro_empresa`, el módulo
+  sin escuchar `inventory.stock_bajo_minimo` pese a que su propio README lo
+  prometía, RN-CDP-001 (nunca despacha a sucursal) sin ningún control en código,
+  doble mecanismo de evidencia para RN-PRD-015, y un seeder sin usuario/almacén/receta
+  de producción que hace el módulo imposible de probar sin `admin`. Se cierra por
+  decisión escrita la segregación crear/completar (no se exige, se compensa con
+  auditoría). Nuevo `docs/roadmap/deuda-production-2026-09-09.md` con el plan
+  completo para saldar todo esto en bloques, en el mismo formato que la auditoría
+  del 2026-08-30. De paso, `docs/roadmap/deuda/modulo-accounting.md` también mentía:
+  listaba `sales.comprobante_emitido`, `inventory.transferencia_recibida` e
+  `inventory.merma_registrada` como eventos sin publicar cuando los tres se asientan
+  desde 2026-08-06/2026-08-31, y `docs/architecture/events.md` documentaba un
+  payload de `production.orden_completada` que el código nunca usó (tres de cinco
+  nombres mal) y no tenía fila para `production.consumo_registrado`, publicado desde
+  el primer día del slice.
+  Costo aceptado: este PR es solo documentación y planificación — el código de
+  `production` no cambia todavía. Los bloques del plan se ejecutan en sesiones
+  separadas.
+
+- **La bandeja de mermas ya no ofrece resolver al que la registró**
+  (2026-09-06). `MermaOut` no exponía `creado_por`, así que la pantalla no
+  podía esconder los botones Desechar/Reintegrar y quien registró la merma
+  se comía el 409 de RN-INV-019 al apretarlos. Suma `creado_por` y
+  `liberado_por`, y un selector de almacén que el endpoint ya aceptaba y la
+  pantalla nunca ofrecía.
+- **La devolución se registra con varias líneas**. El formulario mandaba
+  una sola aunque la API acepta varias desde el primer día — el caso real
+  es rechazar un pedido completo, no un producto a la vez.
+- **La ficha de devolución muestra nombres, no UUID**. Nuevo
+  `users.nombres_de_usuarios` (mismo patrón que `inventory.nombres_de_articulos`,
+  que ya usa el KDS), resuelve `registrado_por`/`anulado_por` en
+  `GET /devoluciones/{id}`.
+
+- El PATCH de las cinco entidades de organización (Grupo, Empresa, Marca,
+  Sucursal, Almacén) ahora distingue "campo ausente" de "`null` explícito"
+  (ADR-096), como ya hacía `editar_usuario` (ADR-070). Antes, un opcional
+  puesto en `null` no se vaciaba — así que no se podía quitar el almacén
+  abastecedor de un almacén, ni su respaldo, ni desactivar el
+  `radio_marcaje_m` de una sucursal, aunque el selector del frontend ya
+  ofrecía "Ninguno". Habilita vaciar `almacen_abastecedor_id`,
+  `almacen_abastecedor_respaldo_id`, `direccion` y `sucursal_id` de almacén,
+  `radio_marcaje_m`/`horario_atencion` de sucursal, `contacto`/
+  `config_fiscal` de empresa, `skins` de marca y los cinco `ubicacion_*`.
+- `MarcaOut` y `SucursalOut` exponen `skins`/`horario_atencion` en la
+  lectura — eran escribibles desde el alta y no viajaban de vuelta.
+- Corregidos dos bugs del mismo origen que el cambio expuso:
+  `editar_almacen` derivaba sus validaciones con `campos.get(x) or actual`,
+  que descartaba un `None` intencional igual que uno ausente; y
+  `ubicacion.desanclar_si_cambio_el_texto` leía el texto crudo de la request
+  en vez del ya aplicado a la entidad, desanclando por error ante un campo
+  no-borrable en `null` explícito.
+
+- **El módulo `production` solo se podía probar como `admin`** (2026-09-09,
+  bloque `feat/produccion-semilla-y-pantalla-con-permisos` del plan de deuda de
+  producción). Ningún seeder creaba un usuario con rol `jefe_cocina`, un
+  almacén tipo `produccion`, ni una receta con `articulo_id` — sin esa receta,
+  `POST /production/ordenes` rechaza toda orden con 409. `seed()` ahora crea
+  `jefecocina1` (PIN 123456) y el almacén `WH-PROD`, abastecido por el central.
+  La receta BOM (insumo + subreceta) fue a `python -m src.seeders.e2e` y no a
+  `seed()`: un artículo real en el catálogo de la empresa base rompía 21 tests
+  de una docena de suites que asumen ese catálogo vacío salvo lo que cada una
+  crea, incluida una colisión de `categoria_udm.nombre` (columna UNIQUE) contra
+  media docena de fixtures que crean su propia categoría "Peso" a mano después
+  de llamar a `seed()`.
+- **La pantalla de producción no distinguía quién podía qué.** `/produccion`
+  mostraba "+ Nueva orden" y los botones de Consumo/Completar a cualquiera con
+  `production.leer`, sin gatear por `production.crear`/`production.completar`
+  como sí hace `inventario/transferencias`. Ahora recibe `permisos` del
+  servidor y oculta cada acción sin su permiso. De paso, la lista paginaba solo
+  con la primera página del servidor sin forma de ver el resto — ahora navega
+  con `?page=` como `/auditoria`.
+  Costo aceptado: la ficha de detalle de una orden sigue sin existir (queda en
+  `feat/produccion-ficha-y-consumo-sugerido`), y `pdv_demo.py`/`pizzas_demo.py`
+  no tienen su propia receta de producción — son seeders de demo, no de
+  desarrollo ni de CI.
+
+- **Dos sitios dejan de hardcodear `"America/Lima"`**:
+  `rrhh/application/pad_asistencia.py` (de donde lo heredaba
+  `avisos_asistencia.py`) y `core/celery_app.py`, que fija la zona de todos
+  los `crontab()`. Los dos leen ahora `settings.zona_horaria`. El guard de
+  `tests/test_fechas_negocio.py` gana un cuarto patrón prohibido para que
+  no vuelva a colarse.
+- **`purchases/comprobantes.py` deja de truncar sobre UTC crudo**.
+  `func.date(Comprobante.created_at)` comparaba contra fechas que el
+  usuario piensa en hora Perú — un comprobante registrado pasadas las
+  19:00 caía del lado equivocado del filtro por fecha.
+- **La consulta de DNI/RUC se cachea, con TTL de 5 minutos** (ADR-095). El
+  alta consulta el mismo documento dos veces (botón «Buscar» +
+  revalidación al guardar, ADR-041, que sigue igual); ahora solo la
+  primera le paga al proveedor.
+- **El 8/11 del documento deja de estar escrito a mano**: nueve sitios del
+  frontend pasan a `tipoPorLargo`/`documentoValido` de `lib/documento.ts`,
+  incluido un `documentoValido` local en el PDV que sombreaba al importado
+  y no aceptaba documento vacío.
+
+- **La reposición por venta anulada vuelve al lote del que salió, no al
+  lote del día** (ADR-094). `movimiento_inventario.referencia` ya guardaba
+  el `venta_id` en cada salida —incluida la que reparte por FEFO entre
+  varios lotes— así que no hizo falta cambiar el contrato del evento: se
+  reconstruye de cuáles lotes salió y se repone en ese mismo orden (por
+  vencimiento, no por `ts`, que puede empatar dentro de la misma
+  transacción). Una reposición parcial —nota de crédito por menos de lo
+  vendido— prioriza el lote que salió primero, sin pasarse de lo que
+  entregó. Sin rastro —venta anterior a este cambio— cae al comportamiento
+  de siempre. Alcanza a `sales.venta_anulada`, `lineas_anuladas` y
+  `nota_credito_emitida`, que comparten el mismo listener.
+
 ## [0.10.0] - 2026-09-06
 
 ### Added
