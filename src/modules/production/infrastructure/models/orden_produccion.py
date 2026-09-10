@@ -45,6 +45,11 @@ class OrdenProduccion(Base, UuidPkMixin, TimestampMixin):
         default="borrador",
     )
     horas_hombre: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
+    # Snapshot al registrar consumo (RN-PRD-018): lo que la receta BOM dice
+    # que debería costar, escalada a `cantidad_planeada` — para comparar
+    # contra `costo_insumos` (lo que de verdad se consumió) al completar. Sin
+    # receta que produzca el artículo, queda NULL: no hay contra qué comparar.
+    costo_teorico_insumos: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
     costo_insumos: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
     costo_mano_obra: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
     costo_real_unitario: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)

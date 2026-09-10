@@ -78,13 +78,23 @@ Plan completo de cómo saldar esta deuda (bloques, orden, decisiones tomadas):
 Encontrada al auditar el módulo para el plan de deuda, sin ítem propio
 hasta ahora:
 
-- ⬜ **Costeo tipeado, no calculado**: `registrar_consumo` recibe
-  `costo_unitario` desde el cliente en vez de leer
-  `articulo.costo_promedio`; no hay "consumo sugerido" desde la receta BOM
-  (`inventory.application.recetas.detalle_receta` ya calcula el costo
-  teórico y no se usa); `peso_desperdicio_real`/`tipo_desperdicio` se
-  guardan pero nunca se contrastan contra `receta_item.merma_pct`, que es
-  literalmente lo que exige RN-PRD-018. Bloque `feat/produccion-costeo-real`.
+- ✅ 2026-09-09 **Costeo tipeado, no calculado** (bloque
+  `feat/produccion-costeo-real`). `registrar_consumo` costea al
+  `costo_promedio` vigente del artículo (`inventory.application.
+  queries_publicas.costo_promedio_de_articulos`) cuando la línea no manda
+  `costo_unitario` explícito. Nuevo `GET /ordenes/{id}/consumo-sugerido`
+  explota la receta BOM (`inventory.application.queries_publicas.
+  consumo_sugerido_de_receta`, misma cuenta que `recetas.costo_linea`)
+  escalada a `cantidad_planeada`, con la merma esperada de cada línea ya
+  aplicada. `GET /ordenes/{id}` pasa a devolver los consumos reales con
+  `desviacion_desperdicio` (`peso_desperdicio_real` contra lo que
+  `receta_item.merma_pct` esperaba) — antes se guardaba y nunca se
+  contrastaba contra nada, que es literalmente lo que exige RN-PRD-018.
+  `orden.costo_teorico_insumos` queda de snapshot al registrar el consumo
+  para esa comparación al completar. `consumo_produccion_item.
+  unidad_medida_id` (nullable = la del artículo, mismo criterio que
+  `receta_item`) permite teclear en otra UdM de la misma categoría
+  (RN-UDM-005); se guarda ya convertida.
 - ✅ 2026-09-09 **Sin auditoría** (mismo bloque). `crear_orden_produccion`,
   `registrar_consumo` y `completar_orden_produccion` llaman a
   `auditoria.registrar` (ADR-031), con `datos_antes`/`datos_despues` y la
@@ -95,13 +105,12 @@ hasta ahora:
   (columnas `consumo_idempotency_key`/`cierre_idempotency_key`, únicas y
   nullable): un reintento de red con la misma clave devuelve la orden tal
   como quedó, sin duplicar el consumo ni volver a cerrar la orden.
-- ⬜ **Tarifa de mano de obra global, no por empresa**:
-  `production_costo_hora_mano_obra` vive en `.env`
-  (`src/config/settings.py`) en vez de `parametro_empresa`, a diferencia
-  del resto del ERP (ADR-014/068). El módulo `"production"` ya está
-  habilitado en `src/shared/parametros.py` y el permiso
-  `production.proponer_parametro` ya se siembra — nadie lo usa todavía.
-  Bloque `feat/produccion-costeo-real`.
+- ✅ 2026-09-09 **Tarifa de mano de obra global, no por empresa** (mismo
+  bloque). `production/application/tarifas.py::costo_hora_mano_obra_de`
+  lee `parametro_empresa` `production/costo_hora_mano_obra` (ADR-014/068,
+  mismo patrón que `sales.application.tarifa_delivery`), con
+  `settings.production_costo_hora_mano_obra` como semilla mientras
+  Gerencia no apruebe ninguna propuesta.
 - ⬜ **`production` no escucha `inventory.stock_bajo_minimo`**: el README
   del módulo dice "Escucha: `inventory.stock_bajo_minimo` (dispara orden
   por necesidad, RN-PRD-007)" pero no existe

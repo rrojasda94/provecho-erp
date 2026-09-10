@@ -7337,6 +7337,9 @@
               {
                 "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
                 "type": "string"
+              },
+              {
+                "type": "null"
               }
             ],
             "title": "Costo Unitario"
@@ -7364,14 +7367,215 @@
               }
             ],
             "title": "Tipo Desperdicio"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
           }
         },
         "required": [
           "articulo_id",
-          "cantidad",
-          "costo_unitario"
+          "cantidad"
         ],
         "title": "ConsumoItemIn",
+        "type": "object"
+      },
+      "ConsumoProduccionItemOut": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "costo_unitario": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Unitario",
+            "type": "string"
+          },
+          "desviacion_desperdicio": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desviacion Desperdicio"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "peso_desperdicio_real": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Peso Desperdicio Real",
+            "type": "string"
+          },
+          "tipo_desperdicio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Desperdicio"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "cantidad",
+          "unidad_medida_id",
+          "costo_unitario",
+          "peso_desperdicio_real",
+          "tipo_desperdicio",
+          "desviacion_desperdicio"
+        ],
+        "title": "ConsumoProduccionItemOut",
+        "type": "object"
+      },
+      "ConsumoSugeridoLineaOut": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "articulo_nombre": {
+            "title": "Articulo Nombre",
+            "type": "string"
+          },
+          "cantidad_sugerida": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad Sugerida",
+            "type": "string"
+          },
+          "costo_linea": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Linea",
+            "type": "string"
+          },
+          "costo_unitario": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Unitario",
+            "type": "string"
+          },
+          "desperdicio_esperado": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Desperdicio Esperado",
+            "type": "string"
+          },
+          "merma_pct": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Merma Pct",
+            "type": "string"
+          },
+          "unidad_medida_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Id"
+          },
+          "unidad_medida_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unidad Medida Nombre"
+          }
+        },
+        "required": [
+          "articulo_id",
+          "articulo_nombre",
+          "unidad_medida_id",
+          "unidad_medida_nombre",
+          "merma_pct",
+          "cantidad_sugerida",
+          "desperdicio_esperado",
+          "costo_unitario",
+          "costo_linea"
+        ],
+        "title": "ConsumoSugeridoLineaOut",
+        "type": "object"
+      },
+      "ConsumoSugeridoOut": {
+        "properties": {
+          "costo_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Total",
+            "type": "string"
+          },
+          "factor": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Factor",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ConsumoSugeridoLineaOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "receta_id": {
+            "format": "uuid",
+            "title": "Receta Id",
+            "type": "string"
+          },
+          "rendimiento_cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Rendimiento Cantidad",
+            "type": "string"
+          }
+        },
+        "required": [
+          "receta_id",
+          "rendimiento_cantidad",
+          "factor",
+          "items",
+          "costo_total"
+        ],
+        "title": "ConsumoSugeridoOut",
         "type": "object"
       },
       "ConteoAnulacion": {
@@ -18243,6 +18447,178 @@
         "title": "OrdenProduccionCreate",
         "type": "object"
       },
+      "OrdenProduccionDetalleOut": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad_planeada": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad Planeada",
+            "type": "string"
+          },
+          "cantidad_producida": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad Producida"
+          },
+          "consumos": {
+            "items": {
+              "$ref": "#/components/schemas/ConsumoProduccionItemOut"
+            },
+            "title": "Consumos",
+            "type": "array"
+          },
+          "costo_insumos": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Insumos"
+          },
+          "costo_mano_obra": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Mano Obra"
+          },
+          "costo_real_unitario": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Real Unitario"
+          },
+          "costo_teorico_insumos": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Teorico Insumos"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lote_codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Codigo"
+          },
+          "merma_cantidad": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merma Cantidad"
+          },
+          "merma_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merma Motivo"
+          },
+          "trazabilidad": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trazabilidad"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "almacen_id",
+          "cantidad_planeada",
+          "cantidad_producida",
+          "estado",
+          "costo_insumos",
+          "costo_mano_obra",
+          "costo_real_unitario",
+          "merma_cantidad",
+          "merma_motivo",
+          "fecha_vencimiento",
+          "lote_codigo",
+          "trazabilidad",
+          "consumos"
+        ],
+        "title": "OrdenProduccionDetalleOut",
+        "type": "object"
+      },
       "OrdenProduccionOut": {
         "properties": {
           "almacen_id": {
@@ -18307,6 +18683,18 @@
               }
             ],
             "title": "Costo Real Unitario"
+          },
+          "costo_teorico_insumos": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Teorico Insumos"
           },
           "estado": {
             "title": "Estado",
@@ -52039,7 +52427,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrdenProduccionOut"
+                  "$ref": "#/components/schemas/OrdenProduccionDetalleOut"
                 }
               }
             },
@@ -52178,6 +52566,55 @@
           }
         ],
         "summary": "Registrar Consumo",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/ordenes/{orden_id}/consumo-sugerido": {
+      "get": {
+        "description": "Cuánto insumo sugiere la receta BOM para la cantidad planeada de la\norden (RN-PRD-018), para prellenar el consumo real en vez de calcularlo\na mano.",
+        "operationId": "ver_consumo_sugerido_api_v1_production_ordenes__orden_id__consumo_sugerido_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orden_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Orden Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsumoSugeridoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Consumo Sugerido",
         "tags": [
           "production"
         ]

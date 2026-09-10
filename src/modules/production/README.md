@@ -41,18 +41,33 @@ consumo real de insumos (`consumo_produccion_item`, transición a
 `en_proceso`) → completar con resultado de control de calidad
 (`conforme` | `no_conforme_reprocesado` | `no_conforme_desechado`).
 Costeo automático al completar (RN-PRD-018): `costo_insumos` (suma de
-consumo real), `costo_mano_obra` (`horas_hombre` × tarifa única
-configurable `production_costo_hora_mano_obra`), `costo_real_unitario`.
+consumo real), `costo_mano_obra` (`horas_hombre` × tarifa por empresa
+`production/costo_hora_mano_obra` en `parametro_empresa`, con
+`settings.production_costo_hora_mano_obra` como semilla — ADR-014/068,
+bloque `feat/produccion-costeo-real`), `costo_real_unitario`.
 Resuelve la receta de la subreceta vía el nuevo `receta.articulo_id`
 (nullable — liga una receta a la subreceta que produce, distinto del uso
 existente `producto_comercial.receta_id` de venta directa). Capas
 `domain/rules.py`, `infrastructure/repositories.py`, `application/`
-(`ordenes.py`), `api/`. Migración `f78501175fba` aplicada.
+(`ordenes.py`, `tarifas.py`), `api/`. Migración `f78501175fba` aplicada.
+
+`registrar_consumo` costea cada línea al `costo_promedio` vigente del
+artículo si no viene `costo_unitario` explícito, y admite tecleer la
+cantidad en otra UdM de la misma categoría (`unidad_medida_id`,
+RN-UDM-005) — se guarda ya convertida a la del artículo. `GET
+/ordenes/{id}/consumo-sugerido` explota la receta BOM escalada a la
+cantidad planeada, con la merma esperada de cada línea ya aplicada, para
+prellenar el consumo en vez de calcularlo a mano. `GET /ordenes/{id}`
+detalla los consumos reales con su `desviacion_desperdicio` (real vs. lo
+que `receta_item.merma_pct` espera). `costo_teorico_insumos` queda de
+snapshot al registrar el consumo, para comparar contra `costo_insumos`
+(lo real) al completar (bloque `feat/produccion-costeo-real`, 2026-09-09).
 
 | Método | Ruta | Permiso |
 |--------|------|---------|
 | POST | `/ordenes` | `production.crear` |
 | GET | `/ordenes/{id}` | `production.leer` |
+| GET | `/ordenes/{id}/consumo-sugerido` | `production.leer` |
 | POST | `/ordenes/{id}/consumo` | `production.crear` |
 | POST | `/ordenes/{id}/completar` | `production.completar` |
 
@@ -69,10 +84,12 @@ Deuda del slice (ver
 `plan_produccion`/cronograma (hoy la orden se crea sin plan),
 `checklist_inocuidad_turno` (bloqueo de cocina por fallo de inocuidad),
 `reporte_produccion` consolidado, subrecetas anidadas (una orden que
-consume otra subreceta con su propia orden), costeo real (hoy
-`costo_unitario` lo tipea el cliente). Ya saldado: lote/trazabilidad del
-producto terminado, auditoría e idempotencia de consumo/completar, y el
-asiento contable del desecho (ADR-100) (2026-09-09).
+consume otra subreceta con su propia orden). Ya saldado: lote/trazabilidad
+del producto terminado, auditoría e idempotencia de consumo/completar, el
+asiento contable del desecho (ADR-100) (2026-09-09), y el costeo real
+—`costo_promedio` por defecto, consumo sugerido desde la BOM, tarifa de
+mano de obra por empresa y desviación de desperdicio real vs. esperado
+(2026-09-09)—.
 
 ## Casos de uso
 
