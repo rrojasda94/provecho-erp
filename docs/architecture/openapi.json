@@ -7639,6 +7639,10 @@
             "title": "Merma Pct",
             "type": "string"
           },
+          "requiere_orden_hija": {
+            "title": "Requiere Orden Hija",
+            "type": "boolean"
+          },
           "unidad_medida_id": {
             "anyOf": [
               {
@@ -7672,7 +7676,8 @@
           "cantidad_sugerida",
           "desperdicio_esperado",
           "costo_unitario",
-          "costo_linea"
+          "costo_linea",
+          "requiere_orden_hija"
         ],
         "title": "ConsumoSugeridoLineaOut",
         "type": "object"
@@ -18463,6 +18468,86 @@
         "title": "OrdenDeJornadaOut",
         "type": "object"
       },
+      "OrdenHijaCreate": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad_planeada": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Cantidad Planeada"
+          },
+          "idempotency_key": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "articulo_id",
+          "cantidad_planeada",
+          "idempotency_key"
+        ],
+        "title": "OrdenHijaCreate",
+        "type": "object"
+      },
+      "OrdenHijaResumenOut": {
+        "description": "Lo mínimo para el árbol padre/hijas de la ficha — no la orden\nentera, que ya se puede pedir aparte por `GET /ordenes/{id}`.",
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad_planeada": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad Planeada",
+            "type": "string"
+          },
+          "cantidad_producida": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad Producida"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "articulo_id",
+          "estado",
+          "cantidad_planeada",
+          "cantidad_producida"
+        ],
+        "title": "OrdenHijaResumenOut",
+        "type": "object"
+      },
       "OrdenMantenimientoCancelar": {
         "properties": {
           "motivo": {
@@ -18969,6 +19054,13 @@
             ],
             "title": "Fecha Vencimiento"
           },
+          "hijas": {
+            "items": {
+              "$ref": "#/components/schemas/OrdenHijaResumenOut"
+            },
+            "title": "Hijas",
+            "type": "array"
+          },
           "horas_hombre": {
             "anyOf": [
               {
@@ -19019,6 +19111,18 @@
               }
             ],
             "title": "Merma Motivo"
+          },
+          "orden_padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden Padre Id"
           },
           "origen": {
             "default": "manual",
@@ -19073,7 +19177,8 @@
           "lote_codigo",
           "trazabilidad",
           "consumos",
-          "trabajadores"
+          "trabajadores",
+          "hijas"
         ],
         "title": "OrdenProduccionDetalleOut",
         "type": "object"
@@ -19233,6 +19338,18 @@
               }
             ],
             "title": "Merma Motivo"
+          },
+          "orden_padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden Padre Id"
           },
           "origen": {
             "default": "manual",
@@ -53750,6 +53867,65 @@
           }
         ],
         "summary": "Adjuntar Evidencia",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/ordenes/{orden_id}/ordenes-hijas": {
+      "post": {
+        "description": "Crea la orden que fabrica una subreceta anidada que el consumo\nsugerido de la padre marcó `requiere_orden_hija` (RN-PRD-020): la padre\nno admite registrar su propio consumo mientras esta orden no llegue a\n`conforme`.",
+        "operationId": "crear_orden_hija_api_v1_production_ordenes__orden_id__ordenes_hijas_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orden_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Orden Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdenHijaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrdenProduccionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Orden Hija",
         "tags": [
           "production"
         ]

@@ -102,10 +102,23 @@ Plan completo de cómo saldar esta deuda (bloques, orden, decisiones tomadas):
   Sin ellos, el lote sigue naciendo sin vencimiento (FEFO cae a FIFO), que
   sigue siendo válido para quien no los declare. QR queda fuera de este
   bloque: no hay todavía dónde imprimirlo.
-- ⬜ **Subrecetas anidadas**: una orden que consume otra subreceta (con su
-  propia orden de producción) no está resuelta — hoy `registrar_consumo`
-  espera insumos ya disponibles en stock. Bloque
-  `feat/produccion-subrecetas-anidadas`.
+- ✅ 2026-09-09 **Subrecetas anidadas** (bloque
+  `feat/produccion-subrecetas-anidadas`, RN-PRD-020). Nueva columna
+  `orden_produccion.orden_padre_id` (autorreferencia nullable, indexada,
+  sin tope de niveles). `GET /ordenes/{id}/consumo-sugerido` marca
+  `requiere_orden_hija` en la línea cuyo artículo tiene receta BOM propia
+  y no alcanza el disponible del almacén
+  (`inventory.application.reservas.disponible`); `POST /ordenes/{id}/
+  ordenes-hijas` crea esa orden en el mismo almacén
+  (`origen="subreceta_anidada"`). `registrar_consumo` de la padre rechaza
+  con 409 mientras tenga una hija que no llegó a `conforme`
+  (`OrdenProduccionRepo.tiene_hija_pendiente`, mismo patrón de existencia
+  que `accounting.CuentaContableRepo.tiene_hijas`) — el insumo que la
+  hija fabrica todavía no existe como stock real. Ficha nueva
+  `/produccion/ordenes/[id]` (no existía ninguna) con el árbol
+  padre/hijas y el consumo sugerido; el resto del alcance de B6f (costo
+  teórico vs. real, lote, trazabilidad, diálogo prellenado) sigue
+  pendiente ahí.
 - ✅ 2026-09-09 **Conteo cíclico del almacén de producción** (bloque
   `fix/inventario-cdp-001-y-conteo-produccion`). Nunca estuvo bloqueado por
   `inventory`: el conteo cíclico (`inventory/application/conteos.py`) es

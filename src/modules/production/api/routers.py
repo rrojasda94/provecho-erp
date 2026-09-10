@@ -160,6 +160,36 @@ def adjuntar_evidencia(
     return archivo
 
 
+@router.post(
+    "/ordenes/{orden_id}/ordenes-hijas", response_model=schemas.OrdenProduccionOut,
+    status_code=201,
+)
+def crear_orden_hija(
+    orden_id: uuid.UUID,
+    body: schemas.OrdenHijaCreate,
+    actor: Usuario = Depends(require_permission(CREAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    """Crea la orden que fabrica una subreceta anidada que el consumo
+    sugerido de la padre marcó `requiere_orden_hija` (RN-PRD-020): la padre
+    no admite registrar su propio consumo mientras esta orden no llegue a
+    `conforme`."""
+    exigir_orden(session, orden_id, tenant)
+    hija = ordenes.crear_orden_hija(
+        session,
+        orden_id,
+        articulo_id=body.articulo_id,
+        cantidad_planeada=body.cantidad_planeada,
+        creado_por=actor.id,
+        idempotency_key=body.idempotency_key,
+        ip=ip,
+    )
+    session.commit()
+    return hija
+
+
 @router.post("/ordenes/{orden_id}/consumo", response_model=schemas.OrdenProduccionOut)
 def registrar_consumo(
     orden_id: uuid.UUID,

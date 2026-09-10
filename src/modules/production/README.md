@@ -91,6 +91,7 @@ snapshot al registrar el consumo, para comparar contra `costo_insumos`
 | GET | `/reportes-jornada` | `production.leer` |
 | GET | `/reportes-jornada/{id}` | `production.leer` |
 | POST | `/reportes-jornada/{id}/visar` | `production.visar_reporte_jornada` |
+| POST | `/ordenes/{id}/ordenes-hijas` | `production.crear` |
 
 `plan_produccion` (`application/planes.py`, bloque `feat/produccion-plan-
 de-produccion`, 2026-09-09) es el cronograma fijo por línea/turno
@@ -134,6 +135,19 @@ reporte por `orden_produccion.completado_at` (columna nueva, se fija al
 completar): `updated_at` no sirve porque cualquier `flush` (p. ej.
 `registrar_consumo`) lo pisa antes de que la orden cierre.
 
+`orden_produccion.orden_padre_id` (bloque
+`feat/produccion-subrecetas-anidadas`, 2026-09-09, RN-PRD-020) resuelve el
+BOM de varios niveles: `GET /ordenes/{id}/consumo-sugerido` marca
+`requiere_orden_hija` en la línea cuyo artículo tiene receta propia y no
+alcanza el disponible del almacén (`inventory.application.reservas.
+disponible`); `POST /ordenes/{id}/ordenes-hijas` crea esa orden, en el
+mismo almacén, con `origen="subreceta_anidada"`. La orden padre rechaza
+`registrar_consumo` con 409 mientras tenga una hija que no llegó a
+`conforme` — el insumo que la hija fabrica todavía no existe como stock
+real. Sin tope de niveles (una subreceta puede colgar de otra) y sin
+riesgo de ciclo: una fila nueva no puede referenciarse a sí misma al
+crearse.
+
 `GET /trabajadores-disponibles` (`?area=`) lista los trabajadores activos
 de la empresa vía `rrhh.queries_publicas.trabajadores_activos` — el picker
 del diálogo de completar, para imputar mano de obra a alguien que RRHH ya
@@ -158,8 +172,9 @@ y recalcula su `costo_promedio` — mismo listener/patrón que
 Deuda del slice (ver
 [plan de deuda](../../../docs/roadmap/deuda-production-2026-09-09.md) y
 [`docs/roadmap/deuda/modulo-production.md`](../../../docs/roadmap/deuda/modulo-production.md)):
-subrecetas anidadas (una orden que consume otra subreceta con su propia
-orden). Ya saldado: lote/trazabilidad
+sin ítems propios pendientes del plan original — quedan los bloques de
+frontend heredados de bloques anteriores (ver "Pendiente de frontend"
+abajo). Ya saldado: lote/trazabilidad
 del producto terminado, auditoría e idempotencia de consumo/completar, el
 asiento contable del desecho (ADR-100) (2026-09-09), el costeo real
 —`costo_promedio` por defecto, consumo sugerido desde la BOM, tarifa de
@@ -171,14 +186,20 @@ por ajuste de necesidad al cruzar `inventory.stock_bajo_minimo` en vez de
 que alguien la cree a mano (2026-09-09), el plan de producción con
 reserva de insumos al iniciar (2026-09-09), el checklist de inocuidad
 de turno que bloquea crear orden y registrar consumo sin uno `aprobado`
-vigente (2026-09-09), y el reporte de producción de la jornada,
+vigente (2026-09-09), el reporte de producción de la jornada,
 consolidado automático al cierre y visado por el jefe de cocina
-(2026-09-09).
+(2026-09-09), y las subrecetas anidadas (BOM de varios niveles) con
+orden hija y bloqueo de consumo en la padre (2026-09-09).
 
 Pendiente de frontend: el diálogo de completar todavía manda
 `evidencia_destruccion_url` como texto libre (`ordenes-cliente.tsx`) en
 vez de subir la evidencia vía `POST .../evidencia` antes de completar —
-`feat/produccion-evidencia-como-archivo` fue backend-only. Bloque
+`feat/produccion-evidencia-como-archivo` fue backend-only. La ficha
+`/produccion/ordenes/[id]` (bloque `feat/produccion-subrecetas-anidadas`,
+2026-09-09) ya existe con el árbol padre/hijas y el consumo sugerido con
+`requiere_orden_hija`, pero solo con eso — el resto del alcance de B6f
+(desviación de desperdicio, costo teórico vs. real, lote generado,
+trazabilidad, diálogo de consumo prellenado) sigue pendiente. Bloque
 `feat/produccion-ficha-y-consumo-sugerido` (B6f) o uno dedicado a esto.
 
 ## Casos de uso
@@ -191,7 +212,10 @@ vez de subir la evidencia vía `POST .../evidencia` antes de completar —
   o suelta, ad-hoc.
 - Ejecutar orden: consumir insumos/subrecetas, producir lote(s) con
   código y trazabilidad completa (manipulador, envasador, variables de
-  proceso).
+  proceso). Si un insumo es a su vez una subreceta sin disponible
+  suficiente (BOM de varios niveles), fabricarla primero con su propia
+  orden hija (`POST /ordenes/{id}/ordenes-hijas`, RN-PRD-020) — la padre
+  no admite su consumo hasta que la hija llegue a `conforme`.
 - Control de calidad de la orden antes de habilitar despacho: conforme,
   no conforme reprocesado, o no conforme desechado.
 - No conformidad (cualquier resultado no conforme) emite el reporte, y desde

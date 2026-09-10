@@ -47,10 +47,30 @@ def q_ordenes(
     return OrdenProduccionRepo(session).q_list(empresa_id, almacen_id, estado)
 
 
+def _requiere_orden_hija(session: Session, almacen_id: uuid.UUID, linea: dict) -> bool:
+    """RN-PRD-020: una línea del consumo sugerido necesita su propia orden
+    (subreceta anidada) cuando el artículo que consume tiene receta BOM
+    propia y el almacén no tiene stock suficiente para cubrirla directo —
+    hay que fabricarla antes de poder consumirla."""
+    if session.scalar(select(Receta).where(Receta.articulo_id == linea["articulo_id"])) is None:
+        return False
+    sku_id = inv_queries.sku_de_articulo(session, linea["articulo_id"])
+    if sku_id is None:
+        return True  # sin SKU activo no hay cómo tener disponible
+    disponible = reservas_uc.disponible(session, almacen_id, sku_id)
+    return disponible < linea["cantidad_sugerida"]
+
+
 def consumo_sugerido(session: Session, orden_id: uuid.UUID) -> dict:
     """Explota la receta BOM de la orden escalada a `cantidad_planeada`
     (RN-PRD-018): cuánto insumo hace falta según la ficha técnica, para
-    prellenar el consumo real en vez de que la cocina lo calcule a mano."""
+    prellenar el consumo real en vez de que la cocina lo calcule a mano.
+
+    Cada línea trae `requiere_orden_hija` (RN-PRD-020): si el insumo es a
+    su vez una subreceta con BOM propia y no alcanza el disponible del
+    almacén, hay que fabricarla primero — `POST /ordenes/{id}/
+    ordenes-hijas` crea esa orden hija.
+    """
     orden = OrdenProduccionRepo(session).get(orden_id)
     if orden is None:
         raise NoEncontrado("orden de producción no encontrada")
@@ -59,6 +79,8 @@ def consumo_sugerido(session: Session, orden_id: uuid.UUID) -> dict:
     )
     if sugerido is None:
         raise ReglaNegocio(f"artículo {orden.articulo_id} no tiene receta de subreceta definida")
+    for linea in sugerido["items"]:
+        linea["requiere_orden_hija"] = _requiere_orden_hija(session, orden.almacen_id, linea)
     return sugerido
 
 
@@ -101,11 +123,22 @@ def detalle_orden(session: Session, orden_id: uuid.UUID) -> dict:
         {"trabajador_id": t.trabajador_id, "horas": t.horas}
         for t in OrdenProduccionRepo(session).trabajadores(orden.id)
     ]
+    hijas = [
+        {
+            "id": h.id,
+            "articulo_id": h.articulo_id,
+            "estado": h.estado,
+            "cantidad_planeada": h.cantidad_planeada,
+            "cantidad_producida": h.cantidad_producida,
+        }
+        for h in OrdenProduccionRepo(session).hijas_de(orden.id)
+    ]
     return {
         "id": orden.id,
         "articulo_id": orden.articulo_id,
         "almacen_id": orden.almacen_id,
         "plan_produccion_id": orden.plan_produccion_id,
+        "orden_padre_id": orden.orden_padre_id,
         "origen": orden.origen,
         "cantidad_planeada": orden.cantidad_planeada,
         "cantidad_producida": orden.cantidad_producida,
@@ -123,6 +156,7 @@ def detalle_orden(session: Session, orden_id: uuid.UUID) -> dict:
         "trazabilidad": orden.trazabilidad,
         "consumos": consumos,
         "trabajadores": trabajadores,
+        "hijas": hijas,
     }
 
 
@@ -188,6 +222,40 @@ def crear_orden_produccion(
         ip=ip,
     )
     return orden
+
+
+def crear_orden_hija(
+    session: Session,
+    orden_padre_id: uuid.UUID,
+    *,
+    articulo_id: uuid.UUID,
+    cantidad_planeada: Decimal,
+    creado_por: uuid.UUID | None,
+    idempotency_key: str,
+    ip: str | None = None,
+) -> OrdenProduccion:
+    """RN-PRD-020: una línea de `consumo_sugerido` marcada `requiere_orden_
+    hija` no tiene stock suficiente del insumo — esta orden hija lo fabrica
+    en el mismo almacén de la padre, antes de que la padre pueda registrar
+    su propio consumo (`registrar_consumo` la bloquea mientras la hija no
+    esté `conforme`)."""
+    padre = OrdenProduccionRepo(session).get(orden_padre_id)
+    if padre is None:
+        raise NoEncontrado("orden de producción no encontrada")
+    hija = crear_orden_produccion(
+        session,
+        articulo_id=articulo_id,
+        almacen_id=padre.almacen_id,
+        cantidad_planeada=cantidad_planeada,
+        creado_por=creado_por,
+        idempotency_key=idempotency_key,
+        origen="subreceta_anidada",
+        ip=ip,
+    )
+    if hija.orden_padre_id is None:
+        hija.orden_padre_id = padre.id
+        session.flush()
+    return hija
 
 
 def _registrar_item_consumo(session: Session, orden: OrdenProduccion, it: dict) -> dict:
@@ -274,6 +342,14 @@ def registrar_consumo(
     almacen_orden = session.get(Almacen, orden.almacen_id)
     if almacen_orden is not None and almacen_orden.tipo == "produccion":
         inocuidad.exigir_cocina_habilitada(session, orden.almacen_id)
+    # RN-PRD-020: una orden hija (subreceta anidada) sin terminar conforme
+    # bloquea el consumo de la padre — el insumo que la hija fabrica
+    # todavía no existe como stock real.
+    if OrdenProduccionRepo(session).tiene_hija_pendiente(orden.id):
+        raise Conflicto(
+            "la orden tiene subórdenes (hijas) sin terminar conformes; "
+            "no admite registrar consumo (RN-PRD-020)"
+        )
     if not rules.puede_registrar_consumo(orden.estado):
         raise Conflicto(f"la orden está {orden.estado}; no admite registrar consumo")
     if not items:

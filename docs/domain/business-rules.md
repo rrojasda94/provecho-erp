@@ -937,6 +937,15 @@ producción se hace en cocinas de sucursal. Ver
   consumo del plato es la suma de todas menos las restas; el empaque se
   suma aparte, según la modalidad (RN-EMP-003), porque no es parte de la
   receta.
+- **RN-PRD-020** Una subreceta puede llevar otra subreceta como insumo
+  (BOM de varios niveles, sin tope de anidamiento). Si el consumo sugerido
+  de una orden trae una línea cuyo artículo tiene receta propia y el
+  almacén no tiene disponible suficiente, esa línea se marca
+  `requiere_orden_hija`: hay que fabricarla primero con su propia orden de
+  producción (`orden_padre_id`), en el mismo almacén. La orden padre no
+  admite registrar su consumo mientras tenga una orden hija que no haya
+  cerrado control de calidad en `conforme` — el insumo que la hija fabrica
+  todavía no existe como stock real.
 
 ## Fecha de vencimiento
 
