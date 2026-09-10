@@ -54,13 +54,14 @@ Plan completo de cómo saldar esta deuda (bloques, orden, decisiones tomadas):
   propia orden de producción) no está resuelta — hoy `registrar_consumo`
   espera insumos ya disponibles en stock. Bloque
   `feat/produccion-subrecetas-anidadas`.
-- ⬜ **Conteo cíclico del almacén de producción**: **no está bloqueado por
-  `inventory`** — al revisar el 2026-09-09 se confirmó que el conteo
-  cíclico (`inventory/application/conteos.py`) es genérico por
-  `almacen_id`, nunca consulta `almacen.tipo`, y el tipo `produccion` ya es
-  un valor válido (`tests/test_production.py` lo usa). Lo que falta es
-  cobertura de test explícita sobre un almacén `produccion` — no capacidad
-  nueva. Bloque `fix/inventario-cdp-001-y-conteo-produccion`.
+- ✅ 2026-09-09 **Conteo cíclico del almacén de producción** (bloque
+  `fix/inventario-cdp-001-y-conteo-produccion`). Nunca estuvo bloqueado por
+  `inventory`: el conteo cíclico (`inventory/application/conteos.py`) es
+  genérico por `almacen_id`, nunca consulta `almacen.tipo`. Lo que faltaba
+  era cobertura de test explícita — `tests/test_conteos.py::
+  test_conteo_ciclico_funciona_igual_en_almacen_de_produccion` abre,
+  registra y cierra un conteo sobre un almacén `produccion` con el mismo
+  resultado (ajuste por diferencia) que sobre el central, cerrando RN-PRD-016.
 - ✅ 2026-09-09 **Segregación quien crea vs. quien completa la orden**: se
   evaluó y se decide **no exigirla**. `production.crear`/`production.completar`
   siguen siendo permisos distintos, pero nada impide que el mismo usuario
@@ -107,11 +108,12 @@ hasta ahora:
   `production/application/listeners.py` ni se registra ningún handler en
   `src/core/app.py`. El evento sí se publica desde 2026-08-06. Bloque
   `feat/produccion-orden-por-necesidad`.
-- ⬜ **RN-CDP-001 sin enforcement**: "una cocina de producción nunca
-  despacha a un almacén de sucursal directamente" no tiene ningún control
-  en `inventory.application.transferencias._validar_almacenes` — hoy nada
-  impide despachar de un almacén `produccion` a uno `sucursal`. Bloque
-  `fix/inventario-cdp-001-y-conteo-produccion`.
+- ✅ 2026-09-09 **RN-CDP-001 sin enforcement** (mismo bloque).
+  `inventory.application.transferencias._validar_almacenes` rechaza con
+  409 un despacho de un almacén `produccion` a uno `sucursal`; el mismo
+  origen sigue pudiendo despachar al central, que es el tramo real
+  (`tests/test_transferencias.py::
+  test_produccion_no_despacha_directo_a_sucursal`).
 - ⬜ **Doble mecanismo de evidencia para RN-PRD-015**:
   `orden_produccion.evidencia_destruccion_url` es un string libre, mientras
   `reporte_escalamiento.evidencia_id` es una FK a `archivo` (con storage

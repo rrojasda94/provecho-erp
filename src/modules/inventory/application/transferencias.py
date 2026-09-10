@@ -128,6 +128,14 @@ def _validar_almacenes(
     destino = _exigir_almacen(session, destino_almacen_id, "destino")
     if origen.empresa_id != destino.empresa_id:
         raise ReglaNegocio("los dos almacenes deben ser de la misma empresa")
+    # Una cocina de producción entrega su producto terminado al almacén
+    # central para que ahí se distribuya, nunca directo a un local — ese
+    # segundo tramo es traslado central→sucursal de siempre (RN-CDP-001).
+    if origen.tipo == "produccion" and destino.tipo == "sucursal":
+        raise ReglaNegocio(
+            "una cocina de producción no despacha directo a un almacén de "
+            "sucursal: solo entrega al almacén central (RN-CDP-001)"
+        )
 
 
 def _solicitud_despachable(
