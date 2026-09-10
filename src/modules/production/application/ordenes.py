@@ -7,6 +7,7 @@ sin plan (deuda técnica, ver ROADMAP).
 """
 
 import uuid
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -26,6 +27,7 @@ from src.modules.production.infrastructure.models import (
 )
 from src.modules.production.infrastructure.repositories import OrdenProduccionRepo
 from src.modules.users.infrastructure.models import Almacen
+from src.shared import auditoria
 
 
 def q_ordenes(
@@ -47,22 +49,25 @@ def crear_orden_produccion(
     cantidad_planeada: Decimal,
     creado_por: uuid.UUID,
     idempotency_key: str,
+    ip: str | None = None,
 ) -> OrdenProduccion:
     repo = OrdenProduccionRepo(session)
     existente = repo.get_by_idempotency(idempotency_key)
     if existente is not None:
         return existente
 
-    if session.get(Articulo, articulo_id) is None:
+    articulo = session.get(Articulo, articulo_id)
+    if articulo is None:
         raise NoEncontrado(f"artículo {articulo_id} no encontrado")
-    if session.get(Almacen, almacen_id) is None:
+    almacen = session.get(Almacen, almacen_id)
+    if almacen is None:
         raise NoEncontrado(f"almacén {almacen_id} no encontrado")
     if Decimal(str(cantidad_planeada)) <= 0:
         raise ReglaNegocio("cantidad_planeada debe ser > 0")
     if session.scalar(select(Receta).where(Receta.articulo_id == articulo_id)) is None:
         raise ReglaNegocio(f"artículo {articulo_id} no tiene receta de subreceta definida")
 
-    return repo.add(
+    orden = repo.add(
         OrdenProduccion(
             articulo_id=articulo_id,
             almacen_id=almacen_id,
@@ -72,6 +77,23 @@ def crear_orden_produccion(
             idempotency_key=idempotency_key,
         )
     )
+    # Acto de autoridad: abre el consumo de insumos de una orden nueva
+    # (ADR-031) — quién la creó, con qué artículo/almacén/cantidad.
+    auditoria.registrar(
+        session,
+        usuario_id=creado_por,
+        entidad="orden_produccion",
+        accion="crear",
+        entidad_id=orden.id,
+        datos_despues={
+            "articulo_id": str(articulo_id),
+            "almacen_id": str(almacen_id),
+            "cantidad_planeada": str(orden.cantidad_planeada),
+        },
+        empresa_id=almacen.empresa_id,
+        ip=ip,
+    )
+    return orden
 
 
 def registrar_consumo(
@@ -80,10 +102,17 @@ def registrar_consumo(
     *,
     # [{articulo_id, cantidad, costo_unitario, peso_desperdicio_real, tipo_desperdicio}]
     items: list[dict],
+    actor_id: uuid.UUID | None = None,
+    idempotency_key: str | None = None,
+    ip: str | None = None,
 ) -> OrdenProduccion:
     orden = OrdenProduccionRepo(session).get(orden_id)
     if orden is None:
         raise NoEncontrado("orden de producción no encontrada")
+    # Reintento de red con la misma clave: la orden ya quedó en_proceso con
+    # este consumo, no se vuelve a procesar (evita duplicar filas/stock).
+    if idempotency_key is not None and orden.consumo_idempotency_key == idempotency_key:
+        return orden
     if not rules.puede_registrar_consumo(orden.estado):
         raise Conflicto(f"la orden está {orden.estado}; no admite registrar consumo")
     if not items:
@@ -111,8 +140,22 @@ def registrar_consumo(
             {"articulo_id": str(it["articulo_id"]), "cantidad": str(cantidad)}
         )
 
+    estado_previo = orden.estado
     orden.estado = "en_proceso"
+    orden.consumo_idempotency_key = idempotency_key
     session.flush()
+    almacen = session.get(Almacen, orden.almacen_id)
+    auditoria.registrar(
+        session,
+        usuario_id=actor_id,
+        entidad="orden_produccion",
+        accion="registrar_consumo",
+        entidad_id=orden.id,
+        datos_antes={"estado": estado_previo},
+        datos_despues={"estado": "en_proceso", "items": evento_items},
+        empresa_id=almacen.empresa_id if almacen else None,
+        ip=ip,
+    )
     event_bus.publish(
         "production.consumo_registrado",
         {
@@ -123,6 +166,90 @@ def registrar_consumo(
         session=session,
     )
     return orden
+
+
+def _cerrar_conforme(
+    session: Session,
+    orden: OrdenProduccion,
+    *,
+    cantidad_producida: Decimal | None,
+    costo_insumos: Decimal,
+    costo_mano_obra: Decimal,
+    fecha_vencimiento: date | None,
+    lote_codigo: str | None,
+) -> dict:
+    """Cierra en conforme: fija costo real, y si hay vencimiento/lote los
+    manda en el evento para que el lote del producto terminado nazca con
+    ellos (RN-VNC-001) — el listener de `inventory` ya los sabe leer."""
+    if not cantidad_producida or Decimal(str(cantidad_producida)) <= 0:
+        raise ReglaNegocio("resultado 'conforme' requiere cantidad_producida > 0")
+    cantidad_producida = Decimal(str(cantidad_producida))
+    orden.cantidad_producida = cantidad_producida
+    orden.costo_real_unitario = rules.costo_real_unitario(
+        costo_insumos, costo_mano_obra, cantidad_producida
+    )
+    orden.estado = "conforme"
+    if fecha_vencimiento:
+        orden.fecha_vencimiento = fecha_vencimiento
+    if lote_codigo:
+        orden.lote_codigo = lote_codigo
+
+    payload = {
+        "orden_produccion_id": str(orden.id),
+        "almacen_id": str(orden.almacen_id),
+        "articulo_id": str(orden.articulo_id),
+        "cantidad_producida": str(cantidad_producida),
+        "costo_unitario": str(orden.costo_real_unitario),
+    }
+    if orden.fecha_vencimiento:
+        payload["fecha_vencimiento"] = orden.fecha_vencimiento.isoformat()
+    if orden.lote_codigo:
+        payload["lote_codigo"] = orden.lote_codigo
+    event_bus.publish("production.orden_completada", payload, session=session)
+    return {"costo_real_unitario": str(orden.costo_real_unitario)}
+
+
+def _cerrar_no_conforme(
+    session: Session,
+    orden: OrdenProduccion,
+    *,
+    resultado: str,
+    merma_cantidad: Decimal | None,
+    merma_motivo: str | None,
+    evidencia_destruccion_url: str | None,
+    registrado_por: uuid.UUID | None,
+) -> dict:
+    """Reproceso no genera merma ni asiento (RN-PRD); desecho exige
+    evidencia de destrucción antes de aceptar la merma (RN-PRD-015)."""
+    extra: dict = {}
+    if resultado == "no_conforme_desechado":
+        if not merma_cantidad or Decimal(str(merma_cantidad)) <= 0:
+            raise ReglaNegocio("desecho requiere merma_cantidad > 0")
+        if not merma_motivo:
+            raise ReglaNegocio("desecho requiere merma_motivo")
+        if not evidencia_destruccion_url:
+            raise ReglaNegocio("desecho requiere evidencia_destruccion_url (RN-PRD-015)")
+        orden.merma_cantidad = Decimal(str(merma_cantidad))
+        orden.merma_motivo = merma_motivo
+        orden.evidencia_destruccion_url = evidencia_destruccion_url
+        extra["merma_cantidad"] = str(orden.merma_cantidad)
+    orden.estado = resultado
+    event_bus.publish(
+        "production.no_conformidad_detectada",
+        # `almacen_id` desde 2026-08-08: es de donde `reports` deduce la
+        # empresa y la sucursal del hecho para escopar y distribuir el
+        # reporte. Sin él la emisión no se puede atribuir a un tenant.
+        {
+            "orden_produccion_id": str(orden.id),
+            "almacen_id": str(orden.almacen_id),
+            "resultado": resultado,
+            # Quien cerró la orden con el control de calidad en la mano:
+            # es a quien Gerencia le va a preguntar qué pasó.
+            "registrado_por": str(registrado_por) if registrado_por else None,
+        },
+        session=session,
+    )
+    return extra
 
 
 def completar_orden_produccion(
@@ -136,11 +263,20 @@ def completar_orden_produccion(
     merma_cantidad: Decimal | None = None,
     merma_motivo: str | None = None,
     evidencia_destruccion_url: str | None = None,
+    fecha_vencimiento: date | None = None,
+    lote_codigo: str | None = None,
+    trazabilidad: dict | None = None,
     registrado_por: uuid.UUID | None = None,
+    idempotency_key: str | None = None,
+    ip: str | None = None,
 ) -> OrdenProduccion:
     orden = OrdenProduccionRepo(session).get(orden_id)
     if orden is None:
         raise NoEncontrado("orden de producción no encontrada")
+    # Reintento de red con la misma clave: la orden ya quedó cerrada con
+    # este resultado, no se vuelve a cerrar (evita duplicar el asiento/lote).
+    if idempotency_key is not None and orden.cierre_idempotency_key == idempotency_key:
+        return orden
     if not rules.puede_completar(orden.estado):
         raise Conflicto(f"la orden está {orden.estado}; no admite completarse")
     if resultado not in rules.RESULTADOS_CONTROL_CALIDAD:
@@ -152,55 +288,51 @@ def completar_orden_produccion(
     )
     horas_hombre = Decimal(str(horas_hombre)) if horas_hombre is not None else Decimal(0)
     costo_mano_obra = horas_hombre * costo_hora_mano_obra
+    estado_previo = orden.estado
     orden.horas_hombre = horas_hombre
     orden.costo_insumos = costo_insumos
     orden.costo_mano_obra = costo_mano_obra
+    orden.cierre_idempotency_key = idempotency_key
+    if trazabilidad is not None:
+        orden.trazabilidad = trazabilidad
 
     if resultado == "conforme":
-        if not cantidad_producida or Decimal(str(cantidad_producida)) <= 0:
-            raise ReglaNegocio("resultado 'conforme' requiere cantidad_producida > 0")
-        cantidad_producida = Decimal(str(cantidad_producida))
-        orden.cantidad_producida = cantidad_producida
-        orden.costo_real_unitario = rules.costo_real_unitario(
-            costo_insumos, costo_mano_obra, cantidad_producida
-        )
-        orden.estado = "conforme"
-        event_bus.publish(
-            "production.orden_completada",
-            {
-                "orden_produccion_id": str(orden.id),
-                "almacen_id": str(orden.almacen_id),
-                "articulo_id": str(orden.articulo_id),
-                "cantidad_producida": str(cantidad_producida),
-                "costo_unitario": str(orden.costo_real_unitario),
-            },
-            session=session,
+        extra = _cerrar_conforme(
+            session,
+            orden,
+            cantidad_producida=cantidad_producida,
+            costo_insumos=costo_insumos,
+            costo_mano_obra=costo_mano_obra,
+            fecha_vencimiento=fecha_vencimiento,
+            lote_codigo=lote_codigo,
         )
     else:
-        if resultado == "no_conforme_desechado":
-            if not merma_cantidad or Decimal(str(merma_cantidad)) <= 0:
-                raise ReglaNegocio("desecho requiere merma_cantidad > 0")
-            if not merma_motivo:
-                raise ReglaNegocio("desecho requiere merma_motivo")
-            if not evidencia_destruccion_url:
-                raise ReglaNegocio("desecho requiere evidencia_destruccion_url (RN-PRD-015)")
-            orden.merma_cantidad = Decimal(str(merma_cantidad))
-            orden.merma_motivo = merma_motivo
-            orden.evidencia_destruccion_url = evidencia_destruccion_url
-        orden.estado = resultado
-        event_bus.publish(
-            "production.no_conformidad_detectada",
-            # `almacen_id` desde 2026-08-08: es de donde `reports` deduce la
-            # empresa y la sucursal del hecho para escopar y distribuir el
-            # reporte. Sin él la emisión no se puede atribuir a un tenant.
-            {
-                "orden_produccion_id": str(orden.id),
-                "almacen_id": str(orden.almacen_id),
-                "resultado": resultado,
-                # Quien cerró la orden con el control de calidad en la mano:
-                # es a quien Gerencia le va a preguntar qué pasó.
-                "registrado_por": str(registrado_por) if registrado_por else None,
-            },
-            session=session,
+        extra = _cerrar_no_conforme(
+            session,
+            orden,
+            resultado=resultado,
+            merma_cantidad=merma_cantidad,
+            merma_motivo=merma_motivo,
+            evidencia_destruccion_url=evidencia_destruccion_url,
+            registrado_por=registrado_por,
         )
+
+    session.flush()
+    almacen = session.get(Almacen, orden.almacen_id)
+    # Acto de autoridad y de plata por definición: cierra el control de
+    # calidad, fija el costo real y, en el desecho, declara la merma
+    # (ADR-031) — sin esto no quedaba registrado quién hizo cada paso, que
+    # es justo lo que compensa no exigir aprobador≠solicitante acá (ver
+    # ROADMAP: decisión de no segregar crear/completar).
+    auditoria.registrar(
+        session,
+        usuario_id=registrado_por,
+        entidad="orden_produccion",
+        accion="completar",
+        entidad_id=orden.id,
+        datos_antes={"estado": estado_previo},
+        datos_despues={"estado": resultado, **extra},
+        empresa_id=almacen.empresa_id if almacen else None,
+        ip=ip,
+    )
     return orden

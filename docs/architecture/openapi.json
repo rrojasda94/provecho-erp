@@ -6464,6 +6464,18 @@
             ],
             "title": "Evidencia Destruccion Url"
           },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
           "horas_hombre": {
             "anyOf": [
               {
@@ -6479,6 +6491,31 @@
               }
             ],
             "title": "Horas Hombre"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
+          "lote_codigo": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Codigo"
           },
           "merma_cantidad": {
             "anyOf": [
@@ -6510,6 +6547,18 @@
           "resultado": {
             "title": "Resultado",
             "type": "string"
+          },
+          "trazabilidad": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trazabilidad"
           }
         },
         "required": [
@@ -7231,6 +7280,19 @@
       },
       "ConsumoCreate": {
         "properties": {
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 8,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotency Key"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/ConsumoItemIn"
@@ -18250,10 +18312,33 @@
             "title": "Estado",
             "type": "string"
           },
+          "fecha_vencimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
             "type": "string"
+          },
+          "lote_codigo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lote Codigo"
           },
           "merma_cantidad": {
             "anyOf": [
@@ -18277,6 +18362,18 @@
               }
             ],
             "title": "Merma Motivo"
+          },
+          "trazabilidad": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trazabilidad"
           }
         },
         "required": [
@@ -18290,7 +18387,10 @@
           "costo_mano_obra",
           "costo_real_unitario",
           "merma_cantidad",
-          "merma_motivo"
+          "merma_motivo",
+          "fecha_vencimiento",
+          "lote_codigo",
+          "trazabilidad"
         ],
         "title": "OrdenProduccionOut",
         "type": "object"

@@ -70,12 +70,11 @@ Deuda del slice (ver
 `checklist_inocuidad_turno` (bloqueo de cocina por fallo de inocuidad),
 `reporte_produccion` consolidado, asiento contable propio para el desecho
 (la merma de `inventory` no aplica: el producto terminado de una orden
-desechada nunca entró a inventario), lote/trazabilidad del producto
-terminado (el listener de `inventory` ya sabe leer `fecha_vencimiento`;
-falta que `production` la mande), subrecetas anidadas (una orden que
+desechada nunca entró a inventario), subrecetas anidadas (una orden que
 consume otra subreceta con su propia orden), costeo real (hoy
-`costo_unitario` lo tipea el cliente), auditoría e idempotencia
-incompletas.
+`costo_unitario` lo tipea el cliente). Ya saldado: lote/trazabilidad del
+producto terminado, auditoría e idempotencia de consumo/completar
+(2026-09-09).
 
 ## Casos de uso
 
