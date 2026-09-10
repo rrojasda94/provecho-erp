@@ -4,6 +4,7 @@ test_purchases.py.
 """
 
 import uuid
+from datetime import time
 from decimal import Decimal
 
 import pytest
@@ -24,9 +25,18 @@ from src.modules.inventory.infrastructure.models import (
     Sku,
     UnidadMedida,
 )
+from src.modules.rrhh.infrastructure.models import Asistencia, Trabajador
 from src.modules.users.api.deps import get_db
-from src.modules.users.infrastructure.models import Almacen, Empresa, Rol, Usuario, UsuarioRol
+from src.modules.users.infrastructure.models import (
+    Almacen,
+    Empresa,
+    Persona,
+    Rol,
+    Usuario,
+    UsuarioRol,
+)
 from src.modules.users.infrastructure.security import hash_pin
+from src.shared import fechas
 from src.shared.models.audit_log import AuditLog
 
 
@@ -86,9 +96,27 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
         rol = s.scalar(select(Rol).where(Rol.nombre == "jefe_cocina"))
         s.add(UsuarioRol(usuario_id=jefe_cocina.id, rol_id=rol.id))
 
+        # Trabajador con 2 horas asistidas hoy (08:00-10:00), para completar
+        # con `trabajadores` en vez del `horas_hombre` tipeado de antes.
+        persona_cocinero = Persona(nombres="Cocinero", apellidos="De Prueba")
+        s.add(persona_cocinero)
+        s.flush()
+        cocinero = Trabajador(
+            empresa_id=empresa.id, persona_id=persona_cocinero.id,
+            cargo="Cocinero", area="Cocina", tipo_vinculo="planilla",
+            fecha_ingreso=fechas.hoy(),
+        )
+        s.add(cocinero)
+        s.flush()
+        s.add(Asistencia(
+            trabajador_id=cocinero.id, fecha=fechas.hoy(),
+            hora_entrada=time(8, 0), hora_salida=time(10, 0),
+        ))
+
         ids.update(
             empresa_id=str(empresa.id), almacen_id=str(almacen.id),
             harina_id=str(harina.id), masa_id=str(masa.id),
+            cocinero_id=str(cocinero.id),
         )
         s.commit()
 
@@ -126,6 +154,15 @@ def _consumo_body(ids, cantidad="10", costo="2.00"):
             {"articulo_id": ids["harina_id"], "cantidad": cantidad, "costo_unitario": costo}
         ],
     }
+
+
+def _trabajadores_body(ids, horas=None):
+    """Sin `horas`, se imputan todas las asistidas hoy (2h, ver fixture
+    `env`) — mismo resultado que el viejo `"horas_hombre": "2"`."""
+    trabajador = {"trabajador_id": ids["cocinero_id"]}
+    if horas is not None:
+        trabajador["horas"] = horas
+    return [trabajador]
 
 
 def _adjuntar_evidencia(client, headers, orden_id, nombre="evidencia.jpg"):
@@ -166,7 +203,8 @@ def test_flujo_completo_conforme_actualiza_stock_y_costo(env):
 
     completar = client.post(
         f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
-            "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+            "resultado": "conforme", "cantidad_producida": "10",
+            "trabajadores": _trabajadores_body(ids),
         },
     )
     assert completar.status_code == 200
@@ -290,6 +328,86 @@ def test_adjuntar_evidencia_registra_auditoria(env):
     assert accion == "adjuntar_evidencia"
 
 
+# --- Horas-hombre desde asistencia de RRHH (feat/produccion-horas-hombre-desde-rrhh) ---
+def test_completar_sin_horas_no_imputa_mano_de_obra(env):
+    """`trabajadores` vacío (default) sigue siendo válido: horas_hombre=0,
+    igual que antes con `horas_hombre` ausente."""
+    client, ids, _ = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-horas-1").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+    r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
+        "resultado": "conforme", "cantidad_producida": "10",
+    })
+    assert r.status_code == 200, r.text
+    assert Decimal(r.json()["costo_mano_obra"]) == Decimal("0")
+
+
+def test_completar_con_horas_explicitas_dentro_de_lo_asistido(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-horas-2").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+    r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
+        "resultado": "conforme", "cantidad_producida": "10",
+        "trabajadores": _trabajadores_body(ids, horas="1.5"),
+    })
+    assert r.status_code == 200, r.text
+    # 1.5 horas * 15.00 (tarifa semilla) = 22.5; (20 + 22.5) / 10 = 4.25.
+    assert Decimal(r.json()["costo_real_unitario"]) == Decimal("4.2500000000")
+
+    detalle = client.get(f"/api/v1/production/ordenes/{orden_id}", headers=h).json()
+    (trabajador,) = detalle["trabajadores"]
+    assert trabajador["trabajador_id"] == ids["cocinero_id"]
+    assert Decimal(trabajador["horas"]) == Decimal("1.50")
+
+
+def test_completar_horas_superan_lo_asistido_409(env):
+    client, ids, _ = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-horas-3").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+    r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
+        "resultado": "conforme", "cantidad_producida": "10",
+        # El cocinero de la fixture solo asistió 2 horas hoy.
+        "trabajadores": _trabajadores_body(ids, horas="5"),
+    })
+    assert r.status_code == 409
+
+
+def test_completar_trabajador_sin_asistencia_hoy_409(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    with TestSession() as s:
+        persona = Persona(nombres="Sin", apellidos="Asistencia")
+        s.add(persona)
+        s.flush()
+        trabajador = Trabajador(
+            empresa_id=uuid.UUID(ids["empresa_id"]), persona_id=persona.id,
+            cargo="Cocinero", area="Cocina", tipo_vinculo="planilla",
+            fecha_ingreso=fechas.hoy(),
+        )
+        s.add(trabajador)
+        s.commit()
+        trabajador_id = str(trabajador.id)
+
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-horas-4").json()["id"]
+    client.post(
+        f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
+    )
+    r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
+        "resultado": "conforme", "cantidad_producida": "10",
+        "trabajadores": [{"trabajador_id": trabajador_id}],
+    })
+    assert r.status_code == 409
+
+
 def test_registrar_consumo_estado_invalido_409(env):
     client, ids, _ = env
     h = _token(client)
@@ -333,6 +451,29 @@ def test_rol_sin_permiso_production_403(env):
     h_cajero = _token(client, "cajero_test", "222222")
     r = _crear_orden(client, h_cajero, ids, idempotency_key="op-key-8")
     assert r.status_code == 403
+
+
+def test_trabajadores_disponibles_lista_activos_de_la_empresa(env):
+    client, ids, _ = env
+    h = _token(client)
+    r = client.get("/api/v1/production/trabajadores-disponibles", headers=h)
+    assert r.status_code == 200, r.text
+    (trabajador,) = r.json()
+    assert trabajador["id"] == ids["cocinero_id"]
+    assert trabajador["cargo"] == "Cocinero"
+
+
+def test_trabajadores_disponibles_filtra_por_area(env):
+    client, ids, _ = env
+    h = _token(client)
+    vacio = client.get(
+        "/api/v1/production/trabajadores-disponibles?area=Comercial", headers=h
+    ).json()
+    assert vacio == []
+    cocina = client.get(
+        "/api/v1/production/trabajadores-disponibles?area=Cocina", headers=h
+    ).json()
+    assert len(cocina) == 1
 
 
 def test_listar_ordenes_filtra_por_estado_y_pagina(env):
@@ -398,7 +539,8 @@ def test_completar_conforme_con_vencimiento_genera_lote_con_esa_fecha(env):
         f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
     )
     r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
-        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+        "resultado": "conforme", "cantidad_producida": "10",
+        "trabajadores": _trabajadores_body(ids),
         "fecha_vencimiento": "2026-12-31", "lote_codigo": "LOTE-PRD-001",
         "trazabilidad": {"linea": "L1", "manipulador_id": "u-123"},
     })
@@ -430,7 +572,8 @@ def test_completar_conforme_sin_vencimiento_el_lote_nace_sin_el(env):
         f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
     )
     r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
-        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+        "resultado": "conforme", "cantidad_producida": "10",
+        "trabajadores": _trabajadores_body(ids),
     })
     assert r.status_code == 200
     assert r.json()["fecha_vencimiento"] is None
@@ -483,7 +626,8 @@ def test_idempotencia_completar_orden(env):
         f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
     )
     cuerpo = {
-        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+        "resultado": "conforme", "cantidad_producida": "10",
+        "trabajadores": _trabajadores_body(ids),
         "idempotency_key": "completar-key-1",
     }
     r1 = client.post(
@@ -519,7 +663,8 @@ def test_auditoria_registra_crear_consumo_y_completar(env):
         f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
     )
     client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
-        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+        "resultado": "conforme", "cantidad_producida": "10",
+        "trabajadores": _trabajadores_body(ids),
     })
 
     with TestSession() as s:
@@ -756,7 +901,8 @@ def test_completar_usa_tarifa_de_parametro_empresa_sobre_la_semilla(env):
         f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
     )
     r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
-        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+        "resultado": "conforme", "cantidad_producida": "10",
+        "trabajadores": _trabajadores_body(ids),
     })
     assert r.status_code == 200, r.text
     # 2 horas * 25.00 (parámetro aprobado, no la semilla de 15.00) = 50;
@@ -820,7 +966,8 @@ def test_completar_conforme_no_publica_orden_desechada(env):
     eventos = []
     event_bus.subscribe("production.orden_desechada", eventos.append)
     r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
-        "resultado": "conforme", "cantidad_producida": "10", "horas_hombre": "2",
+        "resultado": "conforme", "cantidad_producida": "10",
+        "trabajadores": _trabajadores_body(ids),
     })
     assert r.status_code == 200
     assert eventos == []

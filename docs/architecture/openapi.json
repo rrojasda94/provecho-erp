@@ -6465,22 +6465,6 @@
             ],
             "title": "Fecha Vencimiento"
           },
-          "horas_hombre": {
-            "anyOf": [
-              {
-                "minimum": 0.0,
-                "type": "number"
-              },
-              {
-                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Horas Hombre"
-          },
           "idempotency_key": {
             "anyOf": [
               {
@@ -6536,6 +6520,13 @@
           "resultado": {
             "title": "Resultado",
             "type": "string"
+          },
+          "trabajadores": {
+            "items": {
+              "$ref": "#/components/schemas/TrabajadorHorasIn"
+            },
+            "title": "Trabajadores",
+            "type": "array"
           },
           "trazabilidad": {
             "anyOf": [
@@ -18623,6 +18614,18 @@
             ],
             "title": "Fecha Vencimiento"
           },
+          "horas_hombre": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horas Hombre"
+          },
           "id": {
             "format": "uuid",
             "title": "Id",
@@ -18662,6 +18665,13 @@
             ],
             "title": "Merma Motivo"
           },
+          "trabajadores": {
+            "items": {
+              "$ref": "#/components/schemas/TrabajadorHorasOut"
+            },
+            "title": "Trabajadores",
+            "type": "array"
+          },
           "trazabilidad": {
             "anyOf": [
               {
@@ -18690,7 +18700,8 @@
           "fecha_vencimiento",
           "lote_codigo",
           "trazabilidad",
-          "consumos"
+          "consumos",
+          "trabajadores"
         ],
         "title": "OrdenProduccionDetalleOut",
         "type": "object"
@@ -18799,6 +18810,18 @@
               }
             ],
             "title": "Fecha Vencimiento"
+          },
+          "horas_hombre": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horas Hombre"
           },
           "id": {
             "format": "uuid",
@@ -32426,6 +32449,81 @@
           "fecha_ingreso"
         ],
         "title": "TrabajadorCreate",
+        "type": "object"
+      },
+      "TrabajadorDisponibleOut": {
+        "description": "Para el picker del diálogo de completar — mismo shape que devuelve\n`rrhh.queries_publicas.trabajadores_activos`.",
+        "properties": {
+          "cargo": {
+            "title": "Cargo",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "cargo"
+        ],
+        "title": "TrabajadorDisponibleOut",
+        "type": "object"
+      },
+      "TrabajadorHorasIn": {
+        "properties": {
+          "horas": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horas"
+          },
+          "trabajador_id": {
+            "format": "uuid",
+            "title": "Trabajador Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trabajador_id"
+        ],
+        "title": "TrabajadorHorasIn",
+        "type": "object"
+      },
+      "TrabajadorHorasOut": {
+        "properties": {
+          "horas": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Horas",
+            "type": "string"
+          },
+          "trabajador_id": {
+            "format": "uuid",
+            "title": "Trabajador Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trabajador_id",
+          "horas"
+        ],
+        "title": "TrabajadorHorasOut",
         "type": "object"
       },
       "TrabajadorOut": {
@@ -52762,6 +52860,65 @@
           }
         ],
         "summary": "Adjuntar Evidencia",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/trabajadores-disponibles": {
+      "get": {
+        "description": "Trabajadores activos para elegir a quién imputar horas-hombre al\ncompletar una orden (RN-PRD-018) — vía `rrhh.queries_publicas.\ntrabajadores_activos`, el contrato público de RRHH; `production` no\nconoce su ORM.",
+        "operationId": "trabajadores_disponibles_api_v1_production_trabajadores_disponibles_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "area",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Area"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TrabajadorDisponibleOut"
+                  },
+                  "title": "Response Trabajadores Disponibles Api V1 Production Trabajadores Disponibles Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Trabajadores Disponibles",
         "tags": [
           "production"
         ]

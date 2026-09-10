@@ -4,7 +4,13 @@ import { ApiError, apiFetch, type Pagina } from "@/lib/api";
 import { primeroElDe } from "@/lib/destinos";
 import { obtenerSesion } from "@/lib/sesion";
 
-import { OrdenesCliente, type Almacen, type Articulo, type Orden } from "./ordenes-cliente";
+import {
+  OrdenesCliente,
+  type Almacen,
+  type Articulo,
+  type Orden,
+  type TrabajadorDisponible,
+} from "./ordenes-cliente";
 
 // Antes se pedía la página por defecto (50) sin forma de ver el resto: el
 // único indicio de que faltaban órdenes era `AvisoRecortado`, sin ningún
@@ -28,15 +34,24 @@ export default async function ProduccionPage({
     // en pantalla lo dice. Para el catálogo de artículos, que no cabe ni en 200,
     // el propio campo busca contra el servidor (`?q=`); esto es solo lo que
     // ofrece antes de teclear.
-    const [ordenes, articulos, almacenes] = await Promise.all([
+    const [ordenes, articulos, almacenes, trabajadores] = await Promise.all([
       apiFetch<Pagina<Orden>>(
         `/api/v1/production/ordenes?page=${page}&page_size=${PAGE_SIZE}`,
         { token },
       ),
+      // El artículo a producir y los insumos a consumir salen del mismo
+      // catálogo: una subreceta es artículo como cualquier otro.
       apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?page_size=200", {
         token,
       }),
       apiFetch<Almacen[]>("/api/v1/almacenes", { token }),
+      // Para el picker de mano de obra al completar (RN-PRD-018): quién
+      // puede imputarse horas es quien RRHH ya tiene como activo, no un
+      // nombre tipeado a mano.
+      apiFetch<TrabajadorDisponible[]>(
+        "/api/v1/production/trabajadores-disponibles",
+        { token },
+      ),
     ]);
     return (
       <div className="flex flex-col gap-4">
@@ -45,6 +60,7 @@ export default async function ProduccionPage({
           total={ordenes.total}
           articulos={articulos.items}
           almacenes={almacenes}
+          trabajadores={trabajadores}
           permisos={usuario.permisos}
         />
         <Paginador pagina={ordenes} />

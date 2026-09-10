@@ -34,6 +34,7 @@ export type Orden = {
   merma_motivo: string | null;
 };
 export type Articulo = { id: string; nombre: string; id_interno: string; tipo: string };
+export type TrabajadorDisponible = { id: string; nombre: string; cargo: string };
 /** Lo que una orden puede producir. Va al servidor como filtro (`?tipo=`) y
  * no se resuelve en la pantalla: filtrar acá recorta solo lo que vino en la
  * página, que de un catálogo de miles es casi nada. */
@@ -201,8 +202,22 @@ function DialogoConsumo({ orden, articulos }: { orden: Orden; articulos: Articul
   );
 }
 
-function DialogoCompletar({ orden }: { orden: Orden }) {
+type LineaTrabajador = { clave: number; trabajadorId: string; horas: string };
+
+function DialogoCompletar({
+  orden,
+  trabajadores,
+}: {
+  orden: Orden;
+  trabajadores: TrabajadorDisponible[];
+}) {
   const [resultado, setResultado] = useState("conforme");
+  const [lineasTrabajador, setLineasTrabajador] = useState<LineaTrabajador[]>([]);
+
+  const editarTrabajador = (clave: number, campo: keyof LineaTrabajador, valor: string) =>
+    setLineasTrabajador((prev) =>
+      prev.map((l) => (l.clave === clave ? { ...l, [campo]: valor } : l)),
+    );
 
   return (
     <DialogoFormulario
@@ -212,9 +227,13 @@ function DialogoCompletar({ orden }: { orden: Orden }) {
       etiquetaEnvio="Completar"
       etiquetaPendiente="Cerrando..."
       accion={completarOrdenAction}
-      // Desplegable controlado: el `reset()` del formulario no lo devuelve a
-      // «conforme», y la orden siguiente abría con el veredicto de la anterior.
-      alAbrir={() => setResultado("conforme")}
+      // Desplegables controlados: el `reset()` del formulario no los
+      // devuelve a su estado inicial, y la orden siguiente abría con el
+      // veredicto y los trabajadores de la anterior.
+      alAbrir={() => {
+        setResultado("conforme");
+        setLineasTrabajador([]);
+      }}
     >
       <input type="hidden" name="orden_id" value={orden.id} />
       <label className="flex flex-col gap-1 text-sm font-semibold">
@@ -245,10 +264,67 @@ function DialogoCompletar({ orden }: { orden: Orden }) {
           </span>
         </label>
       )}
-      <label className="flex flex-col gap-1 text-sm font-semibold">
-        Horas hombre
-        <input name="horas_hombre" type="number" step="0.01" min="0" placeholder="Opcional" />
-      </label>
+      <div className="flex flex-col gap-1">
+        <span className="text-sm font-semibold">Mano de obra</span>
+        <span className="text-xs font-normal text-muted-foreground">
+          Sin horas: se imputa toda la asistencia de hoy del trabajador (RN-RRHH-009). No
+          puede superar lo que de verdad asistió.
+        </span>
+        {lineasTrabajador.map((linea) => (
+          <div key={linea.clave} className="flex items-end gap-2">
+            <label className="flex flex-1 flex-col gap-1 text-xs font-semibold">
+              Trabajador
+              <select
+                name="trabajador_id"
+                required
+                value={linea.trabajadorId}
+                onChange={(e) => editarTrabajador(linea.clave, "trabajadorId", e.target.value)}
+              >
+                <option value="">Elegir...</option>
+                {trabajadores.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nombre} · {t.cargo}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex w-28 flex-col gap-1 text-xs font-semibold">
+              Horas
+              <input
+                name="trabajador_horas"
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder="Asistidas"
+                value={linea.horas}
+                onChange={(e) => editarTrabajador(linea.clave, "horas", e.target.value)}
+              />
+            </label>
+            <button
+              type="button"
+              aria-label="Quitar trabajador"
+              onClick={() =>
+                setLineasTrabajador((prev) => prev.filter((l) => l.clave !== linea.clave))
+              }
+              className="pb-1.5 text-muted-foreground hover:text-status-danger"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() =>
+            setLineasTrabajador((prev) => [
+              ...prev,
+              { clave: (prev.at(-1)?.clave ?? 0) + 1, trabajadorId: "", horas: "" },
+            ])
+          }
+          className="self-start text-sm font-semibold text-primary hover:underline"
+        >
+          + Agregar trabajador
+        </button>
+      </div>
       <div className="flex gap-2">
         <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
           Merma
@@ -284,6 +360,7 @@ export function OrdenesCliente({
   total,
   articulos,
   almacenes,
+  trabajadores,
   permisos,
 }: {
   ordenes: Orden[];
@@ -291,6 +368,7 @@ export function OrdenesCliente({
   total: number;
   articulos: Articulo[];
   almacenes: Almacen[];
+  trabajadores: TrabajadorDisponible[];
   permisos: string[];
 }) {
   // El router usa `production.crear` tanto para crear la orden como para
@@ -364,7 +442,7 @@ export function OrdenesCliente({
           }
           if (orden.estado === "en_proceso") {
             return puedeCompletar ? (
-              <DialogoCompletar orden={orden} />
+              <DialogoCompletar orden={orden} trabajadores={trabajadores} />
             ) : (
               <span className="text-xs text-gray">—</span>
             );
@@ -373,7 +451,7 @@ export function OrdenesCliente({
         },
       },
     ],
-    [articulos, nombreArticulo, nombreAlmacen, puedeCrear, puedeCompletar],
+    [articulos, nombreArticulo, nombreAlmacen, trabajadores, puedeCrear, puedeCompletar],
   );
 
   return (

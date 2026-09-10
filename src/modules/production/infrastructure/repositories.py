@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from src.modules.production.infrastructure.models import (
     ConsumoProduccionItem,
     OrdenProduccion,
+    OrdenProduccionTrabajador,
 )
 
 # `Almacen` es organización transversal (data-model §1) y vive en `users`
@@ -61,6 +62,15 @@ class OrdenProduccionRepo:
             self.s.scalars(
                 select(ConsumoProduccionItem).where(
                     ConsumoProduccionItem.orden_produccion_id == orden_id
+                )
+            )
+        )
+
+    def trabajadores(self, orden_id: uuid.UUID) -> list[OrdenProduccionTrabajador]:
+        return list(
+            self.s.scalars(
+                select(OrdenProduccionTrabajador).where(
+                    OrdenProduccionTrabajador.orden_produccion_id == orden_id
                 )
             )
         )

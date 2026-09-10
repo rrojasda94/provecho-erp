@@ -45,6 +45,11 @@ consumo real), `costo_mano_obra` (`horas_hombre` × tarifa por empresa
 `production/costo_hora_mano_obra` en `parametro_empresa`, con
 `settings.production_costo_hora_mano_obra` como semilla — ADR-014/068,
 bloque `feat/produccion-costeo-real`), `costo_real_unitario`.
+`horas_hombre` es el agregado de `orden_produccion_trabajador` (`Σ horas`):
+`CompletarOrdenIn.trabajadores[]` imputa trabajadores concretos, cada uno
+tope su propia asistencia real del día (`rrhh.queries_publicas.
+horas_asistidas`, 409 si se excede o si no marcó — RN-RRHH-009, bloque
+`feat/produccion-horas-hombre-desde-rrhh`), no el número libre de antes.
 Resuelve la receta de la subreceta vía el nuevo `receta.articulo_id`
 (nullable — liga una receta a la subreceta que produce, distinto del uso
 existente `producto_comercial.receta_id` de venta directa). Capas
@@ -68,9 +73,15 @@ snapshot al registrar el consumo, para comparar contra `costo_insumos`
 | POST | `/ordenes` | `production.crear` |
 | GET | `/ordenes/{id}` | `production.leer` |
 | GET | `/ordenes/{id}/consumo-sugerido` | `production.leer` |
+| GET | `/trabajadores-disponibles` | `production.completar` |
 | POST | `/ordenes/{id}/consumo` | `production.crear` |
 | POST | `/ordenes/{id}/evidencia` | `production.completar` |
 | POST | `/ordenes/{id}/completar` | `production.completar` |
+
+`GET /trabajadores-disponibles` (`?area=`) lista los trabajadores activos
+de la empresa vía `rrhh.queries_publicas.trabajadores_activos` — el picker
+del diálogo de completar, para imputar mano de obra a alguien que RRHH ya
+tiene como activo en vez de un nombre tipeado.
 
 `POST /ordenes/{id}/evidencia` registra la evidencia de destrucción ya
 subida al storage (`nombre`, `mime_type`, `tamano_bytes`, `url_storage`,
@@ -99,8 +110,15 @@ del producto terminado, auditoría e idempotencia de consumo/completar, el
 asiento contable del desecho (ADR-100) (2026-09-09), el costeo real
 —`costo_promedio` por defecto, consumo sugerido desde la BOM, tarifa de
 mano de obra por empresa y desviación de desperdicio real vs. esperado
-(2026-09-09)—, y la evidencia de destrucción como `Archivo` en vez de
-string libre (2026-09-09).
+(2026-09-09)—, la evidencia de destrucción como `Archivo` en vez de
+string libre (2026-09-09), y las horas-hombre imputadas desde la
+asistencia real de RRHH en vez de tipeadas a mano (2026-09-09).
+
+Pendiente de frontend: el diálogo de completar todavía manda
+`evidencia_destruccion_url` como texto libre (`ordenes-cliente.tsx`) en
+vez de subir la evidencia vía `POST .../evidencia` antes de completar —
+`feat/produccion-evidencia-como-archivo` fue backend-only. Bloque
+`feat/produccion-ficha-y-consumo-sugerido` (B6f) o uno dedicado a esto.
 
 ## Casos de uso
 
