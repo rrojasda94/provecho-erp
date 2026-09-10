@@ -13104,6 +13104,32 @@
         "title": "FiltrosIn",
         "type": "object"
       },
+      "GenerarReporteJornadaIn": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "fecha": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha"
+          }
+        },
+        "required": [
+          "almacen_id"
+        ],
+        "title": "GenerarReporteJornadaIn",
+        "type": "object"
+      },
       "GrupoCreate": {
         "properties": {
           "nombre": {
@@ -18360,6 +18386,83 @@
         "title": "OrdenCompraOut",
         "type": "object"
       },
+      "OrdenDeJornadaOut": {
+        "properties": {
+          "articulo_id": {
+            "format": "uuid",
+            "title": "Articulo Id",
+            "type": "string"
+          },
+          "cantidad_producida": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cantidad Producida"
+          },
+          "costo_real_unitario": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Real Unitario"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "horas_hombre": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horas Hombre"
+          },
+          "merma_cantidad": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Merma Cantidad"
+          },
+          "orden_produccion_id": {
+            "format": "uuid",
+            "title": "Orden Produccion Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "orden_produccion_id",
+          "articulo_id",
+          "estado",
+          "cantidad_producida",
+          "costo_real_unitario",
+          "merma_cantidad",
+          "horas_hombre"
+        ],
+        "title": "OrdenDeJornadaOut",
+        "type": "object"
+      },
       "OrdenMantenimientoCancelar": {
         "properties": {
           "motivo": {
@@ -20311,6 +20414,37 @@
           "page_size"
         ],
         "title": "Pagina[ReporteEmitidoOut]",
+        "type": "object"
+      },
+      "Pagina_ReporteProduccionOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ReporteProduccionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[ReporteProduccionOut]",
         "type": "object"
       },
       "Pagina_RutaOut_": {
@@ -28931,6 +29065,108 @@
         "title": "ReportePosIn",
         "type": "object"
       },
+      "ReporteProduccionOut": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "costo_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Costo Total",
+            "type": "string"
+          },
+          "desperdicio_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Desperdicio Total",
+            "type": "string"
+          },
+          "generado_at": {
+            "format": "date-time",
+            "title": "Generado At",
+            "type": "string"
+          },
+          "horas_hombre_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Horas Hombre Total",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "jornada": {
+            "format": "date",
+            "title": "Jornada",
+            "type": "string"
+          },
+          "merma_total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Merma Total",
+            "type": "string"
+          },
+          "observaciones": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observaciones"
+          },
+          "ordenes": {
+            "items": {
+              "$ref": "#/components/schemas/OrdenDeJornadaOut"
+            },
+            "title": "Ordenes",
+            "type": "array"
+          },
+          "visado_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visado At"
+          },
+          "visado_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visado Por"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "jornada",
+          "generado_at",
+          "ordenes",
+          "merma_total",
+          "desperdicio_total",
+          "horas_hombre_total",
+          "costo_total",
+          "visado_por",
+          "visado_at",
+          "observaciones"
+        ],
+        "title": "ReporteProduccionOut",
+        "type": "object"
+      },
       "RepuestoCompatibleCreate": {
         "properties": {
           "articulo_id": {
@@ -35569,6 +35805,24 @@
           "extra_id"
         ],
         "title": "VincularExtraCreate",
+        "type": "object"
+      },
+      "VisarReporteJornadaIn": {
+        "properties": {
+          "observaciones": {
+            "anyOf": [
+              {
+                "maxLength": 1000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observaciones"
+          }
+        },
+        "title": "VisarReporteJornadaIn",
         "type": "object"
       },
       "src__core__dashboard_router__CajaAbiertaOut": {
@@ -53859,6 +54113,259 @@
           }
         ],
         "summary": "Agregar Orden A Plan",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/reportes-jornada": {
+      "get": {
+        "operationId": "listar_reportes_jornada_api_v1_production_reportes_jornada_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "jornada",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Jornada"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_ReporteProduccionOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Reportes Jornada",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/reportes-jornada/generar": {
+      "post": {
+        "description": "Generación manual (RN-DOC-010 también la admite además del barrido\nautomático de cierre): recalcula mientras el reporte no esté visado.",
+        "operationId": "generar_reporte_jornada_api_v1_production_reportes_jornada_generar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerarReporteJornadaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReporteProduccionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Generar Reporte Jornada",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/reportes-jornada/{reporte_id}": {
+      "get": {
+        "operationId": "ver_reporte_jornada_api_v1_production_reportes_jornada__reporte_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reporte_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reporte Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReporteProduccionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Reporte Jornada",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/reportes-jornada/{reporte_id}/visar": {
+      "post": {
+        "description": "El único acto humano sobre el documento (RN-DOC-010): visa, no\nredacta.",
+        "operationId": "visar_reporte_jornada_api_v1_production_reportes_jornada__reporte_id__visar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reporte_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Reporte Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisarReporteJornadaIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReporteProduccionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Visar Reporte Jornada",
         "tags": [
           "production"
         ]

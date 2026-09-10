@@ -1,7 +1,7 @@
 """DTOs (pydantic) del módulo production."""
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -226,3 +226,39 @@ class ChecklistInocuidadTurnoOut(BaseModel):
     equipos_frio: list[EquipoFrioOut]
     plaga_indicio: bool
     estado: str
+
+
+class GenerarReporteJornadaIn(BaseModel):
+    almacen_id: uuid.UUID
+    # Opcional: sin ella, la jornada de hoy (`fechas.hoy()`).
+    fecha: date | None = None
+
+
+class VisarReporteJornadaIn(BaseModel):
+    observaciones: str | None = Field(default=None, max_length=1000)
+
+
+class OrdenDeJornadaOut(BaseModel):
+    orden_produccion_id: uuid.UUID
+    articulo_id: uuid.UUID
+    estado: str
+    cantidad_producida: Decimal | None
+    costo_real_unitario: Decimal | None
+    merma_cantidad: Decimal | None
+    horas_hombre: Decimal | None
+
+
+class ReporteProduccionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    almacen_id: uuid.UUID
+    jornada: date
+    generado_at: datetime
+    ordenes: list[OrdenDeJornadaOut]
+    merma_total: Decimal
+    desperdicio_total: Decimal
+    horas_hombre_total: Decimal
+    costo_total: Decimal
+    visado_por: uuid.UUID | None
+    visado_at: datetime | None
+    observaciones: str | None

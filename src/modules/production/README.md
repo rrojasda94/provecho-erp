@@ -87,6 +87,10 @@ snapshot al registrar el consumo, para comparar contra `costo_insumos`
 | POST | `/checklists` | `production.verificar_inocuidad` |
 | GET | `/checklists` | `production.leer` |
 | GET | `/checklists/{id}` | `production.leer` |
+| POST | `/reportes-jornada/generar` | `production.visar_reporte_jornada` |
+| GET | `/reportes-jornada` | `production.leer` |
+| GET | `/reportes-jornada/{id}` | `production.leer` |
+| POST | `/reportes-jornada/{id}/visar` | `production.visar_reporte_jornada` |
 
 `plan_produccion` (`application/planes.py`, bloque `feat/produccion-plan-
 de-produccion`, 2026-09-09) es el cronograma fijo por línea/turno
@@ -114,6 +118,22 @@ Sin un checklist `aprobado` vigente del día en un almacén `tipo=produccion`,
 usa el checklist más reciente del día, sin distinguir turno (`orden_
 produccion` no registra en cuál se creó).
 
+`reporte_produccion` (`application/reportes_jornada.py`, bloque
+`feat/produccion-reporte-de-jornada`, 2026-09-09) consolida las órdenes
+que cerraron control de calidad ese día en un almacén (RN-DOC-010) —
+único por `almacen_id, jornada`. `generar_reporte_jornada` recalcula el
+existente mientras no esté visado; una vez visado (`visado_por`/
+`visado_at`) queda congelado, y `POST /reportes-jornada/{id}/visar` es el
+único acto humano sobre el documento: se visa, no se redacta. El barrido
+de Celery `production.generar_reportes_de_jornada_vencidos` (cada 15 min)
+genera el de cada almacén `tipo=produccion` pasada la
+`hora_cierre_jornada` de su empresa (`parametro_empresa`, semilla
+`settings.production_hora_cierre_jornada`, ADR-014/068) — `POST
+/reportes-jornada/generar` hace lo mismo a demanda. La orden aporta al
+reporte por `orden_produccion.completado_at` (columna nueva, se fija al
+completar): `updated_at` no sirve porque cualquier `flush` (p. ej.
+`registrar_consumo`) lo pisa antes de que la orden cierre.
+
 `GET /trabajadores-disponibles` (`?area=`) lista los trabajadores activos
 de la empresa vía `rrhh.queries_publicas.trabajadores_activos` — el picker
 del diálogo de completar, para imputar mano de obra a alguien que RRHH ya
@@ -138,8 +158,8 @@ y recalcula su `costo_promedio` — mismo listener/patrón que
 Deuda del slice (ver
 [plan de deuda](../../../docs/roadmap/deuda-production-2026-09-09.md) y
 [`docs/roadmap/deuda/modulo-production.md`](../../../docs/roadmap/deuda/modulo-production.md)):
-`reporte_produccion` consolidado, subrecetas anidadas (una orden que
-consume otra subreceta con su propia orden). Ya saldado: lote/trazabilidad
+subrecetas anidadas (una orden que consume otra subreceta con su propia
+orden). Ya saldado: lote/trazabilidad
 del producto terminado, auditoría e idempotencia de consumo/completar, el
 asiento contable del desecho (ADR-100) (2026-09-09), el costeo real
 —`costo_promedio` por defecto, consumo sugerido desde la BOM, tarifa de
@@ -149,9 +169,11 @@ string libre (2026-09-09), las horas-hombre imputadas desde la
 asistencia real de RRHH en vez de tipeadas a mano (2026-09-09), la orden
 por ajuste de necesidad al cruzar `inventory.stock_bajo_minimo` en vez de
 que alguien la cree a mano (2026-09-09), el plan de producción con
-reserva de insumos al iniciar (2026-09-09), y el checklist de inocuidad
+reserva de insumos al iniciar (2026-09-09), el checklist de inocuidad
 de turno que bloquea crear orden y registrar consumo sin uno `aprobado`
-vigente (2026-09-09).
+vigente (2026-09-09), y el reporte de producción de la jornada,
+consolidado automático al cierre y visado por el jefe de cocina
+(2026-09-09).
 
 Pendiente de frontend: el diálogo de completar todavía manda
 `evidencia_destruccion_url` como texto libre (`ordenes-cliente.tsx`) en
@@ -186,7 +208,10 @@ vez de subir la evidencia vía `POST .../evidencia` antes de completar —
   alertar a Gerencia y Cocina si algo falla (RN-CDP-002/005) — sin un
   checklist `aprobado` vigente ese día, ni crear orden ni registrar
   consumo pasan.
-- Consolidar reporte de producción al cierre de jornada (RN-DOC-010).
+- Consolidar reporte de producción al cierre de jornada (`POST
+  /reportes-jornada/generar` o el barrido automático de Celery pasada la
+  `hora_cierre_jornada` de la empresa) y visarlo (`POST
+  /reportes-jornada/{id}/visar`) — se visa, no se redacta (RN-DOC-010).
 - Conteo cíclico del almacén propio (tipo `produccion`), mismo esquema
   que `inventory` en Almacén Central — el reporte se genera
   automáticamente a partir de los conteos físicos registrados; el jefe de
@@ -254,3 +279,7 @@ reproceso o desecho con evidencia → reporte de escalamiento).
   `application/inocuidad.py::crear_checklist` (bloque
   `feat/produccion-checklist-inocuidad`, 2026-09-09), consumidos por
   `reports` (alerta a Gerencia y Cocina, nivel `urgente`).
+  `production.reporte_produccion_generado` (bloque
+  `feat/produccion-reporte-de-jornada`, 2026-09-09), sin actor —lo genera
+  un barrido o el endpoint manual, no un acto de alguien—, consumido por
+  `reports` (aviso a Gerencia y Cocina, nivel `aviso`).

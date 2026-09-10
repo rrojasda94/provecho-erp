@@ -8,7 +8,7 @@ la reserva de insumos que `planes.iniciar_plan` dejó abierta por SKU.
 """
 
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -519,6 +519,11 @@ def completar_orden_produccion(
     orden.costo_insumos = costo_insumos
     orden.costo_mano_obra = costo_mano_obra
     orden.cierre_idempotency_key = idempotency_key
+    # Instante, no fecha de negocio: mismo criterio que `reports.
+    # ReporteEscalamiento.cerrado_at` (`datetime.now(UTC)`, nunca
+    # `fechas.ahora()` — esa es para decidir por franja horaria, no para
+    # timbrar una columna).
+    orden.completado_at = datetime.now(UTC)
     if trazabilidad is not None:
         orden.trazabilidad = trazabilidad
 

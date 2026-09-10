@@ -308,6 +308,7 @@ MODULOS_CON_SESSION_FACTORY = (
     "src.modules.assets.application.tasks",
     "src.modules.inventory.application.tasks",
     "src.modules.marketing.application.tasks",
+    "src.modules.production.application.tasks",
     "src.modules.rrhh.purga",
     "src.modules.sales.application.tasks",
     # `delivery` cierra/cancela una entrega al escuchar `sales.venta_entregada`/

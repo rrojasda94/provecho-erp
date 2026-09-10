@@ -111,6 +111,7 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Órdenes", href: "/produccion" },
     { label: "Plan", href: "/produccion/plan" },
     { label: "Inocuidad", href: "/produccion/inocuidad" },
+    { label: "Reportes", href: "/produccion/reportes" },
   ],
   reportes: [
     { label: "Mis reportes", href: "/reportes" },

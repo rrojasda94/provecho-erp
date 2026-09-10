@@ -94,6 +94,10 @@ SIN_ACTOR = {
     # llega a él por su propia bandeja; ponerlo como actor de un reporte que
     # leen su encargado y RRHH lo convertiría en un cargo (RN-RRHH-021).
     "rrhh.salida_sin_marcar",
+    # Lo genera el barrido de cierre de jornada (o el endpoint manual, sin
+    # actor tampoco): el hecho es «cerró la jornada», no un acto de alguien
+    # — visar sí lo es, y eso va en `auditoria.registrar`, no acá.
+    "production.reporte_produccion_generado",
     # Los cuatro de `assets` los detecta el barrido diario de vencimientos
     # (RN-MNT-005): un plan que cruza a "próximo" o un documento que vence no
     # lo provoca nadie, así que no hay a quién ponerle de actor.

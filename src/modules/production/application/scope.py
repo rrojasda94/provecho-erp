@@ -14,6 +14,7 @@ from src.modules.production.infrastructure.models import (
     ChecklistInocuidadTurno,
     OrdenProduccion,
     PlanProduccion,
+    ReporteProduccion,
 )
 from src.modules.users.infrastructure.models import Almacen
 
@@ -52,3 +53,13 @@ def exigir_checklist(
         raise NoEncontrado("checklist de inocuidad no encontrado")
     exigir_almacen(session, checklist.almacen_id, tenant)
     return checklist
+
+
+def exigir_reporte_jornada(
+    session: Session, reporte_id: uuid.UUID, tenant: Tenant
+) -> ReporteProduccion:
+    reporte = session.get(ReporteProduccion, reporte_id)
+    if reporte is None:
+        raise NoEncontrado("reporte de producción no encontrado")
+    exigir_almacen(session, reporte.almacen_id, tenant)
+    return reporte

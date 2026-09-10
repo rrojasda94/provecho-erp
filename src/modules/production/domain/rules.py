@@ -49,6 +49,12 @@ def puede_cerrar_plan(estado: str) -> bool:
     return estado == "en_ejecucion"
 
 
+def puede_visar_reporte(visado_at) -> bool:
+    """RN-DOC-010: se visa una sola vez — el reporte ya visado queda
+    congelado, no se puede reabrir."""
+    return visado_at is None
+
+
 def costo_real_unitario(
     costo_insumos: Decimal, costo_mano_obra: Decimal, cantidad_producida: Decimal
 ) -> Decimal:
