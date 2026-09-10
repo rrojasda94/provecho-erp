@@ -38,21 +38,22 @@ dentro de seis meses.
 
 ## Pendiente de corte
 
-Nada. **0.10.0 se cortó el 2026-09-06** y se lleva los once fragmentos que
-quedaban (PRs #164 a #174): los dos de contabilidad —la empresa que nace con
-su plan de cuentas y el periodo que se abre solo (ADR-089), y el cobro que
-por fin cancela la cuenta por cobrar—, las cinco pantallas de la Ola 3
-(arqueos y libro mayor, auditoría, legajo y permisos de RRHH, áreas de
-distribución, y leads/encuestas/agencias) y los cuatro de la Ola 4.
+Nada. **0.11.0 se cortó el 2026-09-10** y se lleva los 38 fragmentos que
+quedaban desde el corte de 0.10.0: el módulo de delivery completo (PWA de
+repartidor, rutas y entregas, ruteo real con GPS y seguimiento público,
+tablero de despacho, WhatsApp), la ronda avanzada de producción (plan y orden
+por necesidad, costeo real, lotes con trazabilidad y auditoría, checklist de
+inocuidad, evidencia como archivo, reporte de jornada, subrecetas anidadas,
+horas-hombre desde RRHH), el módulo de assets con depreciación, horas
+asistidas de RRHH sobre el contrato público, la guía de remisión emitida
+desde su documento origen (con vehículo registrado), catálogo editable, y una
+tanda de fixes (CDP-001 y conteo de producción, CI de backend contra
+Postgres, deuda de `inventory`/`production` al día, mermas y devoluciones,
+reposición al lote original, entre otros).
 
-Es **minor y no parche**: la Ola 3 son pantallas nuevas sobre endpoints que
-ya existían, no arreglos. Con esto quedan cerradas las cuatro olas de la
-auditoría del 2026-08-30.
-
-Al desplegarla, dos cosas que no se resuelven solas: las empresas creadas
-antes de ADR-089 siguen sin plan de cuentas hasta correr
-`scripts/sembrar_contabilidad.py`, y los asientos que se perdieron mientras
-faltaban las cuentas y el periodo **no se reponen** — está anotado como deuda.
+Es **minor y no parche**: todo lo que se lleva es funcionalidad nueva
+(`added`) o corrección de comportamiento (`fixed`) — no hay ningún fragmento
+`removed` que marque una ruptura de contrato.
 
 Nota del corte anterior, que sigue valiendo: **0.9.0 se cortó pero nunca llegó
 a staging** —el `Desplegar` posterior al corte se disparó con `0.8.2` como
