@@ -387,6 +387,53 @@ def test_cerrar_genera_ajuste_por_diferencia(env):
         s["cantidad"] for s in stock if s["sku_id"] == ids["sku_queso"])) == Decimal("10")
 
 
+def test_conteo_ciclico_funciona_igual_en_almacen_de_produccion(env):
+    """RN-PRD-016: la cocina de producción sigue el mismo esquema de conteo
+    cíclico que Almacén Central. El caso de uso nunca miró `almacen.tipo`
+    — esto es cobertura de esa garantía, no capacidad nueva (ver
+    docs/roadmap/deuda/modulo-production.md)."""
+    client, ids, TestSession = env
+    with TestSession() as s:
+        produccion = Almacen(
+            empresa_id=uuid.UUID(ids["empresa_id"]),
+            nombre="Cocina de producción",
+            tipo="produccion",
+        )
+        s.add(produccion)
+        s.commit()
+        produccion_id = str(produccion.id)
+
+    h = _token(client)
+    r = client.post("/api/v1/inventory/movimientos", headers=h, json={
+        "almacen_id": produccion_id, "sku_id": ids["sku_queso"],
+        "cantidad": "10", "tipo": "recepcion_compra",
+    })
+    assert r.status_code == 201, r.text
+
+    conteo = client.post("/api/v1/inventory/conteos", headers=h, json={
+        "almacen_id": produccion_id, "categoria_id": ids["perecibles_id"],
+        "tipo": "rutina",
+    }).json()
+    detalle = client.get(
+        f"/api/v1/inventory/conteos/{conteo['id']}", headers=h).json()
+    assert [i["sku_id"] for i in detalle["items"]] == [ids["sku_queso"]]
+    assert Decimal(detalle["items"][0]["cantidad_sistema"]) == Decimal("10")
+
+    r = client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cantidades", headers=h,
+        json={"items": [{"sku_id": ids["sku_queso"], "cantidad": "7"}]},
+    )
+    assert r.status_code == 200, r.text
+
+    cierre = client.post(
+        f"/api/v1/inventory/conteos/{conteo['id']}/cerrar", headers=h
+    ).json()
+    assert cierre["conteo"]["estado"] == "cerrado"
+    assert len(cierre["ajustes"]) == 1
+    assert Decimal(cierre["ajustes"][0]["cantidad"]) == Decimal("-3")
+    assert cierre["ajustes"][0]["motivo"] == "faltante"
+
+
 def test_diferencia_dentro_del_margen_no_alarma(env):
     client, ids, _ = env
     h = _token(client)

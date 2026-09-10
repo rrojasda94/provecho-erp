@@ -103,9 +103,11 @@ Deuda restante: **escalar sin reporte previo** (los motivos `queja`,
 pero ninguna emisión los produce: haría falta `sales.queja_registrada` con
 endpoint de alta, que choca con el «no hay `POST /emitidos`»); adjuntar un
 reporte del catálogo de `core/reportes` a una emisión («al cerrar caja, manda
-la foto de `estado_caja` a Gerencia»); canales de transporte más allá de la
-bandeja (correo, WhatsApp — el campo `canal` ya está en el modelo); y
-digest/resumen en vez de una entrega por hecho.
+la foto de `estado_caja` a Gerencia»); WhatsApp como canal (`email` ya
+existe desde 2026-09-09, vía `shared.integrations.email.smtp`, y se suma a
+la bandeja en vez de reemplazarla); pantalla de gestión de
+`regla_distribucion` (hoy solo API); y digest/resumen en vez de una entrega
+por hecho.
 
 ## Casos de uso
 

@@ -48,21 +48,30 @@ def env(_engine_de_prueba):
         s.add(grupo)
         s.flush()
         empresa = Empresa(
-            grupo_id=grupo.id, razon_social="Majambo EIRL", ruc="20100000001",
-            domicilio_fiscal="Jr. X 1", tipo="operativa",
+            grupo_id=grupo.id,
+            razon_social="Majambo EIRL",
+            ruc="20100000001",
+            domicilio_fiscal="Jr. X 1",
+            tipo="operativa",
         )
         marca = Marca(grupo_id=grupo.id, nombre="Charlie's", tipo="restaurante")
         s.add_all([empresa, marca])
         s.flush()
         sucursal = Sucursal(
-            marca_id=marca.id, empresa_id=empresa.id, nombre="CH1",
-            direccion="Jr. X 123", tenencia="alquilada",
+            marca_id=marca.id,
+            empresa_id=empresa.id,
+            nombre="CH1",
+            direccion="Jr. X 123",
+            tenencia="alquilada",
         )
         s.add(sucursal)
         s.flush()
         pv = PuntoVenta(
-            sucursal_id=sucursal.id, canal="trabajador", serie_boleta="B001",
-            serie_factura="F001", politica_pago="adelantado",
+            sucursal_id=sucursal.id,
+            canal="trabajador",
+            serie_boleta="B001",
+            serie_factura="F001",
+            politica_pago="adelantado",
         )
         rol_sup = Rol(nombre="supervisor")
         s.add_all([pv, rol_sup])
@@ -72,11 +81,15 @@ def env(_engine_de_prueba):
         # Dos almacenes: el de la sucursal y el central, que no cuelga de
         # ninguna — es el caso que `destinatarios_de_sucursal` no cubre.
         alm_sucursal = Almacen(
-            empresa_id=empresa.id, sucursal_id=sucursal.id,
-            nombre="Almacén CH1", tipo="sucursal",
+            empresa_id=empresa.id,
+            sucursal_id=sucursal.id,
+            nombre="Almacén CH1",
+            tipo="sucursal",
         )
         alm_central = Almacen(
-            empresa_id=empresa.id, nombre="Central", tipo="central",
+            empresa_id=empresa.id,
+            nombre="Central",
+            tipo="central",
         )
         s.add_all([rol_alm, alm_sucursal, alm_central])
         s.flush()
@@ -91,11 +104,16 @@ def env(_engine_de_prueba):
         s.add(UsuarioRol(usuario_id=usuarios["supervisor1"].id, rol_id=rol_sup.id))
         s.add(UsuarioRol(usuario_id=usuarios["almacenero1"].id, rol_id=rol_alm.id))
         s.commit()
-        yield s, {
-            "sucursal": sucursal, "pv": pv,
-            "alm_sucursal": alm_sucursal, "alm_central": alm_central,
-            **usuarios,
-        }
+        yield (
+            s,
+            {
+                "sucursal": sucursal,
+                "pv": pv,
+                "alm_sucursal": alm_sucursal,
+                "alm_central": alm_central,
+                **usuarios,
+            },
+        )
 
 
 def _abrir_caja(s, ids, *, con_encargado=False):
@@ -169,9 +187,7 @@ def test_sin_destinatarios_no_crea_nada_y_no_falla(env):
 
 def test_marcar_leida_la_saca_de_la_bandeja(env):
     s, ids = env
-    (fila,) = notificaciones.notificar(
-        s, [ids["encargado"].id], tipo="t", titulo="Título"
-    )
+    (fila,) = notificaciones.notificar(s, [ids["encargado"].id], tipo="t", titulo="Título")
     s.flush()
 
     notificaciones.marcar_leida(s, fila.id, ids["encargado"].id)
@@ -183,9 +199,7 @@ def test_marcar_leida_la_saca_de_la_bandeja(env):
 
 def test_no_se_puede_marcar_leida_la_de_otro(env):
     s, ids = env
-    (fila,) = notificaciones.notificar(
-        s, [ids["encargado"].id], tipo="t", titulo="Título"
-    )
+    (fila,) = notificaciones.notificar(s, [ids["encargado"].id], tipo="t", titulo="Título")
     s.flush()
     assert notificaciones.marcar_leida(s, fila.id, ids["supervisor1"].id) is None
     assert len(notificaciones.bandeja(s, ids["encargado"].id)) == 1
@@ -216,9 +230,7 @@ def test_un_reporte_emitido_llena_la_bandeja_de_cada_destinatario(env, monkeypat
 
     # El listener abre su propia sesión (corre post-commit): se le da la del
     # test para poder inspeccionar el resultado.
-    monkeypatch.setattr(
-        listeners, "session_factory", lambda: _SesionQueNoCierra(s)
-    )
+    monkeypatch.setattr(listeners, "session_factory", lambda: _SesionQueNoCierra(s))
     reporte_id = uuid.uuid4()
     listeners.on_reporte_emitido(
         {
@@ -293,6 +305,94 @@ def test_un_reporte_de_ambito_empresa_no_inventa_sucursal(env, monkeypatch):
     )
     (aviso,) = notificaciones.bandeja(s, ids["supervisor1"].id)
     assert aviso.sucursal_id is None
+
+
+def test_un_reporte_con_canal_email_manda_correo_ademas_de_la_bandeja(env, monkeypatch):
+    """El correo se suma a la bandeja, no la reemplaza (2026-09-09):
+    `notificacion.leida_at` sigue siendo el único lugar donde algo se marca
+    como leído."""
+    s, ids = env
+    from src.modules.users.application import listeners
+    from src.shared.integrations.email import smtp
+
+    ids["supervisor1"].email = "supervisor1@majambo.test"
+    s.commit()
+
+    monkeypatch.setattr(listeners, "session_factory", lambda: _SesionQueNoCierra(s))
+    monkeypatch.setattr(smtp, "configurado", lambda: True)
+    enviados = []
+    monkeypatch.setattr(
+        smtp,
+        "enviar",
+        lambda *, destinatario, asunto, cuerpo: enviados.append((destinatario, asunto)),
+    )
+
+    listeners.on_reporte_emitido(
+        {
+            "reporte_emitido_id": str(uuid.uuid4()),
+            "codigo": "sales.venta_anulada",
+            "titulo": "Venta anulada",
+            "cuerpo": "detalle",
+            "nivel": "aviso",
+            "canal": "email",
+            "sucursal_id": str(ids["sucursal"].id),
+            "destinatarios": [str(ids["supervisor1"].id)],
+        }
+    )
+
+    assert enviados == [("supervisor1@majambo.test", "Venta anulada")]
+    assert len(notificaciones.bandeja(s, ids["supervisor1"].id)) == 1
+
+
+def test_sin_email_registrado_no_manda_correo_pero_igual_llena_bandeja(env, monkeypatch):
+    s, ids = env
+    from src.modules.users.application import listeners
+    from src.shared.integrations.email import smtp
+
+    monkeypatch.setattr(listeners, "session_factory", lambda: _SesionQueNoCierra(s))
+    monkeypatch.setattr(smtp, "configurado", lambda: True)
+    llamado = []
+    monkeypatch.setattr(smtp, "enviar", lambda **kw: llamado.append(kw))
+
+    listeners.on_reporte_emitido(
+        {
+            "reporte_emitido_id": str(uuid.uuid4()),
+            "codigo": "sales.venta_anulada",
+            "titulo": "Venta anulada",
+            "nivel": "aviso",
+            "canal": "email",
+            "sucursal_id": None,
+            "destinatarios": [str(ids["supervisor1"].id)],
+        }
+    )
+    assert llamado == []
+    assert len(notificaciones.bandeja(s, ids["supervisor1"].id)) == 1
+
+
+def test_sin_smtp_configurado_no_intenta_enviar(env, monkeypatch):
+    s, ids = env
+    from src.modules.users.application import listeners
+    from src.shared.integrations.email import smtp
+
+    ids["supervisor1"].email = "supervisor1@majambo.test"
+    s.commit()
+    monkeypatch.setattr(listeners, "session_factory", lambda: _SesionQueNoCierra(s))
+    monkeypatch.setattr(smtp, "configurado", lambda: False)
+    llamado = []
+    monkeypatch.setattr(smtp, "enviar", lambda **kw: llamado.append(kw))
+
+    listeners.on_reporte_emitido(
+        {
+            "reporte_emitido_id": str(uuid.uuid4()),
+            "codigo": "sales.venta_anulada",
+            "titulo": "Venta anulada",
+            "nivel": "aviso",
+            "canal": "email",
+            "sucursal_id": None,
+            "destinatarios": [str(ids["supervisor1"].id)],
+        }
+    )
+    assert llamado == []
 
 
 class _SesionQueNoCierra:

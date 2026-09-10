@@ -561,7 +561,7 @@ def test_una_merma_sin_costo_cargado_no_asienta_un_cero(env):
 
 
 def test_el_desecho_de_produccion_se_asienta_por_costo_de_insumos(env):
-    """ADR-098: no reusa `inventory.merma_registrada` — el producto
+    """ADR-100: no reusa `inventory.merma_registrada` — el producto
     terminado de una orden desechada nunca llegó a existir como stock, así
     que el hecho contable es el costo de los insumos ya consumidos."""
     client, ids, _ = env

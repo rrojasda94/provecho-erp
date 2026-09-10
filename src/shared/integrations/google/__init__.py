@@ -9,9 +9,20 @@ paga el cliente (ADR-054).
 
 from src.shared.integrations.google.rutas import (
     Coordenada,
+    RutaCalculada,
     RutasError,
+    Tramo,
     distancia_km,
     habilitado,
+    ruta_optima,
 )
 
-__all__ = ["Coordenada", "RutasError", "distancia_km", "habilitado"]
+__all__ = [
+    "Coordenada",
+    "RutaCalculada",
+    "RutasError",
+    "Tramo",
+    "distancia_km",
+    "habilitado",
+    "ruta_optima",
+]
