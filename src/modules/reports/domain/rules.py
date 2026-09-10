@@ -9,10 +9,12 @@ from typing import Any, Protocol
 
 TIPOS_DESTINATARIO = ("area", "rol", "usuario", "dinamico")
 
-# Qué canal transporta la entrega. Hoy solo la bandeja in-app existe; el
-# campo está para que agregar correo o WhatsApp no sea una migración de
-# datos, sino una fila más (`notificacion.py`: "bandeja, no transporte").
-CANALES = ("bandeja",)
+# Qué canal transporta la entrega. El campo existía desde el principio para
+# que agregar un canal no fuera una migración de datos, sino una fila más
+# (`notificacion.py`: "bandeja, no transporte"); `email` es el primero en
+# usarlo (2026-09-09) — `users.application.listeners` lo despacha por
+# `shared.integrations.email`, la bandeja sigue siendo `Notificacion`.
+CANALES = ("bandeja", "email")
 
 
 class TieneSucursal(Protocol):

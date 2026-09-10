@@ -63,9 +63,14 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
         s.add(udm_cat)
         s.flush()
         udm = UnidadMedida(categoria_udm_id=udm_cat.id, nombre="Kilo", ratio=Decimal(1))
-        almacen = Almacen(empresa_id=empresa.id, nombre="Producción", tipo="produccion")
-        s.add_all([udm, almacen])
+        s.add(udm)
         s.flush()
+        # `seed()` ya crea el almacén `produccion` (WH-PROD, bloque
+        # `feat/produccion-semilla-y-pantalla-con-permisos`): crear uno propio
+        # acá dejaba dos almacenes `tipo=produccion` en la misma empresa, y
+        # `on_stock_bajo_minimo` exige exactamente uno (RN-PRD-007/011) — con
+        # dos, no crea nada y los tests de este bloque fallaban en silencio.
+        almacen = s.scalar(select(Almacen).where(Almacen.tipo == "produccion"))
 
         harina = Articulo(
             empresa_id=empresa.id, id_interno="H001", nombre="Harina",
@@ -845,9 +850,9 @@ def test_auditoria_registra_crear_consumo_y_completar(env):
     assert set(acciones) == {"crear", "registrar_consumo", "completar"}
 
 
-# --- Desecho → contabilidad (feat/produccion-desecho-a-contabilidad, ADR-098) ---
+# --- Desecho → contabilidad (feat/produccion-desecho-a-contabilidad, ADR-100) ---
 def test_completar_desechado_publica_orden_desechada_con_costo_insumos(env):
-    """ADR-098: el hecho contable del desecho es el costo de los insumos ya
+    """ADR-100: el hecho contable del desecho es el costo de los insumos ya
     consumidos, no la merma de `inventory` — el producto terminado de una
     orden desechada nunca llegó a existir como stock."""
     client, ids, _ = env

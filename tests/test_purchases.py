@@ -14,6 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 import src.core.models_registry  # noqa: F401
 from src.core.database import Base
+from src.modules.assets.application import listeners as assets_listeners
 from src.modules.inventory.application import listeners
 from src.modules.inventory.infrastructure.models import (
     Articulo,
@@ -43,6 +44,7 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
     Base.metadata.create_all(engine)
     TestSession = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     monkeypatch.setattr(listeners, "session_factory", TestSession)
+    monkeypatch.setattr(assets_listeners, "session_factory", TestSession)
 
     from src.seeders.seed import seed
 
@@ -56,8 +58,11 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
         udm = UnidadMedida(categoria_udm_id=udm_cat.id, nombre="Kilo", ratio=Decimal(1))
         almacen = Almacen(empresa_id=empresa.id, nombre="Central", tipo="central")
         art = Articulo(
-            empresa_id=empresa.id, id_interno="H001", nombre="Harina",
-            unidad_medida_id=None, tipo="insumo",
+            empresa_id=empresa.id,
+            id_interno="H001",
+            nombre="Harina",
+            unidad_medida_id=None,
+            tipo="insumo",
         )
         s.add_all([udm, almacen])
         s.flush()
@@ -74,22 +79,23 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
         rol_comprador = s.scalar(select(Rol).where(Rol.nombre == "comprador"))
         s.add(UsuarioRol(usuario_id=comprador.id, rol_id=rol_comprador.id))
         # Sin sucursal el JWT sale sin `empresa_id` y todo responde 403 (ADR-004).
-        s.add(
-            UsuarioSucursal(
-                usuario_id=comprador.id, sucursal_id=s.scalar(select(Sucursal)).id
-            )
-        )
+        s.add(UsuarioSucursal(usuario_id=comprador.id, sucursal_id=s.scalar(select(Sucursal)).id))
 
         persona = Persona(
-            nombres="Juan", apellidos="Perez", tipo_documento="dni",
+            nombres="Juan",
+            apellidos="Perez",
+            tipo_documento="dni",
             numero_documento="10000009",
         )
         s.add(persona)
         s.flush()
 
         ids.update(
-            empresa_id=str(empresa.id), almacen_id=str(almacen.id),
-            articulo_id=str(art.id), sku_id=str(sku.id), persona_id=str(persona.id),
+            empresa_id=str(empresa.id),
+            almacen_id=str(almacen.id),
+            articulo_id=str(art.id),
+            sku_id=str(sku.id),
+            persona_id=str(persona.id),
         )
         s.commit()
 
@@ -154,10 +160,16 @@ def test_crear_proveedor_juridico_sin_ruc_409(env):
 def test_crear_proveedor_natural_requiere_persona(env):
     client, ids, _ = env
     h = _token(client)
-    r = client.post("/api/v1/purchases/proveedores", headers=h, json={
-        "empresa_id": ids["empresa_id"], "tipo": "natural", "condicion_pago": "contado",
-        "persona_id": ids["persona_id"],
-    })
+    r = client.post(
+        "/api/v1/purchases/proveedores",
+        headers=h,
+        json={
+            "empresa_id": ids["empresa_id"],
+            "tipo": "natural",
+            "condicion_pago": "contado",
+            "persona_id": ids["persona_id"],
+        },
+    )
     assert r.status_code == 201
     assert r.json()["tipo"] == "natural"
     # Antes no viajaba: un proveedor natural no tenía forma de mostrarse
@@ -168,9 +180,15 @@ def test_crear_proveedor_natural_requiere_persona(env):
 def test_crear_proveedor_natural_sin_persona_id_409(env):
     client, ids, _ = env
     h = _token(client)
-    r = client.post("/api/v1/purchases/proveedores", headers=h, json={
-        "empresa_id": ids["empresa_id"], "tipo": "natural", "condicion_pago": "contado",
-    })
+    r = client.post(
+        "/api/v1/purchases/proveedores",
+        headers=h,
+        json={
+            "empresa_id": ids["empresa_id"],
+            "tipo": "natural",
+            "condicion_pago": "contado",
+        },
+    )
     assert r.status_code == 409
 
 
@@ -186,9 +204,7 @@ def test_editar_proveedor_corrige_ruc_y_razon_social(env, monkeypatch):
     """El caso que motivó el cambio: un RUC mal tecleado llega hasta la
     factura electrónica y hasta ahora solo se corregía tocando la base."""
     client, ids, _ = env
-    monkeypatch.setattr(
-        proveedores_uc, "razon_social_desde_ruc", lambda ruc, fallback: fallback
-    )
+    monkeypatch.setattr(proveedores_uc, "razon_social_desde_ruc", lambda ruc, fallback: fallback)
     h = _token(client)
     proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
 
@@ -258,12 +274,18 @@ def test_editar_proveedor_clasificacion_invalida_422(env):
 
 
 def _crear_oc(client, headers, ids, proveedor_id, idempotency_key="oc-key-1", costo="10.00"):
-    return client.post("/api/v1/purchases/ordenes-compra", headers=headers, json={
-        "proveedor_id": proveedor_id,
-        "almacen_destino_id": ids["almacen_id"],
-        "idempotency_key": idempotency_key,
-        "items": [{"articulo_id": ids["articulo_id"], "cantidad": "100", "costo_unitario": costo}],
-    })
+    return client.post(
+        "/api/v1/purchases/ordenes-compra",
+        headers=headers,
+        json={
+            "proveedor_id": proveedor_id,
+            "almacen_destino_id": ids["almacen_id"],
+            "idempotency_key": idempotency_key,
+            "items": [
+                {"articulo_id": ids["articulo_id"], "cantidad": "100", "costo_unitario": costo}
+            ],
+        },
+    )
 
 
 def test_flujo_oc_completo_actualiza_stock_y_costo(env):
@@ -283,25 +305,25 @@ def test_flujo_oc_completo_actualiza_stock_y_costo(env):
 
     # Comprometer plata con un proveedor deja rastro (ADR-031).
     from src.shared.models import AuditLog
+
     with TestSession() as s:
-        rastro = s.scalar(
-            select(AuditLog).where(AuditLog.entidad_id == uuid.UUID(oc_id))
-        )
+        rastro = s.scalar(select(AuditLog).where(AuditLog.entidad_id == uuid.UUID(oc_id)))
     assert rastro.accion == "emitir"
     assert rastro.datos_despues["total"] == "1000.00"
 
     # ítem id: solo hay uno, lo leemos de la BD directo (no hay GET de items).
     from src.modules.purchases.infrastructure.models import OrdenCompraItem
+
     with TestSession() as s:
         item = s.scalar(
-            select(OrdenCompraItem).where(
-                OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id)
-            )
+            select(OrdenCompraItem).where(OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id))
         )
         item_id = str(item.id)
 
     recepcion = client.post(
-        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones", headers=h, json={
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones",
+        headers=h,
+        json={
             "idempotency_key": "recep-key-1",
             "items": [{"orden_compra_item_id": item_id, "cantidad_recibida": "100"}],
         },
@@ -311,14 +333,124 @@ def test_flujo_oc_completo_actualiza_stock_y_costo(env):
     ver = client.get(f"/api/v1/purchases/ordenes-compra/{oc_id}", headers=h)
     assert ver.json()["estado"] == "recibida"
 
-    stock = client.get(
-        f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h
-    ).json()["items"]
+    stock = client.get(f"/api/v1/inventory/stock?almacen_id={ids['almacen_id']}", headers=h).json()[
+        "items"
+    ]
     assert Decimal(stock[0]["cantidad"]) == Decimal("100")
 
     with TestSession() as s:
         art = s.get(Articulo, uuid.UUID(ids["articulo_id"]))
         assert art.costo_promedio == Decimal("10.0000")
+
+
+def _crear_oc_activo(client, headers, proveedor_id, **overrides):
+    body = {
+        "proveedor_id": proveedor_id,
+        "idempotency_key": "oc-activo-key-1",
+        "id_interno": "EQ100",
+        "nombre": "Horno industrial",
+        "categoria": "cocina",
+        "costo_estimado": "5000.00",
+        "vida_util_meses": 60,
+        **overrides,
+    }
+    return client.post("/api/v1/purchases/ordenes-compra-activo", headers=headers, json=body)
+
+
+def test_oc_activo_flujo_completo_da_de_alta_el_activo(env):
+    """RN nueva: recibir una OC tipo `activo` publica el evento que `assets`
+    consume para dar de alta el activo solo (ADR-099)."""
+    from src.modules.assets.infrastructure.models import Activo
+
+    client, ids, TestSession = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+
+    oc = _crear_oc_activo(client, h, proveedor_id)
+    assert oc.status_code == 201, oc.text
+    body = oc.json()
+    assert body["tipo"] == "activo"
+    assert body["almacen_destino_id"] is None
+    assert body["requerimiento_activo"]["id_interno"] == "EQ100"
+    assert Decimal(body["total"]) == Decimal("5000.00")
+    oc_id = body["id"]
+
+    emit = client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
+    assert emit.status_code == 200, emit.text
+    assert emit.json()["estado"] == "emitida"
+
+    recibir = client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/recibir-activo", headers=h)
+    assert recibir.status_code == 200, recibir.text
+    assert recibir.json()["estado"] == "recibida"
+
+    with TestSession() as s:
+        activo = s.scalar(select(Activo).where(Activo.id_interno == "EQ100"))
+        assert activo is not None
+        assert activo.nombre == "Horno industrial"
+        assert activo.categoria == "cocina"
+        assert activo.valor_compra == Decimal("5000.00")
+        assert activo.vida_util_meses == 60
+        assert activo.estado == "operativo"
+        assert activo.proveedor_id == uuid.UUID(proveedor_id)
+
+
+def test_oc_activo_es_idempotente_por_idempotency_key(env):
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+
+    primera = _crear_oc_activo(client, h, proveedor_id).json()
+    segunda = _crear_oc_activo(client, h, proveedor_id).json()
+    assert primera["id"] == segunda["id"]
+
+
+def test_no_se_puede_recibir_activo_dos_veces(env):
+    client, ids, _ = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc_id = _crear_oc_activo(client, h, proveedor_id).json()["id"]
+    client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
+
+    primera = client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/recibir-activo", headers=h)
+    assert primera.status_code == 200
+    segunda = client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/recibir-activo", headers=h)
+    assert segunda.status_code == 409
+
+
+def test_id_interno_duplicado_no_tumba_la_recepcion(env):
+    """Un `id_interno` ya usado por otro activo no debe romper la OC: la
+    compra ya llegó y el papeleo tiene que quedar consistente aunque el
+    alta automática falle (deuda declarada — la colisión queda solo en el
+    log)."""
+    client, ids, TestSession = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+
+    with TestSession() as s:
+        from src.modules.assets.application import activos as activos_uc
+
+        admin = s.scalar(select(Usuario).where(Usuario.username == "admin"))
+        activos_uc.crear_activo(
+            s,
+            empresa_id=uuid.UUID(ids["empresa_id"]),
+            tipo="equipamiento",
+            id_interno="EQ100",
+            nombre="Ya existente",
+            creado_por=admin.id,
+        )
+        s.commit()
+
+    oc_id = _crear_oc_activo(client, h, proveedor_id).json()["id"]
+    client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
+    recibir = client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/recibir-activo", headers=h)
+    assert recibir.status_code == 200, recibir.text
+    assert recibir.json()["estado"] == "recibida"
+
+    with TestSession() as s:
+        from src.modules.assets.infrastructure.models import Activo
+
+        activos = list(s.scalars(select(Activo).where(Activo.id_interno == "EQ100")))
+        assert len(activos) == 1  # el segundo se omitió, no duplicó
 
 
 def test_recibir_un_articulo_dado_de_alta_por_la_api_mueve_stock(env):
@@ -334,33 +466,43 @@ def test_recibir_un_articulo_dado_de_alta_por_la_api_mueve_stock(env):
     proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
     udm_id = client.get("/api/v1/inventory/unidades-medida", headers=h).json()[0]["id"]
 
-    articulo_id = client.post("/api/v1/inventory/articulos", headers=h, json={
-        "empresa_id": ids["empresa_id"], "id_interno": "AZUC", "nombre": "Azúcar",
-        "unidad_medida_id": udm_id, "tipo": "insumo",
-    }).json()["id"]
+    articulo_id = client.post(
+        "/api/v1/inventory/articulos",
+        headers=h,
+        json={
+            "empresa_id": ids["empresa_id"],
+            "id_interno": "AZUC",
+            "nombre": "Azúcar",
+            "unidad_medida_id": udm_id,
+            "tipo": "insumo",
+        },
+    ).json()["id"]
 
-    oc_id = client.post("/api/v1/purchases/ordenes-compra", headers=h, json={
-        "proveedor_id": proveedor_id,
-        "almacen_destino_id": ids["almacen_id"],
-        "idempotency_key": "oc-key-sin-sku-previo",
-        "items": [
-            {"articulo_id": articulo_id, "cantidad": "40", "costo_unitario": "3.00"}
-        ],
-    }).json()["id"]
+    oc_id = client.post(
+        "/api/v1/purchases/ordenes-compra",
+        headers=h,
+        json={
+            "proveedor_id": proveedor_id,
+            "almacen_destino_id": ids["almacen_id"],
+            "idempotency_key": "oc-key-sin-sku-previo",
+            "items": [{"articulo_id": articulo_id, "cantidad": "40", "costo_unitario": "3.00"}],
+        },
+    ).json()["id"]
     client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
 
     from src.modules.purchases.infrastructure.models import OrdenCompraItem
+
     with TestSession() as s:
         item_id = str(
             s.scalar(
-                select(OrdenCompraItem).where(
-                    OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id)
-                )
+                select(OrdenCompraItem).where(OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id))
             ).id
         )
 
     recepcion = client.post(
-        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones", headers=h, json={
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones",
+        headers=h,
+        json={
             "idempotency_key": "recep-key-sin-sku-previo",
             "items": [{"orden_compra_item_id": item_id, "cantidad_recibida": "40"}],
         },
@@ -369,10 +511,9 @@ def test_recibir_un_articulo_dado_de_alta_por_la_api_mueve_stock(env):
 
     # Lo que staging no tenía: una fila de stock para lo que se recibió.
     from src.modules.inventory.infrastructure.models import Sku
+
     with TestSession() as s:
-        sku_id = s.scalar(
-            select(Sku.id).where(Sku.articulo_id == uuid.UUID(articulo_id))
-        )
+        sku_id = s.scalar(select(Sku.id).where(Sku.articulo_id == uuid.UUID(articulo_id)))
     assert sku_id is not None, "el artículo nació sin SKU: la compra no puede entrar"
 
     stock = client.get(
@@ -388,31 +529,34 @@ def test_la_recepcion_conserva_el_lote_que_declaro_el_proveedor(env):
     client, ids, TestSession = env
     h = _token(client)
     proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
-    oc_id = _crear_oc(
-        client, h, ids, proveedor_id, idempotency_key="oc-key-lote"
-    ).json()["id"]
+    oc_id = _crear_oc(client, h, ids, proveedor_id, idempotency_key="oc-key-lote").json()["id"]
     client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
 
     from src.modules.purchases.infrastructure.models import (
         OrdenCompraItem,
         RecepcionItem,
     )
+
     with TestSession() as s:
         item_id = str(
             s.scalar(
-                select(OrdenCompraItem).where(
-                    OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id)
-                )
+                select(OrdenCompraItem).where(OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id))
             ).id
         )
 
     r = client.post(
-        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones", headers=h, json={
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones",
+        headers=h,
+        json={
             "idempotency_key": "recep-key-lote",
-            "items": [{
-                "orden_compra_item_id": item_id, "cantidad_recibida": "100",
-                "lote_codigo": "LT-2026-08", "fecha_vencimiento": "2026-12-31",
-            }],
+            "items": [
+                {
+                    "orden_compra_item_id": item_id,
+                    "cantidad_recibida": "100",
+                    "lote_codigo": "LT-2026-08",
+                    "fecha_vencimiento": "2026-12-31",
+                }
+            ],
         },
     )
     assert r.status_code == 201, r.text
@@ -431,16 +575,17 @@ def test_recibir_mas_de_lo_ordenado_409(env):
     client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
 
     from src.modules.purchases.infrastructure.models import OrdenCompraItem
+
     with TestSession() as s:
         item = s.scalar(
-            select(OrdenCompraItem).where(
-                OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id)
-            )
+            select(OrdenCompraItem).where(OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id))
         )
         item_id = str(item.id)
 
     r = client.post(
-        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones", headers=h, json={
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones",
+        headers=h,
+        json={
             "idempotency_key": "recep-key-2",
             "items": [{"orden_compra_item_id": item_id, "cantidad_recibida": "999"}],
         },
@@ -515,15 +660,16 @@ def test_anular_oc_borrador_ok_y_recibida_409(env):
     oc2_id = _crear_oc(client, h, ids, proveedor_id, idempotency_key="oc-key-5").json()["id"]
     client.post(f"/api/v1/purchases/ordenes-compra/{oc2_id}/emitir", headers=h)
     from src.modules.purchases.infrastructure.models import OrdenCompraItem
+
     with TestSession() as s:
         item = s.scalar(
-            select(OrdenCompraItem).where(
-                OrdenCompraItem.orden_compra_id == uuid.UUID(oc2_id)
-            )
+            select(OrdenCompraItem).where(OrdenCompraItem.orden_compra_id == uuid.UUID(oc2_id))
         )
         item_id = str(item.id)
     client.post(
-        f"/api/v1/purchases/ordenes-compra/{oc2_id}/recepciones", headers=h, json={
+        f"/api/v1/purchases/ordenes-compra/{oc2_id}/recepciones",
+        headers=h,
+        json={
             "idempotency_key": "recep-key-5",
             "items": [{"orden_compra_item_id": item_id, "cantidad_recibida": "100"}],
         },
@@ -536,13 +682,19 @@ def test_crear_oc_tipo_activo_409(env):
     client, ids, _ = env
     h = _token(client)
     proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
-    r = client.post("/api/v1/purchases/ordenes-compra", headers=h, json={
-        "proveedor_id": proveedor_id,
-        "almacen_destino_id": ids["almacen_id"],
-        "idempotency_key": "oc-key-6",
-        "tipo": "activo",
-        "items": [{"articulo_id": ids["articulo_id"], "cantidad": "1", "costo_unitario": "500"}],
-    })
+    r = client.post(
+        "/api/v1/purchases/ordenes-compra",
+        headers=h,
+        json={
+            "proveedor_id": proveedor_id,
+            "almacen_destino_id": ids["almacen_id"],
+            "idempotency_key": "oc-key-6",
+            "tipo": "activo",
+            "items": [
+                {"articulo_id": ids["articulo_id"], "cantidad": "1", "costo_unitario": "500"}
+            ],
+        },
+    )
     assert r.status_code == 409
 
 
@@ -605,9 +757,7 @@ def test_editar_orden_compra_sin_items_falla(env):
     oc = _crear_oc(client, h, ids, proveedor_id, idempotency_key="oc-edit-3")
     oc_id = oc.json()["id"]
 
-    r = client.patch(
-        f"/api/v1/purchases/ordenes-compra/{oc_id}", headers=h, json={"items": []}
-    )
+    r = client.patch(f"/api/v1/purchases/ordenes-compra/{oc_id}", headers=h, json={"items": []})
     assert r.status_code == 422
 
 
@@ -633,7 +783,8 @@ def test_registrar_compra_directa_crea_oc_recibida_y_conforme(env):
     proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
 
     r = client.post(
-        "/api/v1/purchases/compras-directas", headers=h,
+        "/api/v1/purchases/compras-directas",
+        headers=h,
         json=_compra_directa_body(ids, proveedor_id),
     )
     assert r.status_code == 201
@@ -646,6 +797,7 @@ def test_registrar_compra_directa_crea_oc_recibida_y_conforme(env):
     assert ver.json()["origen"] == "directa"
 
     from src.shared.models import Comprobante
+
     with TestSession() as s:
         comprobante = s.get(Comprobante, uuid.UUID(comprobante_id))
         assert comprobante.compra_id == uuid.UUID(orden_id)
@@ -660,15 +812,15 @@ def test_registrar_compra_directa_publica_evento_compra_recibida_con_contrato_ex
     proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
 
     client.post(
-        "/api/v1/purchases/compras-directas", headers=h,
+        "/api/v1/purchases/compras-directas",
+        headers=h,
         json=_compra_directa_body(ids, proveedor_id, idempotency_key="cd-key-2"),
     )
 
     from src.modules.inventory.infrastructure.models import Stock
+
     with TestSession() as s:
-        stock = s.scalar(
-            select(Stock).where(Stock.sku_id == uuid.UUID(ids["sku_id"]))
-        )
+        stock = s.scalar(select(Stock).where(Stock.sku_id == uuid.UUID(ids["sku_id"])))
         assert stock is not None
         assert stock.cantidad == Decimal("10")
 
@@ -714,11 +866,12 @@ def _hasta_recibida(client, h, ids, proveedor_id, *, clave="fact"):
     oc = _crear_oc(client, h, ids, proveedor_id, idempotency_key=f"oc-factura-{clave}")
     oc_id = oc.json()["id"]
     client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
-    item_id = client.get(
-        f"/api/v1/purchases/ordenes-compra/{oc_id}", headers=h
-    ).json()["items"][0]["id"]
+    item_id = client.get(f"/api/v1/purchases/ordenes-compra/{oc_id}", headers=h).json()["items"][0][
+        "id"
+    ]
     client.post(
-        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones", headers=h,
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones",
+        headers=h,
         json={
             "idempotency_key": f"recepcion-{clave}",
             "items": [{"orden_compra_item_id": item_id, "cantidad_recibida": "100"}],
@@ -738,7 +891,8 @@ def _facturar(client, h, oc_id, **overrides):
     cuerpo.update(overrides)
     return client.post(
         f"/api/v1/purchases/ordenes-compra/{oc_id}/conformidad-comprobante",
-        headers=h, json=cuerpo,
+        headers=h,
+        json=cuerpo,
     )
 
 
@@ -798,7 +952,11 @@ def test_dos_proveedores_pueden_emitir_la_misma_serie_y_correlativo(env):
     h = _token(client)
     uno = _crear_proveedor(client, h, ids).json()["id"]
     otro = _crear_proveedor(
-        client, h, ids, razon_social="Ferretería EIRL", ruc="20222222222",
+        client,
+        h,
+        ids,
+        razon_social="Ferretería EIRL",
+        ruc="20222222222",
     ).json()["id"]
 
     oc_uno = _hasta_recibida(client, h, ids, uno, clave="a")
@@ -834,6 +992,7 @@ def test_una_factura_recibida_no_bloquea_la_serie_propia(env):
     assert _facturar(client, h, oc_id, correlativo=500).status_code == 201
 
     from src.modules.sales.infrastructure.repositories import ComprobanteRepo
+
     with TestSession() as s:
         empresa_id = s.scalar(select(Empresa.id))
         assert ComprobanteRepo(s).siguiente_correlativo(empresa_id, "F001") == 1
@@ -868,9 +1027,9 @@ def test_la_ficha_de_la_oc_lee_sus_recepciones_y_su_factura(env):
     # El artículo sale del ítem de la OC: `recepcion_item` no lo guarda.
     assert recepciones[0]["items"][0]["articulo_id"] == ids["articulo_id"]
 
-    assert client.get(
-        f"/api/v1/purchases/ordenes-compra/{oc_id}/comprobantes", headers=h
-    ).json() == []
+    assert (
+        client.get(f"/api/v1/purchases/ordenes-compra/{oc_id}/comprobantes", headers=h).json() == []
+    )
     _facturar(client, h, oc_id)
     comprobantes = client.get(
         f"/api/v1/purchases/ordenes-compra/{oc_id}/comprobantes", headers=h
@@ -884,7 +1043,11 @@ def test_el_registro_de_compras_filtra_y_trae_el_proveedor(env):
     h = _token(client)
     uno = _crear_proveedor(client, h, ids).json()["id"]
     otro = _crear_proveedor(
-        client, h, ids, razon_social="Ferretería EIRL", ruc="20222222222",
+        client,
+        h,
+        ids,
+        razon_social="Ferretería EIRL",
+        ruc="20222222222",
     ).json()["id"]
     _facturar(client, h, _hasta_recibida(client, h, ids, uno, clave="a"))
     _facturar(client, h, _hasta_recibida(client, h, ids, otro, clave="b"))
@@ -893,13 +1056,12 @@ def test_el_registro_de_compras_filtra_y_trae_el_proveedor(env):
     assert todos["total"] == 2
     # El proveedor y el total de la OC se componen después de paginar.
     assert {c["proveedor"] for c in todos["items"]} == {
-        "Molinera SAC", "Ferretería EIRL",
+        "Molinera SAC",
+        "Ferretería EIRL",
     }
     assert all(Decimal(c["total_orden"]) == Decimal("1000.00") for c in todos["items"])
 
-    solo_uno = client.get(
-        f"/api/v1/purchases/comprobantes?proveedor_id={uno}", headers=h
-    ).json()
+    solo_uno = client.get(f"/api/v1/purchases/comprobantes?proveedor_id={uno}", headers=h).json()
     assert solo_uno["total"] == 1
     assert solo_uno["items"][0]["proveedor"] == "Molinera SAC"
 
@@ -913,9 +1075,9 @@ def test_el_registro_de_compras_filtra_por_fecha_de_negocio_no_utc(env):
     client, ids, TestSession = env
     h = _token(client)
     proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
-    comprobante_id = _facturar(
-        client, h, _hasta_recibida(client, h, ids, proveedor_id)
-    ).json()["id"]
+    comprobante_id = _facturar(client, h, _hasta_recibida(client, h, ids, proveedor_id)).json()[
+        "id"
+    ]
 
     # Lunes 20:00 hora Perú = martes 01:00 UTC. Sin fecha_emision, el filtro
     # cae a created_at (ver docstring de q_comprobantes_recibidos).
@@ -950,27 +1112,38 @@ def test_el_registro_de_compras_lo_ve_el_contador(env):
         rol = s.scalar(select(Rol).where(Rol.nombre == "contador"))
         sucursal_id = s.scalar(select(Sucursal.id))
         contador = Usuario(
-            username="contador_pruebas", pin_hash=hash_pin("999999"), tipo="humano",
+            username="contador_pruebas",
+            pin_hash=hash_pin("999999"),
+            tipo="humano",
         )
         s.add(contador)
         s.flush()
-        s.add_all([
-            UsuarioRol(usuario_id=contador.id, rol_id=rol.id),
-            UsuarioSucursal(usuario_id=contador.id, sucursal_id=sucursal_id),
-        ])
+        s.add_all(
+            [
+                UsuarioRol(usuario_id=contador.id, rol_id=rol.id),
+                UsuarioSucursal(usuario_id=contador.id, sucursal_id=sucursal_id),
+            ]
+        )
         s.commit()
 
     h = _token(client, username="contador_pruebas", pin="999999")
     assert client.get("/api/v1/purchases/comprobantes", headers=h).status_code == 200
     # Y sigue sin poder emitir una OC.
-    assert client.post(
-        "/api/v1/purchases/ordenes-compra", headers=h,
-        json={
-            "proveedor_id": proveedor_id, "almacen_destino_id": ids["almacen_id"],
-            "idempotency_key": "no-deberia-crear",
-            "items": [{"articulo_id": ids["articulo_id"], "cantidad": "1", "costo_unitario": "1"}],
-        },
-    ).status_code == 403
+    assert (
+        client.post(
+            "/api/v1/purchases/ordenes-compra",
+            headers=h,
+            json={
+                "proveedor_id": proveedor_id,
+                "almacen_destino_id": ids["almacen_id"],
+                "idempotency_key": "no-deberia-crear",
+                "items": [
+                    {"articulo_id": ids["articulo_id"], "cantidad": "1", "costo_unitario": "1"}
+                ],
+            },
+        ).status_code
+        == 403
+    )
 
 
 def test_la_compra_directa_guarda_los_datos_de_la_factura(env):

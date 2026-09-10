@@ -303,11 +303,23 @@ MODULOS_CON_SESSION_FACTORY = (
     # `test_alerta_pedido`, que hasta ahora los dejaban abrir la base de
     # producción: 5 s de `connect_timeout` regalados por test y, con la base
     # de desarrollo levantada, el barrido corriendo **contra ella**.
+    "src.modules.accounting.application.tasks",
+    "src.modules.assets.application.listeners",
+    "src.modules.assets.application.tasks",
     "src.modules.inventory.application.tasks",
     "src.modules.marketing.application.tasks",
     "src.modules.production.application.tasks",
     "src.modules.rrhh.purga",
     "src.modules.sales.application.tasks",
+    # `delivery` cierra/cancela una entrega al escuchar `sales.venta_entregada`/
+    # `venta_anulada`, y `sales` marca la venta entregada al escuchar
+    # `delivery.entrega_registrada` (ADR-098): los dos lados de esa cadena
+    # abren su propia sesión y hay que blanquearlos igual que a los demás.
+    "src.modules.delivery.application.listeners",
+    "src.modules.sales.application.listeners",
+    # Barridos de purga de GPS y evidencia (ADR-098) — mismo motivo que los
+    # demás barridos de la lista de arriba.
+    "src.modules.delivery.application.tasks",
 )
 
 

@@ -15,6 +15,8 @@ ESPERADAS = {
     "inventory.reportar_conteos_vencidos",
     "marketing.barrer_encuestas_vencidas",
     "production.generar_reportes_de_jornada_vencidos",
+    "assets.barrer_vencimientos",
+    "accounting.correr_depreciacion_mensual",
     "core.latido_worker",
 }
 

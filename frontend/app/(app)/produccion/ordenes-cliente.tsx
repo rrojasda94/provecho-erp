@@ -8,6 +8,7 @@ import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { ArticuloPicker } from "@/components/articulo-picker/articulo-picker";
+import { tienePermiso } from "@/lib/permisos";
 
 import {
   completarOrdenAction,
@@ -361,6 +362,7 @@ export function OrdenesCliente({
   articulos,
   almacenes,
   trabajadores,
+  permisos,
 }: {
   ordenes: Orden[];
   /** Cuántos hay en total: la página viene recortada. */
@@ -368,7 +370,14 @@ export function OrdenesCliente({
   articulos: Articulo[];
   almacenes: Almacen[];
   trabajadores: TrabajadorDisponible[];
+  permisos: string[];
 }) {
+  // El router usa `production.crear` tanto para crear la orden como para
+  // registrar su consumo (son el mismo paso de cocina); `production.completar`
+  // es el permiso distinto que exige el control de calidad.
+  const puedeCrear = tienePermiso(permisos, "production.crear");
+  const puedeCompletar = tienePermiso(permisos, "production.completar");
+
   const nombreArticulo = useMemo(
     () => new Map(articulos.map((a) => [a.id, `${a.id_interno} · ${a.nombre}`])),
     [articulos],
@@ -422,6 +431,9 @@ export function OrdenesCliente({
         header: "",
         cell: ({ row }) => {
           const orden = row.original;
+          // El ciclo es lineal: se consume en borrador, se completa en
+          // proceso. Mostrar el botón que no aplica solo invita al 409 —
+          // y mostrarlo a quien no tiene el permiso, a un 403.
           return (
             <div className="flex items-center gap-3">
               <Link
@@ -430,20 +442,24 @@ export function OrdenesCliente({
               >
                 Ver
               </Link>
-              {/* El ciclo es lineal: se consume en borrador, se completa en
-                  proceso. Mostrar el botón que no aplica solo invita al 409. */}
-              {orden.estado === "borrador" && (
-                <DialogoConsumo orden={orden} articulos={articulos} />
-              )}
-              {orden.estado === "en_proceso" && (
-                <DialogoCompletar orden={orden} trabajadores={trabajadores} />
-              )}
+              {orden.estado === "borrador" &&
+                (puedeCrear ? (
+                  <DialogoConsumo orden={orden} articulos={articulos} />
+                ) : (
+                  <span className="text-xs text-gray">—</span>
+                ))}
+              {orden.estado === "en_proceso" &&
+                (puedeCompletar ? (
+                  <DialogoCompletar orden={orden} trabajadores={trabajadores} />
+                ) : (
+                  <span className="text-xs text-gray">—</span>
+                ))}
             </div>
           );
         },
       },
     ],
-    [articulos, nombreArticulo, nombreAlmacen, trabajadores],
+    [articulos, nombreArticulo, nombreAlmacen, trabajadores, puedeCrear, puedeCompletar],
   );
 
   return (
@@ -452,7 +468,9 @@ export function OrdenesCliente({
         <h1 className="font-heading text-xl text-dark">
           Órdenes de producción
         </h1>
-        <DialogoNuevaOrden articulos={articulos} almacenes={almacenes} />
+        {puedeCrear && (
+          <DialogoNuevaOrden articulos={articulos} almacenes={almacenes} />
+        )}
       </div>
       <p className="text-sm text-gray">
         Fabricar una subreceta o un producto propio: se crea la orden, se registra lo que
