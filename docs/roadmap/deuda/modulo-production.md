@@ -24,21 +24,20 @@ Plan completo de cómo saldar esta deuda (bloques, orden, decisiones tomadas):
 - ⬜ **`reporte_produccion`** consolidado automático al cierre de jornada
   (RN-DOC-010), visado por el jefe de cocina, no redactado a mano.
   Bloque `feat/produccion-reporte-de-jornada`.
-- ⬜ **Merma → `accounting`**: `no_conforme_desechado` registra
-  `merma_cantidad`/`merma_motivo` en la orden pero nunca dispara un asiento
-  contable. **No está bloqueado por `inventory`** — al revisar el 2026-09-09
-  se confirmó que `stock_merma` nunca existió como tabla: la merma de
-  `inventory` vive en `reserva_stock` (tipo `merma`, ADR-028) desde
-  2026-08-06, con evento `inventory.merma_registrada` y asiento propio en
-  `accounting`. El bloqueo real es de diseño interno de `production`: el
-  producto terminado de una orden desechada **nunca entró a inventory**
-  (solo se publica `orden_completada` en el caso `conforme`), así que no
-  hay stock que reservar como merma — publicar `inventory.merma_registrada`
-  no aplica aquí. La solución es un asiento propio de `production` contra
-  el costo de insumos de la orden (ver el plan, bloque
-  `feat/produccion-desecho-a-contabilidad`). Reproceso
-  (`no_conforme_reprocesado`) correctamente no genera merma ni asiento
-  (RN-PRD — solo detalle en el reporte de escalamiento).
+- ✅ 2026-09-09 **Merma → `accounting`** (bloque
+  `feat/produccion-desecho-a-contabilidad`, ADR-100). No se reusó
+  `inventory.merma_registrada` a propósito: esa merma opera sobre una
+  `reserva_stock` de un SKU que ya está en el almacén, y el producto
+  terminado de una orden desechada **nunca entró a inventory** (solo se
+  publica `orden_completada` en el caso `conforme`) — no hay reserva que
+  apartar. Nuevo evento propio `production.orden_desechada`
+  (`{orden_produccion_id, almacen_id, articulo_id, merma_cantidad,
+  merma_motivo, monto, registrado_por}`, `monto = costo_insumos` de la
+  orden — la mano de obra queda afuera porque ya se reconoce como gasto de
+  planilla) y su plantilla PCGE (`D 6599 / H 201`, mismo circuito que la
+  merma de `inventory`, desglosado por la categoría del artículo
+  producido). Reproceso (`no_conforme_reprocesado`) sigue sin generar
+  merma ni asiento (RN-PRD — solo detalle en el reporte de escalamiento).
 - ✅ 2026-09-09 **Lote/trazabilidad del producto terminado** (bloque
   `feat/produccion-lote-trazabilidad-auditoria`). `CompletarOrdenIn` acepta
   `fecha_vencimiento`, `lote_codigo` y `trazabilidad` (JSONB libre:

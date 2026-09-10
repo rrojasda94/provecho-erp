@@ -199,6 +199,16 @@ PLANTILLAS: dict[str, Plantilla] = {
         monto_es="neto",
         lineas=(_d("6599", rol="merma"), _h("201", rol="existencia")),
     ),
+    # Desecho de producción (ADR-100): no se reusa `inventory.merma_
+    # registrada` porque el producto terminado de una orden desechada nunca
+    # llegó a existir como stock — no hay reserva que apartar. El monto es
+    # el costo de los insumos que `registrar_consumo` ya descontó del
+    # almacén, la única pérdida real y medible; la mano de obra queda
+    # afuera porque ya se reconoce como gasto de planilla, aparte.
+    "production.orden_desechada": Plantilla(
+        monto_es="neto",
+        lineas=(_d("6599", rol="merma"), _h("201", rol="existencia")),
+    ),
     # Pago a proveedor: cancela la deuda contra la cuenta corriente. La
     # detracción no abre línea propia — el dinero sale igual de la misma
     # cuenta, solo cambia el banco de destino (ver README).

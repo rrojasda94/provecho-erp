@@ -560,6 +560,53 @@ def test_una_merma_sin_costo_cargado_no_asienta_un_cero(env):
     assert _asientos_de(client, h, ids, sku_id) == []
 
 
+def test_el_desecho_de_produccion_se_asienta_por_costo_de_insumos(env):
+    """ADR-100: no reusa `inventory.merma_registrada` — el producto
+    terminado de una orden desechada nunca llegó a existir como stock, así
+    que el hecho contable es el costo de los insumos ya consumidos."""
+    client, ids, _ = env
+    h = _token(client)
+    _abrir_periodo_actual(client, h, ids)
+    perdida_id = _crear_cuenta(client, h, ids, "65", "Mermas", "gasto").json()["id"]
+    existencias_id = _crear_cuenta(
+        client, h, ids, "20", "Existencias", "activo"
+    ).json()["id"]
+    _crear_regla_asiento(
+        client, h, ids, "production.orden_desechada", perdida_id, existencias_id
+    )
+
+    orden_id = str(uuid.uuid4())
+    accounting_listeners.on_orden_desechada({
+        "orden_produccion_id": orden_id, "almacen_id": ids["almacen_id"],
+        "articulo_id": str(uuid.uuid4()), "merma_cantidad": "10",
+        "merma_motivo": "contaminación", "monto": "20.00", "registrado_por": None,
+    })
+
+    (generado,) = _asientos_de(client, h, ids, orden_id)
+    assert generado["evento_origen"] == "production.orden_desechada"
+
+
+def test_el_desecho_de_produccion_sin_costo_no_asienta_un_cero(env):
+    client, ids, _ = env
+    h = _token(client)
+    _abrir_periodo_actual(client, h, ids)
+    perdida_id = _crear_cuenta(client, h, ids, "65", "Mermas", "gasto").json()["id"]
+    existencias_id = _crear_cuenta(
+        client, h, ids, "20", "Existencias", "activo"
+    ).json()["id"]
+    _crear_regla_asiento(
+        client, h, ids, "production.orden_desechada", perdida_id, existencias_id
+    )
+
+    orden_id = str(uuid.uuid4())
+    accounting_listeners.on_orden_desechada({
+        "orden_produccion_id": orden_id, "almacen_id": ids["almacen_id"],
+        "articulo_id": str(uuid.uuid4()), "merma_cantidad": "10",
+        "merma_motivo": "contaminación", "monto": "0", "registrado_por": None,
+    })
+    assert _asientos_de(client, h, ids, orden_id) == []
+
+
 # --- Pago a proveedor (PROC-CTB-003) ------------------------------------------
 
 def _dar_conformidad(client, h, oc_id, idempotency_key="conf-key-1"):
