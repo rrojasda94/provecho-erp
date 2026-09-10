@@ -33,9 +33,14 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   comparativa (el camino "simplificado" de proveedor preferente es el
   único implementado). Falta el flujo normal (proveedor regular) con
   cotización de respaldo.
-- ⬜ **OC tipo `activo` + `requerimiento_activo`**: doble aprobación
-  (área + gerencia) y mínimo 2 cotizaciones vinculadas antes de emitir.
-  Hoy el tipo está rechazado explícitamente en la capa de aplicación.
+- 🔶 **OC tipo `activo` + `requerimiento_activo`** (implementado en parte
+  2026-09-09): `crear_orden_compra_activo`/`recibir_orden_compra_activo`
+  (sin ítems de `inventory`, recepción total) — `assets` consume
+  `purchases.requerimiento_activo_recibido` y da de alta el activo solo.
+  Sigue ⬜ pendiente: la doble aprobación (área + gerencia) y el mínimo de
+  2 cotizaciones vinculadas antes de emitir que el diseño original
+  especificaba; comprar un vehículo o varias unidades del mismo activo en
+  una sola OC también queda fuera.
 - ✅ 2026-08-29 **`compra_directa`** (ADR-082): compra a proveedor
   informal sin OC previa, sustentada solo con el comprobante recibido.
   Reutiliza `orden_compra` con `origen="directa"` — mismo contrato de

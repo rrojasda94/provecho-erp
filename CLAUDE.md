@@ -82,8 +82,15 @@ APIs externas desde el dominio.
 
 ## Datos de prueba
 
-Usuarios: `admin` (rol admin) y `cajero1` (rol cajero), PIN: `123456`
-(solo entornos no productivos, vía seeder).
+Usuarios: `admin` (rol admin), `cajero1` (rol cajero), `almacen1`
+(almacenero), `aprobador1` (supervisor) y `jefecocina1` (jefe de cocina),
+todos PIN `123456` (solo entornos no productivos, vía `python -m
+src.seeders.seed`). Ese mismo seeder crea el almacén de producción
+(`WH-PROD`), abastecido por el central. La receta BOM que fabrica algo en
+ese almacén (insumo + subreceta con `articulo_id`) no vive ahí — un
+artículo real en el catálogo de la empresa rompía más de una decena de
+suites de `pytest` que asumen ese catálogo vacío — sino en `python -m
+src.seeders.e2e`, que además crea usuarios con PIN propio para Playwright.
 
 ## Referencias
 

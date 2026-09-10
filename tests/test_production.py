@@ -532,9 +532,9 @@ def test_auditoria_registra_crear_consumo_y_completar(env):
     assert set(acciones) == {"crear", "registrar_consumo", "completar"}
 
 
-# --- Desecho → contabilidad (feat/produccion-desecho-a-contabilidad, ADR-098) ---
+# --- Desecho → contabilidad (feat/produccion-desecho-a-contabilidad, ADR-100) ---
 def test_completar_desechado_publica_orden_desechada_con_costo_insumos(env):
-    """ADR-098: el hecho contable del desecho es el costo de los insumos ya
+    """ADR-100: el hecho contable del desecho es el costo de los insumos ya
     consumidos, no la merma de `inventory` — el producto terminado de una
     orden desechada nunca llegó a existir como stock."""
     client, ids, _ = env

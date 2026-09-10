@@ -318,7 +318,13 @@ un solo registro (`venta_item.estado_preparacion`), sin artefacto de
 traspaso entre cocina y despacho. Las pantallas KDS de tipo `preparacion`
 y `despacho` son vistas distintas del mismo avance, no procesos distintos.
 Si el reparto a domicilio llega a tener ruteo, flota propia y liquidación
-de repartidores, se separa entonces como versión MAYOR.
+de repartidores, se separa entonces como versión MAYOR. **Ocurrió**
+(2026-09-09, ADR-098): ruteo, GPS de flota propia y seguimiento público
+viven en el módulo `delivery`, que se comunica con este proceso solo por
+evento (`delivery.entrega_registrada` avanza la venta a entregada) y por
+contrato de lectura (`sales.queries_publicas.ventas_listas_para_reparto`).
+El avance del ítem (`venta_item.estado_preparacion`) sigue siendo el único
+registro de preparación; `delivery` no lo toca ni lo duplica.
 
 **La preparación es una cadena de estaciones** (2026-08-13, RN-CUP-013,
 ADR-044): armado → horno → … según cómo la sucursal configure el paso de

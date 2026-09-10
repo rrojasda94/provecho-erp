@@ -29,6 +29,7 @@ const ESTADO_INICIAL: EstadoGerencia = { error: "", ok: false };
 
 const MODULOS = [
   "accounting",
+  "assets",
   "inventory",
   "marketing",
   "production",

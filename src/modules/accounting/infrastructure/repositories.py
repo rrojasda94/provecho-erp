@@ -16,6 +16,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from src.modules.accounting.infrastructure.models import (
+    ActivoDepreciacion,
     AperturaCaja,
     Arqueo,
     Asiento,
@@ -210,6 +211,21 @@ class AsientoOmitidoRepo:
         if desde is not None:
             q = q.where(AsientoOmitido.fecha >= desde)
         return self.s.scalar(q) or 0
+
+
+class ActivoDepreciacionRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get_por_activo(self, activo_id: uuid.UUID) -> ActivoDepreciacion | None:
+        return self.s.scalar(
+            select(ActivoDepreciacion).where(ActivoDepreciacion.activo_id == activo_id)
+        )
+
+    def add(self, fila: ActivoDepreciacion) -> ActivoDepreciacion:
+        self.s.add(fila)
+        self.s.flush()
+        return fila
 
 
 class ReglaAsientoRepo:

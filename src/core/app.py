@@ -23,6 +23,11 @@ from src.core.sync.api.routers import router as sync_router
 from src.core.tenant import FueraDeAlcance
 from src.modules.accounting.api.routers import router as accounting_router
 from src.modules.accounting.application import listeners as accounting_listeners
+from src.modules.assets.api.routers import router as assets_router
+from src.modules.assets.application import listeners as assets_listeners
+from src.modules.delivery.api.publico_routers import router as delivery_publico_router
+from src.modules.delivery.api.routers import router as delivery_router
+from src.modules.delivery.application import listeners as delivery_listeners
 from src.modules.inventory.api.routers import router as inventory_router
 from src.modules.inventory.application import listeners as inventory_listeners
 from src.modules.marketing.api.publico_routers import router as marketing_publico_router
@@ -96,6 +101,22 @@ TAGS_METADATA = [
         "description": "Catálogo de artículos, stock por almacén, movimientos y ajustes.",
     },
     {"name": "purchases", "description": "Proveedores y ciclo de orden de compra."},
+    {
+        "name": "assets",
+        "description": (
+            "Activos (equipamiento y vehículos): kilometraje y consumo de "
+            "combustible, cronograma de mantenimiento y documentos con "
+            "fecha de vencimiento (SOAT, licencias, certificados)."
+        ),
+    },
+    {
+        "name": "delivery",
+        "description": (
+            "Reparto propio (ADR-098): repartidores, rutas con varias paradas, "
+            "GPS en ruta y registro de entrega o fallo con motivo. El "
+            "seguimiento público del cliente vive en su propio tag/slice."
+        ),
+    },
     {
         "name": "reports",
         "description": (
@@ -315,6 +336,8 @@ def create_app() -> FastAPI:
     app.include_router(sales_router, prefix="/api/v1")
     app.include_router(kds_router, prefix="/api/v1")
     app.include_router(purchases_router, prefix="/api/v1")
+    app.include_router(assets_router, prefix="/api/v1")
+    app.include_router(delivery_router, prefix="/api/v1")
     app.include_router(production_router, prefix="/api/v1")
     app.include_router(accounting_router, prefix="/api/v1")
     app.include_router(rrhh_router, prefix="/api/v1")
@@ -328,13 +351,24 @@ def create_app() -> FastAPI:
     # que la protege es el rate limit por IP. A cambio, escribe pero no borra
     # y no devuelve más que un booleano (ADR-061).
     app.include_router(sales_publico_router, prefix="/api/v1")
+    # Tampoco lleva JWT: el cliente que sigue su pedido por el enlace no es
+    # usuario del ERP. El token del enlace es la credencial (RN-DLV-008) y
+    # el rate limit por IP es lo que impide probar tokens a fuerza bruta.
+    app.include_router(delivery_publico_router, prefix="/api/v1")
     app.include_router(marketing_webhook_router, prefix="/api/v1")
     app.include_router(sync_router, prefix="/api/v1")
     app.include_router(reports_router, prefix="/api/v1")
     inventory_listeners.register()
     accounting_listeners.register()
+    assets_listeners.register()
     marketing_listeners.register()
     sales_listeners.register()
+    # Después de `sales`: `delivery` escucha `sales.venta_entregada`/
+    # `venta_anulada`, y `sales` escucha `delivery.entrega_registrada` — el
+    # orden de `subscribe` no decide el de despacho entre eventos distintos
+    # (ADR-016), pero registrar los dos lados de la cadena uno después del
+    # otro es más fácil de leer.
+    delivery_listeners.register()
     # `reports` antes que `users`: el primero convierte hechos en reportes y
     # el segundo convierte reportes en bandeja. El orden de `subscribe` no
     # decide el de despacho entre eventos distintos, pero leerlo en este

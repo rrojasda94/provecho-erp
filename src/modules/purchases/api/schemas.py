@@ -107,6 +107,34 @@ class OrdenCompraCreate(BaseModel):
     tipo: str = "insumo"
 
 
+class OrdenCompraActivoCreate(BaseModel):
+    proveedor_id: uuid.UUID
+    idempotency_key: str = Field(min_length=8, max_length=100)
+    sucursal_id: uuid.UUID | None = None
+    id_interno: str = Field(min_length=1, max_length=8)
+    nombre: str = Field(min_length=1, max_length=150)
+    categoria: str | None = Field(default=None, max_length=60)
+    marca: str | None = Field(default=None, max_length=60)
+    modelo: str | None = Field(default=None, max_length=60)
+    costo_estimado: Decimal = Field(gt=0)
+    vida_util_meses: int | None = Field(default=None, gt=0)
+    notas: str | None = None
+
+
+class RequerimientoActivoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    sucursal_id: uuid.UUID | None
+    id_interno: str
+    nombre: str
+    categoria: str | None
+    marca: str | None
+    modelo: str | None
+    costo_estimado: Decimal
+    vida_util_meses: int | None
+    notas: str | None
+
+
 class OrdenCompraItemsUpdate(BaseModel):
     """Reemplaza los ítems de una OC — solo admitido en `estado='borrador'`."""
 
@@ -128,10 +156,12 @@ class OrdenCompraOut(BaseModel):
     proveedor_id: uuid.UUID
     tipo: str
     origen: str
-    almacen_destino_id: uuid.UUID
+    almacen_destino_id: uuid.UUID | None
+    requerimiento_activo_id: uuid.UUID | None
     estado: str
     total: Decimal
     items: list[OrdenCompraItemOut] = []
+    requerimiento_activo: RequerimientoActivoOut | None = None
 
 
 class ComprobanteProveedorBase(BaseModel):
