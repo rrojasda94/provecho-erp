@@ -102,6 +102,7 @@ def detalle_orden(session: Session, orden_id: uuid.UUID) -> dict:
         "id": orden.id,
         "articulo_id": orden.articulo_id,
         "almacen_id": orden.almacen_id,
+        "origen": orden.origen,
         "cantidad_planeada": orden.cantidad_planeada,
         "cantidad_producida": orden.cantidad_producida,
         "estado": orden.estado,
@@ -127,10 +128,14 @@ def crear_orden_produccion(
     articulo_id: uuid.UUID,
     almacen_id: uuid.UUID,
     cantidad_planeada: Decimal,
-    creado_por: uuid.UUID,
+    creado_por: uuid.UUID | None,
     idempotency_key: str,
+    origen: str = "manual",
     ip: str | None = None,
 ) -> OrdenProduccion:
+    """`creado_por=None` solo para `origen="ajuste_por_necesidad"`: la crea
+    el listener de `inventory.stock_bajo_minimo` sin ningún humano detrás
+    (RN-PRD-007) — la API siempre manda el `actor.id` de quien la pide."""
     repo = OrdenProduccionRepo(session)
     existente = repo.get_by_idempotency(idempotency_key)
     if existente is not None:
@@ -153,6 +158,7 @@ def crear_orden_produccion(
             almacen_id=almacen_id,
             cantidad_planeada=Decimal(str(cantidad_planeada)),
             estado="borrador",
+            origen=origen,
             creado_por=creado_por,
             idempotency_key=idempotency_key,
         )

@@ -26,10 +26,22 @@ class OrdenProduccion(Base, UuidPkMixin, TimestampMixin):
             "'no_conforme_reprocesado', 'no_conforme_desechado')",
             name="estado_orden_produccion",
         ),
+        CheckConstraint(
+            "origen IN ('manual', 'ajuste_por_necesidad', 'plan')",
+            name="origen_orden_produccion",
+        ),
     )
 
     articulo_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("articulo.id"))
     almacen_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("almacen.id"))
+    # `manual` (default, vía API) | `ajuste_por_necesidad` (la crea sola
+    # `application/listeners.py` al cruzar `inventory.stock_bajo_minimo`,
+    # RN-PRD-007/011) | `plan` (cronograma, diferido — ver ROADMAP).
+    origen: Mapped[str] = mapped_column(
+        Enum("manual", "ajuste_por_necesidad", "plan", name="origen_orden_produccion",
+             native_enum=False),
+        default="manual",
+    )
     cantidad_planeada: Mapped[Decimal] = mapped_column(Numeric(12, 4))
     cantidad_producida: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
     estado: Mapped[str] = mapped_column(
@@ -75,7 +87,13 @@ class OrdenProduccion(Base, UuidPkMixin, TimestampMixin):
     # envasador_id, linea, variables_proceso — la forma la define quien
     # complete la orden, no hay un esquema fijo todavía (QR queda pendiente).
     trazabilidad: Mapped[dict | None] = mapped_column(JsonB, nullable=True)
-    creado_por: Mapped[uuid.UUID] = mapped_column(ForeignKey("usuario.id"))
+    # Nullable desde `feat/produccion-orden-por-necesidad`: una orden
+    # `ajuste_por_necesidad` la crea el listener, sin ningún humano detrás
+    # (RN-PRD-007) — igual criterio que `usuario_id` nulo en
+    # `inventory.stock_bajo_minimo`, que el reporte muestra como «Sistema».
+    creado_por: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("usuario.id"), nullable=True
+    )
     idempotency_key: Mapped[str] = mapped_column(String(100), unique=True)
     # Nullable y únicas: sin clave, un reintento de red puede duplicar el
     # consumo o completar la orden dos veces (deuda técnica, ver ROADMAP).

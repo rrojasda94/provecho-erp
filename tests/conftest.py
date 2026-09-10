@@ -291,6 +291,7 @@ MODULOS_CON_SESSION_FACTORY = (
     "src.modules.accounting.application.listeners",
     "src.modules.inventory.application.listeners",
     "src.modules.marketing.application.listeners",
+    "src.modules.production.application.listeners",
     # `reports` se suscribe a trece eventos de cuatro módulos y `users`
     # consume el `reports.reporte_emitido` que sale de ahí: entre los dos
     # despiertan en casi cualquier test que confirme una venta o cierre una
