@@ -3,6 +3,18 @@
 Fecha: 2026-08-05
 Estado: aceptada
 
+> **Superado en parte (2026-09-09, ADR-099)**: el punto 4 de este ADR
+> ("No hay entidad `vehiculo`") queda superado — el usuario pidió registrar
+> vehículos de verdad y el módulo `assets` ya los tiene. `guia_remision`
+> ganó un `vehiculo_id` **sin FK** (no una FK cruzada: `inventory` sigue sin
+> poder importar el dominio de `assets`) que resuelve la placa por el
+> contrato público `assets.application.queries_publicas.vehiculo_para_guia`
+> y la congela en `vehiculo_placa` al emitir (RN-VEH-008). `vehiculo_placa`
+> sigue aceptando texto libre cuando no se elige un vehículo — compatibilidad
+> con guías de antes de que `assets` existiera, no una migración de datos.
+> Las decisiones sobre numeración, líneas por SKU e idempotencia de la guía
+> no cambian.
+
 ## Contexto
 
 Charlie's Pizzas mueve mercadería todos los días: del almacén central a CH1

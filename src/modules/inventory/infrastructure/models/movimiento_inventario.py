@@ -31,6 +31,8 @@ TIPO_MOVIMIENTO = Enum(
     "consumo_produccion",
     # Consumo de personal (RN-COM-025): salió del almacén y nadie lo pagó.
     "consumo_interno",
+    # Repuesto usado en una orden de mantenimiento de `assets` (RN-MNT-006).
+    "consumo_mantenimiento",
     "produccion_entrada",
     "ajuste",
     "devolucion",
@@ -61,8 +63,8 @@ class MovimientoInventario(Base, UuidPkMixin):
         CheckConstraint(
             "tipo IN ('recepcion_compra', 'transferencia_salida', "
             "'transferencia_entrada', 'consumo_venta', 'consumo_produccion', "
-            "'consumo_interno', 'produccion_entrada', 'ajuste', 'devolucion', "
-            "'carga_inicial')",
+            "'consumo_interno', 'consumo_mantenimiento', 'produccion_entrada', "
+            "'ajuste', 'devolucion', 'carga_inicial')",
             name="tipo_movimiento",
         ),
         CheckConstraint(

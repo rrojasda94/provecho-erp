@@ -64,6 +64,15 @@ SUCURSALES = {
 # de ninguna sucursal (`sucursal_id` NULL).
 ALMACEN_CENTRAL = ("WH1", SEDE_CASTILLA)
 
+# Cocina de producción: se abastece del central y nunca despacha directo a
+# sucursal (RN-CDP-001) — tampoco cuelga de ninguna sucursal. Sin este
+# almacén el módulo `production` no tiene dónde crear una orden. La receta
+# BOM que fabrica algo en este almacén vive en `python -m src.seeders.e2e`
+# y no acá: un insumo/subreceta real en el catálogo de esta empresa rompía
+# más de una decena de tests que asumen ese catálogo vacío salvo lo que
+# cada uno crea (ver `docs/roadmap/deuda/modulo-production.md`).
+ALMACEN_PRODUCCION = "WH-PROD"
+
 # Matriz semilla (authorization.md). "*" = todo (solo admin, entornos internos).
 PERMISOS = [
     ("*", "Acceso total (solo entornos internos)"),
@@ -144,6 +153,31 @@ PERMISOS = [
     (
         "purchases.dar_conformidad",
         "Dar conformidad al comprobante recibido (dispara el pago)",
+    ),
+    ("assets.leer", "Consultar activos, mantenimiento y documentos con vencimiento"),
+    (
+        "assets.gestionar",
+        "Alta y edición de activos, planes de mantenimiento y documentos con vencimiento",
+    ),
+    (
+        "assets.mantener",
+        "Registrar kilometraje, cargas de combustible y ejecutar órdenes de mantenimiento",
+    ),
+    ("assets.dar_baja", "Dar de baja un activo"),
+    ("delivery.leer", "Consultar repartidores, rutas y entregas"),
+    (
+        "delivery.despachar",
+        "Armar y llevar rutas de reparto propio: asignar, iniciar, "
+        "finalizar, cancelar y registrar el resultado de cualquier entrega",
+    ),
+    (
+        "delivery.gestionar_repartidores",
+        "Dar de alta y editar repartidores propios (ADR-098)",
+    ),
+    (
+        "delivery.repartir",
+        "Ver las rutas propias y registrar la entrega o el fallo de sus "
+        "propias paradas — no las de otro repartidor",
     ),
     ("production.crear", "Crear orden de producción y registrar consumo"),
     ("production.leer", "Consultar órdenes de producción"),
@@ -376,6 +410,18 @@ ROLES = {
         "inventory.aprobar_solicitud",
         "inventory.liberar_reserva",
         "sales.leer_clientes_externos",
+        # El encargado ve el estado de los equipos y vehículos de su local,
+        # da de alta lo que llega y registra kilometraje/combustible y
+        # mantenimiento del día a día. Dar de baja un activo sigue siendo
+        # decisión de un administrador (mismo criterio que `purchases.aprobar`).
+        "assets.leer",
+        "assets.gestionar",
+        "assets.mantener",
+        # Puede dar de alta repartidores propios; también despacha y ve el
+        # reparto cuando le toca cubrir el turno (ADR-098).
+        "delivery.leer",
+        "delivery.despachar",
+        "delivery.gestionar_repartidores",
         "accounting.pago_aprobar",
         "accounting.arqueo_registrar",
         "accounting.caja_retirar",
@@ -409,10 +455,24 @@ ROLES = {
         "sales.entregar_pedido",
         "kds.operar",
         "accounting.caja_operar",
+        # Ve el tablero para saber si un pedido delivery ya salió, no
+        # despacha (eso es del encargado/despachador).
+        "delivery.leer",
     ],
     # Cocina avanza la preparación pero NO cierra la entrega (RN-CUP-006).
     "cocinero": ["kds.operar", "sales.leer"],
-    "despachador": ["kds.operar", "sales.leer", "sales.entregar_pedido"],
+    "despachador": [
+        "kds.operar",
+        "sales.leer",
+        "sales.entregar_pedido",
+        "delivery.leer",
+        "delivery.despachar",
+    ],
+    # Repartidor propio (ADR-098): solo ve y resuelve sus propias rutas —
+    # `delivery.repartir` sin `delivery.despachar` no alcanza la de nadie
+    # más (`scope.exigir_ruta_propia`). No es ni cajero ni cocina: entra y
+    # sale del ERP solo por su PWA de reparto.
+    "repartidor": ["delivery.repartir"],
     # Cuenta y solicita el ajuste, pero no lo aprueba ni ve el stock
     # esperado mientras cuenta: el conteo es a ciegas (RN-INV-005/006).
     "almacenero": [
@@ -425,6 +485,11 @@ ROLES = {
         "inventory.solicitar_ajuste",
         "inventory.contar",
         "inventory.solicitar_insumos",
+        # Kilometraje, combustible y mantenimiento de los vehículos que usa
+        # para transferencias/reparto — no da de alta activos nuevos ni los
+        # da de baja, eso es de quien administra o del encargado del local.
+        "assets.leer",
+        "assets.mantener",
     ],
     "agente_ia": ["sales.crear_pedido"],
     # Cuenta de servicio del hub de sucursal (ADR-009): lo mínimo para
@@ -450,6 +515,12 @@ ROLES = {
         # Qué se pide más y desde dónde, para negociar volumen (contrato
         # público de inventory).
         "inventory.leer_solicitudes_externas",
+        # El área que compra el equipo o el vehículo es la misma que
+        # coordina su mantenimiento con el proveedor de servicio
+        # (RN-MNT-002/004) y da de alta el activo cuando llega.
+        "assets.leer",
+        "assets.gestionar",
+        "assets.mantener",
     ],
     "jefe_cocina": [
         "production.crear",
@@ -474,6 +545,10 @@ ROLES = {
         # Contabilidad audita a Compras, Almacén y las cajas de sucursal
         # (RN-CTB-009): sin el rastro, auditar es preguntar de buena fe.
         "auditoria.leer",
+        # Solo lectura: el valor de compra y la vida útil de un activo son
+        # insumo para la depreciación (deuda declarada, ver ROADMAP), no
+        # algo que Contabilidad dé de alta.
+        "assets.leer",
     ],
     "rrhh_admin": [
         "rrhh.leer",
@@ -496,6 +571,12 @@ ROLES = {
         # alta de infraestructura del ciclo laboral, no del local en sí.
         "rrhh.terminal_gestionar",
         "rrhh.capacitacion_gestionar",
+        # Solo lectura: el carné de sanidad o la licencia de conducir de un
+        # trabajador quedan registrados como `documento_vigencia` con sujeto
+        # `trabajador`, y RRHH necesita verlos aunque no los administre desde
+        # este módulo (el alta va por el mismo permiso que cualquier otro
+        # documento, `assets.gestionar`, que RRHH no tiene).
+        "assets.leer",
     ],
     # Marketing atrae demanda y cuida la marca; no se aprueba su propio
     # brief — eso lo valida Gerencia (RN-MKT-003, RN-GER-007).
@@ -578,6 +659,7 @@ ROLES_POR_AREA = {
     "caja": ("cajero",),
     "contabilidad": ("contador",),
     "rrhh": ("rrhh_admin",),
+    "compras": ("comprador",),
 }
 
 # Usuarios de desarrollo (username, rol). Todos con PIN 123456 y acceso a todas
@@ -596,6 +678,15 @@ USUARIOS_SEMILLA = (
     # `supervisor1` con otro PIN y sembrarlo acá les rompe el alta. El nombre
     # dice además para qué existe — ser el segundo par de ojos.
     ("aprobador1", "supervisor"),
+    # Sin este usuario, el módulo `production` solo se podía probar como
+    # `admin` (el comodín "*"), que nunca ejerce el permiso real que exige
+    # cada endpoint.
+    ("jefecocina1", "jefe_cocina"),
+    # Cuenta de prueba del reparto propio (ADR-098). No es todavía un
+    # `repartidor` de `delivery` —esa fila exige un `trabajador`, que este
+    # seeder no crea— así que sirve para probar el permiso y el login de la
+    # PWA, no para que aparezca en un tablero de despacho.
+    ("repartidor1", "repartidor"),
 )
 
 
@@ -722,12 +813,24 @@ def _seed_organizacion(session: Session) -> None:
         )
 
     nombre_almacen, direccion_almacen = ALMACEN_CENTRAL
-    _get_or_create(
+    central, _ = _get_or_create(
         session,
         Almacen,
         empresa_id=empresa.id,
         nombre=nombre_almacen,
         defaults=dict(tipo="central", sucursal_id=None, direccion=direccion_almacen),
+    )
+
+    _get_or_create(
+        session,
+        Almacen,
+        empresa_id=empresa.id,
+        nombre=ALMACEN_PRODUCCION,
+        defaults=dict(
+            tipo="produccion",
+            sucursal_id=None,
+            almacen_abastecedor_id=central.id,
+        ),
     )
 
 

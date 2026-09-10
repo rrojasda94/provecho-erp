@@ -198,9 +198,15 @@ ningún lado.
 - **Deuda declarada**: `reporte_escalamiento` (RN-CTP-004) sigue sin modelar —
   la cadena supervisor → comercial → gerencia necesita estado y acciones
   propias, no solo distribución. Tampoco están: adjuntar un reporte del
-  catálogo de `core/reportes` a una emisión, canales de transporte más allá de
-  la bandeja (el campo `canal` ya está), y digest en vez de una entrega por
-  hecho.
+  catálogo de `core/reportes` a una emisión, y digest en vez de una entrega
+  por hecho.
+  ~~Canales de transporte más allá de la bandeja~~ — resuelto en parte el
+  2026-09-09: `email` es el primer canal (`domain.rules.CANALES`),
+  despachado por `src.shared.integrations.email.smtp` (SMTP, opcional —
+  sin `SMTP_HOST` el envío se omite y la bandeja sigue llenándose igual).
+  El correo se **suma** a la bandeja, nunca la reemplaza. Sin frontend
+  todavía para elegir el canal al crear una regla (no existe pantalla de
+  gestión de `regla_distribucion`); WhatsApp sigue sin construir.
 
 ## Alternativas descartadas
 

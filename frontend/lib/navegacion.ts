@@ -42,6 +42,11 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Caja", href: "/contabilidad/caja" },
     { label: "Reglas de asiento", href: "/contabilidad/reglas-asiento" },
   ],
+  delivery: [
+    { label: "Tablero", href: "/delivery" },
+    { label: "Repartidores", href: "/delivery/repartidores" },
+    { label: "Historial", href: "/delivery/entregas" },
+  ],
   gerencia: [
     { label: "Parámetros", href: "/gerencia/parametros" },
     { label: "Delivery", href: "/gerencia/delivery" },
@@ -75,6 +80,14 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     // «Reservado» de Stock decía cuánto y no había dónde ver de quién.
     { label: "Mermas", href: "/inventario/mermas" },
     { label: "Reservas", href: "/inventario/reservas" },
+  ],
+  activos: [
+    // La pregunta con la que se abre el módulo: qué se me viene, no la
+    // tabla de planes — mismo criterio que "Stock" en inventario.
+    { label: "Cronograma", href: "/activos/cronograma" },
+    { label: "Activos", href: "/activos/activos" },
+    { label: "Mantenimientos", href: "/activos/mantenimientos" },
+    { label: "Documentos", href: "/activos/documentos" },
   ],
   marketing: [
     { label: "Campañas", href: "/marketing" },
