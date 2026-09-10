@@ -493,11 +493,13 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   RN-CUP-002 y necesita su propia decisión de negocio, no solo código.
 - 🔶 **Cumplimiento de pedido** (`PROC-OPE-002`, definido 2026-07-27):
   preparación + entrega implementadas (`POST /sales/ventas/{id}/entrega`
-  → `sales.venta_entregada`). Falta la **rama delivery con trazabilidad**:
-  entidad `entrega` especificada en `data-model.md` §6 (repartidor propio
-  vs. plataforma externa, hora de salida, resultado `entregado`/`fallido`
-  con motivo — RN-CUP-007/008, evidencia). Hoy una entrega fallida no se
-  puede registrar: solo se marca el pedido entregado o no se marca nada.
+  → `sales.venta_entregada`) para las tres modalidades. ✅ La **rama
+  delivery con trazabilidad** (repartidor propio, hora de salida, resultado
+  `entregado`/`fallido` con motivo — RN-CUP-007/008, evidencia) se separó
+  como módulo aparte y ya tiene código (2026-09-09, ADR-098): ver
+  [`modulo-delivery.md`](modulo-delivery.md). Una entrega fallida se
+  registra desde `POST /delivery/entregas/{id}/fallar`, con motivo y
+  evidencia opcional.
 - ⬜ **Plazo de espera de takeout no recogido** (RN-CUP-011): la regla
   existe, el plazo por sucursal no está configurado ni modelado.
 - ⬜ **Escalar un problema sin reporte previo** (RN-CTP-004, deuda declarada

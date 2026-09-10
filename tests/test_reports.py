@@ -94,6 +94,13 @@ SIN_ACTOR = {
     # llega a él por su propia bandeja; ponerlo como actor de un reporte que
     # leen su encargado y RRHH lo convertiría en un cargo (RN-RRHH-021).
     "rrhh.salida_sin_marcar",
+    # Los cuatro de `assets` los detecta el barrido diario de vencimientos
+    # (RN-MNT-005): un plan que cruza a "próximo" o un documento que vence no
+    # lo provoca nadie, así que no hay a quién ponerle de actor.
+    "assets.mantenimiento_proximo",
+    "assets.mantenimiento_vencido",
+    "assets.documento_por_vencer",
+    "assets.documento_vencido",
 }
 
 
@@ -676,6 +683,41 @@ def test_cambiar_la_regla_no_reescribe_lo_ya_entregado(env):
     assert len(entregas) == 1
     assert entregas[0].usuario_id == ids["almacenero1"].id
     assert entregas[0].motivo == motivo_original
+
+
+# --- Canal de alerta por correo (2026-09-09) ----------------------------------
+def test_regla_con_canal_email_marca_la_entrega(env):
+    """La entrega hereda el canal de la regla que la resolvió — lo que
+    `users.application.listeners` usa para decidir si además del correo va
+    la bandeja."""
+    s, ids = env
+    reglas_uc.crear_regla(
+        s,
+        empresa_id=ids["empresa"].id,
+        codigo_emision="sales.venta_anulada",
+        canal="email",
+        destinatarios=[
+            reglas_uc.DestinatarioIn(tipo="area", area_id=ids["area_gerencia"].id)
+        ],
+        actor_id=ids["supervisor1"].id,
+    )
+    s.commit()
+
+    reporte, destinatarios = emision_uc.emitir(
+        s,
+        "sales.venta_anulada",
+        {
+            "venta_id": str(uuid.uuid4()),
+            "sucursal_id": str(ids["sucursal"].id),
+            "usuario_id": str(ids["cajero"].id),
+        },
+    )
+    s.commit()
+    assert destinatarios == [ids["supervisor1"].id]
+    entrega = s.scalar(
+        select(EntregaReporte).where(EntregaReporte.reporte_emitido_id == reporte.id)
+    )
+    assert entrega.canal == "email"
 
 
 # --- Gobierno y auditoría -----------------------------------------------------

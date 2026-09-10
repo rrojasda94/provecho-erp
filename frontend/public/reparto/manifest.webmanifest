@@ -1,0 +1,17 @@
+{
+  "name": "Provecho — Reparto",
+  "short_name": "Reparto",
+  "description": "Rutas, entregas y GPS del repartidor propio.",
+  "start_url": "/reparto",
+  "scope": "/reparto",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0d0f",
+  "theme_color": "#f4511e",
+  "icons": [
+    { "src": "/reparto/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/reparto/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/reparto/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/reparto/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

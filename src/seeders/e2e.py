@@ -279,6 +279,7 @@ def sembrar_e2e(session: Session) -> dict:
     cliente = _sembrar_cliente(session, empresa)
     abastecimiento = _sembrar_abastecimiento(session, empresa, sucursal)
     rrhh = _sembrar_rrhh(session, empresa, sucursal)
+    produccion = _sembrar_produccion(session, empresa)
 
     return {
         "sucursales": len(puntos_venta),
@@ -289,6 +290,7 @@ def sembrar_e2e(session: Session) -> dict:
         **cliente,
         **abastecimiento,
         **rrhh,
+        **produccion,
     }
 
 
@@ -348,6 +350,121 @@ def _sembrar_abastecimiento(
         fila.stock_minimo = Decimal(minimo)
     session.flush()
     return {"almacen_local_id": str(local.id)}
+
+
+# --- Producción: subreceta con BOM en el almacén de producción -------------
+# Códigos `EPR..` — namespace propio, ninguno de los otros insumos/productos
+# de este seeder empieza así.
+PRODUCCION_INSUMO_ID = "EPRI01"
+PRODUCCION_INSUMO_NOMBRE = "Harina de producción E2E"
+PRODUCCION_SUBRECETA_ID = "EPRS01"
+PRODUCCION_SUBRECETA_NOMBRE = "Masa madre de producción E2E"
+PRODUCCION_RECETA_NOMBRE = "Masa madre E2E (BOM)"
+
+
+def _sembrar_produccion(session: Session, empresa: Empresa) -> dict:
+    """Insumo + subreceta con `articulo_id` + receta BOM, con stock del
+    insumo en el almacén de producción (`WH-PROD`, sembrado por
+    `python -m src.seeders.seed`).
+
+    Sin esto, `POST /production/ordenes` rechaza toda orden con 409 "no
+    tiene receta de subreceta definida" (RN-PRD-003) — el módulo quedaba
+    imposible de ejercitar sin tocar la base a mano. Vive acá y no en el
+    seeder base: un insumo/subreceta real en el catálogo de la empresa
+    rompía más de una decena de suites de `pytest` que asumen ese catálogo
+    vacío salvo lo que cada una crea (ver
+    `docs/roadmap/deuda/modulo-production.md`); este seeder no corre nunca
+    en esa suite.
+    """
+    almacen_prod = session.scalar(
+        select(Almacen).where(
+            Almacen.empresa_id == empresa.id, Almacen.tipo == "produccion"
+        )
+    )
+    if almacen_prod is None:
+        return {}
+
+    udm = _unidad_base(session)
+
+    insumo = session.scalar(
+        select(Articulo).where(Articulo.id_interno == PRODUCCION_INSUMO_ID)
+    )
+    if insumo is None:
+        insumo = Articulo(
+            empresa_id=empresa.id,
+            id_interno=PRODUCCION_INSUMO_ID,
+            nombre=PRODUCCION_INSUMO_NOMBRE,
+            unidad_medida_id=udm.id,
+            tipo="insumo",
+            costo_promedio=Decimal("2.50"),
+        )
+        session.add(insumo)
+        session.flush()
+    sku_insumo = session.scalar(select(Sku).where(Sku.articulo_id == insumo.id))
+    if sku_insumo is None:
+        sku_insumo = Sku(articulo_id=insumo.id, codigo=f"SKU-{PRODUCCION_INSUMO_ID}")
+        session.add(sku_insumo)
+        session.flush()
+    stock_insumo = session.scalar(
+        select(Stock).where(
+            Stock.almacen_id == almacen_prod.id, Stock.sku_id == sku_insumo.id
+        )
+    )
+    if stock_insumo is None:
+        stock_insumo = Stock(almacen_id=almacen_prod.id, sku_id=sku_insumo.id)
+        session.add(stock_insumo)
+    # Valor absoluto, igual que `_stock`: el seeder se vuelve a correr.
+    stock_insumo.cantidad = Decimal(1000)
+
+    subreceta = session.scalar(
+        select(Articulo).where(Articulo.id_interno == PRODUCCION_SUBRECETA_ID)
+    )
+    if subreceta is None:
+        subreceta = Articulo(
+            empresa_id=empresa.id,
+            id_interno=PRODUCCION_SUBRECETA_ID,
+            nombre=PRODUCCION_SUBRECETA_NOMBRE,
+            unidad_medida_id=udm.id,
+            tipo="subreceta",
+            # Perecible de verdad: sí controla lote y vence (RN-VNC-001).
+            controla_lote=True,
+        )
+        session.add(subreceta)
+        session.flush()
+    if session.scalar(select(Sku).where(Sku.articulo_id == subreceta.id)) is None:
+        session.add(
+            Sku(articulo_id=subreceta.id, codigo=f"SKU-{PRODUCCION_SUBRECETA_ID}")
+        )
+
+    receta = session.scalar(
+        select(Receta).where(
+            Receta.nombre == PRODUCCION_RECETA_NOMBRE,
+            Receta.empresa_id == empresa.id,
+        )
+    )
+    if receta is None:
+        receta = Receta(
+            empresa_id=empresa.id,
+            nombre=PRODUCCION_RECETA_NOMBRE,
+            rendimiento_cantidad=Decimal(10),
+            rendimiento_unidad_medida_id=udm.id,
+            articulo_id=subreceta.id,
+        )
+        session.add(receta)
+        session.flush()
+        session.add(
+            RecetaItem(
+                receta_id=receta.id,
+                articulo_id=insumo.id,
+                cantidad=Decimal(1),
+                merma_pct=Decimal("2.00"),
+            )
+        )
+    session.flush()
+    return {
+        "almacen_produccion_id": str(almacen_prod.id),
+        "subreceta_produccion_id": str(subreceta.id),
+    }
 
 
 def _sembrar_rrhh(session: Session, empresa: Empresa, sucursal: Sucursal) -> dict:

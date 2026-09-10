@@ -656,6 +656,61 @@ def on_consumo_registrado(payload: dict) -> None:
         )
 
 
+def on_repuesto_consumido(payload: dict) -> None:
+    """Descuenta stock de los repuestos usados en una orden de mantenimiento
+    de `assets` (RN-MNT-006). Mismo criterio que `on_consumo_registrado`: el
+    consumo ya ocurrió, el stock teórico no lo bloquea."""
+    try:
+        with session_factory() as session:
+            almacen_id = uuid.UUID(payload["almacen_id"])
+            empresa_id = _empresa_de_almacen(session, almacen_id)
+            for it in payload["items"]:
+                articulo_id = uuid.UUID(it["articulo_id"])
+                cantidad = Decimal(it["cantidad"])
+                sku_id = _sku_de_articulo(session, articulo_id)
+                if sku_id is None:
+                    _omitir(
+                        session,
+                        empresa_id=empresa_id,
+                        origen="orden_mantenimiento",
+                        referencia=payload["orden_mantenimiento_id"],
+                        tipo="sin_sku",
+                        detalle="el repuesto no tiene SKU activo",
+                        almacen_id=almacen_id,
+                        articulo_id=articulo_id,
+                        cantidad=cantidad,
+                    )
+                    continue
+                try:
+                    stock_uc.registrar_salida(
+                        session,
+                        almacen_id=almacen_id,
+                        sku_id=sku_id,
+                        cantidad=cantidad,
+                        tipo="consumo_mantenimiento",
+                        referencia=payload["orden_mantenimiento_id"],
+                    )
+                except StockInsuficiente:
+                    _omitir(
+                        session,
+                        empresa_id=empresa_id,
+                        origen="orden_mantenimiento",
+                        referencia=payload["orden_mantenimiento_id"],
+                        tipo="stock_insuficiente",
+                        detalle="el stock teórico no alcanzaba para el repuesto",
+                        almacen_id=almacen_id,
+                        articulo_id=articulo_id,
+                        sku_id=sku_id,
+                        cantidad=cantidad,
+                    )
+            session.commit()
+    except Exception:
+        log.exception(
+            "fallo consumiendo stock de la orden de mantenimiento %s",
+            payload.get("orden_mantenimiento_id"),
+        )
+
+
 def on_orden_completada(payload: dict) -> None:
     try:
         with session_factory() as session:
@@ -721,3 +776,4 @@ def register() -> None:
     event_bus.subscribe("purchases.compra_recibida", on_compra_recibida)
     event_bus.subscribe("production.consumo_registrado", on_consumo_registrado)
     event_bus.subscribe("production.orden_completada", on_orden_completada)
+    event_bus.subscribe("assets.repuesto_consumido", on_repuesto_consumido)
