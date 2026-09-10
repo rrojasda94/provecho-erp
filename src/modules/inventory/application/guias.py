@@ -29,6 +29,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src.core.events import event_bus
+from src.modules.assets.application.queries_publicas import vehiculo_para_guia
 from src.modules.inventory.application.errors import NoEncontrado, ReglaNegocio
 from src.modules.inventory.infrastructure.models import (
     Articulo,
@@ -58,6 +59,26 @@ from src.shared.integrations.factiliza import (
 # Una sola serie por empresa mientras haya un almacén emisor; el día que
 # emitan dos almacenes en paralelo, esto pasa a ser columna del almacén.
 SERIE_GUIA = "T001"
+
+
+def _resolver_placa(
+    session: Session,
+    empresa_id: uuid.UUID,
+    *,
+    vehiculo_id: uuid.UUID | None,
+    vehiculo_placa: str | None,
+) -> str:
+    """La placa a declarar: si viene `vehiculo_id`, la de `assets.Vehiculo`
+    (congelada al emitir, RN-VEH-008); si no, la que se tecleó a mano —
+    compatibilidad con guías de antes de que `assets` existiera."""
+    if vehiculo_id is None:
+        if not vehiculo_placa:
+            raise ReglaNegocio("indica un vehículo o una placa")
+        return vehiculo_placa.strip().upper()
+    resumen = vehiculo_para_guia(session, vehiculo_id)
+    if resumen is None or resumen["empresa_id"] != empresa_id:
+        raise NoEncontrado("vehículo no encontrado")
+    return resumen["placa"]
 
 
 def _exigir_transferencia_despachada(session: Session, transferencia_id: uuid.UUID):
@@ -130,8 +151,9 @@ def emitir_guia_de_devolucion(
     chofer_apellidos: str,
     chofer_num_doc: str,
     chofer_licencia: str,
-    vehiculo_placa: str,
     peso_bruto_kg: Decimal,
+    vehiculo_placa: str | None = None,
+    vehiculo_id: uuid.UUID | None = None,
     fecha_inicio_traslado: datetime.date | None = None,
     modalidad_traslado: str = "02",
     observacion: str | None = None,
@@ -178,6 +200,9 @@ def emitir_guia_de_devolucion(
         if devolucion.referencia_id
         else None
     )
+    placa = _resolver_placa(
+        session, empresa.id, vehiculo_id=vehiculo_id, vehiculo_placa=vehiculo_placa
+    )
     return _crear_guia(
         session,
         repo,
@@ -196,7 +221,8 @@ def emitir_guia_de_devolucion(
         chofer_apellidos=chofer_apellidos,
         chofer_num_doc=chofer_num_doc,
         chofer_licencia=chofer_licencia,
-        vehiculo_placa=vehiculo_placa,
+        vehiculo_placa=placa,
+        vehiculo_id=vehiculo_id,
         emitida_por=emitida_por,
         observacion=observacion,
     )
@@ -211,8 +237,9 @@ def emitir_guia(
     chofer_apellidos: str,
     chofer_num_doc: str,
     chofer_licencia: str,
-    vehiculo_placa: str,
     peso_bruto_kg: Decimal,
+    vehiculo_placa: str | None = None,
+    vehiculo_id: uuid.UUID | None = None,
     fecha_inicio_traslado: datetime.date | None = None,
     motivo_traslado: str = "04",
     modalidad_traslado: str = "02",
@@ -242,6 +269,9 @@ def emitir_guia(
     if peso_bruto_kg <= 0:
         raise ReglaNegocio("el peso bruto declarado debe ser mayor que cero")
 
+    placa = _resolver_placa(
+        session, empresa.id, vehiculo_id=vehiculo_id, vehiculo_placa=vehiculo_placa
+    )
     return _crear_guia(
         session,
         repo,
@@ -262,7 +292,8 @@ def emitir_guia(
         chofer_apellidos=chofer_apellidos,
         chofer_num_doc=chofer_num_doc,
         chofer_licencia=chofer_licencia,
-        vehiculo_placa=vehiculo_placa,
+        vehiculo_placa=placa,
+        vehiculo_id=vehiculo_id,
         emitida_por=emitida_por,
         observacion=observacion,
     )
@@ -288,6 +319,7 @@ def _crear_guia(
     chofer_num_doc,
     chofer_licencia,
     vehiculo_placa,
+    vehiculo_id,
     emitida_por,
     observacion,
 ) -> GuiaRemision:
@@ -314,6 +346,7 @@ def _crear_guia(
             chofer_num_doc=chofer_num_doc.strip(),
             chofer_licencia=chofer_licencia.strip(),
             vehiculo_placa=vehiculo_placa.strip().upper(),
+            vehiculo_id=vehiculo_id,
             emitida_por=emitida_por,
             observacion=observacion,
             estado_emision="pendiente",

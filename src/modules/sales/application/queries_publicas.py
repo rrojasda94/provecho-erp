@@ -248,9 +248,7 @@ def ventas_por_hora(
     por_hora: dict[int, dict] = {}
     for hora, cantidad, total in filas:
         local = (int(hora) + desfase) % 24
-        acumulado = por_hora.setdefault(
-            local, {"cantidad": 0, "total": Decimal(0)}
-        )
+        acumulado = por_hora.setdefault(local, {"cantidad": 0, "total": Decimal(0)})
         acumulado["cantidad"] += cantidad
         acumulado["total"] += Decimal(total)
     return [
@@ -448,16 +446,10 @@ def puntos_venta_de_empresa(
     return list(session.scalars(stmt))
 
 
-def puntos_venta_de_sucursal(
-    session: Session, sucursal_id: uuid.UUID
-) -> list[uuid.UUID]:
+def puntos_venta_de_sucursal(session: Session, sucursal_id: uuid.UUID) -> list[uuid.UUID]:
     """IDs de `punto_venta` de una sucursal. Lo usa `accounting` para
     encontrar la caja abierta del local sin importar `PuntoVenta`."""
-    return list(
-        session.scalars(
-            select(PuntoVenta.id).where(PuntoVenta.sucursal_id == sucursal_id)
-        )
-    )
+    return list(session.scalars(select(PuntoVenta.id).where(PuntoVenta.sucursal_id == sucursal_id)))
 
 
 def puntos_venta_rotulados(
@@ -481,15 +473,11 @@ def puntos_venta_rotulados(
     return {pv_id: f"{sucursal} · {serie}" for pv_id, sucursal, serie in filas}
 
 
-def sucursal_de_punto_venta(
-    session: Session, punto_venta_id: uuid.UUID
-) -> uuid.UUID | None:
+def sucursal_de_punto_venta(session: Session, punto_venta_id: uuid.UUID) -> uuid.UUID | None:
     """Sucursal a la que pertenece un punto de venta — `accounting` la
     necesita para validar el alcance de tenant de caja/arqueo (ADR-004) sin
     importar `PuntoVenta`, que es dominio de `sales`."""
-    return session.scalar(
-        select(PuntoVenta.sucursal_id).where(PuntoVenta.id == punto_venta_id)
-    )
+    return session.scalar(select(PuntoVenta.sucursal_id).where(PuntoVenta.id == punto_venta_id))
 
 
 def venta_para_encuesta(session: Session, venta_id: uuid.UUID) -> dict | None:
@@ -502,9 +490,7 @@ def venta_para_encuesta(session: Session, venta_id: uuid.UUID) -> dict | None:
     if venta is None:
         return None
     estados = list(
-        session.scalars(
-            select(VentaItem.estado_preparacion).where(VentaItem.venta_id == venta_id)
-        )
+        session.scalars(select(VentaItem.estado_preparacion).where(VentaItem.venta_id == venta_id))
     )
     return {
         "id": venta.id,
@@ -541,9 +527,104 @@ def contacto_de_cliente(session: Session, cliente_id: uuid.UUID) -> dict | None:
     return {"id": cliente.id, "nombre": nombre, "telefono": telefono or ""}
 
 
-def total_efectivo_cobrado(
-    session: Session, punto_venta_id: uuid.UUID, desde: datetime
-) -> Decimal:
+def venta_para_reparto(session: Session, venta_id: uuid.UUID) -> dict | None:
+    """Lo que `delivery` necesita para asignar y rutear una venta (ADR-098):
+    sucursal, modalidad, canal, dirección/ubicación, la distancia ya
+    cotizada, el total (para el "monto a cobrar" que ve el repartidor en
+    una venta todavía `orden`, sin pagar), si tiene plataforma externa
+    (RN-PER-003 la excluye del reparto propio) y si todos sus ítems
+    llegaron a `listo` o ya se entregó. `delivery` no importa
+    `Venta`/`VentaItem` — pasa siempre por acá.
+
+    `None` = la venta no existe.
+    """
+    venta = session.get(Venta, venta_id)
+    if venta is None:
+        return None
+    estados = list(
+        session.scalars(select(VentaItem.estado_preparacion).where(VentaItem.venta_id == venta_id))
+    )
+    return {
+        "id": venta.id,
+        "sucursal_id": venta.sucursal_id,
+        "numero_orden": venta.numero_orden,
+        "fecha_orden": venta.fecha_orden,
+        "modalidad": venta.modalidad,
+        "canal": venta.canal,
+        "estado": venta.estado,
+        "cliente_id": venta.cliente_id,
+        "direccion_entrega": venta.direccion_entrega,
+        "ubicacion_lat": venta.ubicacion_lat,
+        "ubicacion_lng": venta.ubicacion_lng,
+        "distancia_entrega_km": venta.distancia_entrega_km,
+        "repartidor_externo_plataforma": venta.repartidor_externo_plataforma,
+        "total": venta.total,
+        "lista": rules.pedido_entregable(estados),
+        "entregada": rules.pedido_entregado(estados),
+    }
+
+
+def ventas_listas_para_reparto(
+    session: Session,
+    sucursal_ids: Sequence[uuid.UUID],
+    *,
+    fecha: date | None = None,
+) -> list[dict]:
+    """Ventas delivery listas para entrar a una ruta: modalidad delivery,
+    sin plataforma externa (RN-PER-003), no anuladas, con todos los ítems
+    en `listo` y ninguno todavía `entregado`.
+
+    `delivery` resuelve así su tablero de "listos sin asignar" en vez de
+    consumir `sales.pedido_listo` (ADR-098): una consulta activa encuentra
+    igual a un pedido que llegó a `listo` antes de que existiera su ruta, o
+    que cambió a delivery después de estar listo — un evento que ya pasó
+    nunca lo habría avisado.
+    """
+    if not sucursal_ids:
+        return []
+    stmt = select(Venta).where(
+        Venta.sucursal_id.in_(list(sucursal_ids)),
+        Venta.modalidad == "delivery",
+        Venta.repartidor_externo_plataforma.is_(None),
+        Venta.estado != "anulada",
+    )
+    if fecha is not None:
+        stmt = stmt.where(Venta.fecha_orden == fecha)
+    ventas = list(session.scalars(stmt.order_by(Venta.created_at)))
+    if not ventas:
+        return []
+
+    estados_por_venta: dict[uuid.UUID, list[str]] = {v.id: [] for v in ventas}
+    filas = session.execute(
+        select(VentaItem.venta_id, VentaItem.estado_preparacion).where(
+            VentaItem.venta_id.in_(list(estados_por_venta))
+        )
+    )
+    for venta_id, estado in filas:
+        estados_por_venta[venta_id].append(estado)
+
+    resultado = []
+    for venta in ventas:
+        estados = estados_por_venta[venta.id]
+        if not rules.pedido_entregable(estados) or rules.pedido_entregado(estados):
+            continue
+        resultado.append(
+            {
+                "id": venta.id,
+                "sucursal_id": venta.sucursal_id,
+                "numero_orden": venta.numero_orden,
+                "fecha_orden": venta.fecha_orden,
+                "cliente_id": venta.cliente_id,
+                "direccion_entrega": venta.direccion_entrega,
+                "ubicacion_lat": venta.ubicacion_lat,
+                "ubicacion_lng": venta.ubicacion_lng,
+                "distancia_entrega_km": venta.distancia_entrega_km,
+            }
+        )
+    return resultado
+
+
+def total_efectivo_cobrado(session: Session, punto_venta_id: uuid.UUID, desde: datetime) -> Decimal:
     """Suma de pagos confirmados en efectivo de ventas de este punto de
     venta desde `desde` — usado por `accounting` para reconciliar el cierre
     de caja (PROC-CTB-001); nunca se llama al revés (accounting no expone
@@ -562,9 +643,7 @@ def total_efectivo_cobrado(
     return Decimal(total)
 
 
-def total_tarjeta_cobrado(
-    session: Session, punto_venta_id: uuid.UUID, desde: datetime
-) -> Decimal:
+def total_tarjeta_cobrado(session: Session, punto_venta_id: uuid.UUID, desde: datetime) -> Decimal:
     """Lo cobrado con tarjeta en este punto de venta desde `desde`.
 
     El cierre de caja cuadra efectivo **y** tarjetas (RN-POS-004): sin este
@@ -622,9 +701,7 @@ def valores_ofrecidos_de_receta(session: Session, receta_id: uuid.UUID) -> set[s
     from src.modules.sales.application import catalogo as catalogo_uc
 
     productos = list(
-        session.scalars(
-            select(ProductoComercial).where(ProductoComercial.receta_id == receta_id)
-        )
+        session.scalars(select(ProductoComercial).where(ProductoComercial.receta_id == receta_id))
     )
     ofrecidos: set[str] = set()
     for producto in productos:
@@ -632,9 +709,7 @@ def valores_ofrecidos_de_receta(session: Session, receta_id: uuid.UUID) -> set[s
     return ofrecidos
 
 
-def atributo_de_valores(
-    session: Session, valor_ids: Sequence[uuid.UUID | str]
-) -> dict[str, str]:
+def atributo_de_valores(session: Session, valor_ids: Sequence[uuid.UUID | str]) -> dict[str, str]:
     """`producto_atributo_valor.id` → `atributo.id`, los dos como texto.
 
     Lo consulta `inventory` para decidir si una línea de receta condicionada
@@ -686,4 +761,3 @@ def categoria_de_productos(
         )
     ).all()
     return dict(filas)
-

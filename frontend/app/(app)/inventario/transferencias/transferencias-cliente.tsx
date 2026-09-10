@@ -488,8 +488,12 @@ function CamposGuia() {
           <input name="chofer_licencia" required minLength={6} maxLength={20} />
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold">
-          Placa del vehículo
-          <input name="vehiculo_placa" required minLength={6} maxLength={10} />
+          Vehículo registrado (Activos) — opcional
+          <input name="vehiculo_id" placeholder="uuid del vehículo" />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold">
+          Placa del vehículo (si no eliges uno registrado)
+          <input name="vehiculo_placa" minLength={6} maxLength={10} />
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold">
           Peso bruto (kg)

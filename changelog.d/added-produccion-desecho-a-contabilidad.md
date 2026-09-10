@@ -1,6 +1,6 @@
 - **Desechar un lote no conforme no dejaba ningún rastro contable**
   (2026-09-09, bloque `feat/produccion-desecho-a-contabilidad` del plan de
-  deuda de producción, ADR-098). `completar_orden_produccion` con resultado
+  deuda de producción, ADR-100). `completar_orden_produccion` con resultado
   `no_conforme_desechado` registraba `merma_cantidad`/`merma_motivo` en la
   orden pero nunca disparaba un asiento — el balance nunca se enteraba de la
   pérdida. No se reusó `inventory.merma_registrada`: esa merma opera sobre
