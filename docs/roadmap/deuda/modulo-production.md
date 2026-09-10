@@ -31,10 +31,29 @@ Plan completo de cómo saldar esta deuda (bloques, orden, decisiones tomadas):
   `inventory.stock_bajo_minimo` (`feat/produccion-orden-por-necesidad`)
   todavía no vincula la orden que crea al plan del día si existe — sigue
   naciendo suelta.
-- ⬜ **`checklist_inocuidad_turno`**: bioseguridad, superficies, equipos
-  de frío (JSONB), indicio de plaga — bloquea la cocina si algo falla
-  (RN-CDP-005), igual criterio que falla de frío en apertura de sucursal.
-  Bloque `feat/produccion-checklist-inocuidad`.
+- ✅ 2026-09-09 **`checklist_inocuidad_turno`** (bloque
+  `feat/produccion-checklist-inocuidad`). Bioseguridad, superficies,
+  limpieza intermedia, equipos de frío (JSONB `[{equipo, temperatura_c,
+  rango_min, rango_max, dentro_rango}]`, `dentro_rango` calculado por el
+  servidor) e indicio de plaga (RN-CDP-002); único por `almacen_id, fecha,
+  turno`. `POST /production/checklists` calcula `estado`
+  (`aprobado`|`bloqueado`) — nunca lo decide quien lo registra: cualquier
+  falla bloquea la cocina entera (más estricto que la letra de RN-CDP-005,
+  que solo habla de detener "ese equipo" — mismo criterio que
+  `data-model.md` §7 y el SOP de inocuidad). Sin checklist `aprobado`
+  vigente del día en un almacén `tipo=produccion`, `crear_orden_produccion`
+  y `registrar_consumo` rechazan con 409 `cocina_bloqueada`
+  (`application/errors.py::CocinaBloqueada`). Publica
+  `production.equipo_frio_fuera_rango` (por cada equipo fuera de rango) y
+  `production.cocina_bloqueada`, ambos nivel `urgente` en el catálogo de
+  `reports` (áreas `gerencia`, `cocina`) — el primero estaba documentado en
+  `events.md` desde antes pero el código nunca lo publicó. Nuevo permiso
+  `production.verificar_inocuidad` (seeder + `jefe_cocina`) y pantalla
+  `/produccion/inocuidad`. Simplificación documentada: `orden_produccion`
+  no registra en qué turno se creó, así que "vigente" es el checklist más
+  reciente del almacén ese día, sin distinguir turno — una vez bloqueada
+  la cocina, sigue bloqueada hasta que un checklist nuevo (de cualquier
+  turno) la reapruebe.
 - ⬜ **`reporte_produccion`** consolidado automático al cierre de jornada
   (RN-DOC-010), visado por el jefe de cocina, no redactado a mano.
   Bloque `feat/produccion-reporte-de-jornada`.

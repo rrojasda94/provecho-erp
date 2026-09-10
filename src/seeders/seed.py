@@ -187,6 +187,10 @@ PERMISOS = [
         "Crear y gestionar el plan de producción (planes, iniciar, cerrar)",
     ),
     (
+        "production.verificar_inocuidad",
+        "Registrar el checklist de inocuidad de turno (bloquea/desbloquea la cocina)",
+    ),
+    (
         "accounting.cuenta_administrar",
         "Administrar plan de cuentas y mapeo de asientos automáticos",
     ),
@@ -527,6 +531,7 @@ ROLES = {
         "production.leer",
         "production.completar",
         "production.planificar",
+        "production.verificar_inocuidad",
     ],
     "contador": [
         "accounting.cuenta_administrar",

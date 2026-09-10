@@ -77,6 +77,9 @@ DESTINOS: dict[str, Destino] = {
     "orden_produccion": Destino(
         "/production/ordenes/{id}", "production.leer", "Ver la orden de producción"
     ),
+    "checklist_inocuidad_turno": Destino(
+        "/production/checklists/{id}", "production.leer", "Ver el checklist de inocuidad"
+    ),
     "activo": Destino("/assets/activos/{id}", "assets.leer", "Ver el activo"),
     "documento_vigencia": Destino(
         "/assets/documentos/{id}", "assets.leer", "Ver el documento"

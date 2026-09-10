@@ -5348,6 +5348,130 @@
         "title": "CertificadoTrabajoOut",
         "type": "object"
       },
+      "ChecklistInocuidadTurnoCreate": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "bioseguridad_ok": {
+            "title": "Bioseguridad Ok",
+            "type": "boolean"
+          },
+          "equipos_frio": {
+            "items": {
+              "$ref": "#/components/schemas/EquipoFrioIn"
+            },
+            "title": "Equipos Frio",
+            "type": "array"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "limpieza_intermedia_ok": {
+            "title": "Limpieza Intermedia Ok",
+            "type": "boolean"
+          },
+          "plaga_indicio": {
+            "default": false,
+            "title": "Plaga Indicio",
+            "type": "boolean"
+          },
+          "superficies_ok": {
+            "title": "Superficies Ok",
+            "type": "boolean"
+          },
+          "turno": {
+            "maxLength": 30,
+            "minLength": 1,
+            "title": "Turno",
+            "type": "string"
+          }
+        },
+        "required": [
+          "almacen_id",
+          "fecha",
+          "turno",
+          "bioseguridad_ok",
+          "superficies_ok",
+          "limpieza_intermedia_ok"
+        ],
+        "title": "ChecklistInocuidadTurnoCreate",
+        "type": "object"
+      },
+      "ChecklistInocuidadTurnoOut": {
+        "properties": {
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "bioseguridad_ok": {
+            "title": "Bioseguridad Ok",
+            "type": "boolean"
+          },
+          "equipos_frio": {
+            "items": {
+              "$ref": "#/components/schemas/EquipoFrioOut"
+            },
+            "title": "Equipos Frio",
+            "type": "array"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "limpieza_intermedia_ok": {
+            "title": "Limpieza Intermedia Ok",
+            "type": "boolean"
+          },
+          "plaga_indicio": {
+            "title": "Plaga Indicio",
+            "type": "boolean"
+          },
+          "superficies_ok": {
+            "title": "Superficies Ok",
+            "type": "boolean"
+          },
+          "turno": {
+            "title": "Turno",
+            "type": "string"
+          },
+          "verificado_por": {
+            "format": "uuid",
+            "title": "Verificado Por",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "almacen_id",
+          "fecha",
+          "turno",
+          "verificado_por",
+          "bioseguridad_ok",
+          "superficies_ok",
+          "limpieza_intermedia_ok",
+          "equipos_frio",
+          "plaga_indicio",
+          "estado"
+        ],
+        "title": "ChecklistInocuidadTurnoOut",
+        "type": "object"
+      },
       "CierreCajaDetalleOut": {
         "description": "El turno con el conteo a la vista. A donde lleva\n`accounting.cierre_caja_irregular`: la fila dice cuánto descuadró, esto\ndice contra qué, que es con lo único que se decide reclamar o corregir.",
         "properties": {
@@ -11856,6 +11980,99 @@
           }
         },
         "title": "EntregarIn",
+        "type": "object"
+      },
+      "EquipoFrioIn": {
+        "description": "Sin `dentro_rango`: lo calcula el servidor a partir de la\ntemperatura y el rango — nunca lo decide quien registra el checklist.",
+        "properties": {
+          "equipo": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Equipo",
+            "type": "string"
+          },
+          "rango_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Rango Max"
+          },
+          "rango_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Rango Min"
+          },
+          "temperatura_c": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              }
+            ],
+            "title": "Temperatura C"
+          }
+        },
+        "required": [
+          "equipo",
+          "temperatura_c",
+          "rango_min",
+          "rango_max"
+        ],
+        "title": "EquipoFrioIn",
+        "type": "object"
+      },
+      "EquipoFrioOut": {
+        "properties": {
+          "dentro_rango": {
+            "title": "Dentro Rango",
+            "type": "boolean"
+          },
+          "equipo": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Equipo",
+            "type": "string"
+          },
+          "rango_max": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Rango Max",
+            "type": "string"
+          },
+          "rango_min": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Rango Min",
+            "type": "string"
+          },
+          "temperatura_c": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Temperatura C",
+            "type": "string"
+          }
+        },
+        "required": [
+          "equipo",
+          "temperatura_c",
+          "rango_min",
+          "rango_max",
+          "dentro_rango"
+        ],
+        "title": "EquipoFrioOut",
         "type": "object"
       },
       "ErrorCampo": {
@@ -19350,6 +19567,37 @@
           "page_size"
         ],
         "title": "Pagina[CampanaOut]",
+        "type": "object"
+      },
+      "Pagina_ChecklistInocuidadTurnoOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ChecklistInocuidadTurnoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[ChecklistInocuidadTurnoOut]",
         "type": "object"
       },
       "Pagina_ClienteBuscadoOut_": {
@@ -52627,6 +52875,214 @@
         "summary": "Anonimizar Persona",
         "tags": [
           "personas"
+        ]
+      }
+    },
+    "/api/v1/production/checklists": {
+      "get": {
+        "operationId": "listar_checklists_api_v1_production_checklists_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fecha",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fecha"
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Estado"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_ChecklistInocuidadTurnoOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Checklists",
+        "tags": [
+          "production"
+        ]
+      },
+      "post": {
+        "description": "Registra el checklist de inocuidad del turno (RN-CDP-002/005):\n`estado` lo calcula el servidor, nunca lo decide quien lo llena.",
+        "operationId": "crear_checklist_api_v1_production_checklists_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChecklistInocuidadTurnoCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChecklistInocuidadTurnoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Checklist",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/checklists/{checklist_id}": {
+      "get": {
+        "operationId": "ver_checklist_api_v1_production_checklists__checklist_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "checklist_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Checklist Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChecklistInocuidadTurnoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Checklist",
+        "tags": [
+          "production"
         ]
       }
     },

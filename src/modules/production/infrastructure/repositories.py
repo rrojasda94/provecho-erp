@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.modules.production.infrastructure.models import (
+    ChecklistInocuidadTurno,
     ConsumoProduccionItem,
     OrdenProduccion,
     OrdenProduccionTrabajador,
@@ -144,3 +145,65 @@ class PlanProduccionRepo:
         self.s.add(plan)
         self.s.flush()
         return plan
+
+
+class ChecklistInocuidadTurnoRepo:
+    def __init__(self, session: Session) -> None:
+        self.s = session
+
+    def get(self, checklist_id: uuid.UUID) -> ChecklistInocuidadTurno | None:
+        return self.s.get(ChecklistInocuidadTurno, checklist_id)
+
+    def get_por_clave(
+        self, almacen_id: uuid.UUID, fecha, turno: str
+    ) -> ChecklistInocuidadTurno | None:
+        return self.s.scalar(
+            select(ChecklistInocuidadTurno).where(
+                ChecklistInocuidadTurno.almacen_id == almacen_id,
+                ChecklistInocuidadTurno.fecha == fecha,
+                ChecklistInocuidadTurno.turno == turno,
+            )
+        )
+
+    def vigente_de(self, almacen_id: uuid.UUID, fecha) -> ChecklistInocuidadTurno | None:
+        """El checklist más reciente del almacén para esa fecha, sin importar
+        turno (`orden_produccion` no registra en cuál se creó): una vez
+        bloqueada la cocina, sigue bloqueada hasta que un checklist nuevo la
+        reapruebe."""
+        return self.s.scalar(
+            select(ChecklistInocuidadTurno)
+            .where(
+                ChecklistInocuidadTurno.almacen_id == almacen_id,
+                ChecklistInocuidadTurno.fecha == fecha,
+            )
+            .order_by(ChecklistInocuidadTurno.created_at.desc())
+            .limit(1)
+        )
+
+    def q_list(
+        self,
+        empresa_id: uuid.UUID | None = None,
+        almacen_id: uuid.UUID | None = None,
+        fecha=None,
+        estado: str | None = None,
+    ):
+        """La consulta sin ejecutar: el router la pagina (ADR-026)."""
+        q = select(ChecklistInocuidadTurno)
+        if almacen_id is not None:
+            q = q.where(ChecklistInocuidadTurno.almacen_id == almacen_id)
+        if fecha is not None:
+            q = q.where(ChecklistInocuidadTurno.fecha == fecha)
+        if estado is not None:
+            q = q.where(ChecklistInocuidadTurno.estado == estado)
+        if empresa_id is not None:
+            q = q.join(Almacen, Almacen.id == ChecklistInocuidadTurno.almacen_id).where(
+                Almacen.empresa_id == empresa_id
+            )
+        return q.order_by(
+            ChecklistInocuidadTurno.fecha.desc(), ChecklistInocuidadTurno.created_at.desc()
+        )
+
+    def add(self, checklist: ChecklistInocuidadTurno) -> ChecklistInocuidadTurno:
+        self.s.add(checklist)
+        self.s.flush()
+        return checklist

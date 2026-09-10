@@ -10,7 +10,11 @@ from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.production.application.errors import NoEncontrado
-from src.modules.production.infrastructure.models import OrdenProduccion, PlanProduccion
+from src.modules.production.infrastructure.models import (
+    ChecklistInocuidadTurno,
+    OrdenProduccion,
+    PlanProduccion,
+)
 from src.modules.users.infrastructure.models import Almacen
 
 
@@ -38,3 +42,13 @@ def exigir_plan(session: Session, plan_id: uuid.UUID, tenant: Tenant) -> PlanPro
         raise NoEncontrado("plan de producción no encontrado")
     exigir_almacen(session, plan.almacen_id, tenant)
     return plan
+
+
+def exigir_checklist(
+    session: Session, checklist_id: uuid.UUID, tenant: Tenant
+) -> ChecklistInocuidadTurno:
+    checklist = session.get(ChecklistInocuidadTurno, checklist_id)
+    if checklist is None:
+        raise NoEncontrado("checklist de inocuidad no encontrado")
+    exigir_almacen(session, checklist.almacen_id, tenant)
+    return checklist

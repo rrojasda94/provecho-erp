@@ -487,6 +487,49 @@ CATALOGO: tuple[Emision, ...] = (
         clave_referencia="orden_produccion_id",
         clave_actor="registrado_por",
     ),
+    Emision(
+        codigo="production.equipo_frio_fuera_rango",
+        nombre="Equipo de frío fuera de rango",
+        descripcion=(
+            "El checklist de turno detectó un equipo de frío fuera de su rango "
+            "esperado (RN-CDP-005). El checklist entero queda `bloqueado` — ver "
+            "`production.cocina_bloqueada`."
+        ),
+        permiso="production.leer",
+        nivel="urgente",
+        ambito="almacen",
+        campos=(
+            "checklist_id",
+            "almacen_id",
+            "equipo",
+            "temperatura_c",
+            "rango_min",
+            "rango_max",
+        ),
+        titulo="Equipo de frío fuera de rango: {equipo} a {temperatura_c}°C",
+        areas_sugeridas=("gerencia", "cocina"),
+        referencia_tipo="checklist_inocuidad_turno",
+        clave_referencia="checklist_id",
+        clave_actor="verificado_por",
+    ),
+    Emision(
+        codigo="production.cocina_bloqueada",
+        nombre="Cocina bloqueada por inocuidad",
+        descripcion=(
+            "El checklist de turno bloqueó la cocina (RN-CDP-002/005): "
+            "`crear_orden_produccion` y `registrar_consumo` rechazan con 409 "
+            "hasta que un checklist nuevo la reapruebe."
+        ),
+        permiso="production.leer",
+        nivel="urgente",
+        ambito="almacen",
+        campos=("checklist_id", "almacen_id", "turno", "fecha", "motivo"),
+        titulo="Cocina bloqueada: {motivo}",
+        areas_sugeridas=("gerencia", "cocina"),
+        referencia_tipo="checklist_inocuidad_turno",
+        clave_referencia="checklist_id",
+        clave_actor="verificado_por",
+    ),
     # --- reports (la cadena de escalamiento, RN-CTP-004) ----------------------
     # Ámbito `empresa` y no `sucursal`: un escalamiento puede nacer de un hecho
     # que no tiene local (un pago sobre umbral es de la empresa). El

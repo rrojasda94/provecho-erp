@@ -84,6 +84,9 @@ snapshot al registrar el consumo, para comparar contra `costo_insumos`
 | POST | `/planes/{id}/ordenes` | `production.planificar` |
 | POST | `/planes/{id}/iniciar` | `production.planificar` |
 | POST | `/planes/{id}/cerrar` | `production.planificar` |
+| POST | `/checklists` | `production.verificar_inocuidad` |
+| GET | `/checklists` | `production.leer` |
+| GET | `/checklists/{id}` | `production.leer` |
 
 `plan_produccion` (`application/planes.py`, bloque `feat/produccion-plan-
 de-produccion`, 2026-09-09) es el cronograma fijo por línea/turno
@@ -98,6 +101,18 @@ reserva de la orden cuando el insumo sale de verdad → `cerrar` libera lo
 que ninguna orden llegó a consumir. `turno`/`linea_produccion` son texto
 libre, no un catálogo con FK: `turno_sucursal` (RRHH) está atado a una
 sucursal y una cocina de producción central no siempre tiene una.
+
+`checklist_inocuidad_turno` (`application/inocuidad.py`, bloque
+`feat/produccion-checklist-inocuidad`, 2026-09-09) registra bioseguridad,
+superficies, limpieza intermedia, equipos de frío (JSONB, `dentro_rango` lo
+calcula el servidor) y posible indicio de plaga por turno — único por
+`almacen_id, fecha, turno`. `POST /checklists` calcula `estado`
+(`aprobado`|`bloqueado`, RN-CDP-002/005): nunca lo decide quien lo llena.
+Sin un checklist `aprobado` vigente del día en un almacén `tipo=produccion`,
+`crear_orden_produccion` y `registrar_consumo` rechazan con 409
+`cocina_bloqueada` — `application/inocuidad.py::exigir_cocina_habilitada`
+usa el checklist más reciente del día, sin distinguir turno (`orden_
+produccion` no registra en cuál se creó).
 
 `GET /trabajadores-disponibles` (`?area=`) lista los trabajadores activos
 de la empresa vía `rrhh.queries_publicas.trabajadores_activos` — el picker
@@ -123,7 +138,6 @@ y recalcula su `costo_promedio` — mismo listener/patrón que
 Deuda del slice (ver
 [plan de deuda](../../../docs/roadmap/deuda-production-2026-09-09.md) y
 [`docs/roadmap/deuda/modulo-production.md`](../../../docs/roadmap/deuda/modulo-production.md)):
-`checklist_inocuidad_turno` (bloqueo de cocina por fallo de inocuidad),
 `reporte_produccion` consolidado, subrecetas anidadas (una orden que
 consume otra subreceta con su propia orden). Ya saldado: lote/trazabilidad
 del producto terminado, auditoría e idempotencia de consumo/completar, el
@@ -134,8 +148,10 @@ mano de obra por empresa y desviación de desperdicio real vs. esperado
 string libre (2026-09-09), las horas-hombre imputadas desde la
 asistencia real de RRHH en vez de tipeadas a mano (2026-09-09), la orden
 por ajuste de necesidad al cruzar `inventory.stock_bajo_minimo` en vez de
-que alguien la cree a mano (2026-09-09), y el plan de producción con
-reserva de insumos al iniciar (2026-09-09).
+que alguien la cree a mano (2026-09-09), el plan de producción con
+reserva de insumos al iniciar (2026-09-09), y el checklist de inocuidad
+de turno que bloquea crear orden y registrar consumo sin uno `aprobado`
+vigente (2026-09-09).
 
 Pendiente de frontend: el diálogo de completar todavía manda
 `evidencia_destruccion_url` como texto libre (`ordenes-cliente.tsx`) en
@@ -165,9 +181,11 @@ vez de subir la evidencia vía `POST .../evidencia` antes de completar —
   mano de obra) — nunca a mano; el desperdicio real por insumo se
   registra por tipo y peso, contrastado contra el esperado de la receta
   (RN-PRD-018).
-- Verificar checklist de inocuidad al inicio de turno, incluyendo
-  temperatura de cada equipo de frío; bloquear la cocina y alertar a
-  Gerencia si algo falla (RN-CDP-002/005).
+- Verificar checklist de inocuidad al inicio de turno (`POST /checklists`),
+  incluyendo temperatura de cada equipo de frío; bloquear la cocina y
+  alertar a Gerencia y Cocina si algo falla (RN-CDP-002/005) — sin un
+  checklist `aprobado` vigente ese día, ni crear orden ni registrar
+  consumo pasan.
 - Consolidar reporte de producción al cierre de jornada (RN-DOC-010).
 - Conteo cíclico del almacén propio (tipo `produccion`), mismo esquema
   que `inventory` en Almacén Central — el reporte se genera
@@ -230,6 +248,9 @@ reproceso o desecho con evidencia → reporte de escalamiento).
   apartar; ver ADR-100). Reproceso (`no_conforme_reprocesado`)
   correctamente no genera merma ni asiento, solo el detalle de la
   corrección en el reporte de escalamiento.
-  `production.equipo_frio_fuera_rango` (alerta inmediata a Gerencia,
-  RN-CDP-005) está documentado en `events.md` pero aún no se publica
-  (depende de `checklist_inocuidad_turno`, deuda técnica).
+  `production.equipo_frio_fuera_rango` (por cada equipo de frío fuera de
+  rango del checklist, RN-CDP-005) y `production.cocina_bloqueada` (al
+  quedar el checklist `bloqueado`, RN-CDP-002/005) se publican desde
+  `application/inocuidad.py::crear_checklist` (bloque
+  `feat/produccion-checklist-inocuidad`, 2026-09-09), consumidos por
+  `reports` (alerta a Gerencia y Cocina, nivel `urgente`).
