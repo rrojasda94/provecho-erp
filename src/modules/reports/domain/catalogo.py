@@ -48,6 +48,10 @@ AREAS_BASE = (
     ("caja", "Caja"),
     ("contabilidad", "Contabilidad"),
     ("rrhh", "Recursos Humanos"),
+    # Agregada para `assets` (2026-09-09): RN-MNT-004 dirige el reporte que
+    # adelanta un mantenimiento a compras y a contabilidad, y hasta este
+    # módulo no había a quién apuntarle en compras.
+    ("compras", "Compras"),
 )
 
 # Resolutores dinámicos: destinatarios que no se pueden listar de antemano
@@ -601,6 +605,130 @@ CATALOGO: tuple[Emision, ...] = (
         referencia_tipo="escalamiento",
         clave_referencia="escalamiento_id",
         clave_actor="resuelto_por",
+    ),
+    # --- assets ----------------------------------------------------------------
+    Emision(
+        codigo="assets.mantenimiento_proximo",
+        nombre="Mantenimiento próximo",
+        descripcion=(
+            "Un plan de mantenimiento entra en su ventana de aviso, por "
+            "fecha o por kilometraje (RN-MNT-005)."
+        ),
+        permiso="assets.leer",
+        ambito="empresa",
+        campos=(
+            "plan_id",
+            "activo_id",
+            "empresa_id",
+            "sucursal_id",
+            "nombre",
+            "plan_nombre",
+            "proxima_fecha",
+            "proximo_km",
+        ),
+        titulo="Mantenimiento próximo: {nombre}",
+        cuerpo="Plan {plan_nombre}.",
+        areas_sugeridas=("gerencia", "compras"),
+        referencia_tipo="activo",
+        clave_referencia="activo_id",
+        # Lo detecta el barrido diario, no una persona.
+        clave_actor="",
+    ),
+    Emision(
+        codigo="assets.mantenimiento_vencido",
+        nombre="Mantenimiento vencido",
+        descripcion="El plan ya pasó su fecha o kilometraje de mantenimiento.",
+        permiso="assets.leer",
+        nivel="urgente",
+        ambito="empresa",
+        campos=(
+            "plan_id",
+            "activo_id",
+            "empresa_id",
+            "sucursal_id",
+            "nombre",
+            "plan_nombre",
+            "proxima_fecha",
+            "proximo_km",
+        ),
+        titulo="Mantenimiento vencido: {nombre}",
+        cuerpo="Plan {plan_nombre}.",
+        areas_sugeridas=("gerencia", "compras"),
+        referencia_tipo="activo",
+        clave_referencia="activo_id",
+        clave_actor="",
+    ),
+    Emision(
+        codigo="assets.documento_por_vencer",
+        nombre="Documento por vencer",
+        descripcion=(
+            "Un permiso, certificado o licencia entra en su ventana de "
+            "aviso antes del vencimiento (SOAT, licencia de funcionamiento, "
+            "carné de sanidad, etc.)."
+        ),
+        permiso="assets.leer",
+        ambito="empresa",
+        campos=(
+            "documento_id",
+            "empresa_id",
+            "sujeto_tipo",
+            "sujeto_id",
+            "tipo_documento",
+            "fecha_vencimiento",
+        ),
+        titulo="Documento por vencer: {tipo_documento}",
+        cuerpo="Vence el {fecha_vencimiento}.",
+        areas_sugeridas=("gerencia", "contabilidad", "rrhh"),
+        referencia_tipo="documento_vigencia",
+        clave_referencia="documento_id",
+        clave_actor="",
+    ),
+    Emision(
+        codigo="assets.documento_vencido",
+        nombre="Documento vencido",
+        descripcion="El documento ya pasó su fecha de vencimiento.",
+        permiso="assets.leer",
+        nivel="urgente",
+        ambito="empresa",
+        campos=(
+            "documento_id",
+            "empresa_id",
+            "sujeto_tipo",
+            "sujeto_id",
+            "tipo_documento",
+            "fecha_vencimiento",
+        ),
+        titulo="Documento vencido: {tipo_documento}",
+        cuerpo="Venció el {fecha_vencimiento}.",
+        areas_sugeridas=("gerencia", "contabilidad", "rrhh"),
+        referencia_tipo="documento_vigencia",
+        clave_referencia="documento_id",
+        clave_actor="",
+    ),
+    Emision(
+        codigo="assets.consumo_anomalo",
+        nombre="Consumo de combustible anómalo",
+        descripcion=(
+            "Una carga de combustible rindió muy por debajo del promedio "
+            "reciente del vehículo — puede ser una fuga, una manipulación o "
+            "un mal uso, y vale la pena mirarlo antes de que se repita."
+        ),
+        permiso="assets.leer",
+        ambito="empresa",
+        campos=(
+            "carga_id",
+            "activo_id",
+            "empresa_id",
+            "rendimiento_km_gal",
+            "galones",
+            "km_recorridos",
+            "registrado_por",
+        ),
+        titulo="Consumo anómalo: {rendimiento_km_gal} km/gal",
+        areas_sugeridas=("gerencia", "contabilidad"),
+        referencia_tipo="activo",
+        clave_referencia="activo_id",
+        clave_actor="registrado_por",
     ),
 )
 

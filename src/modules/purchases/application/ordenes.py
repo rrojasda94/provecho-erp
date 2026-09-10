@@ -1,9 +1,11 @@
 """Casos de uso de orden de compra: crear (borrador) → emitir → recibir
 (total/parcial) → anular.
 
-Tipo `activo` queda declarado en el esquema pero fuera de este slice
-(requiere `requerimiento_activo` con doble aprobación de área/gerencia —
-deuda técnica, ver ROADMAP).
+Tipo `activo` (ADR-099) recibe distinto que tipo `insumo`: sin ítems de
+`inventory`, un solo `requerimiento_activo` y una recepción total (no
+parcial) que publica el evento que `assets` consume para dar de alta el
+activo solo. `emitir_orden_compra`/`anular_orden_compra` no distinguen
+tipo — sirven para los dos sin cambios.
 """
 
 import uuid
@@ -25,14 +27,16 @@ from src.modules.purchases.infrastructure.models import (
     OrdenCompraItem,
     RecepcionCompra,
     RecepcionItem,
+    RequerimientoActivo,
 )
 from src.modules.purchases.infrastructure.repositories import (
     OrdenCompraRepo,
     ProveedorRepo,
     RecepcionCompraRepo,
+    RequerimientoActivoRepo,
 )
 from src.modules.users.infrastructure.models import Almacen
-from src.shared import aprobaciones, auditoria
+from src.shared import aprobaciones, auditoria, fechas
 
 
 def construir_items(session: Session, items: list[dict]) -> tuple[list[OrdenCompraItem], Decimal]:
@@ -69,7 +73,7 @@ def crear_orden_compra(
     tipo: str = "insumo",
 ) -> OrdenCompra:
     if tipo != "insumo":
-        raise ReglaNegocio("OC tipo 'activo' requiere requerimiento_activo — aún no soportado")
+        raise ReglaNegocio("OC tipo 'activo' se crea con crear_orden_compra_activo")
     if not items:
         raise ReglaNegocio("una OC requiere al menos un ítem")
 
@@ -143,6 +147,121 @@ def editar_orden_compra(
         empresa_id=proveedor.empresa_id,
     )
     session.flush()
+    return orden
+
+
+def crear_orden_compra_activo(
+    session: Session,
+    *,
+    proveedor_id: uuid.UUID,
+    empresa_id: uuid.UUID,
+    id_interno: str,
+    nombre: str,
+    costo_estimado: Decimal,
+    creado_por: uuid.UUID,
+    idempotency_key: str,
+    sucursal_id: uuid.UUID | None = None,
+    categoria: str | None = None,
+    marca: str | None = None,
+    modelo: str | None = None,
+    vida_util_meses: int | None = None,
+    notas: str | None = None,
+) -> OrdenCompra:
+    """OC de un activo: sin ítems de `inventory` ni almacén de destino — el
+    `requerimiento_activo` es la única línea. Comprar varias unidades del
+    mismo activo en una sola OC queda fuera (deuda declarada)."""
+    if costo_estimado <= 0:
+        raise ReglaNegocio("el costo estimado debe ser > 0")
+
+    repo = OrdenCompraRepo(session)
+    existente = repo.get_by_idempotency(idempotency_key)
+    if existente is not None:
+        return existente
+
+    proveedor = ProveedorRepo(session).get(proveedor_id)
+    if proveedor is None or not proveedor.activo:
+        raise NoEncontrado(f"proveedor {proveedor_id} no encontrado")
+
+    requerimiento = RequerimientoActivoRepo(session).add(
+        RequerimientoActivo(
+            empresa_id=empresa_id,
+            sucursal_id=sucursal_id,
+            id_interno=id_interno,
+            nombre=nombre,
+            categoria=categoria,
+            marca=marca,
+            modelo=modelo,
+            costo_estimado=costo_estimado,
+            vida_util_meses=vida_util_meses,
+            solicitado_por=creado_por,
+            notas=notas,
+        )
+    )
+    return repo.add(
+        OrdenCompra(
+            proveedor_id=proveedor_id,
+            tipo="activo",
+            almacen_destino_id=None,
+            requerimiento_activo_id=requerimiento.id,
+            estado="borrador",
+            total=costo_estimado,
+            creado_por=creado_por,
+            idempotency_key=idempotency_key,
+        )
+    )
+
+
+def recibir_orden_compra_activo(
+    session: Session, orden_compra_id: uuid.UUID, *, recibido_por: uuid.UUID
+) -> OrdenCompra:
+    """Recepción total (RN nueva: una OC de activo no se recibe a medias —
+    el activo llegó o no llegó). Publica el evento que `assets` consume
+    para darlo de alta; un fallo de `assets` no revierte la recepción,
+    mismo criterio que `purchases.compra_recibida` con `inventory`."""
+    orden = OrdenCompraRepo(session).get(orden_compra_id)
+    if orden is None:
+        raise NoEncontrado("orden de compra no encontrada")
+    if orden.tipo != "activo":
+        raise ReglaNegocio("esta orden no es de tipo 'activo'")
+    if not rules.puede_recibir(orden.estado):
+        raise Conflicto(f"la OC está {orden.estado}; no admite recepción")
+
+    requerimiento = RequerimientoActivoRepo(session).get(orden.requerimiento_activo_id)
+    if requerimiento is None:
+        raise NoEncontrado("requerimiento de activo no encontrado")
+
+    proveedor = ProveedorRepo(session).get(orden.proveedor_id)
+    orden.estado = "recibida"
+    auditoria.registrar(
+        session,
+        usuario_id=recibido_por,
+        entidad="orden_compra",
+        entidad_id=orden.id,
+        accion="recibir_activo",
+        datos_antes={"estado": "emitida"},
+        datos_despues={"estado": "recibida", "requerimiento_activo_id": str(requerimiento.id)},
+        empresa_id=proveedor.empresa_id if proveedor else None,
+    )
+    event_bus.publish(
+        "purchases.requerimiento_activo_recibido",
+        {
+            "orden_compra_id": str(orden.id),
+            "requerimiento_activo_id": str(requerimiento.id),
+            "empresa_id": str(requerimiento.empresa_id),
+            "sucursal_id": str(requerimiento.sucursal_id) if requerimiento.sucursal_id else None,
+            "id_interno": requerimiento.id_interno,
+            "nombre": requerimiento.nombre,
+            "categoria": requerimiento.categoria,
+            "marca": requerimiento.marca,
+            "modelo": requerimiento.modelo,
+            "costo_estimado": str(requerimiento.costo_estimado),
+            "vida_util_meses": requerimiento.vida_util_meses,
+            "proveedor_id": str(orden.proveedor_id),
+            "solicitado_por": str(requerimiento.solicitado_por),
+            "fecha_compra": fechas.hoy().isoformat(),
+        },
+        session=session,
+    )
     return orden
 
 

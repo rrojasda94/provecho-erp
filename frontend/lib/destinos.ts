@@ -28,6 +28,10 @@ const RUTAS: Record<string, (id: string) => string> = {
   orden_produccion: (id) => `/produccion?orden=${id}`,
   escalamiento: (id) => `/reportes/escalamientos/${id}`,
   trabajador: (id) => `/rrhh/trabajadores?trabajador=${id}`,
+  activo: (id) => `/activos/activos/${id}`,
+  // Un documento no tiene ficha propia todavía: se resalta en la lista, como
+  // "categoria" o "ajuste" del lado de inventario.
+  documento_vigencia: (id) => `/activos/documentos?documento=${id}`,
 };
 
 export function rutaDestino(
@@ -52,6 +56,8 @@ const ETIQUETAS: Record<string, string> = {
   movimiento_dinero: "Ver el pago",
   orden_produccion: "Ver la orden",
   escalamiento: "Ver el escalamiento",
+  activo: "Ver el activo",
+  documento_vigencia: "Ver el documento",
 };
 
 export function etiquetaDestino(tipo: string | null | undefined): string {

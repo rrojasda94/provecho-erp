@@ -199,7 +199,7 @@ PLANTILLAS: dict[str, Plantilla] = {
         monto_es="neto",
         lineas=(_d("6599", rol="merma"), _h("201", rol="existencia")),
     ),
-    # Desecho de producción (ADR-098): no se reusa `inventory.merma_
+    # Desecho de producción (ADR-100): no se reusa `inventory.merma_
     # registrada` porque el producto terminado de una orden desechada nunca
     # llegó a existir como stock — no hay reserva que apartar. El monto es
     # el costo de los insumos que `registrar_consumo` ya descontó del

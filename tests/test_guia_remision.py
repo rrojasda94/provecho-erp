@@ -101,6 +101,69 @@ def test_la_guia_congela_origen_destino_y_rucs(traslado):
     assert guia["vehiculo_placa"] == "ABC-123"
 
 
+def _crear_vehiculo_assets(client, h, *, placa="XYZ-999"):
+    r = client.post(
+        "/api/v1/assets/activos",
+        headers=h,
+        json={
+            "tipo": "vehiculo",
+            "id_interno": "V9001",
+            "nombre": "Camioneta de reparto",
+            "placa": placa,
+            "tipo_vehiculo": "camioneta",
+            "tenencia": "propio",
+        },
+    )
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def test_guia_con_vehiculo_de_activos_congela_placa(traslado):
+    """RN-VEH-008: elegir el vehículo por `vehiculo_id` congela su placa en
+    la guía, sin necesidad de teclearla."""
+    client, _, _, h, transferencia = traslado
+    vehiculo_id = _crear_vehiculo_assets(client, h)
+
+    extra = {"vehiculo_placa": None}
+    guia = _emitir(client, h, transferencia["id"], **{**extra, "vehiculo_id": vehiculo_id}).json()
+
+    assert guia["vehiculo_id"] == vehiculo_id
+    assert guia["vehiculo_placa"] == "XYZ-999"
+
+
+def test_guia_sin_vehiculo_ni_placa_falla(traslado):
+    client, _, _, h, transferencia = traslado
+    extra = {"vehiculo_placa": None}
+    r = _emitir(client, h, transferencia["id"], **extra)
+    assert r.status_code == 409
+
+
+def test_guia_con_vehiculo_de_otra_empresa_404(traslado):
+    client, ids, TestSession, h, transferencia = traslado
+
+    with TestSession() as s:
+        from src.modules.assets.infrastructure.models import Activo
+        from src.modules.users.infrastructure.models import Empresa, Grupo
+
+        otra_empresa = Empresa(
+            grupo_id=s.scalar(select(Grupo)).id,
+            razon_social="Otra Flota EIRL",
+            ruc="20888888888",
+            domicilio_fiscal="Jr. Z 1",
+            tipo="operativa",
+        )
+        s.add(otra_empresa)
+        s.flush()
+        vehiculo_id = _crear_vehiculo_assets(client, h, placa="AJE-111")
+        fila = s.get(Activo, uuid.UUID(vehiculo_id))
+        fila.empresa_id = otra_empresa.id
+        s.commit()
+
+    extra = {"vehiculo_placa": None}
+    r = _emitir(client, h, transferencia["id"], **{**extra, "vehiculo_id": vehiculo_id})
+    assert r.status_code == 404
+
+
 def test_un_traslado_una_guia(traslado):
     """Reemitir sobre la misma transferencia devuelve la misma guía: dos
     guías del mismo traslado declararían la misma mercadería dos veces."""
@@ -117,9 +180,7 @@ def test_un_traslado_una_guia(traslado):
 
 def test_el_correlativo_avanza_por_empresa_y_serie(traslado):
     client, ids, _, h, transferencia = traslado
-    otra = _despachar(
-        client, h, ids, [{"sku_id": ids["sku_servilleta"], "cantidad": "5"}]
-    )
+    otra = _despachar(client, h, ids, [{"sku_id": ids["sku_servilleta"], "cantidad": "5"}])
 
     primera = _emitir(client, h, transferencia["id"]).json()
     segunda = _emitir(client, h, otra["id"]).json()
@@ -139,18 +200,12 @@ def test_las_lineas_se_agrupan_por_sku_aunque_salgan_de_varios_lotes(env):  # no
     # fallaba solo. Lo que la prueba necesita es que uno venza antes que el
     # otro y que **ninguno** esté vencido.
     hoy = fechas.hoy()
-    lote_viejo = _crear_lote(
-        client, h, ids, "L-VIEJO", (hoy + timedelta(days=30)).isoformat()
-    )
-    lote_nuevo = _crear_lote(
-        client, h, ids, "L-NUEVO", (hoy + timedelta(days=120)).isoformat()
-    )
+    lote_viejo = _crear_lote(client, h, ids, "L-VIEJO", (hoy + timedelta(days=30)).isoformat())
+    lote_nuevo = _crear_lote(client, h, ids, "L-NUEVO", (hoy + timedelta(days=120)).isoformat())
     _ingresar(client, h, ids["central_id"], ids["sku_queso"], 4, lote_viejo)
     _ingresar(client, h, ids["central_id"], ids["sku_queso"], 10, lote_nuevo)
 
-    transferencia = _despachar(
-        client, h, ids, [{"sku_id": ids["sku_queso"], "cantidad": "6"}]
-    )
+    transferencia = _despachar(client, h, ids, [{"sku_id": ids["sku_queso"], "cantidad": "6"}])
     detalle = client.get(
         f"/api/v1/inventory/transferencias/{transferencia['id']}", headers=h
     ).json()
@@ -218,9 +273,7 @@ def test_guia_de_transferencia_inexistente_404(env):  # noqa: F811
 
 def test_leer_la_guia_antes_de_emitirla_404(traslado):
     client, _, _, h, transferencia = traslado
-    r = client.get(
-        f"/api/v1/inventory/transferencias/{transferencia['id']}/guia", headers=h
-    )
+    r = client.get(f"/api/v1/inventory/transferencias/{transferencia['id']}/guia", headers=h)
     assert r.status_code == 404
 
 
@@ -325,9 +378,7 @@ def test_no_se_descarga_una_guia_sin_aceptar(traslado):
     client, _, _, h, transferencia = traslado
     guia = _emitir(client, h, transferencia["id"]).json()
 
-    r = client.get(
-        f"/api/v1/inventory/guias-remision/{guia['id']}/descargar/pdf", headers=h
-    )
+    r = client.get(f"/api/v1/inventory/guias-remision/{guia['id']}/descargar/pdf", headers=h)
     assert r.status_code == 409
 
 
@@ -335,18 +386,14 @@ def test_descargar_formato_invalido_422(traslado):
     client, _, _, h, transferencia = traslado
     guia = _emitir(client, h, transferencia["id"]).json()
 
-    r = client.get(
-        f"/api/v1/inventory/guias-remision/{guia['id']}/descargar/docx", headers=h
-    )
+    r = client.get(f"/api/v1/inventory/guias-remision/{guia['id']}/descargar/docx", headers=h)
     assert r.status_code == 422
 
 
 def test_descargar_guia_inexistente_404(env):  # noqa: F811
     client, _, _ = env
     h = _token(client)
-    r = client.get(
-        f"/api/v1/inventory/guias-remision/{uuid.uuid4()}/descargar/pdf", headers=h
-    )
+    r = client.get(f"/api/v1/inventory/guias-remision/{uuid.uuid4()}/descargar/pdf", headers=h)
     assert r.status_code == 404
 
 

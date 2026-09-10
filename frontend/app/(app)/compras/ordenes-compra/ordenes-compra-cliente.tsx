@@ -9,7 +9,11 @@ import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { pedir } from "@/lib/cliente-api";
 
-import { crearOrdenCompraAction, editarOrdenCompraAction } from "./actions";
+import {
+  crearOrdenCompraAction,
+  crearOrdenCompraActivoAction,
+  editarOrdenCompraAction,
+} from "./actions";
 import { ArticuloPicker } from "@/components/articulo-picker/articulo-picker";
 import { Combobox } from "@/components/ui/combobox";
 
@@ -20,13 +24,25 @@ export type OrdenCompraItem = {
   costo_unitario: string;
   cantidad_recibida: string;
 };
+export type RequerimientoActivo = {
+  id: string;
+  id_interno: string;
+  nombre: string;
+  categoria: string | null;
+  marca: string | null;
+  modelo: string | null;
+  costo_estimado: string;
+  vida_util_meses: number | null;
+};
 export type OrdenCompra = {
   id: string;
   proveedor_id: string;
   tipo: string;
   // `oc` | `directa` (ADR-082). Se listan juntas y se distinguen acá.
   origen: string;
-  almacen_destino_id: string;
+  almacen_destino_id: string | null;
+  requerimiento_activo_id: string | null;
+  requerimiento_activo?: RequerimientoActivo | null;
   estado: string;
   total: string;
   items?: OrdenCompraItem[];
@@ -268,6 +284,72 @@ function BotonEditarOC({ orden, articulos }: { orden: OrdenCompra; articulos: Ar
   );
 }
 
+/** OC de un activo: sin ítems de inventario, un solo formulario descriptivo
+ * (ADR-099). Comprar varias unidades del mismo activo en una OC queda fuera
+ * de este slice. */
+function DialogoNuevaOCActivo({ proveedores }: { proveedores: Proveedor[] }) {
+  return (
+    <DialogoFormulario
+      titulo="Nueva orden de compra de activo"
+      disparador="+ Activo"
+      etiquetaEnvio="Crear (borrador)"
+      etiquetaPendiente="Creando..."
+      accion={crearOrdenCompraActivoAction}
+      ancho="max-w-lg"
+      ayuda="Compra un equipo o vehículo — no entra a un almacén de inventario. Al recibirla, Activos lo da de alta solo."
+    >
+      <label className="flex flex-col gap-1 text-sm font-semibold">
+        Proveedor
+        <Combobox
+          name="proveedor_id"
+          etiqueta="Proveedor"
+          requerido
+          marcador="Elegir..."
+          opciones={proveedores.map((p) => ({
+            valor: p.id,
+            etiqueta: p.razon_social ?? p.ruc ?? "",
+            pista: p.razon_social ? (p.ruc ?? undefined) : undefined,
+          }))}
+        />
+      </label>
+      <div className="grid grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Código (id_interno)
+          <input name="id_interno" required maxLength={8} placeholder="EQ0001" />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Nombre
+          <input name="nombre" required maxLength={150} />
+        </label>
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Categoría
+          <input name="categoria" maxLength={60} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Marca
+          <input name="marca" maxLength={60} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Modelo
+          <input name="modelo" maxLength={60} />
+        </label>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Costo estimado (S/)
+          <input name="costo_estimado" type="number" step="0.01" min="0.01" required />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-semibold">
+          Vida útil (meses)
+          <input name="vida_util_meses" type="number" min="1" />
+        </label>
+      </div>
+    </DialogoFormulario>
+  );
+}
+
 export function OrdenesCompraCliente({
   ordenes,
   total,
@@ -321,7 +403,8 @@ export function OrdenesCompraCliente({
       {
         id: "almacen",
         header: "Destino",
-        accessorFn: (o) => nombreAlmacen.get(o.almacen_destino_id) ?? "—",
+        accessorFn: (o) =>
+          o.almacen_destino_id ? (nombreAlmacen.get(o.almacen_destino_id) ?? "—") : "—",
       },
       { accessorKey: "tipo", header: "Tipo" },
       { accessorKey: "total", header: "Total" },
@@ -343,7 +426,7 @@ export function OrdenesCompraCliente({
         id: "acciones",
         header: "",
         cell: ({ row }) =>
-          row.original.estado === "borrador" ? (
+          row.original.estado === "borrador" && row.original.tipo !== "activo" ? (
             <BotonEditarOC orden={row.original} articulos={articulos} />
           ) : null,
       },
@@ -368,6 +451,7 @@ export function OrdenesCompraCliente({
             Compra directa
           </Link>
           <DialogoNuevaOC proveedores={proveedores} almacenes={almacenes} articulos={articulos} />
+          <DialogoNuevaOCActivo proveedores={proveedores} />
         </div>
       </div>
       {articulos.length === 0 && (
