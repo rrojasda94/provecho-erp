@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bike,
   BookOpen,
   Building2,
   Calculator,
@@ -12,9 +13,11 @@ import {
   Megaphone,
   Package,
   Receipt,
+  Route,
   ScrollText,
   SlidersHorizontal,
   Users,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -98,6 +101,34 @@ export const MODULOS: Modulo[] = [
     Icono: ChefHat,
   },
   {
+    clave: "delivery",
+    nombre: "Reparto",
+    descripcion: "Tablero de despacho, repartidores propios e historial",
+    href: "/delivery",
+    prefijoPermiso: "delivery.",
+    // Exacto y no por prefijo: un repartidor con `delivery.repartir` no
+    // despacha, y con el prefijo vería esta ficha además de "Mi reparto".
+    // `delivery.leer` es lo que tienen cajero, despachador y supervisor.
+    permiso: "delivery.leer",
+    area: "operacion",
+    Icono: Route,
+  },
+  {
+    clave: "reparto",
+    nombre: "Mi reparto",
+    descripcion: "Tus rutas, tus entregas y el GPS de tu recorrido",
+    // Pantalla completa fuera del shell, igual que el PDV y el KDS
+    // (ADR-013): se opera en la calle, no en el mostrador.
+    href: "/reparto",
+    prefijoPermiso: "delivery.repartir",
+    // Permiso exacto y no por prefijo: un despachador con `delivery.despachar`
+    // no reparte, y con el prefijo `delivery.` vería igual esta ficha —el
+    // tablero de despacho (ADR-098, slice siguiente) es un módulo aparte.
+    permiso: "delivery.repartir",
+    area: "operacion",
+    Icono: Bike,
+  },
+  {
     clave: "produccion",
     nombre: "Producción",
     descripcion: "Órdenes de producción y consumo",
@@ -157,6 +188,15 @@ export const MODULOS: Modulo[] = [
     prefijoPermiso: "inventory.",
     area: "abastecimiento",
     Icono: Package,
+  },
+  {
+    clave: "activos",
+    nombre: "Activos",
+    descripcion: "Equipos y vehículos: mantenimiento, combustible y vencimientos",
+    href: "/activos/cronograma",
+    prefijoPermiso: "assets.",
+    area: "abastecimiento",
+    Icono: Wrench,
   },
   {
     clave: "contabilidad",
