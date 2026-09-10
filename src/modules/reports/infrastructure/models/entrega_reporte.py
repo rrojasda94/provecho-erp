@@ -32,7 +32,7 @@ class EntregaReporte(Base, UuidPkMixin, TimestampMixin):
         # La consulta de `/mios`.
         Index("ix_entrega_usuario", "usuario_id"),
         CheckConstraint(
-            "canal IN ('bandeja')",
+            "canal IN ('bandeja', 'email')",
             name="canal_entrega",
         ),
     )
@@ -46,5 +46,5 @@ class EntregaReporte(Base, UuidPkMixin, TimestampMixin):
     # área, el registro tiene que seguir explicando por qué lo recibió.
     motivo: Mapped[str] = mapped_column(String(60))
     canal: Mapped[str] = mapped_column(
-        Enum("bandeja", name="canal_entrega", native_enum=False), default="bandeja"
+        Enum("bandeja", "email", name="canal_entrega", native_enum=False), default="bandeja"
     )

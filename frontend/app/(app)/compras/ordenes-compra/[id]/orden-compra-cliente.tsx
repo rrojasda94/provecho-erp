@@ -12,6 +12,7 @@ import {
   anularOrdenCompraAction,
   emitirOrdenCompraAction,
   recibirOrdenCompraAction,
+  recibirOrdenCompraActivoAction,
   registrarFacturaAction,
   type EstadoOrdenCompra,
 } from "../actions";
@@ -304,6 +305,23 @@ function DialogoFactura({ orden, ruc }: { orden: OrdenCompra; ruc: string | null
   );
 }
 
+/** Qué botón de recepción mostrar: la de activo es un solo click, la de
+ * insumo abre el diálogo línea por línea. Separado de `Acciones` para que
+ * la ramificación por tipo no infle su complejidad. */
+function BotonRecepcion({ orden, articulos }: { orden: OrdenCompra; articulos: Articulo[] }) {
+  if (orden.tipo === "activo") {
+    return (
+      <BotonAccion
+        ordenId={orden.id}
+        accion={recibirOrdenCompraActivoAction}
+        etiqueta="Recibir activo"
+        confirmacion="¿Confirmas que el activo llegó? Activos lo dará de alta solo."
+      />
+    );
+  }
+  return <DialogoRecepcion orden={orden} articulos={articulos} />;
+}
+
 function Acciones({
   orden,
   articulos,
@@ -342,7 +360,7 @@ function Acciones({
           confirmacion="Emitir la orden la vuelve inmutable y la manda al proveedor. ¿Seguro?"
         />
       )}
-      {puedeRecibir && <DialogoRecepcion orden={orden} articulos={articulos} />}
+      {puedeRecibir && <BotonRecepcion orden={orden} articulos={articulos} />}
       {puedeFacturar && <DialogoFactura orden={orden} ruc={ruc} />}
       {puedeAnular && (
         <BotonAccion
@@ -401,6 +419,54 @@ function ItemsDeLaOrden({
         </table>
       </div>
     </section>
+  );
+}
+
+function RequerimientoActivoInfo({ orden }: { orden: OrdenCompra }) {
+  const req = orden.requerimiento_activo;
+  if (!req) return null;
+  return (
+    <section className="flex flex-col gap-2">
+      <h2 className="text-sm font-bold uppercase text-gray">Activo a comprar</h2>
+      <div className="rounded border border-gray/20 p-3 text-sm">
+        <p className="font-semibold">
+          {req.id_interno} · {req.nombre}
+        </p>
+        <p className="text-gray">
+          {[req.categoria, req.marca, req.modelo].filter(Boolean).join(" · ") || "—"}
+        </p>
+        <p className="mt-1">
+          Costo estimado: {soles(req.costo_estimado)}
+          {req.vida_util_meses ? ` · vida útil ${req.vida_util_meses} meses` : ""}
+        </p>
+      </div>
+      {orden.estado === "recibida" && (
+        <p className="text-sm text-gray">
+          Ya dado de alta en Activos con el código {req.id_interno}.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** Qué mostrar bajo la cabecera: una OC de activo no tiene ítems de
+ * inventario ni recepciones línea por línea. Separado de `OrdenCompraCliente`
+ * por la misma razón que `BotonRecepcion`. */
+function DetalleOrden({
+  orden,
+  recepciones,
+  nombreDeArticulo,
+}: {
+  orden: OrdenCompra;
+  recepciones: Recepcion[];
+  nombreDeArticulo: (id: string) => string;
+}) {
+  if (orden.tipo === "activo") return <RequerimientoActivoInfo orden={orden} />;
+  return (
+    <>
+      <ItemsDeLaOrden orden={orden} nombreDe={nombreDeArticulo} />
+      <Recepciones recepciones={recepciones} nombreDe={nombreDeArticulo} />
+    </>
   );
 }
 
@@ -526,9 +592,7 @@ export function OrdenCompraCliente({
         />
       </header>
 
-      <ItemsDeLaOrden orden={orden} nombreDe={nombreDeArticulo} />
-
-      <Recepciones recepciones={recepciones} nombreDe={nombreDeArticulo} />
+      <DetalleOrden orden={orden} recepciones={recepciones} nombreDeArticulo={nombreDeArticulo} />
       <Facturas comprobantes={comprobantes} />
 
       <Link href="/compras/ordenes-compra" className="text-sm underline">

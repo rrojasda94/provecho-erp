@@ -6,6 +6,9 @@ from src.modules.purchases.infrastructure.models.orden_compra_item import OrdenC
 from src.modules.purchases.infrastructure.models.proveedor import Proveedor
 from src.modules.purchases.infrastructure.models.recepcion_compra import RecepcionCompra
 from src.modules.purchases.infrastructure.models.recepcion_item import RecepcionItem
+from src.modules.purchases.infrastructure.models.requerimiento_activo import (
+    RequerimientoActivo,
+)
 
 __all__ = [
     "OrdenCompra",
@@ -13,4 +16,5 @@ __all__ = [
     "Proveedor",
     "RecepcionCompra",
     "RecepcionItem",
+    "RequerimientoActivo",
 ]

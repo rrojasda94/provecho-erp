@@ -15,9 +15,10 @@ validación cruzada de área solicitante y gerencia.
 (dirección `de_proveedor`), `caja_chica_compras`, `caja_chica_movimiento`,
 `compra_directa` (compra sin OC a proveedor informal, sustentada solo con
 comprobante), `evaluacion_proveedor` (indicador calculado + registro
-cualitativo), `requerimiento_activo` (ficha de especificación + validación
-de área/gerencia, ligada a la OC de tipo `activo`). Detalle en
-`docs/architecture/data-model.md` §5.
+cualitativo), `requerimiento_activo` (ficha del activo a comprar —nombre,
+categoría, marca, modelo, costo estimado, vida útil—, ligada 1:1 a la OC de
+tipo `activo`; **sin** la validación de área/gerencia que la especificación
+original pedía, deuda declarada). Detalle en `docs/architecture/data-model.md` §5.
 
 ## Estado (slice core implementado 2026-07-25)
 
@@ -74,6 +75,8 @@ flush con un 500 en vez de un 422 legible.
 | POST | `/ordenes-compra/{id}/recepciones` | `purchases.recepcionar` |
 | POST | `/ordenes-compra/{id}/anular` | `purchases.anular` |
 | POST | `/ordenes-compra/{id}/conformidad-comprobante` | `purchases.dar_conformidad` |
+| POST | `/ordenes-compra-activo` | `purchases.crear` — ADR-099, ver §OC tipo `activo` |
+| POST | `/ordenes-compra/{id}/recibir-activo` | `purchases.recepcionar` — recepción total, no parcial |
 
 Eventos: publica `purchases.oc_emitida` y `purchases.compra_recibida`
 (inventory suma stock en el almacén destino y recalcula
@@ -82,7 +85,9 @@ almacén que recibe, ver `ponytail:` en
 `inventory/application/listeners.py`), `purchases.oc_anulada` y
 `purchases.comprobante_conforme` (2026-07-25 — registra `comprobante`
 recibido, transversal en `src/shared/models/`, y dispara en `accounting`
-la cola de pago a proveedor, `application/pagos.registrar_pago`). Rol
+la cola de pago a proveedor, `application/pagos.registrar_pago`) y
+`purchases.requerimiento_activo_recibido` (2026-09-09 — `assets` lo consume
+para dar de alta el activo, ver §OC tipo `activo`). Rol
 semilla `comprador` (crear/leer/recepcionar/anular/dar_conformidad).
 
 **`purchases.aprobar` es solo del `admin`** (decisión 2026-08-05). Una OC
@@ -94,8 +99,10 @@ desplegar: el seeder solo agrega permisos, así que en una base ya sembrada
 hay que revocarlo a mano (ver ROADMAP → Deuda técnica → Seguridad).
 
 Deuda del slice (ver ROADMAP): `cotizacion` (camino no-preferente sin
-modelar — hoy toda OC insumo emite sin cotización comparativa),
-OC tipo `activo` + `requerimiento_activo` con doble aprobación,
+modelar — hoy toda OC insumo emite sin cotización comparativa), la doble
+aprobación de área/gerencia y las cotizaciones mínimas de
+`requerimiento_activo` (la OC tipo `activo` en sí ya está resuelta —ver más
+abajo—, esa validación cruzada no),
 `caja_chica_compras`/`caja_chica_movimiento`/`rendicion_caja_chica`
 (`compra_directa` ya no depende de esto — ver más abajo), `evaluacion_proveedor`
 automática por recepción, listener de `inventory.devolucion_a_proveedor`.
@@ -122,6 +129,12 @@ nada. No pasa por el umbral de `purchases.aprobar` (es gasto ya
 incurrido, no un compromiso a aprobar) ni por `caja_chica_movimiento`
 (ese modelo sigue sin existir — el pago sale por cuentas por pagar
 normal). Detalle de la decisión en ADR-082.
+
+**Consumidor nuevo (2026-09-09, ADR-099)**: el módulo `assets` liga el
+comprobante de una carga de combustible con un artículo `tipo="servicio"`
+("Combustible") registrado por esta vía — el ticket del grifo se compra
+como cualquier otro servicio y `assets` solo consume el id del comprobante
+ya recibido, sin importar el ORM de `purchases`.
 
 ## El ciclo completo en pantalla (2026-08-30, ADR-085)
 
@@ -155,6 +168,30 @@ parte por dirección: el emitido es único por empresa, el recibido por emisor.
 diga otra cosa. `tipo` y `sustento` pasan a `Literal` — eran `str` libres
 contra columnas `Enum` con CHECK, o sea un 500 en vez de un 422.
 
+## OC tipo `activo` (2026-09-09, ADR-099)
+
+`POST /ordenes-compra-activo` crea una OC de un `requerimiento_activo`
+(nombre, categoría, marca, modelo, costo estimado, vida útil — su propio
+`id_interno`, futuro código del activo) en vez de ítems de `inventory`: sin
+`almacen_destino_id` (nulo — un activo no entra a stock). `emitir_orden_compra`/
+`anular_orden_compra` son los mismos de cualquier OC, sin cambios. La
+recepción es propia y **total, nunca parcial** (`POST
+/ordenes-compra/{id}/recibir-activo`, permiso `purchases.recepcionar`): el
+activo llegó o no llegó. Publica `purchases.requerimiento_activo_recibido`,
+que `assets.application.listeners` consume para dar de alta el activo
+(`tipo="equipamiento"`) solo — un fallo de `assets` (por ejemplo, un
+`id_interno` ya usado) queda en el log y no revierte la recepción, mismo
+criterio que `inventory` con `purchases.compra_recibida`.
+
+**Comprar varias unidades del mismo activo en una sola OC queda fuera** de
+este slice (`requerimiento_activo` no tiene `cantidad`) — declarado, no un
+olvido. **La doble aprobación de área/gerencia y las 2 cotizaciones mínimas
+que la especificación original describía tampoco se construyeron todavía**:
+la aprobación de esta OC es la misma de cualquier otra (umbral +
+`purchases.aprobar`). Solo compra vehículos vía este camino queda fuera —
+comprar uno todavía es alta manual en `assets` después de recibido el
+papeleo por otra vía.
+
 ## Dirección del proveedor anclada al mapa (2026-08-22, ADR-053)
 
 `proveedor` lleva el `UbicacionMixin` de `core/model_base`. Convive con
@@ -173,10 +210,12 @@ después se puede anclar en el mapa. Corregir el texto a mano suelta el punto
     el ítem es recurrente, la OC se emite sin `cotizacion` previa
     vinculada; el sustento es el `requerimiento_almacen` + la
     `recepcion_compra`/factura.
-  - **Tipo `activo`**: exige `requerimiento_activo` con validación de área
-    solicitante y de gerencia (dos aprobaciones distintas, ambas
-    registradas) antes de permitir la emisión, además de mínimo 2
-    `cotizacion` vinculadas — no aplica el camino simplificado.
+  - **Tipo `activo`** (resuelto en parte 2026-09-09, ver §OC tipo `activo`):
+    compra un `requerimiento_activo` (sin ítems de `inventory`), aprobación
+    y emisión iguales a cualquier OC, recepción total que da de alta el
+    activo solo. La doble aprobación de área/gerencia y el mínimo de 2
+    `cotizacion` vinculadas que la especificación original pedía siguen sin
+    construirse (deuda declarada).
 - Registrar `compra_directa` (sin OC previa): proveedor informal,
   comprobante obligatorio — hoy sale por cuentas por pagar normal
   (`accounting.pagos.registrar_pago`), el cargo a `caja_chica_movimiento`
@@ -203,9 +242,10 @@ después se puede anclar en el mapa. Corregir el texto a mano suelta el punto
 - Aprobación de OC sobre monto umbral requiere permiso `purchases.aprobar`
   (umbral por empresa en `parametro_empresa`, con fallback al valor semilla
   de config — ver `docs/architecture/data-model.md` §8c).
-- OC tipo `activo` requiere `requerimiento_activo.aprobado_area = true` y
-  `requerimiento_activo.aprobado_gerencia = true` antes de permitir emisión
-  — bloqueo a nivel de dominio, no solo de UI.
+- OC tipo `activo` se recibe **total, nunca parcial** — el activo llegó o
+  no llegó (RN nueva, `purchases.recibir_orden_compra_activo`). La
+  validación cruzada de área/gerencia que la especificación original pedía
+  antes de emitir sigue sin construirse (deuda declarada, §OC tipo `activo`).
 - `compra_directa` exige comprobante adjunto antes de guardarse; sin
   comprobante no se persiste. Hoy es una `orden_compra` con
   `origen="directa"` (ADR-082) — no un modelo aparte, ni pasa por

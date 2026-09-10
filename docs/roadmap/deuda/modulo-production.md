@@ -25,7 +25,7 @@ Plan completo de cómo saldar esta deuda (bloques, orden, decisiones tomadas):
   (RN-DOC-010), visado por el jefe de cocina, no redactado a mano.
   Bloque `feat/produccion-reporte-de-jornada`.
 - ✅ 2026-09-09 **Merma → `accounting`** (bloque
-  `feat/produccion-desecho-a-contabilidad`, ADR-098). No se reusó
+  `feat/produccion-desecho-a-contabilidad`, ADR-100). No se reusó
   `inventory.merma_registrada` a propósito: esa merma opera sobre una
   `reserva_stock` de un SKU que ya está en el almacén, y el producto
   terminado de una orden desechada **nunca entró a inventory** (solo se
@@ -52,13 +52,14 @@ Plan completo de cómo saldar esta deuda (bloques, orden, decisiones tomadas):
   propia orden de producción) no está resuelta — hoy `registrar_consumo`
   espera insumos ya disponibles en stock. Bloque
   `feat/produccion-subrecetas-anidadas`.
-- ⬜ **Conteo cíclico del almacén de producción**: **no está bloqueado por
-  `inventory`** — al revisar el 2026-09-09 se confirmó que el conteo
-  cíclico (`inventory/application/conteos.py`) es genérico por
-  `almacen_id`, nunca consulta `almacen.tipo`, y el tipo `produccion` ya es
-  un valor válido (`tests/test_production.py` lo usa). Lo que falta es
-  cobertura de test explícita sobre un almacén `produccion` — no capacidad
-  nueva. Bloque `fix/inventario-cdp-001-y-conteo-produccion`.
+- ✅ 2026-09-09 **Conteo cíclico del almacén de producción** (bloque
+  `fix/inventario-cdp-001-y-conteo-produccion`). Nunca estuvo bloqueado por
+  `inventory`: el conteo cíclico (`inventory/application/conteos.py`) es
+  genérico por `almacen_id`, nunca consulta `almacen.tipo`. Lo que faltaba
+  era cobertura de test explícita — `tests/test_conteos.py::
+  test_conteo_ciclico_funciona_igual_en_almacen_de_produccion` abre,
+  registra y cierra un conteo sobre un almacén `produccion` con el mismo
+  resultado (ajuste por diferencia) que sobre el central, cerrando RN-PRD-016.
 - ✅ 2026-09-09 **Segregación quien crea vs. quien completa la orden**: se
   evaluó y se decide **no exigirla**. `production.crear`/`production.completar`
   siguen siendo permisos distintos, pero nada impide que el mismo usuario
@@ -107,11 +108,12 @@ hasta ahora:
   `production/application/listeners.py` ni se registra ningún handler en
   `src/core/app.py`. El evento sí se publica desde 2026-08-06. Bloque
   `feat/produccion-orden-por-necesidad`.
-- ⬜ **RN-CDP-001 sin enforcement**: "una cocina de producción nunca
-  despacha a un almacén de sucursal directamente" no tiene ningún control
-  en `inventory.application.transferencias._validar_almacenes` — hoy nada
-  impide despachar de un almacén `produccion` a uno `sucursal`. Bloque
-  `fix/inventario-cdp-001-y-conteo-produccion`.
+- ✅ 2026-09-09 **RN-CDP-001 sin enforcement** (mismo bloque).
+  `inventory.application.transferencias._validar_almacenes` rechaza con
+  409 un despacho de un almacén `produccion` a uno `sucursal`; el mismo
+  origen sigue pudiendo despachar al central, que es el tramo real
+  (`tests/test_transferencias.py::
+  test_produccion_no_despacha_directo_a_sucursal`).
 - ⬜ **Doble mecanismo de evidencia para RN-PRD-015**:
   `orden_produccion.evidencia_destruccion_url` es un string libre, mientras
   `reporte_escalamiento.evidencia_id` es una FK a `archivo` (con storage
@@ -122,15 +124,22 @@ hasta ahora:
   (`asistencia`, `marcacion`); falta el contrato público de lectura.
   Bloques `feat/rrhh-horas-asistidas-contrato-publico` +
   `feat/produccion-horas-hombre-desde-rrhh`.
-- ⬜ **Seeder sin datos de producción**: ningún seeder (`seed.py`, `e2e.py`,
-  `pdv_demo.py`, `pizzas_demo.py`) crea un usuario con rol `jefe_cocina`,
-  un almacén tipo `produccion`, ni una receta con `articulo_id` — sin esa
-  receta, crear una orden se rechaza con 409. El módulo no se puede
-  ejercitar en dev/staging sin el comodín de `admin`. Bloque
-  `feat/produccion-semilla-y-pantalla-con-permisos`.
-- ⬜ **Frontend sin gates de permiso ni ficha de detalle**: la pantalla
-  `/produccion` no distingue `production.crear` de `production.completar`
-  al mostrar botones, no recibe `usuario.permisos`, no tiene ficha `[id]`
-  pese a que `GET /ordenes/{id}` existe, y pagina en el cliente en vez de
-  con `page_size`. Bloques `feat/produccion-semilla-y-pantalla-con-permisos`
-  y `feat/produccion-ficha-y-consumo-sugerido`.
+- ✅ 2026-09-09 **Seeder sin datos de producción** (bloque
+  `feat/produccion-semilla-y-pantalla-con-permisos`). `seed()` ahora crea
+  `jefecocina1` (PIN 123456, rol `jefe_cocina`) y el almacén `WH-PROD`
+  (tipo `produccion`, abastecido por el central). La receta BOM (insumo +
+  subreceta con `articulo_id`) no se agregó a `seed()` sino a
+  `python -m src.seeders.e2e`: un artículo real en el catálogo de la
+  empresa de `seed()` rompía 21 tests de una docena de suites que asumen
+  ese catálogo vacío salvo lo que cada una crea (colisión de
+  `categoria_udm.nombre`, que es UNIQUE, y de conteos exactos de
+  artículos/stock). `pdv_demo.py`/`pizzas_demo.py` siguen sin receta de
+  producción — quedan fuera porque son seeders de demo, no de desarrollo
+  ni de CI.
+- ✅ 2026-09-09 **Frontend sin gates de permiso ni paginación server**
+  (mismo bloque). `/produccion` ahora recibe `permisos={usuario.permisos}`
+  y gatea "+ Nueva orden"/Consumo detrás de `production.crear` y
+  Completar detrás de `production.completar` (patrón de
+  `inventario/transferencias`); pagina con `?page=`/`page_size` en vez de
+  pedir solo la primera página. La **ficha de detalle** sigue pendiente:
+  bloque `feat/produccion-ficha-y-consumo-sugerido`.

@@ -72,7 +72,7 @@ Deuda del slice (ver
 consume otra subreceta con su propia orden), costeo real (hoy
 `costo_unitario` lo tipea el cliente). Ya saldado: lote/trazabilidad del
 producto terminado, auditoría e idempotencia de consumo/completar, y el
-asiento contable del desecho (ADR-098) (2026-09-09).
+asiento contable del desecho (ADR-100) (2026-09-09).
 
 ## Casos de uso
 
@@ -143,7 +143,7 @@ reproceso o desecho con evidencia → reporte de escalamiento).
   por `accounting` para el asiento por el costo de insumos consumidos —
   **no** es `inventory.merma_registrada`: el producto terminado de una
   orden desechada nunca ingresó a inventory, así que no hay reserva que
-  apartar; ver ADR-098). Reproceso (`no_conforme_reprocesado`)
+  apartar; ver ADR-100). Reproceso (`no_conforme_reprocesado`)
   correctamente no genera merma ni asiento, solo el detalle de la
   corrección en el reporte de escalamiento.
   `production.equipo_frio_fuera_rango` (alerta inmediata a Gerencia,

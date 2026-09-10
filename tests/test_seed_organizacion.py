@@ -87,14 +87,29 @@ def test_dos_sucursales_activas_alquiladas(sembrado):
 
 
 def test_almacen_central_sin_sucursal(sembrado):
-    almacen = sembrado.scalar(select(Almacen))
-    assert almacen.nombre == "WH1"
+    almacen = sembrado.scalar(select(Almacen).where(Almacen.nombre == "WH1"))
     assert almacen.tipo == "central"
     assert almacen.direccion == SEDE_CASTILLA
     # El central no cuelga de ninguna sucursal: abastece a todas.
     assert almacen.sucursal_id is None
     assert almacen.almacen_abastecedor_id is None
     assert almacen.empresa_id == sembrado.scalar(select(Empresa.id))
+
+
+def test_almacen_produccion_se_abastece_del_central(sembrado):
+    """Sin este almacén, `POST /production/ordenes` no tiene dónde crear una
+    orden — el módulo quedaba imposible de probar sin tocar la base a mano."""
+    central = sembrado.scalar(select(Almacen).where(Almacen.nombre == "WH1"))
+    produccion = sembrado.scalar(
+        select(Almacen).where(Almacen.nombre == "WH-PROD")
+    )
+    assert produccion is not None
+    assert produccion.tipo == "produccion"
+    # Nunca cuelga de una sucursal, y se abastece del central (RN-CDP-001:
+    # tampoco despacha directo a sucursal, eso lo exige `inventory`).
+    assert produccion.sucursal_id is None
+    assert produccion.almacen_abastecedor_id == central.id
+    assert produccion.empresa_id == central.empresa_id
 
 
 def test_permiso_gestionar_parametros_empresa_sembrado_y_solo_admin(sembrado):
@@ -139,8 +154,10 @@ def test_permiso_proponer_parametro_sembrado_por_modulo(sembrado):
 def test_seed_es_idempotente(sembrado):
     seed(sembrado)
 
-    for modelo in (Grupo, Empresa, Marca, LicenciaMarca, Almacen):
+    for modelo in (Grupo, Empresa, Marca, LicenciaMarca):
         assert sembrado.scalar(select(func.count()).select_from(modelo)) == 1
+    # Dos almacenes semilla: el central (WH1) y el de producción (WH-PROD).
+    assert sembrado.scalar(select(func.count()).select_from(Almacen)) == 2
     assert sembrado.scalar(select(func.count()).select_from(Sucursal)) == 2
     assert sembrado.scalar(
         select(func.count()).select_from(MedioPago)

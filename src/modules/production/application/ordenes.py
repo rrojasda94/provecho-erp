@@ -223,7 +223,7 @@ def _cerrar_no_conforme(
     """Reproceso no genera merma ni asiento (RN-PRD); desecho exige
     evidencia de destrucción antes de aceptar la merma (RN-PRD-015) y
     dispara el asiento contable por el costo de insumos ya consumidos
-    (ADR-098 — no se reusa `inventory.merma_registrada`: el producto
+    (ADR-100 — no se reusa `inventory.merma_registrada`: el producto
     terminado de una orden desechada nunca llegó a existir como stock)."""
     extra: dict = {}
     if resultado == "no_conforme_desechado":
