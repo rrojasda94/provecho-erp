@@ -128,6 +128,15 @@ def _consumo_body(ids, cantidad="10", costo="2.00"):
     }
 
 
+def _adjuntar_evidencia(client, headers, orden_id, nombre="evidencia.jpg"):
+    return client.post(
+        f"/api/v1/production/ordenes/{orden_id}/evidencia", headers=headers, json={
+            "nombre": nombre, "mime_type": "image/jpeg", "tamano_bytes": 1024,
+            "url_storage": "https://x/evidencia.jpg",
+        },
+    )
+
+
 def test_crear_orden_sin_receta_409(env):
     client, ids, _ = env
     h = _token(client)
@@ -215,13 +224,70 @@ def test_completar_desechado_con_evidencia_ok(env):
     client.post(
         f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
     )
+    assert _adjuntar_evidencia(client, h, orden_id).status_code == 201
     r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
         "resultado": "no_conforme_desechado", "merma_cantidad": "10",
-        "merma_motivo": "contaminación", "evidencia_destruccion_url": "https://x/evidencia.jpg",
+        "merma_motivo": "contaminación",
     })
-    assert r.status_code == 200
+    assert r.status_code == 200, r.text
     assert r.json()["estado"] == "no_conforme_desechado"
     assert r.json()["merma_motivo"] == "contaminación"
+
+
+# --- Evidencia de destrucción como archivo (feat/produccion-evidencia-como-archivo) ---
+def test_adjuntar_evidencia_setea_evidencia_archivo_id_en_la_orden(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-evidencia-1").json()["id"]
+    r = _adjuntar_evidencia(client, h, orden_id)
+    assert r.status_code == 201, r.text
+    archivo_id = r.json()["id"]
+
+    detalle = client.get(f"/api/v1/production/ordenes/{orden_id}", headers=h).json()
+    assert detalle["evidencia_archivo_id"] == archivo_id
+
+
+def test_adjuntar_evidencia_mime_no_admitido_409(env):
+    client, ids, _ = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-evidencia-2").json()["id"]
+    r = client.post(
+        f"/api/v1/production/ordenes/{orden_id}/evidencia", headers=h, json={
+            "nombre": "planilla.xlsx", "mime_type": "application/vnd.ms-excel",
+            "tamano_bytes": 1024, "url_storage": "https://x/planilla.xlsx",
+        },
+    )
+    assert r.status_code == 409
+
+
+def test_adjuntar_evidencia_supera_tamano_maximo_409(env):
+    client, ids, _ = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-evidencia-3").json()["id"]
+    r = client.post(
+        f"/api/v1/production/ordenes/{orden_id}/evidencia", headers=h, json={
+            "nombre": "video.mp4", "mime_type": "video/mp4",
+            "tamano_bytes": 200 * 1024 * 1024, "url_storage": "https://x/video.mp4",
+        },
+    )
+    assert r.status_code == 409
+
+
+def test_adjuntar_evidencia_registra_auditoria(env):
+    client, ids, TestSession = env
+    h = _token(client)
+    orden_id = _crear_orden(client, h, ids, idempotency_key="op-evidencia-4").json()["id"]
+    _adjuntar_evidencia(client, h, orden_id)
+
+    with TestSession() as s:
+        accion = s.scalar(
+            select(AuditLog.accion).where(
+                AuditLog.entidad == "orden_produccion",
+                AuditLog.entidad_id == uuid.UUID(orden_id),
+                AuditLog.accion == "adjuntar_evidencia",
+            )
+        )
+    assert accion == "adjuntar_evidencia"
 
 
 def test_registrar_consumo_estado_invalido_409(env):
@@ -478,13 +544,17 @@ def test_completar_desechado_publica_orden_desechada_con_costo_insumos(env):
         f"/api/v1/production/ordenes/{orden_id}/consumo", headers=h, json=_consumo_body(ids)
     )
 
+    evidencia_id = _adjuntar_evidencia(client, h, orden_id).json()["id"]
+
     eventos = []
     event_bus.subscribe("production.orden_desechada", eventos.append)
+    eventos_no_conformidad = []
+    event_bus.subscribe("production.no_conformidad_detectada", eventos_no_conformidad.append)
     r = client.post(f"/api/v1/production/ordenes/{orden_id}/completar", headers=h, json={
         "resultado": "no_conforme_desechado", "merma_cantidad": "10",
-        "merma_motivo": "contaminación", "evidencia_destruccion_url": "https://x/evidencia.jpg",
+        "merma_motivo": "contaminación",
     })
-    assert r.status_code == 200
+    assert r.status_code == 200, r.text
 
     (evento,) = eventos
     assert evento["orden_produccion_id"] == orden_id
@@ -494,6 +564,10 @@ def test_completar_desechado_publica_orden_desechada_con_costo_insumos(env):
     # mano de obra (que ya se reconoce aparte, como gasto de planilla).
     assert Decimal(evento["monto"]) == Decimal("20.00")
     assert evento["merma_motivo"] == "contaminación"
+    # RN-PRD-015: la misma evidencia viaja también en `no_conformidad_
+    # detectada`, para que el escalamiento nazca con ella sin pedirla de nuevo.
+    (evento_no_conformidad,) = eventos_no_conformidad
+    assert evento_no_conformidad["evidencia_id"] == evidencia_id
 
 
 def test_completar_reprocesado_no_publica_orden_desechada(env):

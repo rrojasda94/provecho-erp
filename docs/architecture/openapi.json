@@ -6453,17 +6453,6 @@
             ],
             "title": "Cantidad Producida"
           },
-          "evidencia_destruccion_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Evidencia Destruccion Url"
-          },
           "fecha_vencimiento": {
             "anyOf": [
               {
@@ -12472,6 +12461,81 @@
           "opciones"
         ],
         "title": "EvaluacionOut",
+        "type": "object"
+      },
+      "EvidenciaCreate": {
+        "description": "Evidencia de destrucción ya subida al storage — mismo contrato que\n`marketing.AdjuntoCreate` (RN-PRD-015).",
+        "properties": {
+          "mime_type": {
+            "maxLength": 100,
+            "minLength": 3,
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "tamano_bytes": {
+            "exclusiveMinimum": 0.0,
+            "title": "Tamano Bytes",
+            "type": "integer"
+          },
+          "url_storage": {
+            "maxLength": 500,
+            "minLength": 3,
+            "title": "Url Storage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "mime_type",
+          "tamano_bytes",
+          "url_storage"
+        ],
+        "title": "EvidenciaCreate",
+        "type": "object"
+      },
+      "EvidenciaOut": {
+        "properties": {
+          "extension": {
+            "title": "Extension",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "tamano_bytes": {
+            "title": "Tamano Bytes",
+            "type": "integer"
+          },
+          "url_storage": {
+            "title": "Url Storage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "extension",
+          "mime_type",
+          "tamano_bytes",
+          "url_storage"
+        ],
+        "title": "EvidenciaOut",
         "type": "object"
       },
       "ExclusionIn": {
@@ -18535,6 +18599,18 @@
             "title": "Estado",
             "type": "string"
           },
+          "evidencia_archivo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidencia Archivo Id"
+          },
           "fecha_vencimiento": {
             "anyOf": [
               {
@@ -18699,6 +18775,18 @@
           "estado": {
             "title": "Estado",
             "type": "string"
+          },
+          "evidencia_archivo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidencia Archivo Id"
           },
           "fecha_vencimiento": {
             "anyOf": [
@@ -52615,6 +52703,65 @@
           }
         ],
         "summary": "Ver Consumo Sugerido",
+        "tags": [
+          "production"
+        ]
+      }
+    },
+    "/api/v1/production/ordenes/{orden_id}/evidencia": {
+      "post": {
+        "description": "Registra la evidencia de destrucción ya subida al storage\n(RN-PRD-015). `completar` con resultado `no_conforme_desechado` exige\nque exista una antes de aceptar la merma.",
+        "operationId": "adjuntar_evidencia_api_v1_production_ordenes__orden_id__evidencia_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orden_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Orden Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvidenciaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenciaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Adjuntar Evidencia",
         "tags": [
           "production"
         ]

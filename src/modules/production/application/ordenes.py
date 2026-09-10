@@ -105,6 +105,7 @@ def detalle_orden(session: Session, orden_id: uuid.UUID) -> dict:
         "costo_real_unitario": orden.costo_real_unitario,
         "merma_cantidad": orden.merma_cantidad,
         "merma_motivo": orden.merma_motivo,
+        "evidencia_archivo_id": orden.evidencia_archivo_id,
         "fecha_vencimiento": orden.fecha_vencimiento,
         "lote_codigo": orden.lote_codigo,
         "trazabilidad": orden.trazabilidad,
@@ -332,25 +333,28 @@ def _cerrar_no_conforme(
     costo_insumos: Decimal,
     merma_cantidad: Decimal | None,
     merma_motivo: str | None,
-    evidencia_destruccion_url: str | None,
     registrado_por: uuid.UUID | None,
 ) -> dict:
-    """Reproceso no genera merma ni asiento (RN-PRD); desecho exige
-    evidencia de destrucción antes de aceptar la merma (RN-PRD-015) y
-    dispara el asiento contable por el costo de insumos ya consumidos
-    (ADR-100 — no se reusa `inventory.merma_registrada`: el producto
-    terminado de una orden desechada nunca llegó a existir como stock)."""
+    """Reproceso no genera merma ni asiento (RN-PRD); desecho exige que ya
+    se haya adjuntado evidencia de destrucción (RN-PRD-015, `POST
+    /ordenes/{id}/evidencia` — `orden.evidencia_archivo_id`) antes de
+    aceptar la merma, y dispara el asiento contable por el costo de insumos
+    ya consumidos (ADR-100 — no se reusa `inventory.merma_registrada`: el
+    producto terminado de una orden desechada nunca llegó a existir como
+    stock)."""
     extra: dict = {}
     if resultado == "no_conforme_desechado":
         if not merma_cantidad or Decimal(str(merma_cantidad)) <= 0:
             raise ReglaNegocio("desecho requiere merma_cantidad > 0")
         if not merma_motivo:
             raise ReglaNegocio("desecho requiere merma_motivo")
-        if not evidencia_destruccion_url:
-            raise ReglaNegocio("desecho requiere evidencia_destruccion_url (RN-PRD-015)")
+        if orden.evidencia_archivo_id is None:
+            raise ReglaNegocio(
+                "desecho requiere evidencia de destrucción adjunta primero "
+                "(POST /ordenes/{id}/evidencia, RN-PRD-015)"
+            )
         orden.merma_cantidad = Decimal(str(merma_cantidad))
         orden.merma_motivo = merma_motivo
-        orden.evidencia_destruccion_url = evidencia_destruccion_url
         extra["merma_cantidad"] = str(orden.merma_cantidad)
     orden.estado = resultado
     event_bus.publish(
@@ -365,6 +369,12 @@ def _cerrar_no_conforme(
             # Quien cerró la orden con el control de calidad en la mano:
             # es a quien Gerencia le va a preguntar qué pasó.
             "registrado_por": str(registrado_por) if registrado_por else None,
+            # Para que el `reporte_escalamiento` nazca con la misma
+            # evidencia (RN-PRD-015) — antes había dos mecanismos para lo
+            # mismo y ninguno llenaba al otro.
+            "evidencia_id": (
+                str(orden.evidencia_archivo_id) if orden.evidencia_archivo_id else None
+            ),
         },
         session=session,
     )
@@ -397,7 +407,6 @@ def completar_orden_produccion(
     horas_hombre: Decimal | None = None,
     merma_cantidad: Decimal | None = None,
     merma_motivo: str | None = None,
-    evidencia_destruccion_url: str | None = None,
     fecha_vencimiento: date | None = None,
     lote_codigo: str | None = None,
     trazabilidad: dict | None = None,
@@ -449,7 +458,6 @@ def completar_orden_produccion(
             costo_insumos=costo_insumos,
             merma_cantidad=merma_cantidad,
             merma_motivo=merma_motivo,
-            evidencia_destruccion_url=evidencia_destruccion_url,
             registrado_por=registrado_por,
         )
 

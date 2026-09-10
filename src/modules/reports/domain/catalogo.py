@@ -469,12 +469,15 @@ CATALOGO: tuple[Emision, ...] = (
         nombre="No conformidad de producción",
         descripcion=(
             "Una orden de producción terminó fuera de norma (RN-PRD-015). "
-            "`almacen_id` se agregó al payload para este módulo (2026-08-08)."
+            "`almacen_id` se agregó al payload para este módulo (2026-08-08). "
+            "`evidencia_id` se agregó el 2026-09-09 (bloque `feat/produccion-"
+            "evidencia-como-archivo`): antes había dos mecanismos de evidencia "
+            "para la misma regla y ninguno llenaba al otro."
         ),
         permiso="production.leer",
         nivel="urgente",
         ambito="almacen",
-        campos=("orden_produccion_id", "almacen_id", "resultado"),
+        campos=("orden_produccion_id", "almacen_id", "resultado", "evidencia_id"),
         titulo="No conformidad de producción: {resultado}",
         # `cocina` desde 2026-08-10: RN-PRD-014 le pide al jefe de cocina que
         # redacte el hallazgo y la acción tomada, y hasta ahora el aviso iba a

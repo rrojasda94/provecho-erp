@@ -895,12 +895,22 @@ producción se hace en cocinas de sucursal. Ver
 - **RN-PRD-015** La destrucción de un lote no conforme se realiza dentro
   del establecimiento, en zona cubierta por cámaras de videovigilancia
   (nunca fuera del local) y dentro del horario laboral. El video de la
-  destrucción y el desecho final a la basura son la evidencia adjunta al
-  reporte de escalamiento — previene sustracción del producto declarado
-  como merma. Lo exige `reporte_escalamiento.evidencia_id` cuando el motivo es
-  `no_conformidad_calidad` y la orden terminó en desecho; la validación vive en
-  la capa de aplicación y no en un CHECK porque «terminó en desecho» es un
-  campo de `orden_produccion`, otra tabla de otro módulo (ADR-036).
+  destrucción y el desecho final a la basura son la evidencia — previene
+  sustracción del producto declarado como merma. Se sube una sola vez, vía
+  `POST /production/ordenes/{id}/evidencia` (`Archivo`,
+  `orden_produccion.evidencia_archivo_id`, bloque `feat/produccion-
+  evidencia-como-archivo`, 2026-09-09): `completar_orden_produccion` exige
+  que ya exista antes de aceptar un `no_conforme_desechado`, y el mismo id
+  viaja en `production.no_conformidad_detectada.evidencia_id` para que
+  `reporte_escalamiento.evidencia_id` nazca con ella sin que el usuario la
+  vuelva a pegar a mano al abrir el escalamiento — hasta entonces
+  `orden_produccion.evidencia_destruccion_url` (string libre) y
+  `reporte_escalamiento.evidencia_id` (FK `archivo`) eran dos mecanismos
+  para la misma regla y ninguno llenaba al otro. La validación de que el
+  motivo sea `no_conformidad_calidad` y la orden haya terminado en desecho
+  sigue en la capa de aplicación y no en un CHECK porque «terminó en
+  desecho» es un campo de `orden_produccion`, otra tabla de otro módulo
+  (ADR-036).
 - **RN-PRD-016** El inventario de la cocina de producción (insumos,
   subrecetas en elaboración, producto terminado) sigue el mismo esquema
   de conteo cíclico y margen de error que Almacén Central (RN-INV-007/

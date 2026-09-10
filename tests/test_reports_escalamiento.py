@@ -33,7 +33,7 @@ from src.modules.users.infrastructure.models import (
     UsuarioSucursal,
 )
 from src.modules.users.infrastructure.security import hash_pin
-from src.shared.models import AuditLog
+from src.shared.models import Archivo, AuditLog
 
 
 @pytest.fixture()
@@ -191,6 +191,31 @@ def test_una_no_conformidad_desechada_exige_evidencia(api):
     assert ok.status_code == 201
     # Origen `produccion`: lo dice el `referencia_tipo` del reporte.
     assert ok.json()["origen"] == "produccion"
+
+
+def test_una_no_conformidad_desechada_con_evidencia_en_el_reporte_no_la_vuelve_a_pedir(api):
+    """RN-PRD-015 una sola vez: si `production.orden_desechada` ya la mandó
+    en el payload (`production.no_conformidad_detectada.evidencia_id`), el
+    escalamiento nace con ella sin que el usuario la vuelva a pegar a mano."""
+    c, s, ids = api
+    archivo = Archivo(
+        nombre="evidencia.jpg", extension="jpg", mime_type="image/jpeg",
+        tamano_bytes=1024, url_storage="https://x/evidencia.jpg", origen="subido",
+        entidad_tipo="orden_produccion", entidad_id=uuid.uuid4(),
+    )
+    s.add(archivo)
+    s.commit()
+    evidencia_id = archivo.id
+    reporte = _reporte(
+        s,
+        ids,
+        codigo="production.no_conformidad_detectada",
+        referencia_tipo="orden_produccion",
+        datos={"resultado": "no_conforme_desechado", "evidencia_id": str(evidencia_id)},
+    )
+    r = _abrir(c, reporte.id, motivo="no_conformidad_calidad", descripcion="Se desechó")
+    assert r.status_code == 201, r.text
+    assert r.json()["evidencia_id"] == str(evidencia_id)
 
 
 # --- La cadena ----------------------------------------------------------------

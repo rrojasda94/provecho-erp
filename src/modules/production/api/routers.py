@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.core.tenant import Tenant
 from src.modules.production.api import schemas
-from src.modules.production.application import ordenes, tarifas
+from src.modules.production.application import evidencia, ordenes, tarifas
 from src.modules.production.application.scope import exigir_almacen, exigir_orden
 from src.modules.users.api.deps import client_ip, get_db, get_tenant, require_permission
 from src.modules.users.infrastructure.models import Almacen, Usuario
@@ -97,6 +97,35 @@ def ver_consumo_sugerido(
     return ordenes.consumo_sugerido(session, orden_id)
 
 
+@router.post(
+    "/ordenes/{orden_id}/evidencia", response_model=schemas.EvidenciaOut, status_code=201
+)
+def adjuntar_evidencia(
+    orden_id: uuid.UUID,
+    body: schemas.EvidenciaCreate,
+    actor: Usuario = Depends(require_permission(COMPLETAR)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+    ip: str | None = Depends(client_ip),
+):
+    """Registra la evidencia de destrucción ya subida al storage
+    (RN-PRD-015). `completar` con resultado `no_conforme_desechado` exige
+    que exista una antes de aceptar la merma."""
+    exigir_orden(session, orden_id, tenant)
+    archivo = evidencia.adjuntar_evidencia(
+        session,
+        orden_id,
+        nombre=body.nombre,
+        mime_type=body.mime_type,
+        tamano_bytes=body.tamano_bytes,
+        url_storage=body.url_storage,
+        subido_por=actor.id,
+        ip=ip,
+    )
+    session.commit()
+    return archivo
+
+
 @router.post("/ordenes/{orden_id}/consumo", response_model=schemas.OrdenProduccionOut)
 def registrar_consumo(
     orden_id: uuid.UUID,
@@ -142,7 +171,6 @@ def completar_orden(
         horas_hombre=body.horas_hombre,
         merma_cantidad=body.merma_cantidad,
         merma_motivo=body.merma_motivo,
-        evidencia_destruccion_url=body.evidencia_destruccion_url,
         fecha_vencimiento=body.fecha_vencimiento,
         lote_codigo=body.lote_codigo,
         trazabilidad=body.trazabilidad,
