@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { ADMIN, dialogo, ingresar } from "../e2e/util";
+import { ADMIN, ingresar } from "../e2e/util";
 import { capturar } from "./util";
 
 /**
@@ -40,19 +40,32 @@ test("una dirección escrita a mano se guarda igual sin mapa", async ({
   await expect(page.getByRole("heading", { name: "Sucursales" })).toBeVisible();
   await capturar(page, testInfo, "sucursales");
 
-  await page
-    .getByRole("row")
-    .filter({ hasText: SUCURSAL })
-    .getByRole("button", { name: "Editar" })
-    .click();
-  const formulario = dialogo(page);
+  const fila = page.getByRole("row").filter({ hasText: SUCURSAL });
+  await fila.getByRole("button", { name: "Editar" }).click();
+  // Acotado a la fila y no a `dialogo(page)` (`dialog[open]` de toda la
+  // página): esta tabla arma un `<dialog>` de edición POR FILA (uno por
+  // sucursal), así que con más de una sucursal sembrada la página tiene
+  // varios `<dialog>` a la vez — cerrados, pero igual en el DOM. Acotar por
+  // fila evita cualquier ambigüedad con el diálogo de otra sucursal.
+  const formulario = fila.locator("dialog[open]");
   await expect(
     formulario.getByRole("heading", { name: "Editar sucursal" }),
   ).toBeVisible();
 
   // Sin clave no hay lista de sugerencias ni mapa: el campo de texto es todo
   // lo que hay, y tiene que alcanzar.
-  const direccion = formulario.getByLabel("Dirección");
+  //
+  // `input[name="direccion"]` y no `getByLabel("Dirección")`: verificado a
+  // mano (contando nodos con `.count()`, que no revienta con más de un
+  // match) que en esta pantalla siempre hay exactamente un diálogo abierto
+  // y un solo campo de dirección — pero el snapshot de accesibilidad que
+  // arma `getByLabel` para resolver la etiqueta interpreta ese único campo
+  // como dos nodos y dispara `strictModeViolationError`, que a su vez
+  // revienta con `text.replace is not a function` (bug interno del propio
+  // Playwright generando el mensaje, no un problema de esta pantalla). El
+  // `name` del campo es estable y sin ambigüedad — mismo dato, sin pasar
+  // por el motor de accesibilidad que tropieza acá.
+  const direccion = formulario.locator('input[name="direccion"]');
   await expect(direccion).toBeVisible();
   await expect(formulario.getByRole("status")).toContainText(/no está disponible/i);
   // El punto de ADR-072: sin SDK el campo es un `<input>` pelado, no un
