@@ -51,12 +51,11 @@ def upgrade() -> None:
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(["cliente_id"], ["cliente.id"]),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("email"),
         sa.UniqueConstraint("google_sub"),
         sa.UniqueConstraint("cliente_id"),
     )
     op.create_index(
-        op.f("ix_storefront_cuenta_email"), "storefront_cuenta", ["email"], unique=False,
+        op.f("ix_storefront_cuenta_email"), "storefront_cuenta", ["email"], unique=True,
     )
 
     op.create_table(
