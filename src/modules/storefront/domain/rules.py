@@ -9,6 +9,12 @@ import datetime
 
 CLAVES_CONTENIDO = ("hero", "nosotros", "contacto", "trabaja", "pie", "seo")
 
+# Lockout de clave de cuenta (ADR-102) — mismos valores que `users`
+# (`MAX_INTENTOS_FALLIDOS`/`DURACION_BLOQUEO`): no hay razón para que una
+# cuenta de cliente tolere más intentos de fuerza bruta que una de staff.
+MAX_INTENTOS_FALLIDOS = 5
+DURACION_BLOQUEO = datetime.timedelta(minutes=15)
+
 ENTIDADES_FOTO = {
     "producto": "producto_comercial_foto",
     "ingrediente": "articulo_foto",

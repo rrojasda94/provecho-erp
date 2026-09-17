@@ -196,3 +196,13 @@ accounting.asiento_generado
 > `cliente`) y PR3 agrega `storefront.pedido_web_confirmado` (consumido por
 > `sales` para crear la `venta`). Se documentan aquí al implementarse, no
 > antes.
+
+> **Nota (2026-09-17, ADR-102)**: `storefront` publica `cuenta_registrada`
+> (consumido por `sales.application.listeners.on_cuenta_registrada`, que
+> crea/encuentra el `cliente` y publica `sales.cliente_vinculado`, que a su
+> vez consume `storefront.application.listeners.on_cliente_vinculado` para
+> guardar `cliente_id`). Payload de `storefront.cuenta_registrada`:
+> `{cuenta_id, marca_id, nombres, apellidos, tipo_documento,
+> numero_documento, telefono, email, fecha_nacimiento, direccion,
+> ubicacion}`. Payload de `sales.cliente_vinculado`: `{cuenta_id,
+> cliente_id}`.

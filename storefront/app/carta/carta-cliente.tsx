@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { buscar, type Buscable } from "@/lib/busqueda";
+import { agregarFavoritoAction, quitarFavoritoAction } from "@/app/cuenta/actions";
 
 export type Ingrediente = { id: string; nombre: string };
 export type Variante = {
@@ -37,12 +38,82 @@ function terminosDe(p: Producto): string[] {
   ];
 }
 
-export function CartaCliente({ carta }: { carta: Carta }) {
+function BotonFavorito({
+  productoId,
+  esFavorito,
+  sesionActiva,
+  onCambio,
+}: {
+  productoId: string;
+  esFavorito: boolean;
+  sesionActiva: boolean;
+  onCambio: (id: string, favorito: boolean) => void;
+}) {
+  const [pendiente, startTransition] = useTransition();
+
+  if (!sesionActiva) {
+    return (
+      <Link
+        href="/cuenta/ingresar"
+        onClick={(e) => e.stopPropagation()}
+        className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs"
+        title="Ingresa para guardar favoritos"
+      >
+        ♡
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={pendiente}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const nuevoValor = !esFavorito;
+        onCambio(productoId, nuevoValor);
+        startTransition(async () => {
+          try {
+            if (nuevoValor) await agregarFavoritoAction(productoId);
+            else await quitarFavoritoAction(productoId);
+          } catch {
+            onCambio(productoId, esFavorito);
+          }
+        });
+      }}
+      className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-sm"
+      title={esFavorito ? "Quitar de favoritos" : "Agregar a favoritos"}
+    >
+      {esFavorito ? "♥" : "♡"}
+    </button>
+  );
+}
+
+export function CartaCliente({
+  carta,
+  sesionActiva = false,
+  favoritosIds = [],
+}: {
+  carta: Carta;
+  sesionActiva?: boolean;
+  favoritosIds?: string[];
+}) {
   const [consulta, setConsulta] = useState("");
   const [categoria, setCategoria] = useState<string | null>(null);
   const [tamano, setTamano] = useState<string>("");
   const [precioMax, setPrecioMax] = useState<string>("");
   const [soloDisponibles, setSoloDisponibles] = useState(false);
+  const [favoritos, setFavoritos] = useState(() => new Set(favoritosIds));
+
+  function alCambiarFavorito(id: string, favorito: boolean) {
+    setFavoritos((actual) => {
+      const siguiente = new Set(actual);
+      if (favorito) siguiente.add(id);
+      else siguiente.delete(id);
+      return siguiente;
+    });
+  }
 
   const tamanos = useMemo(() => {
     const set = new Set<string>();
@@ -159,6 +230,12 @@ export function CartaCliente({ carta }: { carta: Carta }) {
                   No disponible
                 </span>
               )}
+              <BotonFavorito
+                productoId={p.id}
+                esFavorito={favoritos.has(p.id)}
+                sesionActiva={sesionActiva}
+                onCambio={alCambiarFavorito}
+              />
             </div>
             <div className="flex flex-1 flex-col gap-1 p-3">
               <h3 className="font-bold">{p.nombre}</h3>

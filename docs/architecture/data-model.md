@@ -2135,6 +2135,17 @@ redes, horario de delivery).
 Lista vacía = cerrado ese día; hasta 2 tramos por día (`HH:MM`, 24h). Filas
 con otra forma (heredadas) se toleran y el sitio muestra "consultar horario".
 
+### Cuenta de cliente del sitio (ADR-102, PR2)
+
+Credencial separada del ERP — ver ADR-102 para el detalle del aislamiento.
+
+| Tabla | Columnas propias | Notas |
+|---|---|---|
+| `storefront_cuenta` | `email` (único), `password_hash` (nullable), `google_sub` (único, nullable), `nombres`, `apellidos`, `tipo_documento`, `numero_documento`, `telefono`, `fecha_nacimiento`, `cliente_id` (FK `cliente`, único, nullable), `intentos_fallidos`, `bloqueado_hasta` | `cliente_id` se completa por evento, puede quedar `NULL` |
+| `storefront_direccion` | `cuenta_id` (FK), `etiqueta`, `direccion`, `referencia`, `predeterminada` + `UbicacionMixin` | Varias por cuenta; una sola `predeterminada` a la vez |
+| `storefront_favorito` | `cuenta_id` (FK), `producto_comercial_id` (FK) | `UNIQUE(cuenta_id, producto_comercial_id)`, sin soft delete |
+| `storefront_refresh_token` | `cuenta_id` (FK), `token_hash` (único), `sesion_id`, `expira_en`, `revocado` | Mismo mecanismo de rotación que `refresh_token` del ERP, tabla propia |
+
 ### `archivo.entidad_tipo` nuevos (tabla `archivo`, `src/shared/models/archivo.py`)
 
 `"producto_comercial_foto"` y `"articulo_foto"` — foto principal = la más

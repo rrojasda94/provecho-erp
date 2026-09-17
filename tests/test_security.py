@@ -16,6 +16,9 @@ _PROD_OK = {
     "environment": "production",
     "debug": False,
     "jwt_secret": "x" * 48,
+    # Distinto de `jwt_secret` a propósito (ADR-102): el aislamiento entre la
+    # cuenta del sitio y el ERP depende de que nunca coincidan.
+    "storefront_jwt_secret": "y" * 48,
     "database_url": "postgresql+psycopg://provecho:s3cr3t@db:5432/provecho",
     "allowed_hosts": ["erp.majambo.pe"],
     "cors_origins": ["https://erp.majambo.pe"],
@@ -36,6 +39,9 @@ def test_produccion_valida_arranca() -> None:
     [
         ({"jwt_secret": "change-me"}, "placeholder"),
         ({"jwt_secret": "corto"}, "32 caracteres"),
+        ({"storefront_jwt_secret": "change-me"}, "STOREFRONT_JWT_SECRET.*placeholder"),
+        ({"storefront_jwt_secret": "corto"}, "STOREFRONT_JWT_SECRET.*32 caracteres"),
+        ({"storefront_jwt_secret": "x" * 48}, "STOREFRONT_JWT_SECRET.*igual a JWT_SECRET"),
         ({"debug": True}, "DEBUG"),
         (
             {"database_url": "postgresql+psycopg://provecho:provecho@db:5432/provecho"},

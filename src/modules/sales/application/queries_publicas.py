@@ -895,3 +895,37 @@ def promociones_web_vigentes(
             }
         )
     return resultado
+
+
+def ultimo_pedido_de_cliente(session: Session, cliente_id: uuid.UUID) -> dict | None:
+    """El pedido más reciente de un cliente, para el "tu último pedido" del
+    sitio de marca (ADR-102) — cualquier canal, no solo web (todavía no
+    existe canal `web`; un cliente que ya compró en salón o delivery
+    también quiere ver ese pedido al loguearse). `None` si nunca compró.
+    """
+    venta = session.scalar(
+        select(Venta)
+        .where(Venta.cliente_id == cliente_id, Venta.estado != "anulada")
+        .order_by(Venta.created_at.desc())
+        .limit(1)
+    )
+    if venta is None:
+        return None
+    items = session.execute(
+        select(VentaItem.cantidad, ProductoComercial.nombre)
+        .join(ProductoComercial, ProductoComercial.id == VentaItem.producto_comercial_id)
+        .where(
+            VentaItem.venta_id == venta.id,
+            VentaItem.padre_venta_item_id.is_(None),
+        )
+    )
+    return {
+        "id": venta.id,
+        "numero_orden": venta.numero_orden,
+        "fecha_orden": venta.fecha_orden,
+        "estado": venta.estado,
+        "total": venta.total,
+        "canal": venta.canal,
+        "modalidad": venta.modalidad,
+        "items": [{"nombre": nombre, "cantidad": cantidad} for cantidad, nombre in items],
+    }

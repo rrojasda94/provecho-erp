@@ -1,4 +1,4 @@
-# Deuda técnica — Módulo storefront (sitio de marca, PR1 — deuda declarada)
+# Deuda técnica — Módulo storefront (sitio de marca, PR1+PR2 — deuda declarada)
 
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
@@ -42,3 +42,26 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     agregó a `docker-compose.yml` (dev) y `docker-compose.staging.yml`,
     que es el único ambiente desplegado hoy (`docs/engineering/staging.md`).
     Agregarlo a producción cuando ese compose se use de verdad.
+
+- ✅ 2026-09-17 **PR2** (ADR-102): cuentas de cliente web
+  (`storefront_cuenta`), direcciones, favoritos y "tu último pedido",
+  registro con email/clave o Google, vínculo a `cliente` de `sales` por
+  evento (`storefront.cuenta_registrada` → `sales.cliente_vinculado`).
+  Lo que deja abierto:
+  - ⬜ **Sin "olvidé mi contraseña".** La cuenta web no tiene flujo de
+    recuperación — a diferencia del PIN del ERP (`tests/test_reset_pin.py`),
+    quien pierde su clave hoy no puede recuperarla sola.
+  - ⬜ **Sin verificación de email.** El registro por email/clave deja la
+    cuenta operativa de inmediato; no hay envío de correo de confirmación
+    ni columna `verificada_at`.
+  - ⬜ **Favoritos sin resolver a nombre/foto en `/cuenta`.** La pantalla de
+    cuenta (`storefront/app/cuenta/cuenta-cliente.tsx`) solo muestra el
+    conteo de favoritos y enlaza a la carta — no llama a
+    `carta_publica` para mostrar nombre/foto de cada uno, para no sumar
+    otra ida y vuelta a la API en esa página. Resolver si el listado de
+    favoritos necesita mostrarse ahí directamente.
+  - ⬜ **Anonimización ARCO (ADR-011) no extendida en código.** Declarado en
+    ADR-102 §"Aislamiento y privacidad" que `storefront_cuenta`/
+    `storefront_direccion` deben poder anonimizarse igual que `persona`,
+    pero el flujo real de solicitudes ARCO (`rrhh`/`users`) todavía no
+    conoce estas tablas.
