@@ -59,7 +59,7 @@ const DIAS_HORARIO = [
 
 /**
  * Horario de atención público (glosario), no el turno laboral de nadie. Lo
- * lee el sitio de marca (storefront, ADR-101) para mostrar "abierto ahora"
+ * lee el sitio de marca (storefront, ADR-103) para mostrar "abierto ahora"
  * y la lista de locales. Un tramo por día — la forma admite varios; este
  * formulario cubre el caso común (deuda: varios tramos por API).
  */

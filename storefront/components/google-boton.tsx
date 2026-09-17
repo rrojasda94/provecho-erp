@@ -19,7 +19,7 @@ declare global {
 }
 
 /**
- * "Continuar con Google" (ADR-102). Si la cuenta ya existe, entra directo.
+ * "Continuar con Google" (ADR-104). Si la cuenta ya existe, entra directo.
  * Si es nueva, el backend responde 409 pidiendo el resto del perfil
  * (RN-WEB-005) y este componente muestra el formulario que falta antes de
  * reintentar con los mismos datos de Google.

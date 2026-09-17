@@ -1,4 +1,4 @@
-"""Checkout del sitio de marca (ADR-103/ADR-104): cotizar antes de confirmar,
+"""Checkout del sitio de marca (ADR-105): cotizar antes de confirmar,
 confirmar el pedido, y publicar el evento que `sales` convierte en una
 `Venta` real de canal `web`.
 

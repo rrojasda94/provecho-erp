@@ -1,5 +1,5 @@
-"""Listeners de `storefront`: cierra el enlace cuenta↔cliente (ADR-102) y el
-resultado de un pedido web confirmado (ADR-103).
+"""Listeners de `storefront`: cierra el enlace cuenta↔cliente (ADR-104) y el
+resultado de un pedido web confirmado (ADR-105).
 
 `sales` escucha `storefront.cuenta_registrada`/`storefront.pedido_web_
 confirmado` y publica de vuelta `sales.cliente_vinculado`/`sales.pedido_web_

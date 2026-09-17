@@ -1984,6 +1984,36 @@ No hay tabla de mapeo hub-id↔nube-id: `venta`, `pago` y
 `movimiento_inventario` conservan el mismo UUID en ambos lados porque el
 `id` se genera en la aplicación (`UuidPkMixin`) y viaja en el lote.
 
+## 15. Supervisión (módulo supervision, ADR-102)
+
+Tareas programadas de apertura y cierre de sucursal, con checklist y
+evidencia fotográfica opcional (RN-SUP-001..008).
+
+- **categoria_tarea**: empresa_id, nombre, activa. Catálogo libre por
+  empresa (limpieza, apertura, mantenimiento...), sin valores fijos en
+  código.
+- **tarea_plantilla**: empresa_id, marca_id (nullable), sucursal_id
+  (nullable — al menos uno de los dos, RN-SUP-001), categoria_id, nombre,
+  descripcion, momento (`apertura`\|`cierre`), orden (repetible, RN-SUP-002),
+  frecuencia (`diaria`\|`interdiaria`\|`semanal`\|`mensual`), dia_semana,
+  dia_mes, fecha_inicio, requiere_foto (bool), checklist (JSONB
+  `list[str]`), asignado_a (usuario, nullable), activa.
+- **tarea_instancia**: plantilla_id (nullable — una tarea manual no viene de
+  plantilla), sucursal_id, fecha, momento, orden, nombre, categoria_id,
+  requiere_foto, checklist (JSONB `[{texto, hecho}]`), asignado_a
+  (nullable), estado (`pendiente`\|`completada`\|`vencida`), completada_at,
+  completada_por, foto (binario, comprimido y sin EXIF por el servidor,
+  purgado a los `supervision_foto_retencion_dias`), foto_tomada_at (fecha
+  EXIF leída antes de comprimir), foto_valida (bool, nullable —
+  `null` = sin foto o sin EXIF que comparar), observacion. Único parcial
+  `(plantilla_id, sucursal_id, fecha)` donde `plantilla_id IS NOT NULL`:
+  la generación diaria es idempotente por sucursal sin impedir que una
+  tarea manual se repita el mismo día.
+- **informe_diario**: sucursal_id, fecha (único por par), total,
+  completadas, vencidas, fotos_invalidas, generado_at. Se emite al catálogo
+  de `reports` (`supervision.informe_diario_generado`) al cerrar la
+  jornada — es la entidad a la que apunta ese reporte (RN-SUP-007).
+
 ## 16. Emisión y distribución de reportes (módulo reports, ADR-033)
 
 Seis tablas que responden «qué reporta el ERP, a quién le llega y qué se
@@ -2093,7 +2123,7 @@ remuneración).
 (`src/core/tenant.py`, ADR-004): mismas tablas de origen, no una copia. Su
 equivalencia la congela `tests/test_bi_alcance.py` (RN-BI-002).
 
-## 18. Sitio de marca (módulo `storefront`, ADR-101)
+## 18. Sitio de marca (módulo `storefront`, ADR-105)
 
 Contenido editable y fotos del sitio público de una marca. La superficie
 pública se lee por `storefront/application/queries_publicas` de los demás
@@ -2135,9 +2165,9 @@ redes, horario de delivery).
 Lista vacía = cerrado ese día; hasta 2 tramos por día (`HH:MM`, 24h). Filas
 con otra forma (heredadas) se toleran y el sitio muestra "consultar horario".
 
-### Cuenta de cliente del sitio (ADR-102, PR2)
+### Cuenta de cliente del sitio (ADR-104, PR2)
 
-Credencial separada del ERP — ver ADR-102 para el detalle del aislamiento.
+Credencial separada del ERP — ver ADR-104 para el detalle del aislamiento.
 
 | Tabla | Columnas propias | Notas |
 |---|---|---|
@@ -2146,10 +2176,10 @@ Credencial separada del ERP — ver ADR-102 para el detalle del aislamiento.
 | `storefront_favorito` | `cuenta_id` (FK), `producto_comercial_id` (FK) | `UNIQUE(cuenta_id, producto_comercial_id)`, sin soft delete |
 | `storefront_refresh_token` | `cuenta_id` (FK), `token_hash` (único), `sesion_id`, `expira_en`, `revocado` | Mismo mecanismo de rotación que `refresh_token` del ERP, tabla propia |
 
-### Pedido del sitio de marca (ADR-103, PR3)
+### Pedido del sitio de marca (ADR-105, PR3)
 
 `storefront` es dueño del pedido hasta que `sales` lo confirma como
-`Venta` (canal `web`, ver más abajo) — ver ADR-103 para el flujo por
+`Venta` (canal `web`, ver más abajo) — ver ADR-105 para el flujo por
 eventos y por qué el efectivo no llama a `registrar_pago` de inmediato.
 
 | Tabla | Columnas propias | Notas |
@@ -2157,7 +2187,7 @@ eventos y por qué el efectivo no llama a `registrar_pago` de inmediato.
 | `storefront_pedido` | `marca_id` (FK), `cuenta_id` (FK, nullable — invitado), `nombre_contacto`, `telefono_contacto`, `email_contacto`, `modalidad` (`takeout`\|`delivery`), `sucursal_id` (FK, nullable hasta asignarse), `direccion_entrega`, `medio_pago` (`efectivo`\|`izipay`), `numero_documento`, `nombre_o_razon_social`, `total_estimado`, `costo_delivery_estimado`, `distancia_km_estimada`, `eta_min`, `eta_max`, `estado` (`pendiente`\|`confirmado`\|`fallido`), `fallo_motivo`, `venta_id` (FK `venta`, único, nullable), `numero_orden`, `idempotency_key` (único), `token_acceso` (único) + `UbicacionMixin` (destino del delivery) | `token_acceso` deja que un invitado sin cuenta consulte su pedido sin login |
 | `storefront_pedido_item` | `pedido_id` (FK), `producto_comercial_id` (FK), `nombre_congelado`, `cantidad`, `precio_unitario_congelado` | Foto del checkout para mostrar; el precio real lo vuelve a fijar `sales` al confirmar (RN-PRC-003) |
 
-### `venta.canal`/`lista_precio.canal` ganan `web` (ADR-103, PR3)
+### `venta.canal`/`lista_precio.canal` ganan `web` (ADR-105, PR3)
 
 `sales.domain.rules.CANALES` pasa de `{pdv, agente_ia, delivery}` a
 `{pdv, agente_ia, delivery, web}` — el `CheckConstraint`/`Enum` de ambas

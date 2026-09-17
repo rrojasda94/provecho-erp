@@ -2,7 +2,7 @@
 integrations/`; puerto de pagos agnóstico para el módulo `sales`).
 
 Sin credenciales reales de comercio en este entorno, el checkout del sitio
-de marca (ADR-103/ADR-104) necesita poder cobrar "de mentira" para que todo
+de marca (ADR-105) necesita poder cobrar "de mentira" para que todo
 el flujo — crear el pedido, cobrar, emitir comprobante — se pueda probar de
 punta a punta. `pasarela_activa()` decide entre `IzipayFake` (por defecto,
 aprueba de inmediato) e `IzipayReal` (cuando alguien carga

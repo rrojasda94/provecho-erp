@@ -1,4 +1,4 @@
-"""Favoritos de una cuenta (ADR-102). Valida el producto por el contrato
+"""Favoritos de una cuenta (ADR-104). Valida el producto por el contrato
 público de `sales`, nunca por su ORM."""
 
 import uuid

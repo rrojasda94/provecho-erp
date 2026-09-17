@@ -1,5 +1,5 @@
 """Fotos del catálogo público: presign a S3 + registro del `Archivo`
-(ADR-101). Mismo patrón que `assets.application.documentos.presignar_adjunto`
+(ADR-103). Mismo patrón que `assets.application.documentos.presignar_adjunto`
 /`adjuntar`, con dos entidades (`producto`, `ingrediente`) en vez de una.
 
 El binario nunca pasa por el backend: el cliente sube directo a la URL

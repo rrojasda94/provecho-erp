@@ -1,4 +1,4 @@
-# ADR-103 — El pedido web es un canal propio de `venta`, y "cobra por
+# ADR-105 — El pedido web es un canal propio de `venta`, y "cobra por
 adelantado" no excluye al repartidor
 
 Fecha: 2026-09-17

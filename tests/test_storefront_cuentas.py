@@ -1,4 +1,4 @@
-"""Cuenta de cliente del sitio de marca (`/storefront/cuentas/*`, ADR-102):
+"""Cuenta de cliente del sitio de marca (`/storefront/cuentas/*`, ADR-104):
 registro/login/refresh/logout, Google (mockeado), direcciones, favoritos,
 el enlace a `cliente` por evento y el aislamiento frente a las credenciales
 del ERP.
@@ -275,7 +275,7 @@ def test_sin_token_no_autoriza(env):
 
 
 def test_token_de_cuenta_web_no_sirve_en_el_erp(env):
-    """Aislamiento de credenciales (ADR-102): un token de storefront no
+    """Aislamiento de credenciales (ADR-104): un token de storefront no
     decodifica contra el secreto del ERP — falla en la firma, no llega
     siquiera a mirar el `sub`."""
     client, ids, _ = env

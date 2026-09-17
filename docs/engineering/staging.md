@@ -21,7 +21,7 @@ general del despliegue.
 | Dominio frontend | `staging.majambo.com.pe` |
 | Dominio API | `api-staging.majambo.com.pe` |
 | Dominio landing pública | `clientes.majambo.com.pe` — el del QR (ADR-080). Mismo contenedor `web`, pero el proxy solo deja pasar `/reconocerte*`, `/postular*` y sus estáticos |
-| Dominio sitio de marca | `charlies.majambo.com.pe` — Charlie's Pizzas (ADR-101). Contenedor **aparte**, `charlies`: proceso, imagen y build propios, no comparte nada con `web` |
+| Dominio sitio de marca | `charlies.majambo.com.pe` — Charlie's Pizzas (ADR-103). Contenedor **aparte**, `charlies`: proceso, imagen y build propios, no comparte nada con `web` |
 | Usuario de la app | `app` (sudo, sin login root, sin login por contraseña) |
 | Llave SSH | `renato-provecho` — privada en `~/.ssh/provecho_droplet` (tu PC, nunca en el repo). **Con passphrase**: sirve para entrar a mano y no desde un shell no interactivo — para eso está la llave de despliegue de ADR-060, ver `devops.md` |
 
@@ -197,7 +197,7 @@ durante una hora. `dig +short <dominio>` antes de tocar nada.
       todavía): al terminar, sube por el flujo normal (PR → CI verde →
       merge → `release.yml` publica `latest` → `docker compose pull && up -d`
       en el servidor — ver sección Despliegue de `devops.md`)
-- [ ] **Sitio de marca `charlies.majambo.com.pe` (ADR-101), pendiente de
+- [ ] **Sitio de marca `charlies.majambo.com.pe` (ADR-103), pendiente de
       desplegar**: registro DNS A → `165.227.120.112` (antes de tocar el
       `Caddyfile` — ver «El `Caddyfile` se copia a mano»), copiar el
       `docker-compose.staging.yml` y `Caddyfile` actualizados al droplet,

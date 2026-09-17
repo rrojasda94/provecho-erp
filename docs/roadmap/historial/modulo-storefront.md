@@ -1,11 +1,11 @@
 # Historial — Módulo `storefront`
 
-Estado vigente: 🔶 En curso — PR1 (2026-09-17, ADR-101): sitio público de
+Estado vigente: 🔶 En curso — PR1 (2026-09-17, ADR-105): sitio público de
 solo lectura para Charlie's Pizzas en `charlies.majambo.com.pe`, servido por
-una app Next.js separada del ERP (`storefront/`). PR2 (2026-09-17, ADR-102):
+una app Next.js separada del ERP (`storefront/`). PR2 (2026-09-17, ADR-104):
 cuentas de cliente (email/clave + Google), direcciones, favoritos y "tu
 último pedido", con credencial separada de la del ERP. PR3 (2026-09-17,
-ADR-103/ADR-104): carrito, checkout invitado o logueado, asignación
+ADR-105): carrito, checkout invitado o logueado, asignación
 automática de local, ETA, boleta/factura, efectivo e Izipay (adaptador
 falso), canal `web` en `venta`. Playwright del sitio, SEO (sitemap, OG) y
 hardening de seguridad quedan para PR4. Ver
@@ -13,7 +13,7 @@ hardening de seguridad quedan para PR4. Ver
 
 ## Cronología
 
-### 2026-09-17 — PR1: sitio público, CMS y fotos (ADR-101)
+### 2026-09-17 — PR1: sitio público, CMS y fotos (ADR-105)
 
 Encargo del usuario: una web de marca completa para Charlie's Pizzas
 (catálogo con fotos e ingredientes, promos web, locales en mapa, cuentas
@@ -22,7 +22,7 @@ insumos externos: brand guideline de Charlie's (`brand-voice-guidelines.md`,
 `majambo.md` §3.1, `Brandbook_CharliesPizza.pdf`) y un prototipo de
 storefront ya construido con Claude Design, portado a HTML/JS estándar.
 
-Decisión de arquitectura central (ADR-101): el sitio vive en una **app Next
+Decisión de arquitectura central (ADR-105): el sitio vive en una **app Next
 separada** (`storefront/`), no en una ruta más del proceso `web` compartido
 con el ERP como hizo ADR-080 para la landing del QR — el sitio de marca
 necesita SEO real, tema y CSP propios (paleta verde/crema del brandbook de
@@ -75,7 +75,7 @@ Verificado antes de abrir el PR: suite completa de `pytest` en verde
 `build` en verde en `frontend/` y en `storefront/` (sin API arriba para el
 build), `openapi.json` regenerado.
 
-### 2026-09-17 — PR2: cuentas de cliente (ADR-102)
+### 2026-09-17 — PR2: cuentas de cliente (ADR-104)
 
 Sobre la rama de PR1, sin pausa (encargo del usuario: PRs encadenados,
 "en automático uno tras otro"). Alcance: cuentas de cliente para el sitio
@@ -88,7 +88,7 @@ de Charlie's Pizzas, separadas de las credenciales del ERP.
   `storefront_favorito` (única por cuenta+producto),
   `storefront_refresh_token` (rotación con detección de reuso, mismo
   patrón que `users`) — migración `a4f1a2f11b85`.
-- **Aislamiento de credenciales (ADR-102)**: `security.py` propio del
+- **Aislamiento de credenciales (ADR-104)**: `security.py` propio del
   módulo, JWT firmado con `STOREFRONT_JWT_SECRET` (nunca `JWT_SECRET`) y
   `aud="storefront"`; el decoder exige esa audiencia, así que un token de
   cliente jamás decodifica en un endpoint del ERP y viceversa (probado en
@@ -129,7 +129,7 @@ Verificado antes de abrir el PR: suite completa de `pytest` en verde
 regenerado, `npm run lint`/`typecheck`/`test`/`build` en verde en
 `storefront/`.
 
-### 2026-09-17 — PR3: carrito, checkout y pago (ADR-103/ADR-104)
+### 2026-09-17 — PR3: carrito, checkout y pago (ADR-105)
 
 Sobre la rama de PR2, sin pausa (mismo encargo de PRs encadenados). Alcance:
 carrito, checkout (invitado o con cuenta), asignación automática de local,
@@ -145,7 +145,7 @@ estimado de espera, boleta/factura, pago en efectivo o Izipay.
   misma garantía que un cajero. Efectivo: la `Venta` nace `orden` sin pago,
   se cobra al entregar/recoger con el flujo normal de caja. Izipay: se cobra
   de inmediato con `registrar_pago(..., exigir_caja_abierta=False)` —
-  excepción explícita a ADR-025 §1, documentada en ADR-103.
+  excepción explícita a ADR-025 §1, documentada en ADR-105.
 - **Flujo por eventos** (mismo patrón que ADR-102):
   `storefront.pedido_web_confirmado` → `sales.application.listeners::
   on_pedido_web_confirmado` crea la `Venta` (y el pago si es Izipay) →
@@ -189,7 +189,7 @@ estimado de espera, boleta/factura, pago en efectivo o Izipay.
   comprobante, medio de pago) y `/pedido/{id}` (confirmación, con el
   `token_acceso` en la URL para un invitado).
 - **Simplificación deliberada**: sin extras ni Mitad x Mitad (no existe
-  concepto de extra/combo en `sales` todavía — ver ADR-103 §6), y la
+  concepto de extra/combo en `sales` todavía — ver ADR-105 §6), y la
   boleta/factura elegida en el checkout no llega a la pantalla del cajero
   para pedidos en efectivo (se vuelve a pedir al cobrar, igual que
   cualquier pedido telefónico de hoy).

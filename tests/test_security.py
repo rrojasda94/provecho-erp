@@ -16,7 +16,7 @@ _PROD_OK = {
     "environment": "production",
     "debug": False,
     "jwt_secret": "x" * 48,
-    # Distinto de `jwt_secret` a propósito (ADR-102): el aislamiento entre la
+    # Distinto de `jwt_secret` a propósito (ADR-104): el aislamiento entre la
     # cuenta del sitio y el ERP depende de que nunca coincidan.
     "storefront_jwt_secret": "y" * 48,
     "database_url": "postgresql+psycopg://provecho:s3cr3t@db:5432/provecho",

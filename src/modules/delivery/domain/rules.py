@@ -18,6 +18,9 @@ ESTADOS_ENTREGA = (
     "fallida",
     "cancelada",
 )
+#: Una parada en uno de estos estados ya se resolvió: `editar_paradas` no la
+#: toca — no se quita, no se reordena, no cambia de repartidor.
+ESTADOS_ENTREGA_RESUELTOS = ("entregada", "fallida", "cancelada")
 ESTADOS_RUTA = ("planificada", "en_curso", "finalizada", "cancelada")
 MOTIVOS_FALLO = ("cliente_ausente", "direccion_errada", "rechazo", "no_contesta", "otro")
 FUENTES_RUTEO = ("google", "heuristica", "manual")
@@ -96,7 +99,10 @@ def puede_iniciar_ruta(estado: str, cantidad_paradas: int) -> bool:
 
 
 def puede_editar_paradas(estado: str) -> bool:
-    return estado == "planificada"
+    """RN-DLV-005 extendida: una ruta se edita mientras no terminó —
+    `planificada` (antes de salir) o `en_curso` (lo que sigue en camino,
+    parada por parada; lo ya resuelto queda fijo)."""
+    return estado in ("planificada", "en_curso")
 
 
 def puede_cancelar_ruta(estado: str) -> bool:
@@ -108,7 +114,7 @@ def puede_finalizar_ruta(estado_ruta: str, estados_entregas: list[str]) -> bool:
     con una entrega todavía `en_ruta` colgando."""
     if estado_ruta != "en_curso":
         return False
-    return all(e in ("entregada", "fallida", "cancelada") for e in estados_entregas)
+    return all(e in ESTADOS_ENTREGA_RESUELTOS for e in estados_entregas)
 
 
 # --- Posición del repartidor (RN-DLV-007) ------------------------------------

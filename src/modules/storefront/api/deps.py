@@ -1,4 +1,4 @@
-"""Dependencias FastAPI propias de la cuenta del sitio (ADR-102).
+"""Dependencias FastAPI propias de la cuenta del sitio (ADR-104).
 
 `get_db` se reusa de `users.api.deps` (contrato público entre módulos,
 `api.deps`) — es una sesión de base genérica, no algo específico de la

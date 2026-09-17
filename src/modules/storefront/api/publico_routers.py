@@ -1,10 +1,10 @@
 """Superficie pública del sitio de marca: sin JWT, protegida solo por rate
 limit por IP (mismo patrón que `sales.api.publico_routers` y
-`delivery.api.publico_routers`, ADR-101).
+`delivery.api.publico_routers`, ADR-105).
 
 Regla de oro (RN-WEB-001): cada respuesta pasa por un `*PublicoOut` que
 enumera sus campos — nunca se serializa un dict/ORM de otro módulo tal
-cual. El checkout (`/pedidos*`, ADR-103) es la única excepción a "solo
+cual. El checkout (`/pedidos*`, ADR-105) es la única excepción a "solo
 lectura": admite invitados (RN-WEB-012, `get_cuenta_opcional` nunca exige
 `Authorization`) y valida todo lo que llega antes de tocar la base.
 """

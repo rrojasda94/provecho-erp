@@ -12,6 +12,71 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.12.0] - 2026-09-17
+
+### Added
+
+- **Módulo `supervision`: tareas de apertura/cierre, checklist y foto**
+  (2026-09-17). El supervisor programa por categoría, momento
+  (apertura/cierre) y frecuencia (diaria/interdiaria/semanal/mensual), con
+  orden repetible para tareas en paralelo; una plantilla puede alcanzar a
+  una sucursal o a toda una marca. El sistema genera la tarea del día
+  automáticamente, el trabajador asignado marca su checklist y sube foto
+  desde el celular — el servidor comprime la imagen y le lee la fecha EXIF
+  antes de guardarla, sin confiar en lo que declare el cliente; una foto
+  sin EXIF o fuera de ventana no bloquea completar, solo queda marcada para
+  revisión. Al cerrar la jornada se genera un informe diario por sucursal
+  que entra al catálogo centralizado de `reports` y se escala con el
+  mecanismo ya existente. La foto se purga a los 30 días; la fila y el
+  checklist se conservan. Costo aceptado: Pillow como dependencia nueva de
+  la API, para leer EXIF y comprimir en el servidor (ADR-102).
+
+## [0.11.1] - 2026-09-17
+
+### Added
+
+- **Una ruta de reparto se gestiona de punta a punta** (2026-09-17,
+  ADR-101). `PUT /delivery/rutas/{id}/paradas` ahora funciona con la ruta
+  `planificada` **o** `en_curso` — agrega, quita paradas no resueltas y
+  reasigna repartidor sin cancelar y crear de nuevo. El tablero
+  (`/delivery`) gana Editar, Iniciar (deshabilitado si algo sigue en
+  cocina), Finalizar y "Marcar entregada" por parada.
+- **Se rutea desde que se toma el pedido, no desde que está listo**
+  (RN-DLV-001). El despacho arma la ruta con lo que ya sabe que va a
+  salir, y decide con qué de verdad sale recién al iniciarla — que sigue
+  exigiendo todas las paradas `lista`. El tablero y la PWA del repartidor
+  marcan "En cocina" lo que todavía no llegó.
+- **Toast + sonido en KDS y caja cuando delivery registra una entrega o
+  termina una ruta.** `GET /delivery/avisos` (sondeado cada 15 s, sin
+  datos del cliente) más dos notificaciones de bandeja nuevas —
+  `delivery.entrega_para_cobrar` (caja) y `delivery.ruta_finalizada`, que
+  hasta ahora no tenía consumidor. Resueltas por permiso, no por rol
+  (`users.usuarios_con_permiso`, contrato nuevo).
+- **El mapa del tablero marca el sentido de la ruta con flechas.** La ida
+  y la vuelta al origen se dibujaban superpuestas y sin indicar
+  dirección, fácil de leer como "va en los dos sentidos" en una calle de
+  sentido único.
+
+### Fixed
+
+- **Despachar un pedido delivery desde el KDS hacía desaparecer su ruta**
+  (2026-09-17, ADR-101). `delivery` escuchaba `sales.venta_entregada` para
+  cerrar sola la `entrega` desde cualquier estado — si la ruta seguía en
+  la calle, la parada saltaba a `entregada` sin que el repartidor hiciera
+  nada; si el pedido todavía no tenía ruta, salía para siempre de "sin
+  asignar". Se quitó ese listener: cerrar una entrega es ahora solo del
+  repartidor (o de despacho en su nombre, desde `/delivery`); el botón del
+  KDS pasa a llamarse "Despachar" y ya no toca el reparto. Costo aceptado:
+  la venta puede quedar `entregada` en `sales` un rato antes de que
+  `delivery` confirme el reparto — mismo trato que ya tenían los dos
+  caminos convergentes de ADR-098, ahora en un solo sentido.
+- **Cancelar una ruta y volver a crearla con la misma venta chocaba con
+  `uq_entrega_venta`.** La entrega quedaba `pendiente` (correcto), pero
+  contaba como "ya ruteada" para el tablero y `crear` insertaba una fila
+  nueva en vez de reusar la existente. `pendiente` deja de contar como
+  ruteada, y `crear`/`editar_paradas` reusan la fila que ya tenía la
+  venta.
+
 ## [0.11.0] - 2026-09-10
 
 ### Added

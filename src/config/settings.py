@@ -16,7 +16,7 @@ _PASSWORD_DB_POR_DEFECTO = "provecho:provecho@"
 def _fallas_de_secreto(
     nombre: str, valor: str, otro_secreto: str | None = None
 ) -> list[str]:
-    """Mismo chequeo para `JWT_SECRET` y `STOREFRONT_JWT_SECRET` (ADR-102):
+    """Mismo chequeo para `JWT_SECRET` y `STOREFRONT_JWT_SECRET` (ADR-104):
     ni el placeholder, ni demasiado corto, y —solo para el segundo— nunca
     igual al primero, porque de eso depende que un token de cuenta web no
     decodifique contra el secreto del ERP."""
@@ -95,7 +95,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 15
     refresh_token_days: int = 7
-    # Secreto y `aud` propios del JWT de cuenta web (storefront, ADR-102):
+    # Secreto y `aud` propios del JWT de cuenta web (storefront, ADR-104):
     # nunca el mismo que `jwt_secret`. Un token firmado con este secreto no
     # decodifica contra el del ERP ni viceversa — es la mitad "criptográfica"
     # del aislamiento de credenciales; la otra mitad es que ningún endpoint
@@ -175,6 +175,21 @@ class Settings(BaseSettings):
     # Pasado el plazo la purga borra solo `marcacion.foto`; la fila y el
     # resto de la evidencia (terminal, IP, distancia) se quedan.
     rrhh_marcaje_foto_retencion_dias: int = 90
+    # Hora del negocio (no UTC) a partir de la cual el barrido de cierre de
+    # jornada de supervisión (RN-SUP-007) da por vencida toda tarea
+    # pendiente y genera el informe diario de cada sucursal — valor semilla,
+    # no configurable por empresa todavía (ver ROADMAP, deuda de
+    # `supervision`).
+    supervision_hora_cierre_jornada: str = "23:30"
+    # Días que se conserva la foto de evidencia de una tarea de supervisión
+    # (ADR-102). Mismo criterio que `rrhh_marcaje_foto_retencion_dias`: la
+    # purga borra solo el binario, la fila y el checklist se quedan.
+    supervision_foto_retencion_dias: int = 30
+    # Ventana de tolerancia entre la fecha EXIF de la foto y el instante en
+    # que se completó la tarea. Fuera de esta ventana no bloquea completar
+    # (RN-SUP-006): solo marca `foto_valida=false` para que el supervisor la
+    # revise en el informe.
+    supervision_foto_tolerancia_minutos: int = 15
     # Facturación electrónica (Factiliza → SUNAT). Por defecto apunta al
     # entorno QA: emitir contra producción exige cambiar la URL a conciencia.
     factiliza_base_url: str = "https://apife-qa.factiliza.com/api/v1"
@@ -308,7 +323,7 @@ class Settings(BaseSettings):
     sales_promocion_cupon_fin: date = date(2026, 12, 31)
     # Cada cupón vale un mes desde que se emite.
     sales_promocion_cupon_vigencia_dias: int = 30
-    # --- Sitio de marca (storefront, ADR-101) ---------------------------------
+    # --- Sitio de marca (storefront, ADR-105) ---------------------------------
     # Marca que sirve el sitio público. Vacío = los endpoints públicos
     # responden 404 ("sitio no configurado") — no hay una marca por
     # defecto que adivinar en un grupo con varias marcas.
@@ -328,7 +343,7 @@ class Settings(BaseSettings):
     # `GET /storefront/publico/convocatorias`. Vive en `clientes.majambo.com.pe`,
     # no en el sitio de marca — mismo dominio que ya sirve `/postular/{token}`.
     storefront_url_postular_base: str = "https://clientes.majambo.com.pe/postular"
-    # --- Pedidos del sitio de marca (checkout, ADR-103/ADR-104) ---------------
+    # --- Pedidos del sitio de marca (checkout, ADR-105) ---------------
     # Estimado de espera que ve el cliente: base + minutos por cada pedido
     # `orden` que ya tiene la sucursal delante del suyo (RN-WEB-011). Semilla
     # por `.env`, no `parametro_empresa` todavía — a diferencia de la tarifa
@@ -340,7 +355,7 @@ class Settings(BaseSettings):
     # la asignación automática de local prueba otra candidata dentro del
     # radio de delivery antes de insistir en la más cercana (RN-WEB-010).
     storefront_saturacion_pedidos: int = 4
-    # --- Pasarela de pagos Izipay (ADR-003, checkout ADR-103) -----------------
+    # --- Pasarela de pagos Izipay (ADR-003, checkout ADR-105) -----------------
     # Vacío = el checkout usa `IzipayFake` (aprueba cualquier cobro de
     # inmediato): no hay cuenta de comercio real todavía. Ver
     # `src/shared/integrations/izipay/__init__.py`.

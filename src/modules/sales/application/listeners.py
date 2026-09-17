@@ -51,7 +51,7 @@ def on_venta_confirmada(payload: dict) -> None:
 
 def on_cuenta_registrada(payload: dict) -> None:
     """Una cuenta nueva del sitio de marca se enlaza a un `cliente` de
-    `sales` (ADR-102): el sitio no importa `application.clientes` —publica
+    `sales` (ADR-104): el sitio no importa `application.clientes` —publica
     el evento y este handler hace la llamada real, mismo patrón que
     `on_entrega_registrada`.
 
@@ -128,7 +128,7 @@ def on_cuenta_registrada(payload: dict) -> None:
 
 def _medio_pago_izipay(session, sucursal_id: uuid.UUID) -> uuid.UUID:
     """El medio de pago 'Izipay' de la empresa de esa sucursal, creándolo la
-    primera vez que hace falta (ADR-103) — igual que el usuario de servicio
+    primera vez que hace falta (ADR-105) — igual que el usuario de servicio
     del sitio, exigir un alta manual antes del primer pedido pagado en
     línea sería un paso de despliegue más para olvidar."""
     from sqlalchemy import func, select
@@ -157,7 +157,7 @@ def _medio_pago_izipay(session, sucursal_id: uuid.UUID) -> uuid.UUID:
 
 
 def on_pedido_web_confirmado(payload: dict) -> None:
-    """Un pedido confirmado en el sitio de marca (ADR-103/ADR-104) se
+    """Un pedido confirmado en el sitio de marca (ADR-105) se
     convierte en una `Venta` real de canal `web` — el sitio no importa
     `application.ventas`, publica el evento y este handler hace la llamada
     real, mismo patrón que `on_cuenta_registrada`.
@@ -167,7 +167,7 @@ def on_pedido_web_confirmado(payload: dict) -> None:
 
     Izipay: se cobra de inmediato contra la pasarela activa (`IzipayFake`
     hoy, aprueba siempre) y se registra el pago **sin exigir caja abierta**
-    — excepción explícita a RN-POS-005/ADR-025 documentada en ADR-103: en
+    — excepción explícita a RN-POS-005/ADR-025 documentada en ADR-105: en
     delivery/recojo web alguien SÍ cobra en el momento de la entrega (el
     repartidor o el mostrador), la misma garantía que un cajero, así que la
     razón de ser de "cobra por adelantado" (nadie persigue al cliente) no

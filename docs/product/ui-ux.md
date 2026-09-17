@@ -498,7 +498,7 @@ el problema y se descarta lo que choca con las reglas ya decididas.
 
 ## Sitio de marca Charlie's (fuera del sistema visual de Provecho)
 
-`storefront/` (ADR-101) **no usa los tokens `--marca-*`/`--hue` de esta
+`storefront/` (ADR-103) **no usa los tokens `--marca-*`/`--hue` de esta
 sección**: es la web pública de una marca del grupo, no una pantalla del
 ERP, y su paleta sale del brandbook propio de Charlie's Pizzas
 (`D:\Antropic\brand chp\`), no del brandboard de Provecho:

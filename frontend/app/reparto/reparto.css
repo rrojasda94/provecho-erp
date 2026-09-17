@@ -127,12 +127,22 @@
     gap: 0.5rem;
 }
 
+.reparto-estado-grupo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 .reparto-estado-parada {
     font-size: 0.75rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: var(--rep-muted);
+}
+
+.reparto-estado-en-cocina {
+    color: var(--rep-ambar);
 }
 
 .reparto-estado-en_ruta {

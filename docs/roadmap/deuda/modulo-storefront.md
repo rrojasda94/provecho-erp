@@ -3,7 +3,7 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
-- ✅ 2026-09-17 **PR1** (ADR-101): módulo `storefront`, app `storefront/`
+- ✅ 2026-09-17 **PR1** (ADR-105): módulo `storefront`, app `storefront/`
   separada del ERP, sitio público de solo lectura de
   `charlies.majambo.com.pe` (home, carta con búsqueda/filtros/ingredientes
   clicables, mapa de locales, "Nosotros", "Trabaja con nosotros"), CMS de
@@ -15,7 +15,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   - ⬜ **Fuentes de marca sin llegar.** Isidora Black/Tusker Grotesk
     (brandbook) todavía no están en `storefront/public/fonts/`: el sitio
     corre con el fallback Anton+Archivo (Google Fonts) declarado en
-    ADR-101 §12. Reemplazar cuando el brandbook las entregue como
+    ADR-105 §12. Reemplazar cuando el brandbook las entregue como
     archivos, sin tocar el resto de `globals.css`.
   - ⬜ **Logo provisional.** `storefront/public/marcas/logo.png` viene del
     prototipo portado, no del brandbook oficial — ver
@@ -43,7 +43,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     que es el único ambiente desplegado hoy (`docs/engineering/staging.md`).
     Agregarlo a producción cuando ese compose se use de verdad.
 
-- ✅ 2026-09-17 **PR2** (ADR-102): cuentas de cliente web
+- ✅ 2026-09-17 **PR2** (ADR-104): cuentas de cliente web
   (`storefront_cuenta`), direcciones, favoritos y "tu último pedido",
   registro con email/clave o Google, vínculo a `cliente` de `sales` por
   evento (`storefront.cuenta_registrada` → `sales.cliente_vinculado`).
@@ -61,12 +61,12 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     otra ida y vuelta a la API en esa página. Resolver si el listado de
     favoritos necesita mostrarse ahí directamente.
   - ⬜ **Anonimización ARCO (ADR-011) no extendida en código.** Declarado en
-    ADR-102 §"Aislamiento y privacidad" que `storefront_cuenta`/
+    ADR-104 §"Aislamiento y privacidad" que `storefront_cuenta`/
     `storefront_direccion` deben poder anonimizarse igual que `persona`,
     pero el flujo real de solicitudes ARCO (`rrhh`/`users`) todavía no
     conoce estas tablas.
 
-- ✅ 2026-09-17 **PR3** (ADR-103/ADR-104): carrito, checkout invitado o
+- ✅ 2026-09-17 **PR3** (ADR-105): carrito, checkout invitado o
   logueado, asignación automática de local, ETA, boleta/factura, efectivo
   e Izipay, canal `web` en `venta`. Lo que deja abierto:
   - ⬜ **`IzipayReal` es un esqueleto.** `src/shared/integrations/izipay/`
@@ -76,7 +76,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     firma del webhook) — completar antes de aceptar un pago real.
   - ⬜ **Sin extras ni Mitad x Mitad.** El carrito es "producto/tamaño +
     cantidad"; `sales` no tiene todavía un concepto de extra/combo del que
-    colgarse (ver ADR-103 §6). Necesita diseño conjunto con el negocio
+    colgarse (ver ADR-105 §6). Necesita diseño conjunto con el negocio
     antes de construirse.
   - ⬜ **Boleta/factura del checkout no llega al cajero en efectivo.** La
     preferencia de comprobante que el cliente tecleó vive en
@@ -86,12 +86,12 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   - ⬜ **Sin outbox/reconciliación real.** Si el proceso muere entre crear
     el `storefront_pedido` y publicar el evento (crash, no una excepción de
     negocio), el pedido queda `pendiente` para siempre y nadie lo repara
-    solo — ADR-103 documenta por qué se prefirió no construir un outbox
+    solo — ADR-105 documenta por qué se prefirió no construir un outbox
     real todavía (mismo criterio que ADR-016), pero el hueco es real.
   - ⬜ **ETA y saturación fijos por `.env`, no `parametro_empresa`.** A
     diferencia de la tarifa de delivery (`delivery_radio_km`), Gerencia no
     puede tunear `STOREFRONT_ETA_*`/`STOREFRONT_SATURACION_PEDIDOS` sin un
-    despliegue — aceptado para la primera versión, ver ADR-103 §4.
+    despliegue — aceptado para la primera versión, ver ADR-105 §4.
   - ⬜ **La cotización de delivery evalúa cada sucursal candidata por
     separado.** Bien para las dos sucursales actuales de Charlie's; una
     marca con muchas más necesitaría una versión que cotice en lote en vez

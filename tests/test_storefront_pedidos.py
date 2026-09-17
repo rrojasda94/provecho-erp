@@ -1,5 +1,5 @@
 """Checkout del sitio de marca (`/storefront/publico/pedidos*`,
-ADR-103/ADR-104): invitado y logueado, asignación de local, ETA, efectivo e
+ADR-105): invitado y logueado, asignación de local, ETA, efectivo e
 Izipay, idempotencia y el token de consulta para un invitado sin cuenta.
 """
 

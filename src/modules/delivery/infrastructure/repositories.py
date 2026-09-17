@@ -111,6 +111,26 @@ class RutaRepo:
             )
         )
 
+    def finalizadas_desde(
+        self, sucursal_ids: Sequence[uuid.UUID], desde: datetime
+    ) -> list[RutaReparto]:
+        """Rutas que terminaron después de `desde` en estas sucursales — el
+        aviso de sonido/toast de KDS y caja (`GET /delivery/avisos`,
+        ADR-101), sin depender de push."""
+        if not sucursal_ids:
+            return []
+        return list(
+            self.s.scalars(
+                select(RutaReparto)
+                .where(
+                    RutaReparto.sucursal_id.in_(list(sucursal_ids)),
+                    RutaReparto.estado == "finalizada",
+                    RutaReparto.hora_fin > desde,
+                )
+                .order_by(RutaReparto.hora_fin)
+            )
+        )
+
     def vivas_de_repartidor(self, repartidor_id: uuid.UUID) -> list[RutaReparto]:
         """Rutas vivas de un repartidor — `GET /delivery/mi/rutas`."""
         return list(
@@ -150,20 +170,46 @@ class EntregaRepo:
             )
         )
 
-    def venta_ids_con_entrega_abierta(self, venta_ids: Sequence[uuid.UUID]) -> set[uuid.UUID]:
-        """De estas ventas, cuáles ya tienen una `entrega` que no sea
-        `cancelada` — el tablero las resta de "listos sin asignar" aunque
-        el evento `sales.pedido_listo` nunca haya llegado (ADR-098, la
-        consulta manda, no el evento)."""
+    def venta_ids_ya_ruteadas(self, venta_ids: Sequence[uuid.UUID]) -> set[uuid.UUID]:
+        """De estas ventas, cuáles ya tienen una `entrega` asignada a una
+        ruta o resuelta — el tablero las resta de "sin asignar" aunque el
+        evento `sales.pedido_listo` nunca haya llegado (ADR-098, la
+        consulta manda, no el evento).
+
+        `pendiente` no cuenta como ruteada: es una entrega que quedó suelta
+        al cancelar su ruta o al sacarla de una (`editar_paradas`,
+        `reintentar`) — la venta debe poder volver a "sin asignar" y
+        reusarse en una ruta nueva, no quedar invisible para siempre
+        (`uq_entrega_venta` exige reusar esa misma fila, nunca crear otra).
+        `cancelada` tampoco cuenta: fue una decisión explícita del despacho
+        o la venta se anuló, y no bloquea rutear la venta de nuevo si algo
+        la revive."""
         if not venta_ids:
             return set()
         filas = self.s.scalars(
             select(Entrega.venta_id).where(
                 Entrega.venta_id.in_(list(venta_ids)),
-                Entrega.estado != "cancelada",
+                Entrega.estado.not_in(("pendiente", "cancelada")),
             )
         )
         return set(filas)
+
+    def entregadas_desde(self, sucursal_ids: Sequence[uuid.UUID], desde: datetime) -> list[Entrega]:
+        """Entregas registradas después de `desde` en estas sucursales — el
+        aviso de sonido/toast de caja (`GET /delivery/avisos`, ADR-101)."""
+        if not sucursal_ids:
+            return []
+        return list(
+            self.s.scalars(
+                select(Entrega)
+                .where(
+                    Entrega.sucursal_id.in_(list(sucursal_ids)),
+                    Entrega.estado == "entregada",
+                    Entrega.fecha_entrega > desde,
+                )
+                .order_by(Entrega.fecha_entrega)
+            )
+        )
 
     def q_historial(
         self,

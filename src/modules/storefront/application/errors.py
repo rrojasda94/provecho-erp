@@ -1,6 +1,6 @@
 """Errores de aplicación de storefront. La tripleta común (`NoEncontrado`,
 `Conflicto`, `ReglaNegocio`) y su mapeo a HTTP viven en
-`src/shared/errors.py`. Los cuatro de autenticación de cuenta (ADR-102) son
+`src/shared/errors.py`. Los cuatro de autenticación de cuenta (ADR-104) son
 propios — mismo criterio que `users.application.errors` — y su estado HTTP
 lo registra `api/error_handlers.py`."""
 

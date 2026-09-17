@@ -1,4 +1,4 @@
-"""Schemas del checkout público del sitio de marca (ADR-103/ADR-104)."""
+"""Schemas del checkout público del sitio de marca (ADR-105)."""
 
 import uuid
 from decimal import Decimal

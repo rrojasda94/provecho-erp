@@ -1,4 +1,4 @@
-"""Cuenta de cliente del sitio de marca (ADR-102).
+"""Cuenta de cliente del sitio de marca (ADR-104).
 
 Credencial **completamente separada** de `usuario` (staff del ERP): secreto
 de JWT propio, sin PIN, sin rol/permiso. `cliente_id` es el enlace hacia el

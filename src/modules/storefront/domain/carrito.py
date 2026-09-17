@@ -4,7 +4,7 @@ El precio nunca se calcula acá — lo fija `sales` server-side al confirmar
 (RN-PRC-003, `crear_venta`), igual que cualquier otro canal. Esto solo
 valida la FORMA del carrito antes de mandarlo.
 
-Simplificación deliberada de PR3 (ADR-103): una línea es "un producto
+Simplificación deliberada de PR3 (ADR-105): una línea es "un producto
 comercial (ya sea la pizza o el tamaño/variante elegido) + una cantidad".
 Extras (máx. 3) y Mitad x Mitad de la carta de Charlie's (brand guideline
 §3.1.8) todavía no tienen un concepto en `sales` del que colgarse — ni

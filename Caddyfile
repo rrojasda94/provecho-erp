@@ -37,7 +37,7 @@ clientes.majambo.com.pe {
 	# redirect devuelve donde se esperaba JavaScript. Se ve perfecta y no
 	# funciona nada, que es el peor síntoma posible.
 	# `/postular*` entra porque "Trabaja con nosotros" del sitio de marca
-	# (charlies.majambo.com.pe, ADR-101) enlaza a `/postular/{token}`, que
+	# (charlies.majambo.com.pe, ADR-103) enlaza a `/postular/{token}`, que
 	# vive en ESTE dominio y no en el nuevo (ADR-087).
 	@landing path /reconocerte /reconocerte/* /postular /postular/* /_next/static/* /_next/image* /marcas/* /favicon.ico
 	handle @landing {
@@ -71,7 +71,7 @@ clientes.majambo.com.pe {
 	}
 }
 
-# Sitio de marca Charlie's Pizzas (ADR-101). A diferencia de la landing de
+# Sitio de marca Charlie's Pizzas (ADR-103). A diferencia de la landing de
 # arriba, es un contenedor y un proceso de Next COMPLETAMENTE aparte
 # (`charlies`, no `web`): no hay recorte de rutas que hacer acá, todo el
 # sitio vive en este dominio. `X-Robots-Tag` NO se agrega a propósito — este

@@ -80,7 +80,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Sitio de marca Charlie's Pizzas (ADR-101): tercera imagen, aparte de
+      # Sitio de marca Charlie's Pizzas (ADR-103): tercera imagen, aparte de
       # `-web` — proceso, tema y CSP propios; comparten solo la API. Mismo
       # criterio de tags que arriba: se fija a la misma versión que las otras
       # dos en el `.env` de producción (`PROVECHO_CHARLIES_IMAGE`).

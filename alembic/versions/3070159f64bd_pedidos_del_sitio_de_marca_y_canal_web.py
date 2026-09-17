@@ -1,7 +1,7 @@
 """pedidos del sitio de marca y canal web: storefront_pedido,
 storefront_pedido_item, canal 'web' en venta/lista_precio
 
-Tercer slice de `storefront` (ADR-103/ADR-104, PR3): carrito, checkout
+Tercer slice de `storefront` (ADR-105, PR3): carrito, checkout
 (invitado o con cuenta), asignación automática de local, ETA y pago en
 efectivo o Izipay. `venta.canal`/`lista_precio.canal` ganan el valor `web`
 que faltaba desde PR1 (`sales.domain.rules.CANALES`).

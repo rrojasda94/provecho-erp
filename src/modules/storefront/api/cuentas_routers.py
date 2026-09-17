@@ -1,5 +1,5 @@
 """Cuenta de cliente del sitio: registro, login (email/clave o Google),
-refresh, logout, perfil, direcciones y favoritos (ADR-102).
+refresh, logout, perfil, direcciones y favoritos (ADR-104).
 
 Sin JWT del ERP — es la segunda credencial del sistema, completamente
 separada. Rate limit por IP en cada endpoint de autenticación, mismo

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 
-/** Cookies de la cuenta de cliente (ADR-102) — prefijo propio, nunca las del
+/** Cookies de la cuenta de cliente (ADR-104) — prefijo propio, nunca las del
  * ERP (`provecho_token`/`provecho_refresh` de `frontend/`). httpOnly: el
  * JavaScript del navegador no las lee, solo el proceso de Next. */
 export const COOKIE_TOKEN = "charlies_token";

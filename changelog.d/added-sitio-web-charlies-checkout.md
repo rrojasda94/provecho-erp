@@ -1,5 +1,5 @@
 - **Carrito y checkout en el sitio de Charlie's Pizzas, PR3** (2026-09-17,
-  ADR-103/ADR-104). Carrito en el navegador, checkout de invitado o con
+  ADR-105). Carrito en el navegador, checkout de invitado o con
   cuenta, dirección de entrega con la ubicación del navegador o local
   elegido para recojo, boleta o factura, y pago en efectivo o Izipay. Al
   confirmar, el pedido se asigna automáticamente a la sucursal más cercana

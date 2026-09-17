@@ -66,8 +66,14 @@ class RutaCreate(BaseModel):
 
 
 class RutaParadasUpdate(BaseModel):
-    venta_ids: list[uuid.UUID] = Field(min_length=1)
+    #: Paradas **no resueltas** que se quiere después del cambio — puede
+    #: llegar vacío si a la ruta le quedan paradas resueltas de sobra
+    #: (`RutaReparto.cantidad_de_paradas_valida` exige al menos una entre
+    #: resueltas y pendientes, no que `venta_ids` sola llegue a uno).
+    venta_ids: list[uuid.UUID] = Field(min_length=0)
     optimizar: bool = True
+    #: `None` deja el repartidor actual; un id distinto lo reasigna.
+    repartidor_id: uuid.UUID | None = None
 
 
 class RutaOut(BaseModel):
@@ -157,6 +163,9 @@ class VentaListaOut(BaseModel):
     ubicacion_lat: Decimal | None
     ubicacion_lng: Decimal | None
     distancia_entrega_km: Decimal | None
+    #: `False` mientras el pedido sigue en cocina (RN-DLV-001/005): se
+    #: puede rutear igual, pero la ruta no sale hasta que sea `True`.
+    lista: bool
 
 
 class ParadaRepartoOut(BaseModel):
@@ -170,6 +179,10 @@ class ParadaRepartoOut(BaseModel):
     estado: str
     numero_orden: int | None
     direccion_entrega: str | None
+    #: `False` mientras el pedido sigue en cocina (RN-DLV-005): el tablero y
+    #: la PWA la marcan "en cocina" y no dejan iniciar la ruta hasta que
+    #: todas sus paradas lleguen a `True`.
+    lista: bool
     destino_lat: Decimal | None
     destino_lng: Decimal | None
     cliente_nombre: str | None
@@ -214,6 +227,36 @@ class TableroOut(BaseModel):
     #: Si el envío automático no está configurado, el tablero no ofrece
     #: "reenviar" — solo copiar/`wa.me`, que siempre funciona.
     whatsapp_habilitado: bool
+
+
+class AvisoEntregaOut(BaseModel):
+    """Una fila del aviso de caja (ADR-101): entrega registrada. Sin datos
+    del cliente — solo lo que hace falta para una línea de toast."""
+
+    entrega_id: uuid.UUID
+    numero_orden: int | None
+    repartidor_nombre: str | None
+    #: Solo si la venta sigue sin pagar (RN-CUP): lo que caja debe cobrar.
+    monto_a_cobrar: Decimal | None
+    fecha_entrega: datetime | None
+
+
+class AvisoRutaOut(BaseModel):
+    """Una fila del aviso de KDS y caja: una ruta terminó."""
+
+    ruta_id: uuid.UUID
+    repartidor_nombre: str | None
+    entregadas: int
+    fallidas: int
+    hora_fin: datetime | None
+
+
+class AvisosOut(BaseModel):
+    #: Reloj del servidor al responder — el cliente lo guarda como próximo
+    #: `desde`, para no perder ni repetir avisos entre sondeos.
+    ahora: datetime
+    entregas: list[AvisoEntregaOut]
+    rutas_finalizadas: list[AvisoRutaOut]
 
 
 class PosicionIn(BaseModel):

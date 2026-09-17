@@ -1,4 +1,4 @@
-"""Pedido del sitio de marca (checkout, ADR-103): lo que el cliente confirmó
+"""Pedido del sitio de marca (checkout, ADR-105): lo que el cliente confirmó
 en `charlies.majambo.com.pe`, antes y después de que `sales` lo convierta en
 una `Venta` real.
 

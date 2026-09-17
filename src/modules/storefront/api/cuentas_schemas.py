@@ -1,4 +1,4 @@
-"""Schemas de la cuenta de cliente del sitio (ADR-102)."""
+"""Schemas de la cuenta de cliente del sitio (ADR-104)."""
 
 import re
 import uuid

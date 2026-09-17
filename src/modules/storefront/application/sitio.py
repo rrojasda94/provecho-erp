@@ -1,5 +1,5 @@
 """Compone las respuestas de la superficie pública del sitio de marca
-(ADR-101). Solo llama a `application/queries_publicas.py` de otros
+(ADR-105). Solo llama a `application/queries_publicas.py` de otros
 módulos — nunca a su dominio ni infraestructura (RN-WEB-001).
 """
 

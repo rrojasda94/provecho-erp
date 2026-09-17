@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Carrito del sitio (ADR-103): vive en `localStorage`, nunca en el servidor
+ * Carrito del sitio (ADR-105): vive en `localStorage`, nunca en el servidor
  * hasta que se confirma el pedido — el precio que se ve acá es solo para
  * mostrar, `sales` lo vuelve a fijar server-side al confirmar (RN-PRC-003).
  *

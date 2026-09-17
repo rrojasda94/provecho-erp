@@ -1,5 +1,5 @@
 - **Cuentas de cliente en el sitio de Charlie's Pizzas, PR2** (2026-09-17,
-  ADR-102). Registro e ingreso con email/clave o con Google, direcciones
+  ADR-104). Registro e ingreso con email/clave o con Google, direcciones
   guardadas (con predeterminada), favoritos y "tu último pedido" en la
   cuenta y en el home. La cuenta web (`storefront_cuenta`) es una
   credencial **separada** de la del ERP: JWT propio

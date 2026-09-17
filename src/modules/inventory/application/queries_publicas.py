@@ -723,7 +723,7 @@ def categoria_de_skus(
     return dict(filas)
 
 
-# --- Contrato del sitio de marca (storefront, ADR-101/RN-WEB-001) ----------
+# --- Contrato del sitio de marca (storefront, ADR-103/RN-WEB-001) ----------
 
 def insumos_de_recetas(
     session: Session,

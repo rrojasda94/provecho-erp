@@ -1840,8 +1840,10 @@ módulo aparte de `sales` según ya preveía
 - **RN-DLV-001** Una venta tiene como máximo una `entrega` (RN-CUP-005): se
   crea al asignarla a una `ruta_reparto`, no antes. Solo entran ventas en
   modalidad delivery, sin `repartidor_externo_plataforma` (RN-PER-003 las
-  excluye — esas no son reparto propio), no anuladas y con todos sus ítems
-  en `listo`.
+  excluye — esas no son reparto propio) y no anuladas — **no** hace falta
+  que esté `lista` todavía (ADR-101): se rutea desde que se toma el
+  pedido, y quién sale con qué se decide recién al iniciar la ruta
+  (RN-DLV-005).
 - **RN-DLV-002** Toda parada de una ruta necesita coordenadas ancladas
   (`UbicacionMixin` de la venta, ADR-053): una dirección sin anclar no
   puede rutearse ni mostrar posición en vivo. El tablero lo rechaza al
@@ -1856,10 +1858,14 @@ módulo aparte de `sales` según ya preveía
   estado anterior queda en `audit_log`. Cerrar una entrega fallida o
   pendiente (`cancelada`) es una decisión explícita del despacho, distinta
   de reintentar.
-- **RN-DLV-005** Una ruta se inicia solo con al menos una parada y un
-  repartidor activo; al iniciar, todas sus entregas pasan a `en_ruta` y
-  quedan con la hora de salida real. Una ruta ya iniciada no se cancela:
-  se resuelve parada por parada (RN-CUP-008 aplica a cada una).
+- **RN-DLV-005** Una ruta se inicia solo con al menos una parada, un
+  repartidor activo y **todas sus paradas `lista`** (ADR-101) — un pedido
+  a medio preparar no sale a la calle. Al iniciar, todas sus entregas
+  pasan a `en_ruta` y quedan con la hora de salida real. Una ruta ya
+  iniciada no se cancela: se resuelve parada por parada (RN-CUP-008 aplica
+  a cada una) — pero sí se le pueden agregar o quitar paradas no resueltas
+  y cambiarle el repartidor (`PUT /delivery/rutas/{id}/paradas`, ADR-101);
+  sumar una parada a una ruta ya en curso exige que también esté `lista`.
 - **RN-DLV-006** Si se anula una venta con entrega `pendiente` o
   `asignada`, la entrega se cancela sola. Si ya estaba `en_ruta`, no se
   cancela automáticamente — se notifica a quien creó la ruta para que
@@ -1877,6 +1883,16 @@ módulo aparte de `sales` según ya preveía
   entrega llega a un resultado (`entregada`, `fallida` o `cancelada`); un
   token vencido, cancelado o inexistente responde exactamente igual (404),
   para no confirmarle a quien lo reenvía que existió.
+- **RN-DLV-009** Despachar un pedido delivery desde el KDS
+  (`POST /sales/ventas/{id}/entrega`) **no** cierra su `entrega` de
+  reparto (ADR-101): cierra la comanda de cocina y saca el pedido de la
+  cola, nada más. Solo el repartidor (desde su PWA) o el despacho en su
+  nombre (desde `/delivery`, `POST /delivery/entregas/{id}/entregar`)
+  cierran la entrega — y solo cuando de verdad está `en_ruta`. Los dos
+  estados pueden divergir un rato (la venta `entregada` en `sales`, la
+  entrega todavía `en_ruta` en `delivery`): es el costo aceptado de que
+  `delivery`, y no `sales`, sea la única fuente de verdad de si el reparto
+  se completó.
 
 ## Comercial — estrategia
 
@@ -2045,6 +2061,51 @@ es a dónde va y quién puede abrirlo.
   rastro en `audit_log` (ADR-031), por lo mismo que RN-REP-007: decidir que
   algo sube de nivel —o que se da por resuelto— es un acto de autoridad.
 
+## Supervisión (módulo supervision, ADR-102)
+
+Tareas programadas de apertura y cierre de sucursal (los SOP de
+`docs/diagrams/Procesos/Operaciones/`), con checklist y evidencia
+fotográfica opcional.
+
+- **RN-SUP-001** Una plantilla de tarea alcanza a **una sucursal** o a
+  **toda una marca** (`sucursal_id` nulo, `marca_id` obligatorio en ese
+  caso), nunca a ninguna de las dos. La generación diaria fabrica una
+  instancia por cada sucursal de la marca cuando la plantilla es de marca:
+  una cadena no repite treinta veces el mismo checklist de apertura.
+- **RN-SUP-002** El `orden` de una tarea dentro de su plantilla **se puede
+  repetir**: dos tareas con el mismo orden se ejecutan en paralelo (ej.
+  encender las luces mientras se trae lo de limpieza). El orden ordena
+  turnos de trabajo, no una fila única.
+- **RN-SUP-003** Solo el trabajador **asignado** puede marcar el checklist,
+  subir la foto o completar su tarea. Una tarea sin asignar no la puede
+  ejecutar nadie — el supervisor la asigna primero desde el tablero. Un
+  trabajador de línea solo ve las tareas que tiene asignadas a sí mismo; ver
+  y gestionar la asignación de cualquiera es privilegio de
+  `supervision.gestionar`.
+- **RN-SUP-004** `completar` exige el checklist completo y, si la tarea la
+  pide, una foto adjunta. La hora de finalización es la del servidor
+  (`fechas.ahora()`), nunca la que declare el cliente.
+- **RN-SUP-005** La foto se comprime en el servidor (Pillow, JPEG ≤1280px,
+  sin EXIF en la copia guardada) y **antes** de eso se lee su
+  `DateTimeOriginal` para saber cuándo se tomó — el cliente nunca declara
+  esa fecha por su cuenta.
+- **RN-SUP-006** Que la foto no traiga fecha EXIF, o que esa fecha caiga
+  fuera de la ventana de tolerancia (`supervision_foto_tolerancia_minutos`)
+  respecto al instante de completar, **no bloquea** completar la tarea:
+  marca `foto_valida` en `false` (o `null` si no hay fecha que comparar)
+  para que el supervisor la revise en el informe. Mismo criterio que
+  RN-SUC-006: la meta es visibilidad, no un candado automático.
+- **RN-SUP-007** Al cerrar la jornada de una sucursal, toda tarea que siga
+  `pendiente` pasa a `vencida` — no hay ventana de gracia después del
+  cierre. El informe diario resultante (`total`, `completadas`, `vencidas`,
+  `fotos_invalidas`) es una entidad propia y se emite a `reports`
+  (`supervision.informe_diario_generado`) para que el supervisor lo escale
+  con el mecanismo ya existente (RN-REP-001..014) en vez de uno propio.
+- **RN-SUP-008** La foto de una tarea completada se purga a los
+  `supervision_foto_retencion_dias` (30 por defecto): se borra el binario,
+  la fila y su checklist se quedan — mismo criterio que
+  `rrhh_marcaje_foto_retencion_dias` y `delivery_evidencia_retencion_dias`.
+
 ## BI autoservicio (ADR-083)
 
 Reglas del BI (Superset) sobre las vistas `vw_bi_*`. No reemplazan las de
@@ -2090,7 +2151,7 @@ segunda puerta de análisis, no el dashboard operativo.
 ## Sitio de marca (módulo `storefront`)
 
 Reglas de la superficie pública del sitio web de Charlie's Pizzas
-(`charlies.majambo.com.pe`, ADR-101). `storefront` es un módulo más: sus
+(`charlies.majambo.com.pe`, ADR-105). `storefront` es un módulo más: sus
 casos de uso de gestión (CMS, fotos) siguen RBAC normal; estas reglas son
 específicas de la parte **sin JWT**.
 
@@ -2113,7 +2174,7 @@ específicas de la parte **sin JWT**.
   nacimiento — Google solo confirma el email, nunca reemplaza esos datos.
   Sin ellos no hay con qué vincular un `cliente` (RN-PTS-002).
 - **RN-WEB-006** La cuenta del sitio y el `usuario` del ERP son credenciales
-  completamente separadas: secreto de JWT y `aud` propios (ADR-102). Ningún
+  completamente separadas: secreto de JWT y `aud` propios (ADR-104). Ningún
   endpoint del ERP acepta un token de cuenta web, y ninguno de
   `/storefront/cuentas/*` acepta uno del ERP.
 - **RN-WEB-007** El enlace `storefront_cuenta.cliente_id` se resuelve por
@@ -2128,7 +2189,7 @@ específicas de la parte **sin JWT**.
 - **RN-WEB-009** El checkout web nunca exige cuenta: un invitado (sin
   `Authorization`) confirma un pedido igual que un cliente logueado, con
   nombre/teléfono tecleados en el formulario en vez de leídos del perfil
-  (ADR-103).
+  (ADR-105).
 - **RN-WEB-010** Un pedido de delivery se asigna a la sucursal más cercana
   dentro del radio de delivery (`DELIVERY_DISTANCIA_MAXIMA_KM`) que tenga un
   punto de venta `web` habilitado para esa modalidad, salvo que esté
@@ -2146,7 +2207,7 @@ específicas de la parte **sin JWT**.
 - **RN-WEB-013** Un pedido pagado en efectivo nace `Venta.estado='orden'`
   sin ningún pago registrado — se cobra al entregar/recoger, con el flujo de
   caja normal. Un pedido pagado con Izipay se cobra de inmediato y su pago
-  se registra sin exigir caja abierta en el punto de venta `web` (ADR-103,
+  se registra sin exigir caja abierta en el punto de venta `web` (ADR-105,
   excepción explícita a ADR-025 §1).
 - **RN-WEB-014** Todo pedido web es idempotente por `idempotency_key`
   (tecleada por el cliente, generada por el navegador): confirmar dos veces
