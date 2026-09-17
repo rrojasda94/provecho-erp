@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Integer, func, select
+from sqlalchemy import Integer, func, or_, select
 from sqlalchemy.orm import Session
 
 from src.modules.sales.domain import rules
@@ -26,11 +26,12 @@ from src.modules.sales.infrastructure.models import (
     ProductoAtributoLinea,
     ProductoAtributoValor,
     ProductoComercial,
+    Promocion,
     PuntoVenta,
     Venta,
     VentaItem,
 )
-from src.modules.users.infrastructure.models import Persona, Sucursal
+from src.modules.users.infrastructure.models import Marca, Persona, Sucursal
 from src.shared import fechas
 
 
@@ -761,3 +762,136 @@ def categoria_de_productos(
         )
     ).all()
     return dict(filas)
+
+
+# --- Contrato del sitio de marca (storefront, ADR-101/RN-WEB-001..002) -----
+
+def marca_de_producto(
+    session: Session, producto_id: uuid.UUID
+) -> uuid.UUID | None:
+    """La `marca_id` de un producto comercial. `None` si no existe — lo usa
+    `storefront` para validar que una foto se sube a un producto real antes
+    de tocar S3."""
+    return session.scalar(
+        select(ProductoComercial.marca_id).where(ProductoComercial.id == producto_id)
+    )
+
+
+def marca_publica(session: Session, marca_id: uuid.UUID) -> dict | None:
+    """Nombre de una marca, para el encabezado del sitio público. `None`
+    si no existe o está borrada."""
+    marca = session.scalar(
+        select(Marca).where(Marca.id == marca_id, Marca.deleted_at.is_(None))
+    )
+    if marca is None:
+        return None
+    return {"id": marca.id, "nombre": marca.nombre}
+
+
+def carta_publica(
+    session: Session,
+    *,
+    marca_id: uuid.UUID,
+    sucursal_id: uuid.UUID,
+    canal: str,
+    modalidad: str,
+) -> list[dict]:
+    """La carta que ve un cliente del sitio público: mismo motor de precio
+    que el PDV (`precios.carta`), recortada a lo que RN-WEB-001 permite
+    mostrar —sin extras, atributos ni exclusiones, que son detalle de
+    configuración del PDV— y enriquecida con `descripcion`/`receta_id` por
+    nodo, que `precios.carta` no trae porque el PDV nunca los necesitó.
+    """
+    # Import diferido: `precios` importa (transitivamente, vía
+    # `inventory.application.recetas`) este mismo módulo — un import al
+    # tope del archivo sería un ciclo. `carta_publica` es la única función
+    # de este archivo que necesita `precios`.
+    from src.modules.sales.application import precios
+
+    items = precios.carta(
+        session,
+        sucursal_id=sucursal_id,
+        canal=canal,
+        modalidad=modalidad,
+        marca_id=marca_id,
+    )
+    ids = {i["producto_comercial_id"] for i in items}
+    for i in items:
+        ids.update(v["producto_comercial_id"] for v in i.get("variantes", []))
+    if not ids:
+        return []
+    filas = {
+        p.id: p
+        for p in session.scalars(
+            select(ProductoComercial).where(ProductoComercial.id.in_(ids))
+        )
+    }
+
+    def _nodo(item: dict) -> dict:
+        producto = filas.get(item["producto_comercial_id"])
+        return {
+            "producto_comercial_id": item["producto_comercial_id"],
+            "nombre": item["nombre"],
+            "descripcion": producto.descripcion if producto else None,
+            "receta_id": producto.receta_id if producto else None,
+            "precio_unitario": item["precio_unitario"],
+            "stock_bajo": item["stock_bajo"],
+        }
+
+    return [
+        {
+            **_nodo(item),
+            "categoria_id": item["categoria_id"],
+            "variantes": [
+                _nodo(v) | {"orden": v.get("orden", 0)} for v in item.get("variantes", [])
+            ],
+        }
+        for item in items
+    ]
+
+
+def promociones_web_vigentes(
+    session: Session,
+    *,
+    empresa_ids: Sequence[uuid.UUID],
+    marca_id: uuid.UUID,
+    hoy: date,
+) -> list[dict]:
+    """Promociones (`sales.promocion`) con `"web"` en `canales`, vigentes
+    hoy y con `marca_id` NULL o igual a la marca del sitio (RN-WEB-002).
+
+    El filtro de `canales`/vigencia se hace en Python: `canales` es JSONB y
+    el volumen de promociones activas por empresa es chico, mientras que la
+    consulta equivalente se escribe distinto en SQLite y Postgres — mismo
+    criterio que `ptav_usados_en_condiciones` de `inventory`.
+    """
+    if not empresa_ids:
+        return []
+    stmt = select(Promocion).where(
+        Promocion.empresa_id.in_(list(empresa_ids)),
+        Promocion.activa.is_(True),
+        Promocion.deleted_at.is_(None),
+        or_(Promocion.marca_id.is_(None), Promocion.marca_id == marca_id),
+    )
+    resultado = []
+    for promo in session.scalars(stmt):
+        if not promo.canales or "web" not in promo.canales:
+            continue
+        if promo.desde is not None and hoy < promo.desde:
+            continue
+        if promo.hasta is not None and hoy > promo.hasta:
+            continue
+        resultado.append(
+            {
+                "id": promo.id,
+                "nombre": promo.nombre,
+                "tipo": promo.tipo,
+                "beneficio": promo.beneficio,
+                "desde": promo.desde,
+                "hasta": promo.hasta,
+                "dias_semana": promo.dias_semana,
+                "hora_desde": promo.hora_desde,
+                "hora_hasta": promo.hora_hasta,
+            }
+        )
+    return resultado

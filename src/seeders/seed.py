@@ -25,6 +25,7 @@ from src.modules.reports.infrastructure.models import (
     ReglaDistribucion,
 )
 from src.modules.sales.infrastructure.models import MedioPago, PromocionCupon
+from src.modules.storefront.infrastructure.models import StorefrontContenido
 from src.modules.users.infrastructure.models import (
     Almacen,
     Empresa,
@@ -363,6 +364,14 @@ PERMISOS = [
     ("rrhh.capacitacion_gestionar", "Administrar pactos de permanencia por capacitación"),
     ("sync.leer", "Descargar catálogo, stock y RBAC de la sucursal hacia su hub"),
     ("sync.empujar", "Reproducir en la nube las ventas y cobros de un hub offline"),
+    (
+        "storefront.leer",
+        "Ver la configuración del sitio de marca (contenido, fotos)",
+    ),
+    (
+        "storefront.editar",
+        "Editar textos, fotos y disponibilidad del sitio de marca (ADR-101)",
+    ),
 ] + [
     # Un permiso por módulo: cada área propone parámetros de lo suyo y de nada
     # más (ADR-014 Addendum). Gerencia sigue siendo quien aprueba.
@@ -447,6 +456,8 @@ ROLES = {
         "marketing.leer",
         "marketing.campana_aprobar",
         "marketing.agencia_decidir",
+        # Consulta el sitio de marca; editarlo sigue siendo de Marketing.
+        "storefront.leer",
         "dashboard.leer",
         "bi.acceder",
         "rrhh.leer",
@@ -598,6 +609,10 @@ ROLES = {
         "marketing.encuesta_gestionar",
         "marketing.agencia_evaluar",
         "sales.leer_clientes_externos",
+        # El sitio de marca es la vitrina digital: mismo dueño que el resto
+        # de contenido/campañas (ADR-101).
+        "storefront.leer",
+        "storefront.editar",
     ],
 }
 
@@ -971,8 +986,79 @@ def _seed_promocion_cupon(session: Session) -> None:
     )
 
 
+def _seed_storefront_contenido(session: Session) -> None:
+    """Contenido inicial del sitio de marca (ADR-101), tomado de
+    `majambo.md` §3.1 — historia, contacto y horario público de delivery.
+    `_get_or_create` no toca lo ya editado desde el ERP: correr el seeder
+    de nuevo no pisa lo que Marketing haya cambiado a mano."""
+    marca = session.scalar(select(Marca).filter_by(nombre=MARCA))
+    if marca is None:
+        return
+    contenido_por_clave = {
+        "hero": {
+            "titulo": "A tu manera",
+            "subtitulo": "Pizza de barrio horneada al momento en Tarapoto desde 2006.",
+            "cta_texto": "Ver la carta",
+            "cta_url": "/carta",
+        },
+        "nosotros": {
+            "titulo": "Nuestra historia",
+            "parrafos": [
+                "Charlie's Pizzas nació en 2006, cuando Carlos decidió sacar "
+                "adelante a su familia apostando por un producto que le guste "
+                "a todos: la pizza.",
+                "Lo que empezó como un negocio de una sola persona haciendo de "
+                "todo fue creciendo con atención al detalle y un trato cercano, "
+                "como en familia.",
+            ],
+            "hitos": [
+                {"anio": "2006", "texto": "Abrimos nuestro primer local en Tarapoto."},
+                {
+                    "anio": "2024",
+                    "texto": "Nueva identidad de marca: nace el eslogan \"A tu manera\".",
+                },
+                {
+                    "anio": "2024",
+                    "texto": "Abrimos nuestro segundo local para atenderte mejor.",
+                },
+            ],
+        },
+        "contacto": {
+            "whatsapp": "972510528",
+            "email": "hola@majambo.com.pe",
+            "instagram": "charlies.pe",
+            "facebook": "charlies.pe",
+            "tiktok": "charlies.pe",
+        },
+        "trabaja": {
+            "titulo": "Trabaja con nosotros",
+            "cuerpo": "Somos un equipo que crece con atención al detalle y trato "
+            "cercano. Si te gusta la buena pizza y el buen servicio, revisa "
+            "nuestras vacantes abiertas.",
+        },
+        "pie": {
+            "texto": "Charlie's Pizzas — una marca de Grupo Majambo. Delivery de "
+            "lunes a sábado 6:00 pm a 10:30 pm, domingos 6:30 pm a 10:30 pm.",
+        },
+        "seo": {
+            "titulo": "Charlie's Pizzas — Pizza de barrio en Tarapoto",
+            "descripcion": "Pizza horneada al momento en Tarapoto desde 2006. "
+            "Pide delivery o recojo en nuestros locales.",
+        },
+    }
+    for clave, valor in contenido_por_clave.items():
+        _get_or_create(
+            session,
+            StorefrontContenido,
+            marca_id=marca.id,
+            clave=clave,
+            defaults=dict(valor=valor),
+        )
+
+
 def seed(session: Session) -> None:
     _seed_organizacion(session)
+    _seed_storefront_contenido(session)
 
     # --- Divisas (RN-GER-010: sin divisa, ningún monto puede declarar unidad) ---
     for codigo, nombre, simbolo, decimales in DIVISAS:

@@ -709,6 +709,8 @@ class ProductoCreate(BaseModel):
     # En una variante se ignora: hereda la marca del padre.
     marca_id: uuid.UUID
     nombre: str = Field(min_length=1, max_length=150)
+    # Copy para la ficha pública del sitio de marca (storefront, ADR-101).
+    descripcion: str | None = None
     # NULL solo si el producto agrupa variantes: entonces la receta va en
     # cada hija (RN-COM-022).
     receta_id: uuid.UUID | None = None
@@ -778,6 +780,7 @@ class VincularExtraCreate(BaseModel):
 
 class ProductoUpdate(BaseModel):
     nombre: str | None = None
+    descripcion: str | None = None
     activo: bool | None = None
     receta_id: uuid.UUID | None = None
     # Único modo de dejar el producto sin receta: `receta_id=None` es
@@ -796,6 +799,7 @@ class ProductoOut(BaseModel):
     id_interno: str
     marca_id: uuid.UUID
     nombre: str
+    descripcion: str | None = None
     categoria_id: uuid.UUID | None = None
     receta_id: uuid.UUID | None = None
     producto_padre_id: uuid.UUID | None = None

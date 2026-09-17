@@ -40,6 +40,7 @@ decidió no hacerlo).
 | `reports` (catálogo de reportes + Gerencia/dashboards) | 🔶 En curso | Motor de consulta y emisión/distribución construidos y en uso, catálogo cerrado, escalamiento y matriz de áreas editable; edición de reglas de distribución sigue por API y el BI autoservicio (Superset) sin desplegar. | [`modulo-reports.md`](docs/roadmap/historial/modulo-reports.md) |
 | `delivery` (reparto propio: repartidores, rutas, seguimiento público) | ✅ Completo (MVP) | Slices 1-6 implementados 2026-09-09 (ADR-098): repartidores, ciclo completo de ruta/entrega con ruteo real (Google Routes) u heurístico, GPS de flota, enlace público de seguimiento con mapa, PWA instalable del repartidor (`/reparto`), tablero de despacho en el ERP (`/delivery`, con mapa de ruta y polilínea) y aviso al cliente por WhatsApp en cada hito con fallback copiar/`wa.me`, convergiendo con `sales` por evento en los dos sentidos. | [`modulo-delivery.md`](docs/roadmap/historial/modulo-delivery.md) |
 | Calidad y auditorías transversales | 🔶 En curso | Rondas periódicas de auditoría de punta a punta (Ola 1 a Ola 4, ago-sep 2026) que encuentran y corrigen bugs cruzando varios módulos a la vez, antes de sumar funcionalidad nueva. | [`calidad-y-auditorias.md`](docs/roadmap/historial/calidad-y-auditorias.md) |
+| `storefront` (sitio de marca Charlie's Pizzas) | 🔶 En curso | PR1 (2026-09-17, ADR-101): app `storefront/` separada del ERP sirviendo `charlies.majambo.com.pe` — home, carta con búsqueda/filtros e ingredientes clicables, mapa de locales, "Nosotros" y "Trabaja con nosotros", todo en solo lectura contra `/api/v1/storefront/publico/*`; CMS de contenido y fotos de catálogo desde el ERP (`/web`). Cuentas de cliente, carrito y pagos (Izipay) quedan para PR2/PR3. | [`modulo-storefront.md`](docs/roadmap/historial/modulo-storefront.md) |
 
 ## Pendientes de decisión (registro vivo)
 
@@ -272,3 +273,4 @@ nombre del archivo.
 | Módulo rrhh (slice completo — deuda declarada) | [`modulo-rrhh.md`](docs/roadmap/deuda/modulo-rrhh.md) | 11 | 4 |
 | Módulo marketing (slice core — deuda declarada) | [`modulo-marketing.md`](docs/roadmap/deuda/modulo-marketing.md) | 5 | 2 |
 | Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013) | [`frontend.md`](docs/roadmap/deuda/frontend.md) | 11 | 24 |
+| Módulo storefront (sitio de marca, PR1 — deuda declarada) | [`modulo-storefront.md`](docs/roadmap/deuda/modulo-storefront.md) | 8 | 0 |

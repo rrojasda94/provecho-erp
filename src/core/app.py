@@ -44,6 +44,8 @@ from src.modules.sales.api.kds_routers import router as kds_router
 from src.modules.sales.api.publico_routers import router as sales_publico_router
 from src.modules.sales.api.routers import router as sales_router
 from src.modules.sales.application import listeners as sales_listeners
+from src.modules.storefront.api.publico_routers import router as storefront_publico_router
+from src.modules.storefront.api.routers import router as storefront_router
 from src.modules.users.api import error_handlers as users_error_handlers
 from src.modules.users.api.routers import router as users_router
 from src.modules.users.application import listeners as users_listeners
@@ -67,6 +69,14 @@ TAGS_METADATA = [
         "description": "Login por PIN, refresh rotativo, logout. Sin JWT previo.",
     },
     {"name": "users", "description": "Perfil del usuario autenticado (`/users/me`)."},
+    {
+        "name": "storefront",
+        "description": (
+            "Sitio público de marca (charlies.majambo.com.pe, ADR-101): "
+            "CMS de contenido y fotos (JWT) + carta/sucursales/promociones/"
+            "convocatorias públicas (sin JWT, rate limit por IP)."
+        ),
+    },
     {
         "name": "personas",
         "description": "Party model transversal: base de trabajador/cliente/usuario natural.",
@@ -342,6 +352,7 @@ def create_app() -> FastAPI:
     app.include_router(production_router, prefix="/api/v1")
     app.include_router(accounting_router, prefix="/api/v1")
     app.include_router(rrhh_router, prefix="/api/v1")
+    app.include_router(storefront_router, prefix="/api/v1")
     app.include_router(marketing_router, prefix="/api/v1")
     # Sin JWT a propósito: el cliente que contesta la encuesta no es usuario
     # del ERP, y Meta tampoco. Cada uno trae su propia credencial — el token
@@ -356,6 +367,10 @@ def create_app() -> FastAPI:
     # usuario del ERP. El token del enlace es la credencial (RN-DLV-008) y
     # el rate limit por IP es lo que impide probar tokens a fuerza bruta.
     app.include_router(delivery_publico_router, prefix="/api/v1")
+    # Sin JWT: el sitio de marca es una app aparte que ningún cliente del
+    # restaurante loguea como personal del ERP (ADR-101). Rate limit por IP,
+    # nunca escribe.
+    app.include_router(storefront_publico_router, prefix="/api/v1")
     app.include_router(marketing_webhook_router, prefix="/api/v1")
     app.include_router(sync_router, prefix="/api/v1")
     app.include_router(reports_router, prefix="/api/v1")

@@ -20,7 +20,7 @@ from src.modules.users.application.errors import (
     UsuarioBloqueado,
 )
 from src.modules.users.domain import rules
-from src.modules.users.infrastructure.models import Usuario
+from src.modules.users.infrastructure.models import Sucursal, Usuario
 from src.modules.users.infrastructure.repositories import UsuarioRepo
 
 
@@ -141,4 +141,46 @@ def notificar_a(
         cuerpo=cuerpo,
         nivel=nivel,
         sucursal_id=sucursal_id,
+    )
+
+
+# --- Contrato del sitio de marca (storefront, ADR-101/RN-WEB-001/004) ------
+
+def sucursales_publicas_de_marca(
+    session: Session, marca_id: uuid.UUID
+) -> list[dict]:
+    """Sucursales activas de una marca, con lo que el sitio público puede
+    mostrar (RN-WEB-004: `inactiva` o borrada no aparece). Nunca
+    `empresa_id` ni `tenencia`."""
+    filas = session.scalars(
+        select(Sucursal).where(
+            Sucursal.marca_id == marca_id,
+            Sucursal.estado == "activa",
+            Sucursal.deleted_at.is_(None),
+        )
+    )
+    return [
+        {
+            "id": s.id,
+            "nombre": s.nombre,
+            "direccion": s.direccion,
+            "telefono": s.telefono,
+            "horario_atencion": s.horario_atencion,
+            "lat": s.ubicacion_lat,
+            "lng": s.ubicacion_lng,
+        }
+        for s in filas
+    ]
+
+
+def empresas_de_marca(session: Session, marca_id: uuid.UUID) -> list[uuid.UUID]:
+    """Empresas que operan `marca_id` en al menos una sucursal activa — para
+    que otro módulo filtre "lo de esta marca" (ej. promociones vigentes)
+    sin conocer la licencia empresa↔marca."""
+    return list(
+        session.scalars(
+            select(Sucursal.empresa_id)
+            .where(Sucursal.marca_id == marca_id, Sucursal.deleted_at.is_(None))
+            .distinct()
+        )
     )

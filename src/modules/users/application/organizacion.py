@@ -420,6 +420,7 @@ def crear_sucursal(
     marca_id: uuid.UUID,
     nombre: str,
     direccion: str,
+    telefono: str | None = None,
     tenencia: str,
     estado: str = "activa",
     horario_atencion: dict | None = None,
@@ -438,6 +439,7 @@ def crear_sucursal(
             marca_id=marca_id,
             nombre=nombre,
             direccion=direccion,
+            telefono=telefono,
             tenencia=tenencia,
             estado=estado,
             horario_atencion=horario_atencion,
@@ -482,6 +484,7 @@ def editar_sucursal(
             "marca_id",
             "nombre",
             "direccion",
+            "telefono",
             "estado",
             "tenencia",
             "horario_atencion",
@@ -491,8 +494,11 @@ def editar_sucursal(
         # `radio_marcaje_m` en None es "no evalúa distancia" (RN-RRHH-024):
         # sin esto no había forma de desactivarlo, solo de cambiarlo por otro
         # número. `horario_atencion` puede vaciarse igual que `contacto` de
-        # empresa.
-        frozenset({"horario_atencion", "radio_marcaje_m", *CAMPOS_UBICACION}),
+        # empresa. `telefono` igual: un local puede quedarse sin teléfono
+        # publicado.
+        frozenset(
+            {"horario_atencion", "radio_marcaje_m", "telefono", *CAMPOS_UBICACION}
+        ),
     )
     antes |= desanclar_si_cambio_el_texto(
         sucursal, campos, direccion_previa, "direccion"

@@ -57,6 +57,7 @@ def crear_producto(
     id_interno: str,
     marca_id: uuid.UUID,
     nombre: str,
+    descripcion: str | None = None,
     receta_id: uuid.UUID | None = None,
     categoria_id: uuid.UUID | None = None,
     producto_padre_id: uuid.UUID | None = None,
@@ -82,6 +83,7 @@ def crear_producto(
             id_interno=id_interno,
             marca_id=marca_id,
             nombre=a_titulo(nombre),
+            descripcion=descripcion,
             receta_id=receta_id,
             categoria_id=categoria_id,
             producto_padre_id=producto_padre_id,
@@ -274,7 +276,8 @@ def editar_producto(session: Session, producto_id: uuid.UUID, **campos) -> Produ
     if campos.get("empaque_id") is not None:
         _exigir_empaque(session, campos["empaque_id"])
     for campo in (
-        "activo", "categoria_id", "orden", "empaque_id", "modalidades_empaque",
+        "activo", "descripcion", "categoria_id", "orden", "empaque_id",
+        "modalidades_empaque",
     ):
         if campos.get(campo) is not None:
             setattr(prod, campo, campos[campo])

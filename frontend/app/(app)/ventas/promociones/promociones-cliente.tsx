@@ -26,6 +26,7 @@ export type Promocion = {
   hora_hasta: string | null;
   sucursal_id: string | null;
   modalidades: string[] | null;
+  canales: string[] | null;
   prioridad: number;
   acumulable: boolean;
   activa: boolean;
@@ -87,6 +88,9 @@ const DIAS = [
 ] as const;
 
 const MODALIDADES = ["mesa", "takeout", "delivery"] as const;
+// `web` es el sitio de marca (storefront, ADR-101): una promoción con este
+// canal aparece en charlies.majambo.com.pe (RN-WEB-002).
+const CANALES = ["pdv", "agente_ia", "delivery", "web"] as const;
 
 const CAMPO = "flex flex-col gap-1 text-sm font-semibold";
 
@@ -124,6 +128,14 @@ function comoSeLee(p: Promocion): string {
 
 /** La vigencia en una línea. `—` es "siempre, hasta que alguien la apague",
  * que es como se piden la mitad de ellas. */
+/** El único bit que este archivo agrega a la fila fuera del texto ya
+ * armado por `cuandoCorre`/`comoSeLee`: aislarlo en su propio componente
+ * evita subir la complejidad ciclomática del `.map()` de la tabla. */
+function EtiquetaCanalWeb({ canales }: { canales: string[] | null }) {
+  if (!canales?.includes("web")) return null;
+  return <span className="ml-1 text-xs font-normal text-gray">(web)</span>;
+}
+
 function cuandoCorre(p: Promocion): string {
   const partes: string[] = [];
   if (p.desde || p.hasta) partes.push(`${p.desde ?? "…"} → ${p.hasta ?? "…"}`);
@@ -351,6 +363,18 @@ function DialogoNuevaPromocion({
           Sin marcar ninguna = todas. Una promoción de salón no siempre vale
           en delivery, donde el margen ya se lo comió el reparto.
         </span>
+        <div className="flex flex-wrap gap-2 text-sm">
+          {CANALES.map((c) => (
+            <label key={c} className="flex items-center gap-1">
+              <input type="checkbox" name="canales" value={c} />
+              {c}
+            </label>
+          ))}
+        </div>
+        <span className="text-xs text-gray">
+          Canal: sin marcar ninguno = todos. Marca <code>web</code> para que
+          la promoción aparezca en el sitio público de la marca.
+        </span>
       </fieldset>
 
       <label className={CAMPO}>
@@ -464,6 +488,7 @@ export function PromocionesCliente({
                     {sucursales.find((s) => s.id === p.sucursal_id)?.nombre ??
                       "Todas"}
                     {p.modalidades?.length ? ` · ${p.modalidades.join(", ")}` : ""}
+                    <EtiquetaCanalWeb canales={p.canales} />
                   </td>
                   <td className="p-2">{p.prioridad}</td>
                   <td className="p-2 text-right">

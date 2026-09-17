@@ -10,7 +10,8 @@
 # migrar dentro del arranque automático de varias réplicas a la vez —
 # acá hay una sola réplica de cada servicio, así que el servicio `init`
 # del compose puede migrar solo con seguridad):
-#   1. Fija PROVECHO_IMAGE/PROVECHO_WEB_IMAGE a la versión pedida.
+#   1. Fija PROVECHO_IMAGE/PROVECHO_WEB_IMAGE/PROVECHO_CHARLIES_IMAGE a la
+#      versión pedida.
 #   2. `docker compose pull` — baja las imágenes nuevas.
 #   3. `docker compose up -d` — reinicia con las imágenes nuevas; el
 #      servicio `init` corre `alembic upgrade head` antes de que `api`
@@ -25,8 +26,9 @@ DOMINIO_API="${DOMINIO_API:-https://api-staging.majambo.com.pe}"
 
 export PROVECHO_IMAGE="ghcr.io/rrojasda94/provecho-erp:${VERSION}"
 export PROVECHO_WEB_IMAGE="ghcr.io/rrojasda94/provecho-erp-web:${VERSION}"
+export PROVECHO_CHARLIES_IMAGE="ghcr.io/rrojasda94/provecho-erp-charlies:${VERSION}"
 
-echo "Desplegando ${PROVECHO_IMAGE} / ${PROVECHO_WEB_IMAGE}"
+echo "Desplegando ${PROVECHO_IMAGE} / ${PROVECHO_WEB_IMAGE} / ${PROVECHO_CHARLIES_IMAGE}"
 $COMPOSE pull
 $COMPOSE up -d
 

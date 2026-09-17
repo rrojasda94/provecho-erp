@@ -277,6 +277,25 @@ class Settings(BaseSettings):
     sales_promocion_cupon_fin: date = date(2026, 12, 31)
     # Cada cupón vale un mes desde que se emite.
     sales_promocion_cupon_vigencia_dias: int = 30
+    # --- Sitio de marca (storefront, ADR-101) ---------------------------------
+    # Marca que sirve el sitio público. Vacío = los endpoints públicos
+    # responden 404 ("sitio no configurado") — no hay una marca por
+    # defecto que adivinar en un grupo con varias marcas.
+    storefront_marca_id: str = ""
+    # Sucursal con la que se resuelve la carta pública (precio/disponibilidad).
+    # Vacío = la primera sucursal activa de la marca.
+    storefront_sucursal_id: str = ""
+    # Con qué `canal`/`modalidad` de `lista_precio` se resuelve la carta
+    # pública (mismo vocabulario que `sales.domain.rules.CANALES`/
+    # `MODALIDADES`). El canal `web` no existe todavía en `venta` (llega en
+    # un slice posterior) — hasta entonces la carta pública se cotiza con un
+    # canal/modalidad ya existente.
+    storefront_canal: str = "delivery"
+    storefront_modalidad: str = "delivery"
+    # Base del enlace de postulación pública (ADR-087) que arma
+    # `GET /storefront/publico/convocatorias`. Vive en `clientes.majambo.com.pe`,
+    # no en el sitio de marca — mismo dominio que ya sirve `/postular/{token}`.
+    storefront_url_postular_base: str = "https://clientes.majambo.com.pe/postular"
     # Cola de emisión de comprobantes (Celery). Por defecto reusa Redis.
     celery_broker_url: str = ""
     # --- Observabilidad -----------------------------------------------------

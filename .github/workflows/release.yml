@@ -79,3 +79,27 @@ jobs:
           labels: ${{ steps.meta-web.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Sitio de marca Charlie's Pizzas (ADR-101): tercera imagen, aparte de
+      # `-web` — proceso, tema y CSP propios; comparten solo la API. Mismo
+      # criterio de tags que arriba: se fija a la misma versión que las otras
+      # dos en el `.env` de producción (`PROVECHO_CHARLIES_IMAGE`).
+      - id: meta-charlies
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRO }}/${{ github.repository }}-charlies
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./storefront
+          target: runner
+          push: true
+          tags: ${{ steps.meta-charlies.outputs.tags }}
+          labels: ${{ steps.meta-charlies.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

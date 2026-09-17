@@ -208,5 +208,7 @@ documentación. Prohibido usar sinónimos ambiguos.
 > [marco-legal-contabilidad.md](../contabilidad/marco-legal-contabilidad.md).
 > Los importes/tasas concretos viven en configuración, no en el glosario.
 
+| **Storefront (sitio de marca)** | Sitio web público de una marca (`charlies.majambo.com.pe`), servido por una app Next.js aparte (ADR-101) y alimentado por el módulo `storefront` a través de contratos públicos de lectura de los demás módulos. No confundir con la landing `clientes.majambo.com.pe` (ADR-080), que es un formulario único del QR de mesa. | Landing del QR (`reconocerte`) |
+
 > Al introducir un concepto nuevo del negocio, primero se agrega aquí, luego se
 > usa en código.

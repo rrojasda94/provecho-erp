@@ -36,7 +36,10 @@ clientes.majambo.com.pe {
 	# del servidor— y nunca hidrata, porque `nosniff` rechaza el HTML que el
 	# redirect devuelve donde se esperaba JavaScript. Se ve perfecta y no
 	# funciona nada, que es el peor síntoma posible.
-	@landing path /reconocerte /reconocerte/* /_next/static/* /_next/image* /marcas/* /favicon.ico
+	# `/postular*` entra porque "Trabaja con nosotros" del sitio de marca
+	# (charlies.majambo.com.pe, ADR-101) enlaza a `/postular/{token}`, que
+	# vive en ESTE dominio y no en el nuevo (ADR-087).
+	@landing path /reconocerte /reconocerte/* /postular /postular/* /_next/static/* /_next/image* /marcas/* /favicon.ico
 	handle @landing {
 		reverse_proxy web:3000
 	}
@@ -66,4 +69,14 @@ clientes.majambo.com.pe {
 	handle {
 		redir * /reconocerte 302
 	}
+}
+
+# Sitio de marca Charlie's Pizzas (ADR-101). A diferencia de la landing de
+# arriba, es un contenedor y un proceso de Next COMPLETAMENTE aparte
+# (`charlies`, no `web`): no hay recorte de rutas que hacer acá, todo el
+# sitio vive en este dominio. `X-Robots-Tag` NO se agrega a propósito — este
+# sitio sí quiere indexarse (`storefront/app/robots.ts`), al revés que
+# `clientes.majambo.com.pe`.
+charlies.majambo.com.pe {
+	reverse_proxy charlies:3000
 }

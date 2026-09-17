@@ -32,6 +32,9 @@ class Sucursal(
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"))
     nombre: Mapped[str] = mapped_column(String(100))
     direccion: Mapped[str] = mapped_column(String(255))
+    # No existía ninguna columna de teléfono de sucursal — lo pide el sitio
+    # de marca (storefront, ADR-101) para la lista de locales.
+    telefono: Mapped[str | None] = mapped_column(String(20), nullable=True)
     estado: Mapped[str] = mapped_column(
         Enum("activa", "inactiva", name="estado_sucursal", native_enum=False),
         default="activa",
