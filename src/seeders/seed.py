@@ -371,6 +371,8 @@ PERMISOS = [
     (
         "storefront.editar",
         "Editar textos, fotos y disponibilidad del sitio de marca (ADR-103)",
+    ),
+    (
         "supervision.gestionar",
         "Administrar categorías, plantillas de tarea y asignación de "
         "tareas de apertura/cierre de sucursal",
