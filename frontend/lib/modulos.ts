@@ -5,6 +5,7 @@ import {
   Building2,
   Calculator,
   ChefHat,
+  ClipboardCheck,
   ClipboardList,
   Factory,
   Gauge,
@@ -136,6 +137,15 @@ export const MODULOS: Modulo[] = [
     prefijoPermiso: "production.",
     area: "operacion",
     Icono: Factory,
+  },
+  {
+    clave: "supervision",
+    nombre: "Supervisión",
+    descripcion: "Tareas de apertura y cierre, checklist y foto",
+    href: "/supervision/mis-tareas",
+    prefijoPermiso: "supervision.",
+    area: "operacion",
+    Icono: ClipboardCheck,
   },
   {
     clave: "ventas",

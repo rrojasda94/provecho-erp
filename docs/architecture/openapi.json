@@ -3289,6 +3289,20 @@
         "title": "AsientoOut",
         "type": "object"
       },
+      "AsignarBody": {
+        "properties": {
+          "usuario_id": {
+            "format": "uuid",
+            "title": "Usuario Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "usuario_id"
+        ],
+        "title": "AsignarBody",
+        "type": "object"
+      },
       "AsistenciaMarcarEntrada": {
         "properties": {
           "fecha": {
@@ -4002,6 +4016,20 @@
           "subtotal"
         ],
         "title": "BloqueResultadosOut",
+        "type": "object"
+      },
+      "Body_subir_foto_api_v1_supervision_tareas__instancia_id__foto_post": {
+        "properties": {
+          "archivo": {
+            "contentMediaType": "application/octet-stream",
+            "title": "Archivo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "archivo"
+        ],
+        "title": "Body_subir_foto_api_v1_supervision_tareas__instancia_id__foto_post",
         "type": "object"
       },
       "Body_token_api_v1_oauth_token_post": {
@@ -4925,127 +4953,6 @@
         "title": "CatalogoOut",
         "type": "object"
       },
-      "CategoriaCreate": {
-        "properties": {
-          "asiento_contable_config": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AsientoContableConfig"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "empresa_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Empresa Id"
-          },
-          "frecuencia_conteo": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Frecuencia Conteo"
-          },
-          "nombre": {
-            "maxLength": 100,
-            "minLength": 1,
-            "title": "Nombre",
-            "type": "string"
-          },
-          "padre_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Padre Id"
-          }
-        },
-        "required": [
-          "nombre"
-        ],
-        "title": "CategoriaCreate",
-        "type": "object"
-      },
-      "CategoriaOut": {
-        "properties": {
-          "asiento_contable_config": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Asiento Contable Config"
-          },
-          "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
-          },
-          "frecuencia_conteo": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Frecuencia Conteo"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "nombre": {
-            "title": "Nombre",
-            "type": "string"
-          },
-          "padre_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Padre Id"
-          }
-        },
-        "required": [
-          "id",
-          "empresa_id",
-          "nombre",
-          "frecuencia_conteo"
-        ],
-        "title": "CategoriaOut",
-        "type": "object"
-      },
       "CategoriaUdmCreate": {
         "properties": {
           "nombre": {
@@ -5091,68 +4998,6 @@
           "unidad_base_id"
         ],
         "title": "CategoriaUdmOut",
-        "type": "object"
-      },
-      "CategoriaUpdate": {
-        "properties": {
-          "asiento_contable_config": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AsientoContableConfig"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "frecuencia_conteo": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Frecuencia Conteo"
-          },
-          "nombre": {
-            "anyOf": [
-              {
-                "maxLength": 100,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Nombre"
-          },
-          "padre_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Padre Id"
-          },
-          "quitar_frecuencia": {
-            "default": false,
-            "title": "Quitar Frecuencia",
-            "type": "boolean"
-          },
-          "quitar_padre": {
-            "default": false,
-            "title": "Quitar Padre",
-            "type": "boolean"
-          }
-        },
-        "title": "CategoriaUpdate",
         "type": "object"
       },
       "CeldaIn": {
@@ -5470,6 +5315,24 @@
           "estado"
         ],
         "title": "ChecklistInocuidadTurnoOut",
+        "type": "object"
+      },
+      "ChecklistItemOut": {
+        "properties": {
+          "hecho": {
+            "title": "Hecho",
+            "type": "boolean"
+          },
+          "texto": {
+            "title": "Texto",
+            "type": "string"
+          }
+        },
+        "required": [
+          "texto",
+          "hecho"
+        ],
+        "title": "ChecklistItemOut",
         "type": "object"
       },
       "CierreCajaDetalleOut": {
@@ -6592,6 +6455,24 @@
           "producto_atributo_valor_id"
         ],
         "title": "CombinacionOut",
+        "type": "object"
+      },
+      "CompletarBody": {
+        "properties": {
+          "observacion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          }
+        },
+        "title": "CompletarBody",
         "type": "object"
       },
       "CompletarOrdenIn": {
@@ -14133,6 +14014,58 @@
         "title": "ImportarRecetasIn",
         "type": "object"
       },
+      "InformeDiarioOut": {
+        "properties": {
+          "completadas": {
+            "title": "Completadas",
+            "type": "integer"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "fotos_invalidas": {
+            "title": "Fotos Invalidas",
+            "type": "integer"
+          },
+          "generado_at": {
+            "format": "date-time",
+            "title": "Generado At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "vencidas": {
+            "title": "Vencidas",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "sucursal_id",
+          "fecha",
+          "total",
+          "completadas",
+          "vencidas",
+          "fotos_invalidas",
+          "generado_at"
+        ],
+        "title": "InformeDiarioOut",
+        "type": "object"
+      },
       "IngredienteImportadoIn": {
         "description": "Una línea de la hoja «Ingredientes», ya resuelta por la pantalla.\n\n`articulo_id` en `None` significa **omitir esta línea**: es lo que\ndevuelve la pantalla cuando el usuario decidió no resolver ese insumo.",
         "properties": {
@@ -15560,6 +15493,19 @@
           "tiene_foto"
         ],
         "title": "MarcacionOut",
+        "type": "object"
+      },
+      "MarcarItemBody": {
+        "properties": {
+          "hecho": {
+            "title": "Hecho",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "hecho"
+        ],
+        "title": "MarcarItemBody",
         "type": "object"
       },
       "MatrizCeldaOut": {
@@ -20099,6 +20045,37 @@
         "title": "Pagina[GuiaRemisionOut]",
         "type": "object"
       },
+      "Pagina_InformeDiarioOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InformeDiarioOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[InformeDiarioOut]",
+        "type": "object"
+      },
       "Pagina_LeadOut_": {
         "properties": {
           "items": {
@@ -20407,37 +20384,6 @@
           "page_size"
         ],
         "title": "Pagina[PlanProduccionOut]",
-        "type": "object"
-      },
-      "Pagina_PlantillaOut_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/PlantillaOut"
-            },
-            "title": "Items",
-            "type": "array"
-          },
-          "page": {
-            "title": "Page",
-            "type": "integer"
-          },
-          "page_size": {
-            "title": "Page Size",
-            "type": "integer"
-          },
-          "total": {
-            "title": "Total",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "items",
-          "total",
-          "page",
-          "page_size"
-        ],
-        "title": "Pagina[PlantillaOut]",
         "type": "object"
       },
       "Pagina_PostulanteOut_": {
@@ -23240,72 +23186,6 @@
         "title": "PlanProduccionOut",
         "type": "object"
       },
-      "PlantillaCreate": {
-        "properties": {
-          "activa": {
-            "default": false,
-            "title": "Activa",
-            "type": "boolean"
-          },
-          "despedida": {
-            "default": "¡Gracias por responder!",
-            "maxLength": 300,
-            "title": "Despedida",
-            "type": "string"
-          },
-          "empresa_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Empresa Id"
-          },
-          "marca_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Marca Id"
-          },
-          "nombre": {
-            "maxLength": 120,
-            "minLength": 3,
-            "title": "Nombre",
-            "type": "string"
-          },
-          "preguntas": {
-            "items": {
-              "$ref": "#/components/schemas/PreguntaCreate"
-            },
-            "minItems": 1,
-            "title": "Preguntas",
-            "type": "array"
-          },
-          "saludo": {
-            "maxLength": 300,
-            "minLength": 3,
-            "title": "Saludo",
-            "type": "string"
-          }
-        },
-        "required": [
-          "nombre",
-          "saludo",
-          "preguntas"
-        ],
-        "title": "PlantillaCreate",
-        "type": "object"
-      },
       "PlantillaDetalleOut": {
         "properties": {
           "activa": {
@@ -23367,27 +23247,20 @@
         "title": "PlantillaDetalleOut",
         "type": "object"
       },
-      "PlantillaOut": {
+      "PlantillaUpdate": {
         "properties": {
           "activa": {
-            "title": "Activa",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activa"
           },
-          "despedida": {
-            "title": "Despedida",
-            "type": "string"
-          },
-          "empresa_id": {
-            "format": "uuid",
-            "title": "Empresa Id",
-            "type": "string"
-          },
-          "id": {
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
-          "marca_id": {
+          "asignado_a": {
             "anyOf": [
               {
                 "format": "uuid",
@@ -23397,27 +23270,97 @@
                 "type": "null"
               }
             ],
-            "title": "Marca Id"
+            "title": "Asignado A"
+          },
+          "checklist": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checklist"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "dia_mes": {
+            "anyOf": [
+              {
+                "maximum": 28.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dia Mes"
+          },
+          "dia_semana": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dia Semana"
           },
           "nombre": {
-            "title": "Nombre",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
           },
-          "saludo": {
-            "title": "Saludo",
-            "type": "string"
+          "orden": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orden"
+          },
+          "requiere_foto": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requiere Foto"
           }
         },
-        "required": [
-          "id",
-          "empresa_id",
-          "marca_id",
-          "nombre",
-          "saludo",
-          "despedida",
-          "activa"
-        ],
-        "title": "PlantillaOut",
+        "title": "PlantillaUpdate",
         "type": "object"
       },
       "PosTarjetaIn": {
@@ -32426,6 +32369,224 @@
         "title": "TableroIn",
         "type": "object"
       },
+      "TareaInstanciaOut": {
+        "properties": {
+          "asignado_a": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asignado A"
+          },
+          "categoria_id": {
+            "format": "uuid",
+            "title": "Categoria Id",
+            "type": "string"
+          },
+          "checklist": {
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItemOut"
+            },
+            "title": "Checklist",
+            "type": "array"
+          },
+          "completada_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completada At"
+          },
+          "completada_por": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completada Por"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "foto_valida": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto Valida"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "momento": {
+            "title": "Momento",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "observacion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observacion"
+          },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          },
+          "plantilla_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plantilla Id"
+          },
+          "requiere_foto": {
+            "title": "Requiere Foto",
+            "type": "boolean"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          },
+          "tiene_foto": {
+            "default": false,
+            "title": "Tiene Foto",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "plantilla_id",
+          "sucursal_id",
+          "fecha",
+          "momento",
+          "orden",
+          "nombre",
+          "categoria_id",
+          "requiere_foto",
+          "checklist",
+          "asignado_a",
+          "estado",
+          "completada_at",
+          "completada_por",
+          "foto_valida",
+          "observacion"
+        ],
+        "title": "TareaInstanciaOut",
+        "type": "object"
+      },
+      "TareaManualCreate": {
+        "properties": {
+          "asignado_a": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asignado A"
+          },
+          "categoria_id": {
+            "format": "uuid",
+            "title": "Categoria Id",
+            "type": "string"
+          },
+          "checklist": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checklist",
+            "type": "array"
+          },
+          "fecha": {
+            "format": "date",
+            "title": "Fecha",
+            "type": "string"
+          },
+          "momento": {
+            "enum": [
+              "apertura",
+              "cierre"
+            ],
+            "title": "Momento",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Orden",
+            "type": "integer"
+          },
+          "requiere_foto": {
+            "default": false,
+            "title": "Requiere Foto",
+            "type": "boolean"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sucursal_id",
+          "fecha",
+          "momento",
+          "categoria_id",
+          "nombre"
+        ],
+        "title": "TareaManualCreate",
+        "type": "object"
+      },
       "TarjetaIn": {
         "properties": {
           "alto": {
@@ -36142,6 +36303,189 @@
         "title": "TableroOut",
         "type": "object"
       },
+      "src__modules__inventory__api__schemas__CategoriaCreate": {
+        "properties": {
+          "asiento_contable_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AsientoContableConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "frecuencia_conteo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frecuencia Conteo"
+          },
+          "nombre": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Padre Id"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "CategoriaCreate",
+        "type": "object"
+      },
+      "src__modules__inventory__api__schemas__CategoriaOut": {
+        "properties": {
+          "asiento_contable_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asiento Contable Config"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "frecuencia_conteo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frecuencia Conteo"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Padre Id"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "nombre",
+          "frecuencia_conteo"
+        ],
+        "title": "CategoriaOut",
+        "type": "object"
+      },
+      "src__modules__inventory__api__schemas__CategoriaUpdate": {
+        "properties": {
+          "asiento_contable_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AsientoContableConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "frecuencia_conteo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frecuencia Conteo"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          },
+          "padre_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Padre Id"
+          },
+          "quitar_frecuencia": {
+            "default": false,
+            "title": "Quitar Frecuencia",
+            "type": "boolean"
+          },
+          "quitar_padre": {
+            "default": false,
+            "title": "Quitar Padre",
+            "type": "boolean"
+          }
+        },
+        "title": "CategoriaUpdate",
+        "type": "object"
+      },
       "src__modules__inventory__api__schemas__ResultadoImportacionOut": {
         "description": "El mismo sobre para las tres entidades: crear, actualizar, omitir.",
         "properties": {
@@ -36173,6 +36517,125 @@
           "omitidas"
         ],
         "title": "ResultadoImportacionOut",
+        "type": "object"
+      },
+      "src__modules__marketing__api__schemas__PlantillaCreate": {
+        "properties": {
+          "activa": {
+            "default": false,
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "despedida": {
+            "default": "¡Gracias por responder!",
+            "maxLength": 300,
+            "title": "Despedida",
+            "type": "string"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "nombre": {
+            "maxLength": 120,
+            "minLength": 3,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "preguntas": {
+            "items": {
+              "$ref": "#/components/schemas/PreguntaCreate"
+            },
+            "minItems": 1,
+            "title": "Preguntas",
+            "type": "array"
+          },
+          "saludo": {
+            "maxLength": 300,
+            "minLength": 3,
+            "title": "Saludo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "saludo",
+          "preguntas"
+        ],
+        "title": "PlantillaCreate",
+        "type": "object"
+      },
+      "src__modules__marketing__api__schemas__PlantillaOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "despedida": {
+            "title": "Despedida",
+            "type": "string"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "saludo": {
+            "title": "Saludo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "marca_id",
+          "nombre",
+          "saludo",
+          "despedida",
+          "activa"
+        ],
+        "title": "PlantillaOut",
         "type": "object"
       },
       "src__modules__purchases__api__schemas__ComprobanteOut": {
@@ -36487,6 +36950,390 @@
         "title": "ResultadoImportacionOut",
         "type": "object"
       },
+      "src__modules__supervision__api__schemas__CategoriaCreate": {
+        "properties": {
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "nombre": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "CategoriaCreate",
+        "type": "object"
+      },
+      "src__modules__supervision__api__schemas__CategoriaOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "nombre",
+          "activa"
+        ],
+        "title": "CategoriaOut",
+        "type": "object"
+      },
+      "src__modules__supervision__api__schemas__CategoriaUpdate": {
+        "properties": {
+          "activa": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activa"
+          },
+          "nombre": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre"
+          }
+        },
+        "title": "CategoriaUpdate",
+        "type": "object"
+      },
+      "src__modules__supervision__api__schemas__PlantillaCreate": {
+        "properties": {
+          "asignado_a": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asignado A"
+          },
+          "categoria_id": {
+            "format": "uuid",
+            "title": "Categoria Id",
+            "type": "string"
+          },
+          "checklist": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Checklist",
+            "type": "array"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "dia_mes": {
+            "anyOf": [
+              {
+                "maximum": 28.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dia Mes"
+          },
+          "dia_semana": {
+            "anyOf": [
+              {
+                "maximum": 6.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dia Semana"
+          },
+          "empresa_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empresa Id"
+          },
+          "fecha_inicio": {
+            "format": "date",
+            "title": "Fecha Inicio",
+            "type": "string"
+          },
+          "frecuencia": {
+            "enum": [
+              "diaria",
+              "interdiaria",
+              "semanal",
+              "mensual"
+            ],
+            "title": "Frecuencia",
+            "type": "string"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "momento": {
+            "enum": [
+              "apertura",
+              "cierre"
+            ],
+            "title": "Momento",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "default": 1,
+            "minimum": 1.0,
+            "title": "Orden",
+            "type": "integer"
+          },
+          "requiere_foto": {
+            "default": false,
+            "title": "Requiere Foto",
+            "type": "boolean"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "required": [
+          "categoria_id",
+          "nombre",
+          "momento",
+          "frecuencia",
+          "fecha_inicio"
+        ],
+        "title": "PlantillaCreate",
+        "type": "object"
+      },
+      "src__modules__supervision__api__schemas__PlantillaOut": {
+        "properties": {
+          "activa": {
+            "title": "Activa",
+            "type": "boolean"
+          },
+          "asignado_a": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asignado A"
+          },
+          "categoria_id": {
+            "format": "uuid",
+            "title": "Categoria Id",
+            "type": "string"
+          },
+          "checklist": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checklist",
+            "type": "array"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "dia_mes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dia Mes"
+          },
+          "dia_semana": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dia Semana"
+          },
+          "empresa_id": {
+            "format": "uuid",
+            "title": "Empresa Id",
+            "type": "string"
+          },
+          "fecha_inicio": {
+            "format": "date",
+            "title": "Fecha Inicio",
+            "type": "string"
+          },
+          "frecuencia": {
+            "title": "Frecuencia",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "marca_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marca Id"
+          },
+          "momento": {
+            "title": "Momento",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "orden": {
+            "title": "Orden",
+            "type": "integer"
+          },
+          "requiere_foto": {
+            "title": "Requiere Foto",
+            "type": "boolean"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "required": [
+          "id",
+          "empresa_id",
+          "marca_id",
+          "sucursal_id",
+          "categoria_id",
+          "nombre",
+          "descripcion",
+          "momento",
+          "orden",
+          "frecuencia",
+          "dia_semana",
+          "dia_mes",
+          "fecha_inicio",
+          "requiere_foto",
+          "checklist",
+          "asignado_a",
+          "activa"
+        ],
+        "title": "PlantillaOut",
+        "type": "object"
+      },
       "src__modules__users__api__schemas__MarcaOut": {
         "properties": {
           "grupo_id": {
@@ -36558,6 +37405,68 @@
           "descripcion"
         ],
         "title": "RolOut",
+        "type": "object"
+      },
+      "src__shared__paginacion__Pagina_PlantillaOut___1": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/src__modules__marketing__api__schemas__PlantillaOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[PlantillaOut]",
+        "type": "object"
+      },
+      "src__shared__paginacion__Pagina_PlantillaOut___2": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/src__modules__supervision__api__schemas__PlantillaOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "Pagina[PlantillaOut]",
         "type": "object"
       }
     },
@@ -44626,7 +45535,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/CategoriaOut"
+                    "$ref": "#/components/schemas/src__modules__inventory__api__schemas__CategoriaOut"
                   },
                   "title": "Response Listar Categorias Api V1 Inventory Categorias Get",
                   "type": "array"
@@ -44662,7 +45571,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CategoriaCreate"
+                "$ref": "#/components/schemas/src__modules__inventory__api__schemas__CategoriaCreate"
               }
             }
           },
@@ -44673,7 +45582,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CategoriaOut"
+                  "$ref": "#/components/schemas/src__modules__inventory__api__schemas__CategoriaOut"
                 }
               }
             },
@@ -44806,7 +45715,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CategoriaOut"
+                  "$ref": "#/components/schemas/src__modules__inventory__api__schemas__CategoriaOut"
                 }
               }
             },
@@ -44852,7 +45761,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CategoriaUpdate"
+                "$ref": "#/components/schemas/src__modules__inventory__api__schemas__CategoriaUpdate"
               }
             }
           },
@@ -44863,7 +45772,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CategoriaOut"
+                  "$ref": "#/components/schemas/src__modules__inventory__api__schemas__CategoriaOut"
                 }
               }
             },
@@ -50752,7 +51661,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Pagina_PlantillaOut_"
+                  "$ref": "#/components/schemas/src__shared__paginacion__Pagina_PlantillaOut___1"
                 }
               }
             },
@@ -50785,7 +51694,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PlantillaCreate"
+                "$ref": "#/components/schemas/src__modules__marketing__api__schemas__PlantillaCreate"
               }
             }
           },
@@ -50892,7 +51801,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PlantillaOut"
+                  "$ref": "#/components/schemas/src__modules__marketing__api__schemas__PlantillaOut"
                 }
               }
             },
@@ -65816,6 +66725,1150 @@
         ]
       }
     },
+    "/api/v1/supervision/categorias": {
+      "get": {
+        "operationId": "listar_categorias_api_v1_supervision_categorias_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/src__modules__supervision__api__schemas__CategoriaOut"
+                  },
+                  "title": "Response Listar Categorias Api V1 Supervision Categorias Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Categorias",
+        "tags": [
+          "supervision"
+        ]
+      },
+      "post": {
+        "operationId": "crear_categoria_api_v1_supervision_categorias_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/src__modules__supervision__api__schemas__CategoriaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__supervision__api__schemas__CategoriaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Categoria",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/categorias/{categoria_id}": {
+      "patch": {
+        "operationId": "editar_categoria_api_v1_supervision_categorias__categoria_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "categoria_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Categoria Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/src__modules__supervision__api__schemas__CategoriaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__supervision__api__schemas__CategoriaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Categoria",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/informes": {
+      "get": {
+        "operationId": "listar_informes_api_v1_supervision_informes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sucursal Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pagina_InformeDiarioOut_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Informes",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/informes/generar": {
+      "post": {
+        "operationId": "generar_informe_api_v1_supervision_informes_generar_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fecha",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fecha"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InformeDiarioOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Generar Informe",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/informes/{informe_id}": {
+      "get": {
+        "operationId": "ver_informe_api_v1_supervision_informes__informe_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "informe_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Informe Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InformeDiarioOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Informe",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/plantillas": {
+      "get": {
+        "operationId": "listar_plantillas_api_v1_supervision_plantillas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "empresa_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Empresa Id"
+            }
+          },
+          {
+            "description": "Página, empezando en 1",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "description": "Página, empezando en 1",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filas por página (máx. 200)",
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "description": "Filas por página (máx. 200)",
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__shared__paginacion__Pagina_PlantillaOut___2"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Plantillas",
+        "tags": [
+          "supervision"
+        ]
+      },
+      "post": {
+        "operationId": "crear_plantilla_api_v1_supervision_plantillas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/src__modules__supervision__api__schemas__PlantillaCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__supervision__api__schemas__PlantillaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Plantilla",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/plantillas/{plantilla_id}": {
+      "delete": {
+        "operationId": "desactivar_plantilla_api_v1_supervision_plantillas__plantilla_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plantilla_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plantilla Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__supervision__api__schemas__PlantillaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Desactivar Plantilla",
+        "tags": [
+          "supervision"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_plantilla_api_v1_supervision_plantillas__plantilla_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plantilla_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Plantilla Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlantillaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/src__modules__supervision__api__schemas__PlantillaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Plantilla",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/tareas": {
+      "get": {
+        "operationId": "listar_tareas_api_v1_supervision_tareas_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fecha",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fecha"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TareaInstanciaOut"
+                  },
+                  "title": "Response Listar Tareas Api V1 Supervision Tareas Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Tareas",
+        "tags": [
+          "supervision"
+        ]
+      },
+      "post": {
+        "operationId": "crear_tarea_manual_api_v1_supervision_tareas_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TareaManualCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaInstanciaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Tarea Manual",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/tareas/generar": {
+      "post": {
+        "operationId": "generar_tareas_api_v1_supervision_tareas_generar_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "fecha",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fecha"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Generar Tareas",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/tareas/mias": {
+      "get": {
+        "operationId": "listar_mis_tareas_api_v1_supervision_tareas_mias_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "fecha",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fecha"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TareaInstanciaOut"
+                  },
+                  "title": "Response Listar Mis Tareas Api V1 Supervision Tareas Mias Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Mis Tareas",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/tareas/{instancia_id}": {
+      "get": {
+        "operationId": "ver_tarea_api_v1_supervision_tareas__instancia_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instancia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Instancia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaInstanciaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Tarea",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/tareas/{instancia_id}/asignar": {
+      "patch": {
+        "operationId": "asignar_tarea_api_v1_supervision_tareas__instancia_id__asignar_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instancia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Instancia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AsignarBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaInstanciaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Asignar Tarea",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/tareas/{instancia_id}/checklist/{indice}": {
+      "patch": {
+        "operationId": "marcar_item_api_v1_supervision_tareas__instancia_id__checklist__indice__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instancia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Instancia Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "indice",
+            "required": true,
+            "schema": {
+              "title": "Indice",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarcarItemBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaInstanciaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Marcar Item",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/tareas/{instancia_id}/completar": {
+      "post": {
+        "operationId": "completar_tarea_api_v1_supervision_tareas__instancia_id__completar_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instancia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Instancia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletarBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaInstanciaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Completar Tarea",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
+    "/api/v1/supervision/tareas/{instancia_id}/foto": {
+      "get": {
+        "operationId": "ver_foto_api_v1_supervision_tareas__instancia_id__foto_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instancia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Instancia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Foto",
+        "tags": [
+          "supervision"
+        ]
+      },
+      "post": {
+        "operationId": "subir_foto_api_v1_supervision_tareas__instancia_id__foto_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "instancia_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Instancia Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_subir_foto_api_v1_supervision_tareas__instancia_id__foto_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TareaInstanciaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Subir Foto",
+        "tags": [
+          "supervision"
+        ]
+      }
+    },
     "/api/v1/sync/pull": {
       "get": {
         "description": "Filas del recurso con `campo_marca >= desde`, acotadas a la sucursal\nde la cuenta. Sin `desde` es la carga inicial del hub.",
@@ -67361,6 +69414,10 @@
     {
       "description": "Órdenes de producción (fabricación) y costeo.",
       "name": "production"
+    },
+    {
+      "description": "Tareas programadas de apertura y cierre de local, por categoría y frecuencia, con checklist y evidencia fotográfica. El informe diario por sucursal se emite al módulo `reports`.",
+      "name": "supervision"
     },
     {
       "description": "Libro contable, pago a proveedor (tesorería).",

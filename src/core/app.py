@@ -44,6 +44,7 @@ from src.modules.sales.api.kds_routers import router as kds_router
 from src.modules.sales.api.publico_routers import router as sales_publico_router
 from src.modules.sales.api.routers import router as sales_router
 from src.modules.sales.application import listeners as sales_listeners
+from src.modules.supervision.api.routers import router as supervision_router
 from src.modules.users.api import error_handlers as users_error_handlers
 from src.modules.users.api.routers import router as users_router
 from src.modules.users.application import listeners as users_listeners
@@ -129,6 +130,14 @@ TAGS_METADATA = [
     {
         "name": "production",
         "description": "Órdenes de producción (fabricación) y costeo.",
+    },
+    {
+        "name": "supervision",
+        "description": (
+            "Tareas programadas de apertura y cierre de local, por categoría "
+            "y frecuencia, con checklist y evidencia fotográfica. El informe "
+            "diario por sucursal se emite al módulo `reports`."
+        ),
     },
     {
         "name": "accounting",
@@ -343,6 +352,7 @@ def create_app() -> FastAPI:
     app.include_router(accounting_router, prefix="/api/v1")
     app.include_router(rrhh_router, prefix="/api/v1")
     app.include_router(marketing_router, prefix="/api/v1")
+    app.include_router(supervision_router, prefix="/api/v1")
     # Sin JWT a propósito: el cliente que contesta la encuesta no es usuario
     # del ERP, y Meta tampoco. Cada uno trae su propia credencial — el token
     # del enlace y la firma HMAC del webhook.

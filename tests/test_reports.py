@@ -105,6 +105,10 @@ SIN_ACTOR = {
     "assets.mantenimiento_vencido",
     "assets.documento_por_vencer",
     "assets.documento_vencido",
+    # Mismo caso que `production.reporte_produccion_generado`: lo genera el
+    # barrido de cierre de jornada de supervisión (o el endpoint manual),
+    # cerrar el día no es un acto de una persona (RN-SUP-007).
+    "supervision.informe_diario_generado",
 }
 
 

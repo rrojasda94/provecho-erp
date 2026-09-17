@@ -122,6 +122,13 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Áreas", href: "/reportes/areas" },
     { label: "Emitidos", href: "/reportes/emitidos" },
   ],
+  supervision: [
+    { label: "Mis tareas", href: "/supervision/mis-tareas" },
+    { label: "Tablero", href: "/supervision/tablero" },
+    { label: "Plantillas", href: "/supervision/plantillas" },
+    { label: "Categorías", href: "/supervision/categorias" },
+    { label: "Informes", href: "/supervision/informes" },
+  ],
   rrhh: [
     { label: "Contratación", href: "/rrhh/contratacion" },
     { label: "Trabajadores", href: "/rrhh/trabajadores" },
