@@ -38,22 +38,23 @@ dentro de seis meses.
 
 ## Pendiente de corte
 
-Nada. **0.11.0 se cortó el 2026-09-10** y se lleva los 38 fragmentos que
-quedaban desde el corte de 0.10.0: el módulo de delivery completo (PWA de
-repartidor, rutas y entregas, ruteo real con GPS y seguimiento público,
-tablero de despacho, WhatsApp), la ronda avanzada de producción (plan y orden
-por necesidad, costeo real, lotes con trazabilidad y auditoría, checklist de
-inocuidad, evidencia como archivo, reporte de jornada, subrecetas anidadas,
-horas-hombre desde RRHH), el módulo de assets con depreciación, horas
-asistidas de RRHH sobre el contrato público, la guía de remisión emitida
-desde su documento origen (con vehículo registrado), catálogo editable, y una
-tanda de fixes (CDP-001 y conteo de producción, CI de backend contra
-Postgres, deuda de `inventory`/`production` al día, mermas y devoluciones,
-reposición al lote original, entre otros).
+Nada. **0.11.1 se cortó el 2026-09-17** y se lleva los 2 fragmentos
+acumulados desde el corte de 0.11.0: rutear un pedido delivery ya no exige
+que esté listo (se decide con qué sale recién al iniciar la ruta), despachar
+desde el KDS deja de cerrar la entrega de reparto (antes hacía desaparecer
+la ruta), una ruta se edita —paradas y repartidor— mientras no terminó, y
+avisos de sonido/toast más bandeja en KDS y caja cuando se registra una
+entrega o termina una ruta (ADR-101). Mismo criterio de numeración que
+siempre: **parche**, como el resto de los cortes de esta serie 0.x —no
+distingue `added` de `fixed`, se reserva `minor`/`major` para cuando el
+proyecto lo pida explícitamente.
 
-Es **minor y no parche**: todo lo que se lleva es funcionalidad nueva
-(`added`) o corrección de comportamiento (`fixed`) — no hay ningún fragmento
-`removed` que marque una ruptura de contrato.
+Nota histórica del corte anterior (0.11.0, 2026-09-10): se llevó 38
+fragmentos desde 0.10.0 — el módulo de delivery completo (PWA de repartidor,
+rutas y entregas, ruteo real con GPS y seguimiento público, tablero de
+despacho, WhatsApp), la ronda avanzada de producción, el módulo de assets
+con depreciación, horas asistidas de RRHH, la guía de remisión emitida desde
+su documento origen, catálogo editable, y una tanda de fixes.
 
 Nota del corte anterior, que sigue valiendo: **0.9.0 se cortó pero nunca llegó
 a staging** —el `Desplegar` posterior al corte se disparó con `0.8.2` como
