@@ -105,9 +105,7 @@ def _marcar_enviado(entrega: Entrega, hito: str) -> None:
         entrega.aviso_resultado_at = ahora
 
 
-def _avisar_en_camino(
-    session: Session, cliente, entrega: Entrega, telefono, cliente_nombre
-) -> str:
+def _avisar_en_camino(session: Session, cliente, entrega: Entrega, telefono, cliente_nombre) -> str:
     repartidor_nombre = _nombre_repartidor(session, entrega.repartidor_id)
     parametros = [
         cliente_nombre,

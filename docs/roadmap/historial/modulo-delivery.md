@@ -351,3 +351,84 @@ mismo patrón que ya usa `marketing.application.tasks`. Suite completa
 verde en SQLite (2499 pruebas) y contra Postgres real (ADR-097),
 `ruff`/`eslint`/`tsc` limpios, `npm run build` y `npm test` (499 casos)
 sin advertencias nuevas, contrato OpenAPI regenerado.
+
+## 2026-09-17 — ADR-101: el KDS despacha, el repartidor entrega
+
+Tres problemas reportados por el negocio, todos con la misma raíz
+(ADR-098 §2, "el camino inverso" — ver el ADR para el detalle):
+`delivery` escuchaba `sales.venta_entregada` para cerrar sola su
+`entrega` cuando el pedido se marcaba entregado desde el botón del KDS,
+sin importar en qué estado estuviera. Eso hacía desaparecer una ruta
+(la parada saltaba a `entregada` aunque el repartidor siguiera en la
+calle) o, si el pedido todavía no tenía ruta, lo sacaba para siempre de
+"sin asignar" (`pedido_entregado` es el mismo filtro que usaba el
+tablero para no mostrar lo ya resuelto). Además, RN-DLV-001 exigía que
+la venta estuviera `lista` para entrar a una ruta — el despacho no podía
+planificar la salida hasta que cocina terminara.
+
+**Rutear ya no exige `lista`.** `sales.ventas_listas_para_reparto` se
+renombra a `ventas_para_reparto` y deja de filtrar por
+`pedido_entregable`; cada fila trae `lista: bool`. `delivery.rutas.crear`
+y `editar_paradas` aceptan una venta en cualquier estado de preparación
+(no anulada, sin plataforma externa, con ubicación anclada). La condición
+se movió a `iniciar` — recién ahí se exige que todas las paradas estén
+`lista` (y lo mismo para sumar una parada nueva a una ruta ya `en_curso`).
+
+**`delivery` deja de escuchar `sales.venta_entregada`.** Se borró
+`on_venta_entregada`/`cerrar_por_venta_entregada`. Cerrar una entrega es
+ahora solo del repartidor o de despacho en su nombre, siempre desde
+`en_ruta`. El botón del KDS para un pedido delivery pasa a llamarse
+"Despachar": sigue cerrando la comanda de cocina (mismo
+`cumplimiento.registrar_entrega`, sin tocar) pero ya no toca la entrega
+de reparto. Costo aceptado y documentado en el ADR: la venta puede quedar
+`entregada` en `sales` mientras la entrega sigue `en_ruta` en `delivery`
+— es la misma separación de autoridad de ADR-098, aplicada en un solo
+sentido.
+
+**Una ruta se edita de punta a punta.** `editar_paradas` ahora funciona
+con la ruta `planificada` **o** `en_curso`: lo resuelto (entregada,
+fallida, cancelada) queda fijo — nunca se quita ni se reordena, solo se
+renumera al inicio —, lo demás se replanifica desde la última posición
+del repartidor (o la sucursal, si todavía no pingueó). Gana
+`repartidor_id` opcional para reasignar. De paso se cerró un bug latente:
+cancelar una ruta dejaba la `entrega` en `pendiente`, que contaba como
+"ya ruteada" y chocaba con `uq_entrega_venta` al intentar rutear la misma
+venta de nuevo — `venta_ids_con_entrega_abierta` se renombra a
+`venta_ids_ya_ruteadas` y deja de contar `pendiente`; `crear`/`editar`
+reusan la fila existente en vez de insertar una segunda. Frontend:
+`nueva-ruta-dialogo.tsx` se generaliza a `ruta-dialogo.tsx` (crear y
+editar comparten formulario), `tarjeta-ruta.tsx` gana Editar/Iniciar
+(deshabilitado si algo sigue en cocina)/Finalizar/"Marcar entregada" por
+parada, y la PWA (`/reparto`) marca "En cocina" por parada y bloquea
+Iniciar hasta que todo esté listo.
+
+**Avisos a caja y cocina.** `GET /delivery/avisos?sucursal_id&desde`
+(permiso `delivery.leer` o `kds.operar`, para que el cocinero también
+entre) devuelve entregas y rutas finalizadas después de `desde`, sin
+datos del cliente. `lib/use-avisos-reparto.ts` sondea cada 15 s, muestra
+un `toast` (sonner) y un beep de `AudioContext` (sin archivo de audio,
+`resume()` en el primer toque por la política de autoplay); montado en
+`/kds` (solo rutas) y `/pdv` (entregas y rutas). En paralelo, dos avisos
+de bandeja nuevos: `delivery.entrega_para_cobrar` y
+`delivery.ruta_finalizada` (que por fin tiene consumidor), resueltos por
+permiso y no por rol — `users.queries_publicas.usuarios_con_permiso` es
+contrato nuevo, mismo criterio de alcance por sucursal que ya usaba
+`reports.destinatarios._usuarios_de_rol` pero sin que `delivery` tenga
+que conocer el catálogo de roles.
+
+**Maps y sentido de las calles**: no hay nada que activar del lado del
+ERP — la polilínea la calcula Google Routes API (`travelMode: DRIVE`, que
+ya respeta calles de sentido único) y "Navegar" en la PWA abre la app de
+Google Maps. Lo que sí se corrigió es que la ida y la vuelta al origen se
+dibujaban superpuestas y sin indicar dirección: `mapa-rutas.tsx` agrega
+flechas (`SymbolPath.FORWARD_OPEN_ARROW`, cada 80px) a la polilínea. Si
+una calle concreta se ve mal incluso con flechas, es un dato de Google
+Maps en esa ciudad — se corrige desde la app (*Contribuir → Editar mapa*),
+no hay ajuste posible del lado del servidor.
+
+Tests: `tests/test_delivery.py` gana casos para pedido en cocina
+ruteable/no-iniciable, el bug de `uq_entrega_venta` cerrado, y
+`editar_paradas` (quitar/agregar en curso, cambiar repartidor, rechazar
+un pedido en cocina agregado a una ruta en marcha); se invierte el test
+de convergencia KDS↔delivery para probar lo contrario de antes. `ruff`,
+`eslint`, `tsc` limpios; contrato OpenAPI regenerado.

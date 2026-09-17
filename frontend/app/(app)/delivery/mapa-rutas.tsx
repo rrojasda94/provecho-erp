@@ -68,12 +68,22 @@ async function crearMapa(
   }
 
   if (ruta.polyline) {
+    // Flechas cada 80px: sin ellas, la ida y la vuelta al origen se pintan
+    // superpuestas (`ruteo` siempre cotiza la salida redonda) y una calle
+    // de sentido único se ve como si se recorriera en los dos sentidos.
     new google.maps.Polyline({
       path: decodificarPolyline(ruta.polyline),
       map: mapa,
       strokeColor: "#f4511e",
       strokeOpacity: 0.85,
       strokeWeight: 3,
+      icons: [
+        {
+          icon: { path: google.maps.SymbolPath.FORWARD_OPEN_ARROW, scale: 3 },
+          offset: "0",
+          repeat: "80px",
+        },
+      ],
     });
   }
 
