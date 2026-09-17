@@ -13,7 +13,7 @@ import {
 import { ErrorApi } from "@/lib/cliente-api";
 import { apiDelivery, type Repartidor, type Tablero, type VentaLista } from "@/lib/delivery";
 
-import NuevaRutaDialogo from "./nueva-ruta-dialogo";
+import RutaDialogo from "./ruta-dialogo";
 import TarjetaRuta from "./tarjeta-ruta";
 import { useTablero } from "./use-tablero";
 
@@ -28,7 +28,14 @@ type Props = {
 function TarjetaSinAsignar({ venta }: { venta: VentaLista }) {
   return (
     <li className="rounded-lg border border-border bg-card p-3 text-sm">
-      <p className="font-medium">#{venta.numero_orden}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-medium">#{venta.numero_orden}</p>
+        {!venta.lista ? (
+          <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
+            En cocina
+          </span>
+        ) : null}
+      </div>
       <p className="text-gray">{venta.direccion_entrega ?? "Sin dirección anotada"}</p>
       {venta.distancia_entrega_km ? (
         <p className="text-xs text-gray">{venta.distancia_entrega_km} km</p>
@@ -56,6 +63,33 @@ export default function TableroCliente({
     }
   };
 
+  const iniciar = async (rutaId: string) => {
+    try {
+      await apiDelivery.iniciarRuta(rutaId);
+      refrescar();
+    } catch (e) {
+      toast(e instanceof ErrorApi ? e.message : "No se pudo iniciar la ruta.");
+    }
+  };
+
+  const finalizar = async (rutaId: string) => {
+    try {
+      await apiDelivery.finalizarRuta(rutaId);
+      refrescar();
+    } catch (e) {
+      toast(e instanceof ErrorApi ? e.message : "No se pudo finalizar la ruta.");
+    }
+  };
+
+  const entregar = async (entregaId: string) => {
+    try {
+      await apiDelivery.entregar(entregaId, {});
+      refrescar();
+    } catch (e) {
+      toast(e instanceof ErrorApi ? e.message : "No se pudo registrar la entrega.");
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -76,11 +110,15 @@ export default function TableroCliente({
             </Select>
           ) : null}
           {puedeDespachar ? (
-            <NuevaRutaDialogo
+            <RutaDialogo
               sucursalId={sucursalId}
               sinAsignar={tablero.sin_asignar}
               repartidores={repartidores}
-              onCreada={refrescar}
+              onListo={refrescar}
+              trigger={{
+                label: "+ Nueva ruta",
+                disabled: repartidores.length === 0 || tablero.sin_asignar.length === 0,
+              }}
             />
           ) : null}
         </div>
@@ -91,7 +129,7 @@ export default function TableroCliente({
           Sin asignar ({tablero.sin_asignar.length})
         </h2>
         {tablero.sin_asignar.length === 0 ? (
-          <p className="text-sm text-gray">No hay pedidos delivery listos sin asignar.</p>
+          <p className="text-sm text-gray">No hay pedidos delivery sin asignar.</p>
         ) : (
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {tablero.sin_asignar.map((venta) => (
@@ -113,7 +151,14 @@ export default function TableroCliente({
                 ruta={ruta}
                 puedeDespachar={puedeDespachar}
                 onCancelar={cancelar}
+                onIniciar={iniciar}
+                onFinalizar={finalizar}
+                onEntregar={entregar}
                 whatsappHabilitado={tablero.whatsapp_habilitado}
+                sucursalId={sucursalId}
+                sinAsignar={tablero.sin_asignar}
+                repartidores={repartidores}
+                onEditada={refrescar}
               />
             ))}
           </div>

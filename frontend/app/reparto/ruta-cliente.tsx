@@ -79,6 +79,7 @@ function BotonRuta({
   ruta,
   enCurso,
   ocupado,
+  todasListas,
   todasResueltas,
   iniciar,
   finalizar,
@@ -86,20 +87,28 @@ function BotonRuta({
   ruta: RutaConParadas;
   enCurso: boolean;
   ocupado: boolean;
+  todasListas: boolean;
   todasResueltas: boolean;
   iniciar: () => void;
   finalizar: () => void;
 }) {
   if (ruta.estado === "planificada") {
     return (
-      <button
-        type="button"
-        className="reparto-boton-primario"
-        disabled={ocupado}
-        onClick={iniciar}
-      >
-        {ocupado ? "Iniciando…" : "Iniciar ruta"}
-      </button>
+      <>
+        <button
+          type="button"
+          className="reparto-boton-primario"
+          disabled={ocupado || !todasListas}
+          onClick={iniciar}
+        >
+          {ocupado ? "Iniciando…" : "Iniciar ruta"}
+        </button>
+        {!todasListas ? (
+          <p className="reparto-error" role="status">
+            Hay pedidos que siguen en cocina.
+          </p>
+        ) : null}
+      </>
     );
   }
   if (!enCurso) return null;
@@ -115,6 +124,37 @@ function BotonRuta({
   );
 }
 
+function AccionesParada({
+  parada,
+  enlace,
+  onAccion,
+}: {
+  parada: ParadaReparto;
+  enlace: string | null;
+  onAccion: (modo: "entregar" | "fallar") => void;
+}) {
+  return (
+    <div className="reparto-parada-acciones">
+      {parada.cliente_telefono ? <a href={`tel:${parada.cliente_telefono}`}>Llamar</a> : null}
+      {enlace ? (
+        <a href={enlace} target="_blank" rel="noreferrer">
+          Navegar
+        </a>
+      ) : null}
+      {parada.estado === "en_ruta" ? (
+        <>
+          <button type="button" onClick={() => onAccion("entregar")}>
+            Entregado
+          </button>
+          <button type="button" onClick={() => onAccion("fallar")}>
+            No se pudo
+          </button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function Parada({
   parada,
   onAccion,
@@ -127,8 +167,13 @@ function Parada({
     <li className="reparto-parada">
       <header>
         <strong>Pedido #{parada.numero_orden ?? "—"}</strong>
-        <span className={`reparto-estado-parada reparto-estado-${parada.estado}`}>
-          {ETIQUETA_ESTADO_ENTREGA[parada.estado] ?? parada.estado}
+        <span className="reparto-estado-grupo">
+          {parada.estado === "asignada" && !parada.lista ? (
+            <span className="reparto-estado-parada reparto-estado-en-cocina">En cocina</span>
+          ) : null}
+          <span className={`reparto-estado-parada reparto-estado-${parada.estado}`}>
+            {ETIQUETA_ESTADO_ENTREGA[parada.estado] ?? parada.estado}
+          </span>
         </span>
       </header>
       <p>{parada.direccion_entrega ?? "Sin dirección anotada"}</p>
@@ -137,26 +182,7 @@ function Parada({
         <p className="reparto-monto">Cobrar S/ {Number(parada.monto_a_cobrar).toFixed(2)}</p>
       ) : null}
 
-      <div className="reparto-parada-acciones">
-        {parada.cliente_telefono ? (
-          <a href={`tel:${parada.cliente_telefono}`}>Llamar</a>
-        ) : null}
-        {enlace ? (
-          <a href={enlace} target="_blank" rel="noreferrer">
-            Navegar
-          </a>
-        ) : null}
-        {parada.estado === "en_ruta" ? (
-          <>
-            <button type="button" onClick={() => onAccion("entregar")}>
-              Entregado
-            </button>
-            <button type="button" onClick={() => onAccion("fallar")}>
-              No se pudo
-            </button>
-          </>
-        ) : null}
-      </div>
+      <AccionesParada parada={parada} enlace={enlace} onAccion={onAccion} />
     </li>
   );
 }
@@ -188,6 +214,7 @@ export default function RutaCliente({
 
   const { aviso, ocupado, iniciar, finalizar } = useAccionesRuta(ruta.id, onCambio);
   const todasResueltas = ruta.paradas.every((p) => resuelta(p.estado));
+  const todasListas = ruta.paradas.every((p) => p.lista);
 
   return (
     <section className="reparto-ruta">
@@ -207,6 +234,7 @@ export default function RutaCliente({
         ruta={ruta}
         enCurso={enCurso}
         ocupado={ocupado}
+        todasListas={todasListas}
         todasResueltas={todasResueltas}
         iniciar={iniciar}
         finalizar={finalizar}

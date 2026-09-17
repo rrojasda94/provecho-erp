@@ -10,7 +10,7 @@ nunca el ORM.
 
 import uuid
 from collections.abc import Sequence
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import Integer, func, select
@@ -564,21 +564,36 @@ def venta_para_reparto(session: Session, venta_id: uuid.UUID) -> dict | None:
     }
 
 
-def ventas_listas_para_reparto(
+#: `ventas_para_reparto` no filtra por fecha: sin ventana, un delivery
+#: antiguo que quedó con una `entrega` abierta (p. ej. cancelada y nunca
+#: reintentada) inundaría el tablero para siempre. 24 h alcanza para
+#: cualquier salida del día y su reintento — el mismo horizonte que ya
+#: usa el historial de `delivery` por defecto.
+# ponytail: ventana fija, no un parámetro de empresa — no hay pedido de
+# negocio para configurarla; se vuelve parámetro si alguna sucursal
+# necesita un horizonte distinto.
+VENTANA_REPARTO_HORAS = 24
+
+
+def ventas_para_reparto(
     session: Session,
     sucursal_ids: Sequence[uuid.UUID],
     *,
     fecha: date | None = None,
 ) -> list[dict]:
-    """Ventas delivery listas para entrar a una ruta: modalidad delivery,
-    sin plataforma externa (RN-PER-003), no anuladas, con todos los ítems
-    en `listo` y ninguno todavía `entregado`.
+    """Ventas delivery ruteables: modalidad delivery, sin plataforma externa
+    (RN-PER-003), no anuladas, con al menos un ítem que no esté `entregado`.
 
-    `delivery` resuelve así su tablero de "listos sin asignar" en vez de
-    consumir `sales.pedido_listo` (ADR-098): una consulta activa encuentra
-    igual a un pedido que llegó a `listo` antes de que existiera su ruta, o
-    que cambió a delivery después de estar listo — un evento que ya pasó
-    nunca lo habría avisado.
+    A diferencia del `venta.lista` que trae cada fila (`rules.pedido_entregable`
+    — todos los ítems al menos `listo`), esta consulta **no exige que el
+    pedido esté listo**: el despacho arma la ruta desde que se toma el
+    pedido y decide con qué sale (RN-DLV-001/005) — solo `rutas.iniciar`
+    exige que todas sus paradas ya estén `lista`.
+
+    `delivery` resuelve así su tablero de "sin asignar" en vez de consumir
+    `sales.pedido_listo` (ADR-098): una consulta activa encuentra igual a
+    un pedido que cambió a delivery después de tomado, sin depender de que
+    ningún evento haya llegado.
     """
     if not sucursal_ids:
         return []
@@ -590,6 +605,9 @@ def ventas_listas_para_reparto(
     )
     if fecha is not None:
         stmt = stmt.where(Venta.fecha_orden == fecha)
+    else:
+        desde = datetime.now(UTC) - timedelta(hours=VENTANA_REPARTO_HORAS)
+        stmt = stmt.where(Venta.created_at >= desde)
     ventas = list(session.scalars(stmt.order_by(Venta.created_at)))
     if not ventas:
         return []
@@ -606,7 +624,7 @@ def ventas_listas_para_reparto(
     resultado = []
     for venta in ventas:
         estados = estados_por_venta[venta.id]
-        if not rules.pedido_entregable(estados) or rules.pedido_entregado(estados):
+        if rules.pedido_entregado(estados):
             continue
         resultado.append(
             {
@@ -619,6 +637,7 @@ def ventas_listas_para_reparto(
                 "ubicacion_lat": venta.ubicacion_lat,
                 "ubicacion_lng": venta.ubicacion_lng,
                 "distancia_entrega_km": venta.distancia_entrega_km,
+                "lista": rules.pedido_entregable(estados),
             }
         )
     return resultado
