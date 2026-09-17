@@ -242,7 +242,7 @@ def cuenta_de_trabajador(session: Session, trabajador_id: uuid.UUID) -> dict | N
     }
 
 
-# --- Contrato del sitio de marca (storefront, ADR-101/RN-WEB-003) ----------
+# --- Contrato del sitio de marca (storefront, ADR-103/RN-WEB-003) ----------
 
 def convocatorias_publicadas(
     session: Session, *, empresa_ids: Sequence[uuid.UUID], hoy: date

@@ -31,7 +31,7 @@ habría obligado a reconstruir la imagen para cambiar de servidor.
 |--------|----------|-------|-----------|
 | `ghcr.io/<repo>` | `.` | única | FastAPI, Celery worker, Celery beat, runner de sync |
 | `ghcr.io/<repo>-web` | `./frontend` | `runner` | Next.js en modo `standalone` (el ERP) |
-| `ghcr.io/<repo>-charlies` | `./storefront` | `runner` | Next.js en modo `standalone` (sitio de marca, ADR-101) — proceso y build separados de `-web`, comparten solo la API |
+| `ghcr.io/<repo>-charlies` | `./storefront` | `runner` | Next.js en modo `standalone` (sitio de marca, ADR-103) — proceso y build separados de `-web`, comparten solo la API |
 
 `frontend/Dockerfile` es multietapa. `deps` instala con **`npm ci`** (el
 árbol exacto del lockfile, el mismo que resolvió CI — con `npm install` y sin

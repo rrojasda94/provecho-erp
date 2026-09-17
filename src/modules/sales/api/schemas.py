@@ -709,7 +709,7 @@ class ProductoCreate(BaseModel):
     # En una variante se ignora: hereda la marca del padre.
     marca_id: uuid.UUID
     nombre: str = Field(min_length=1, max_length=150)
-    # Copy para la ficha pública del sitio de marca (storefront, ADR-101).
+    # Copy para la ficha pública del sitio de marca (storefront, ADR-103).
     descripcion: str | None = None
     # NULL solo si el producto agrupa variantes: entonces la receta va en
     # cada hija (RN-COM-022).

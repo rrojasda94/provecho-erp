@@ -48,17 +48,14 @@ Declarada al construir el slice 4 (PWA del repartidor):
 
 Declarada al construir el slice 5 (tablero de despacho):
 
-- ⬜ **El tablero no reordena, agrega ni quita paradas de una ruta ya
-  creada** (`PUT /delivery/rutas/{id}/paradas` existe y lo usa el backend
-  al reintentar, pero no hay diálogo de "editar ruta" en
-  `app/(app)/delivery/`). Hoy, para cambiar una ruta planificada, se
-  cancela y se crea de nuevo.
-- ⬜ **El despacho no puede forzar iniciar/finalizar una ruta desde el
-  tablero**, aunque el permiso lo permite (`delivery.despachar` alcanza
-  para `POST .../iniciar|finalizar`, no solo el repartidor dueño):
-  `tarjeta-ruta.tsx` solo ofrece "Cancelar". Sirve para el caso normal
-  —el repartidor inicia y finaliza desde la PWA— pero no para un
-  teléfono sin batería o una ruta que hay que cerrar a mano.
+- ✅ **El tablero no reordena, agrega ni quita paradas de una ruta ya
+  creada.** Cerrada 2026-09-17 (ADR-101): `ruta-dialogo.tsx` edita una
+  ruta `planificada` o `en_curso` (agregar/quitar paradas no resueltas,
+  cambiar repartidor) desde el propio tablero.
+- ✅ **El despacho no puede forzar iniciar/finalizar una ruta desde el
+  tablero.** Cerrada 2026-09-17 (ADR-101): `tarjeta-ruta.tsx` ofrece
+  Iniciar (deshabilitado si alguna parada sigue en cocina), Finalizar y
+  "Marcar entregada" por parada, además de Cancelar.
 - ⬜ **`tablero.rutas_vivas` y `entregas.historial_enriquecido` resuelven
   la venta y el repartidor de cada fila con una llamada aparte** (N+1):
   barato con pocas rutas vivas y una página de historial acotada
@@ -88,3 +85,28 @@ Declarada al construir el slice 6 (notificaciones por WhatsApp):
   /delivery/entregas`), pero nada resalta "este aviso falló" en el
   tablero — el despachador tiene el enlace copiable como red de
   seguridad, pero no una alerta activa.
+
+Declarada al construir ADR-101 ("el KDS despacha, el repartidor entrega"):
+
+- ⬜ **La encuesta de satisfacción de `marketing` puede salir antes de que
+  el pedido llegue de verdad.** Se dispara con `sales.venta_entregada`
+  (ADR-021), que ahora puede publicarse al despachar desde el KDS —antes
+  de que el repartidor confirme la entrega en la puerta— para un pedido
+  delivery. No es un bug nuevo (la encuesta siempre escuchó ese evento):
+  es que ADR-101 hizo más frecuente que "despachado" y "entregado de
+  verdad" sean momentos distintos para delivery. Mover el trigger de la
+  encuesta a `delivery.entrega_registrada` para modalidad delivery
+  específicamente exigiría que `marketing` conociera `delivery`, o un
+  contrato de lectura nuevo — no se resolvió acá.
+- ⬜ **Replanificar lo pendiente de una ruta `en_curso` no modela una
+  eventual vuelta al local.** `_origen_de_ruta` parte de la última
+  posición del repartidor (o de la sucursal si todavía no pingueó);
+  correcto para agregar una parada en el camino, pero si el despacho
+  agrega un pedido que en la práctica exige pasar antes por el local
+  (recoger algo, por ejemplo), el ETA no lo refleja — asume que el
+  repartidor va directo.
+- ⬜ **Una entrega `fallida` sigue sin acción en el tablero.**
+  `POST /entregas/{id}/reintentar` y `.../cerrar` existen desde el slice
+  6 pero ninguna pantalla los llama (ni el historial, ni la tarjeta de
+  ruta) — con rutas ahora más fáciles de dejar `finalizada` con paradas
+  fallidas, la ausencia de esta UI pesa más que antes.

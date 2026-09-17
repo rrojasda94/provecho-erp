@@ -1,4 +1,4 @@
-# ADR-102 — La cuenta del sitio es una credencial aparte, vinculada a
+# ADR-104 — La cuenta del sitio es una credencial aparte, vinculada a
 `cliente` por evento
 
 Fecha: 2026-09-17

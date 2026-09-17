@@ -1,4 +1,4 @@
-"""Listeners de `storefront`: cierra el enlace cuenta↔cliente (ADR-102).
+"""Listeners de `storefront`: cierra el enlace cuenta↔cliente (ADR-104).
 
 `sales` escucha `storefront.cuenta_registrada` y publica de vuelta
 `sales.cliente_vinculado` cuando termina — este módulo nunca importa

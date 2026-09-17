@@ -1,4 +1,4 @@
-"""Estados HTTP propios de la autenticación de cuenta del sitio (ADR-102).
+"""Estados HTTP propios de la autenticación de cuenta del sitio (ADR-104).
 Mismo patrón que `users.api.error_handlers`."""
 
 from fastapi import FastAPI, HTTPException, Request, status

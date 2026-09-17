@@ -1,6 +1,6 @@
 """cuentas del sitio de marca: cuenta, direccion, favorito, refresh_token
 
-Segundo slice de `storefront` (ADR-102, PR2): la cuenta de cliente web es
+Segundo slice de `storefront` (ADR-104, PR2): la cuenta de cliente web es
 una credencial completamente aparte de `usuario` — su propio secreto de
 JWT y su propia tabla de refresh token, con la misma mecánica de rotación
 que `refresh_token` del ERP pero sin compartir fila.

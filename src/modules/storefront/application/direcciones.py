@@ -1,4 +1,4 @@
-"""Direcciones de envío de una cuenta (ADR-102): varias, nombrables, una
+"""Direcciones de envío de una cuenta (ADR-104): varias, nombrables, una
 predeterminada. El cliente elige cuál usar en cada pedido (F3) — acá solo
 se guardan."""
 

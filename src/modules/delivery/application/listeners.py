@@ -1,5 +1,6 @@
 """Listeners de `delivery`: reacciona a hechos de `sales` sin importar su
-dominio, y a sus propios hechos para encolar el aviso al cliente (ADR-098).
+dominio, y a sus propios hechos para encolar el aviso al cliente y avisar
+a caja/cocina (ADR-098/ADR-101).
 
 Cada handler abre su propia sesión (o delega en `tasks.encolar_aviso`, que
 abre la suya): el bus despacha después del commit del emisor (ADR-016), así
@@ -10,11 +11,19 @@ deshacerla, y por eso tampoco se propaga.
 import logging
 import uuid
 
+from sqlalchemy.orm import Session
+
 from src.core.database import SessionLocal
 from src.core.events import event_bus
 from src.modules.delivery.application import entregas, notificaciones
+from src.modules.users.application.queries_publicas import notificar_a, usuarios_con_permiso
 
 log = logging.getLogger(__name__)
+
+# Códigos de `notificacion.tipo` (bandeja in-app) para los avisos de
+# caja/cocina del tablero de despacho (ADR-101).
+TIPO_ENTREGA_PARA_CAJA = "delivery.entrega_para_cobrar"
+TIPO_RUTA_FINALIZADA = "delivery.ruta_finalizada"
 
 # Inyectable (los tests la reemplazan, ver `MODULOS_CON_SESSION_FACTORY` en
 # `tests/conftest.py`). Sin esto, cualquier test que anule o entregue una
@@ -22,27 +31,6 @@ log = logging.getLogger(__name__)
 session_factory = SessionLocal
 
 _registrado = False
-
-
-def on_venta_entregada(payload: dict) -> None:
-    """Si la venta se marcó entregada desde el KDS (no desde el tablero de
-    reparto), cierra la `entrega` abierta que le quedó colgando — los dos
-    caminos convergen sin que ninguno conozca el dominio del otro."""
-    venta_id = uuid.UUID(payload["venta_id"])
-    entregado_por = payload.get("entregado_por")
-    try:
-        with session_factory() as session:
-            entregas.cerrar_por_venta_entregada(
-                session,
-                venta_id,
-                entregado_por=uuid.UUID(entregado_por) if entregado_por else None,
-            )
-            session.commit()
-    except Exception:
-        log.exception(
-            "No se pudo cerrar la entrega tras venta_entregada",
-            extra={"venta_id": str(venta_id)},
-        )
 
 
 def on_venta_anulada(payload: dict) -> None:
@@ -75,6 +63,27 @@ def on_ruta_iniciada(payload: dict) -> None:
             )
 
 
+def _avisar_a_permisos(
+    session: Session,
+    *,
+    codigos: tuple[str, ...],
+    sucursal_id: uuid.UUID,
+    tipo: str,
+    titulo: str,
+    cuerpo: str,
+) -> None:
+    """Bandeja in-app de todos los que tienen alguno de estos permisos en
+    la sucursal — una sola fila por usuario aunque tenga más de un permiso
+    de la lista (`set` en vez de notificar por cada uno)."""
+    destinatarios: set[uuid.UUID] = set()
+    for codigo in codigos:
+        destinatarios |= set(usuarios_con_permiso(session, codigo, sucursal_id))
+    for usuario_id in destinatarios:
+        notificar_a(
+            session, usuario_id, tipo=tipo, titulo=titulo, cuerpo=cuerpo, sucursal_id=sucursal_id
+        )
+
+
 def on_entrega_registrada(payload: dict) -> None:
     from src.modules.delivery.application import tasks
 
@@ -85,6 +94,43 @@ def on_entrega_registrada(payload: dict) -> None:
         log.exception(
             "No se pudo encolar el aviso de entregado", extra={"entrega_id": str(entrega_id)}
         )
+    try:
+        with session_factory() as session:
+            _avisar_a_permisos(
+                session,
+                codigos=("sales.cobrar",),
+                sucursal_id=uuid.UUID(payload["sucursal_id"]),
+                tipo=TIPO_ENTREGA_PARA_CAJA,
+                titulo="Entrega registrada",
+                cuerpo="Un pedido delivery se marcó entregado.",
+            )
+            session.commit()
+    except Exception:
+        log.exception(
+            "No se pudo avisar a caja de la entrega", extra={"entrega_id": str(entrega_id)}
+        )
+
+
+def on_ruta_finalizada(payload: dict) -> None:
+    """Aviso de KDS y caja cuando un repartidor cierra su ruta (ADR-101):
+    `delivery.ruta_finalizada` no tenía suscriptores hasta acá."""
+    ruta_id = payload["ruta_id"]
+    cuerpo = (
+        f"{payload.get('entregadas', 0)} entregada(s), {payload.get('fallidas', 0)} fallida(s)."
+    )
+    try:
+        with session_factory() as session:
+            _avisar_a_permisos(
+                session,
+                codigos=("sales.cobrar", "kds.operar"),
+                sucursal_id=uuid.UUID(payload["sucursal_id"]),
+                tipo=TIPO_RUTA_FINALIZADA,
+                titulo="Un repartidor terminó su ruta",
+                cuerpo=cuerpo,
+            )
+            session.commit()
+    except Exception:
+        log.exception("No se pudo avisar que la ruta terminó", extra={"ruta_id": ruta_id})
 
 
 def on_entrega_fallida(payload: dict) -> None:
@@ -105,8 +151,8 @@ def register() -> None:
     if _registrado:
         return
     _registrado = True
-    event_bus.subscribe("sales.venta_entregada", on_venta_entregada)
     event_bus.subscribe("sales.venta_anulada", on_venta_anulada)
     event_bus.subscribe("delivery.ruta_iniciada", on_ruta_iniciada)
     event_bus.subscribe("delivery.entrega_registrada", on_entrega_registrada)
     event_bus.subscribe("delivery.entrega_fallida", on_entrega_fallida)
+    event_bus.subscribe("delivery.ruta_finalizada", on_ruta_finalizada)

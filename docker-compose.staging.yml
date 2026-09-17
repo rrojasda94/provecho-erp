@@ -149,7 +149,7 @@ services:
     depends_on:
       - api
 
-  # Sitio de marca Charlie's Pizzas (charlies.majambo.com.pe, ADR-101):
+  # Sitio de marca Charlie's Pizzas (charlies.majambo.com.pe, ADR-103):
   # app Next SEPARADA de `web`, mismo criterio que ADR-080 rechazó para la
   # landing pero que acá sí compensa (SEO, tema y CSP propios, superficie
   # de ataque acotada — ver el ADR).

@@ -1,4 +1,4 @@
-"""Primitivas de seguridad de la cuenta del sitio (ADR-102).
+"""Primitivas de seguridad de la cuenta del sitio (ADR-104).
 
 Deliberadamente **no** importa `src.modules.users.infrastructure.security`:
 aunque el código sería casi idéntico, importar de `users` acoplaría el

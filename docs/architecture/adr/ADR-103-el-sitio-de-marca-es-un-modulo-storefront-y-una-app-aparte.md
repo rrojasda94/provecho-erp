@@ -1,4 +1,4 @@
-# ADR-101 — El sitio de marca es un módulo `storefront` y una app Next aparte
+# ADR-103 — El sitio de marca es un módulo `storefront` y una app Next aparte
 
 Fecha: 2026-09-17
 Estado: aceptada

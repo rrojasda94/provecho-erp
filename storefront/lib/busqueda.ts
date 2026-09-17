@@ -1,6 +1,6 @@
 /**
  * Búsqueda en cliente sobre la carta completa (catálogo chico: unas pocas
- * decenas de productos). Sin dependencia nueva ni `pg_trgm` (ADR-101,
+ * decenas de productos). Sin dependencia nueva ni `pg_trgm` (ADR-103,
  * decisión 9): normaliza acentos, compara trigramas con el coeficiente de
  * Dice y suma un empate exacto de substring, que cubre "mal escrito"
  * (`peperoni` → `Pepperoni`) sin dejar de encontrar `napolitana` dentro de

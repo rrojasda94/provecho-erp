@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * Content-Security-Policy con nonce por request (ADR-101).
+ * Content-Security-Policy con nonce por request (ADR-103).
  *
  * Sin sesión: este sitio no tiene cookies de autenticación en PR1, así que
  * no hay nada que renovar acá — a diferencia de `frontend/middleware.ts`,
@@ -15,7 +15,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * `connect-src 'self'` y nada de la API del ERP: el navegador de este
  * sitio nunca le habla a la API directo — todo el contenido sale por
  * Server Components/Actions contra `API_INTERNAL_URL`, que corre en el
- * proceso de Next, no en el navegador (ADR-101 §7).
+ * proceso de Next, no en el navegador (ADR-103 §7).
  */
 const GOOGLE_APIS = "https://*.googleapis.com";
 const GOOGLE_ESTATICO = "https://*.gstatic.com";

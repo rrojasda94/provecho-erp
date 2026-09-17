@@ -1,5 +1,5 @@
 """Favorito: un producto comercial que una cuenta marcó para volver rápido
-(ADR-102). `producto_comercial_id` es cross-módulo (`sales`) a nivel de FK
+(ADR-104). `producto_comercial_id` es cross-módulo (`sales`) a nivel de FK
 de base de datos — el límite de import es de la capa de aplicación, no del
 esquema (mismo patrón que `producto_comercial.empaque_id` → `articulo`)."""
 

@@ -1,4 +1,4 @@
-"""Dirección de envío guardada por una cuenta del sitio (ADR-102). El
+"""Dirección de envío guardada por una cuenta del sitio (ADR-104). El
 cliente puede tener varias, nombrarlas y elegir una por defecto."""
 
 import uuid

@@ -1,6 +1,6 @@
 """sitio de marca (storefront): contenido, descripciones y telefono de sucursal
 
-Primer código del módulo `storefront` (ADR-101, PR1 — sitio público de
+Primer código del módulo `storefront` (ADR-103, PR1 — sitio público de
 solo lectura). `storefront_contenido` es el CMS mínimo del sitio de marca
 (`clave` fija validada en `application/contenido.py`; ver `data-model.md`
 §18). Las tres columnas nuevas son nullable y sin backfill: un producto,
@@ -8,7 +8,7 @@ un insumo o una sucursal sin descripción/teléfono siguen funcionando
 exactamente igual que hoy en el PDV y en el resto del ERP.
 
 Revision ID: 405c9227fce3
-Revises: 74e3f09568a0
+Revises: d518f6efa2ce
 Create Date: 2026-09-17 00:00:00.000000
 
 """
@@ -19,7 +19,7 @@ from sqlalchemy.dialects import postgresql
 from alembic import op
 
 revision: str = "405c9227fce3"
-down_revision: str | None = "74e3f09568a0"
+down_revision: str | None = "d518f6efa2ce"
 branch_labels = None
 depends_on = None
 

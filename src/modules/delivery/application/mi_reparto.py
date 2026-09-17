@@ -58,9 +58,7 @@ def _nombre_repartidor(session: Session, repartidor_id: uuid.UUID) -> str | None
 def _parada_de(session: Session, entrega: Entrega) -> dict:
     venta = venta_para_reparto(session, entrega.venta_id)
     contacto = (
-        contacto_de_cliente(session, venta["cliente_id"])
-        if venta and venta["cliente_id"]
-        else None
+        contacto_de_cliente(session, venta["cliente_id"]) if venta and venta["cliente_id"] else None
     )
     return {
         "entrega_id": entrega.id,
@@ -69,6 +67,10 @@ def _parada_de(session: Session, entrega: Entrega) -> dict:
         "estado": entrega.estado,
         "numero_orden": venta["numero_orden"] if venta else None,
         "direccion_entrega": venta["direccion_entrega"] if venta else None,
+        #: `False` mientras el pedido sigue en cocina (RN-DLV-005): el
+        #: tablero y la PWA lo marcan "en cocina" y no dejan iniciar la
+        #: ruta hasta que todas las paradas lo tengan en `True`.
+        "lista": venta["lista"] if venta else False,
         "destino_lat": entrega.destino_lat,
         "destino_lng": entrega.destino_lng,
         "cliente_nombre": contacto["nombre"] if contacto else None,

@@ -3,7 +3,7 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
-- ✅ 2026-09-17 **PR1** (ADR-101): módulo `storefront`, app `storefront/`
+- ✅ 2026-09-17 **PR1** (ADR-103): módulo `storefront`, app `storefront/`
   separada del ERP, sitio público de solo lectura de
   `charlies.majambo.com.pe` (home, carta con búsqueda/filtros/ingredientes
   clicables, mapa de locales, "Nosotros", "Trabaja con nosotros"), CMS de
@@ -15,7 +15,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   - ⬜ **Fuentes de marca sin llegar.** Isidora Black/Tusker Grotesk
     (brandbook) todavía no están en `storefront/public/fonts/`: el sitio
     corre con el fallback Anton+Archivo (Google Fonts) declarado en
-    ADR-101 §12. Reemplazar cuando el brandbook las entregue como
+    ADR-103 §12. Reemplazar cuando el brandbook las entregue como
     archivos, sin tocar el resto de `globals.css`.
   - ⬜ **Logo provisional.** `storefront/public/marcas/logo.png` viene del
     prototipo portado, no del brandbook oficial — ver
@@ -43,7 +43,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     que es el único ambiente desplegado hoy (`docs/engineering/staging.md`).
     Agregarlo a producción cuando ese compose se use de verdad.
 
-- ✅ 2026-09-17 **PR2** (ADR-102): cuentas de cliente web
+- ✅ 2026-09-17 **PR2** (ADR-104): cuentas de cliente web
   (`storefront_cuenta`), direcciones, favoritos y "tu último pedido",
   registro con email/clave o Google, vínculo a `cliente` de `sales` por
   evento (`storefront.cuenta_registrada` → `sales.cliente_vinculado`).
@@ -61,7 +61,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     otra ida y vuelta a la API en esa página. Resolver si el listado de
     favoritos necesita mostrarse ahí directamente.
   - ⬜ **Anonimización ARCO (ADR-011) no extendida en código.** Declarado en
-    ADR-102 §"Aislamiento y privacidad" que `storefront_cuenta`/
+    ADR-104 §"Aislamiento y privacidad" que `storefront_cuenta`/
     `storefront_direccion` deben poder anonimizarse igual que `persona`,
     pero el flujo real de solicitudes ARCO (`rrhh`/`users`) todavía no
     conoce estas tablas.

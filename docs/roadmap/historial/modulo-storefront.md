@@ -1,8 +1,8 @@
 # Historial — Módulo `storefront`
 
-Estado vigente: 🔶 En curso — PR1 (2026-09-17, ADR-101): sitio público de
+Estado vigente: 🔶 En curso — PR1 (2026-09-17, ADR-103): sitio público de
 solo lectura para Charlie's Pizzas en `charlies.majambo.com.pe`, servido por
-una app Next.js separada del ERP (`storefront/`). PR2 (2026-09-17, ADR-102):
+una app Next.js separada del ERP (`storefront/`). PR2 (2026-09-17, ADR-104):
 cuentas de cliente (email/clave + Google), direcciones, favoritos y "tu
 último pedido", con credencial separada de la del ERP. Carrito, checkout y
 pagos (Izipay) quedan para PR3; Playwright del sitio y SEO (sitemap, OG)
@@ -10,7 +10,7 @@ para PR4. Ver `docs/roadmap/deuda/modulo-storefront.md`.
 
 ## Cronología
 
-### 2026-09-17 — PR1: sitio público, CMS y fotos (ADR-101)
+### 2026-09-17 — PR1: sitio público, CMS y fotos (ADR-103)
 
 Encargo del usuario: una web de marca completa para Charlie's Pizzas
 (catálogo con fotos e ingredientes, promos web, locales en mapa, cuentas
@@ -19,7 +19,7 @@ insumos externos: brand guideline de Charlie's (`brand-voice-guidelines.md`,
 `majambo.md` §3.1, `Brandbook_CharliesPizza.pdf`) y un prototipo de
 storefront ya construido con Claude Design, portado a HTML/JS estándar.
 
-Decisión de arquitectura central (ADR-101): el sitio vive en una **app Next
+Decisión de arquitectura central (ADR-103): el sitio vive en una **app Next
 separada** (`storefront/`), no en una ruta más del proceso `web` compartido
 con el ERP como hizo ADR-080 para la landing del QR — el sitio de marca
 necesita SEO real, tema y CSP propios (paleta verde/crema del brandbook de
@@ -72,7 +72,7 @@ Verificado antes de abrir el PR: suite completa de `pytest` en verde
 `build` en verde en `frontend/` y en `storefront/` (sin API arriba para el
 build), `openapi.json` regenerado.
 
-### 2026-09-17 — PR2: cuentas de cliente (ADR-102)
+### 2026-09-17 — PR2: cuentas de cliente (ADR-104)
 
 Sobre la rama de PR1, sin pausa (encargo del usuario: PRs encadenados,
 "en automático uno tras otro"). Alcance: cuentas de cliente para el sitio
@@ -85,7 +85,7 @@ de Charlie's Pizzas, separadas de las credenciales del ERP.
   `storefront_favorito` (única por cuenta+producto),
   `storefront_refresh_token` (rotación con detección de reuso, mismo
   patrón que `users`) — migración `a4f1a2f11b85`.
-- **Aislamiento de credenciales (ADR-102)**: `security.py` propio del
+- **Aislamiento de credenciales (ADR-104)**: `security.py` propio del
   módulo, JWT firmado con `STOREFRONT_JWT_SECRET` (nunca `JWT_SECRET`) y
   `aud="storefront"`; el decoder exige esa audiencia, así que un token de
   cliente jamás decodifica en un endpoint del ERP y viceversa (probado en

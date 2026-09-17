@@ -1,4 +1,4 @@
-"""CMS mínimo del sitio de marca: textos por marca y clave fija (ADR-101).
+"""CMS mínimo del sitio de marca: textos por marca y clave fija (ADR-103).
 
 Los modelos `Hero`/`Nosotros`/... viven acá (no en `api/schemas.py`) porque
 son la forma que este caso de uso valida al guardar, no una entrada de

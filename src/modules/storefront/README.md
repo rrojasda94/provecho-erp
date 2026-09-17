@@ -2,8 +2,8 @@
 
 Dueño del contenido editable, las fotos de catálogo, las cuentas de cliente
 web (desde PR2) y (desde PR3) los pedidos del sitio de marca
-(`charlies.majambo.com.pe`, ADR-101). Es la única puerta por la que la app
-`storefront/` (un proceso Next.js aparte) lee y escribe al ERP.
+(`charlies.majambo.com.pe`, ADR-103). Es la única puerta por la que la app
+`storefront/` (un proceso Next.js aparte, sin JWT de ERP) lee y escribe al ERP.
 
 ## Alcance de PR1 (sitio público de solo lectura)
 
@@ -16,7 +16,7 @@ web (desde PR2) y (desde PR3) los pedidos del sitio de marca
   sucursales activas de la marca, promociones con canal `web`, convocatorias
   publicadas.
 
-## Alcance de PR2 (cuentas de cliente, ADR-102)
+## Alcance de PR2 (cuentas de cliente, ADR-104)
 
 - **Cuenta de cliente web** (`storefront_cuenta`): registro por email/clave
   o Google, login, refresh rotativo con detección de reuso, logout, perfil.
@@ -26,7 +26,7 @@ web (desde PR2) y (desde PR3) los pedidos del sitio de marca
 - **Direcciones** (`storefront_direccion`) y **favoritos**
   (`storefront_favorito`) de la cuenta.
 - **Enlace a `cliente`** por evento (`storefront.cuenta_registrada` →
-  `sales.cliente_vinculado`, ver ADR-102 y `docs/architecture/events.md`) —
+  `sales.cliente_vinculado`, ver ADR-104 y `docs/architecture/events.md`) —
   `storefront` nunca importa `sales.application.clientes`.
 - **"Tu último pedido"**: `GET /storefront/cuentas/me/ultimo-pedido` lee
   `sales.queries_publicas.ultimo_pedido_de_cliente` (cualquier canal, no
@@ -78,6 +78,6 @@ Públicos de solo lectura (sin JWT, prefix `/api/v1/storefront/publico`,
 `STOREFRONT_CANAL`/`STOREFRONT_MODALIDAD` (con qué lista de precios se resuelve
 la carta pública — `delivery`/`delivery` por defecto), `STOREFRONT_URL_POSTULAR_BASE`,
 `STOREFRONT_JWT_SECRET`/`STOREFRONT_ACCESS_TOKEN_MINUTES`/
-`STOREFRONT_REFRESH_TOKEN_DAYS` (credencial de cuenta, ADR-102 — el secreto
+`STOREFRONT_REFRESH_TOKEN_DAYS` (credencial de cuenta, ADR-104 — el secreto
 nunca debe coincidir con `JWT_SECRET`), `GOOGLE_OAUTH_CLIENT_ID` (vacío ⇒
 "Continuar con Google" no se ofrece).

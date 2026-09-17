@@ -3,7 +3,7 @@
  * Carga del SDK de Google Maps, una sola vez por pestaña. Copia recortada
  * de `frontend/lib/google-maps.ts` — solo la librería `marker`, sin
  * `places` ni `geocoding` porque este sitio no tiene campo de dirección
- * (ADR-101, el mapa de locales solo dibuja marcadores fijos).
+ * (ADR-103, el mapa de locales solo dibuja marcadores fijos).
  *
  * El fix del race de `importLibrary` (ADR-080 §"Lo que apareció construyendo
  * esto") aplica igual acá: `window.google.maps` puede existir antes de que

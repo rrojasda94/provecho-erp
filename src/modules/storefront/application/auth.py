@@ -1,4 +1,4 @@
-"""Casos de uso de autenticación de cuenta del sitio (ADR-102): registro por
+"""Casos de uso de autenticación de cuenta del sitio (ADR-104): registro por
 email/clave o Google, login, refresh (rotación + detección de reuso) y
 logout. Mismo mecanismo que `users.application.auth`, sobre su propia tabla
 y su propio secreto — nunca importa `users`.
@@ -72,7 +72,7 @@ def _publicar_cuenta_registrada(
     direccion: str | None,
     ubicacion: dict | None,
 ) -> None:
-    """Dispara el enlace hacia `sales.cliente` (ADR-102). Post-commit y
+    """Dispara el enlace hacia `sales.cliente` (ADR-104). Post-commit y
     best-effort (ADR-016): si el listener de `sales` falla, la cuenta queda
     sin `cliente_id` hasta la reconciliación — nunca bloquea el registro."""
     event_bus.publish(

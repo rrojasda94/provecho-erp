@@ -1,5 +1,5 @@
 """Refresh token de una cuenta del sitio: mismo mecanismo de rotación y
-detección de reuso que `users.refresh_token` (ADR-102), sobre su propia
+detección de reuso que `users.refresh_token` (ADR-104), sobre su propia
 tabla — nunca comparte fila con el refresh token del ERP."""
 
 import uuid

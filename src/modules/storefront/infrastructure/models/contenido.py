@@ -1,4 +1,4 @@
-"""Contenido editable del sitio de marca (CMS mínimo, ADR-101).
+"""Contenido editable del sitio de marca (CMS mínimo, ADR-103).
 
 Una fila por `(marca_id, clave)`. La forma de `valor` depende de la clave y
 se valida en `application/contenido.py` con el modelo Pydantic

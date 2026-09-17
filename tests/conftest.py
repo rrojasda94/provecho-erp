@@ -320,6 +320,9 @@ MODULOS_CON_SESSION_FACTORY = (
     # Barridos de purga de GPS y evidencia (ADR-098) — mismo motivo que los
     # demás barridos de la lista de arriba.
     "src.modules.delivery.application.tasks",
+    # Generación diaria, cierre de jornada y purga de fotos de supervisión
+    # (ADR-102) — mismo motivo que los demás barridos de la lista.
+    "src.modules.supervision.application.tasks",
 )
 
 

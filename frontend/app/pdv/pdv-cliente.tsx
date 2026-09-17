@@ -6,6 +6,7 @@ import { esSinPermiso, type Falla } from "@/lib/carga";
 import { tipoPorLargo } from "@/lib/documento";
 import { apiKds } from "@/lib/kds";
 import { tienePermiso } from "@/lib/permisos";
+import { useAvisosReparto } from "@/lib/use-avisos-reparto";
 import {
   api,
   claveIdempotencia,
@@ -339,6 +340,10 @@ export default function PdvCliente({
   puntoVenta,
 }: Props) {
   const datos = useDatosPdv(puntoVenta.id, sucursalId);
+  // Caja: cada entrega registrada (con el monto a cobrar si aplica) y
+  // cada ruta que termina — el mozo/cajero se entera sin ir al tablero
+  // (ADR-101).
+  useAvisosReparto(sucursalId);
   const [borradores, setBorradores] = useState<Borrador[]>([nuevoBorrador()]);
   const [activoId, setActivoId] = useState<string | null>(null);
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());

@@ -9,7 +9,7 @@ import datetime
 
 CLAVES_CONTENIDO = ("hero", "nosotros", "contacto", "trabaja", "pie", "seo")
 
-# Lockout de clave de cuenta (ADR-102) — mismos valores que `users`
+# Lockout de clave de cuenta (ADR-104) — mismos valores que `users`
 # (`MAX_INTENTOS_FALLIDOS`/`DURACION_BLOQUEO`): no hay razón para que una
 # cuenta de cliente tolere más intentos de fuerza bruta que una de staff.
 MAX_INTENTOS_FALLIDOS = 5
@@ -34,7 +34,7 @@ def abierto_ahora(horario: dict | None, ahora: datetime.datetime) -> bool | None
 
     `None` cuando el horario no existe o no tiene la forma esperada
     (`{"lun": [["HH:MM","HH:MM"]], ...}`) — filas heredadas del JSONB libre
-    que precedía a este esquema (ADR-101). El sitio muestra "consultar
+    que precedía a este esquema (ADR-103). El sitio muestra "consultar
     horario" en ese caso, nunca un booleano adivinado.
     """
     if not isinstance(horario, dict):

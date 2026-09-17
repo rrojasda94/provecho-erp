@@ -51,7 +51,7 @@ def on_venta_confirmada(payload: dict) -> None:
 
 def on_cuenta_registrada(payload: dict) -> None:
     """Una cuenta nueva del sitio de marca se enlaza a un `cliente` de
-    `sales` (ADR-102): el sitio no importa `application.clientes` —publica
+    `sales` (ADR-104): el sitio no importa `application.clientes` —publica
     el evento y este handler hace la llamada real, mismo patrón que
     `on_entrega_registrada`.
 

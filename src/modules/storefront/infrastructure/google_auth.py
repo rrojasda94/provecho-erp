@@ -1,4 +1,4 @@
-"""Verificación del `id_token` de "Continuar con Google" (ADR-102).
+"""Verificación del `id_token` de "Continuar con Google" (ADR-104).
 
 El navegador nunca es la fuente de verdad de quién inició sesión: manda el
 `id_token` que Google le dio, y este módulo lo valida contra las claves
