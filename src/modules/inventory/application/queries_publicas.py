@@ -722,3 +722,58 @@ def categoria_de_skus(
     ).all()
     return dict(filas)
 
+
+# --- Contrato del sitio de marca (storefront, ADR-103/RN-WEB-001) ----------
+
+def insumos_de_recetas(
+    session: Session,
+    receta_ids: Sequence[uuid.UUID],
+    *,
+    solo_incondicionales: bool = True,
+) -> dict[uuid.UUID, list[dict]]:
+    """`receta_id` → sus insumos, en una sola consulta para varias recetas.
+
+    Mismo criterio que `insumos_de_receta` (singular), con dos diferencias
+    para el sitio público: resuelve muchas recetas de una vez (una carta
+    entera, no un plato) y `solo_incondicionales=True` (default) descarta
+    las líneas con `aplica_valores` — los sabores de una MitadXMitad no son
+    "ingredientes de la pizza", son ingredientes de una condición que el
+    sitio no modela (RN-WEB-001: el sitio no reconstruye la matriz de
+    atributos, solo lista lo que el producto siempre lleva).
+    """
+    if not receta_ids:
+        return {}
+    stmt = (
+        select(RecetaItem.receta_id, Articulo.id, Articulo.nombre)
+        .join(Articulo, Articulo.id == RecetaItem.articulo_id)
+        .where(RecetaItem.receta_id.in_(list(receta_ids)))
+        .distinct()
+        .order_by(Articulo.nombre)
+    )
+    if solo_incondicionales:
+        stmt = stmt.where(RecetaItem.aplica_valores.is_(None))
+    resultado: dict[uuid.UUID, list[dict]] = {}
+    for receta_id, articulo_id, nombre in session.execute(stmt):
+        resultado.setdefault(receta_id, []).append(
+            {"articulo_id": articulo_id, "nombre": nombre}
+        )
+    return resultado
+
+
+def articulos_publicos(
+    session: Session, articulo_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, dict]:
+    """`articulo_id` → nombre y descripción, para el diálogo de ingrediente
+    del sitio público. Nunca costo, nunca proveedor, nunca stock."""
+    ids = {i for i in articulo_ids if i is not None}
+    if not ids:
+        return {}
+    filas = session.execute(
+        select(Articulo.id, Articulo.nombre, Articulo.descripcion).where(
+            Articulo.id.in_(ids)
+        )
+    )
+    return {
+        fila.id: {"nombre": fila.nombre, "descripcion": fila.descripcion}
+        for fila in filas
+    }

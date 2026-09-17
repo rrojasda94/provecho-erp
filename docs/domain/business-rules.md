@@ -2147,3 +2147,24 @@ segunda puerta de análisis, no el dashboard operativo.
 
 > Nota: esta lista crece con cada módulo. Al implementar un módulo se agregan
 > aquí sus reglas antes de codificarlas.
+
+## Sitio de marca (módulo `storefront`)
+
+Reglas de la superficie pública del sitio web de Charlie's Pizzas
+(`charlies.majambo.com.pe`, ADR-103). `storefront` es un módulo más: sus
+casos de uso de gestión (CMS, fotos) siguen RBAC normal; estas reglas son
+específicas de la parte **sin JWT**.
+
+- **RN-WEB-001** La superficie pública (`api/publico_routers.py`) nunca
+  devuelve `empresa_id`/`grupo_id`, costos, datos de `persona` de terceros,
+  remuneración, usuarios/proveedores ni cantidades de receta — solo los
+  campos enumerados en cada `*PublicoOut`. Ningún endpoint público serializa
+  un modelo ORM directamente.
+- **RN-WEB-002** Solo se publican promociones (`sales.promocion`) cuya
+  columna `canales` incluye `"web"`, vigentes por fecha/hora/día, y cuya
+  `marca_id` (si tiene) coincide con `STOREFRONT_MARCA_ID`.
+- **RN-WEB-003** Solo se publican convocatorias (`rrhh.convocatoria`) en
+  estado `publicada`, con `fecha_limite` no vencida (o sin fecha límite).
+  Nunca se expone `remuneracion_min`/`remuneracion_max`.
+- **RN-WEB-004** Una sucursal `inactiva` o borrada (`deleted_at`) no aparece
+  en `GET /storefront/publico/sucursales` ni en la carta pública.

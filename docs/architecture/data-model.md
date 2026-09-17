@@ -2123,6 +2123,53 @@ remuneración).
 (`src/core/tenant.py`, ADR-004): mismas tablas de origen, no una copia. Su
 equivalencia la congela `tests/test_bi_alcance.py` (RN-BI-002).
 
+## 18. Sitio de marca (módulo `storefront`, ADR-103)
+
+Contenido editable y fotos del sitio público de una marca. La superficie
+pública se lee por `storefront/application/queries_publicas` de los demás
+módulos (RN-WEB-001) — esta sección solo documenta lo propio del módulo.
+
+### `storefront_contenido`
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | UUID PK | |
+| `marca_id` | UUID FK `marca` | |
+| `clave` | String(40) | CHECK `clave_storefront_contenido`: `hero\|nosotros\|contacto\|trabaja\|pie\|seo` |
+| `valor` | JSONB | Forma depende de `clave` (validada en `application/contenido.py`, no en el CHECK) |
+| `updated_by` | UUID, nullable | quién hizo el último `PUT` |
+| `created_at`/`updated_at` | timestamp | |
+
+`UNIQUE(marca_id, clave)`. Sembrado por el seeder con `_get_or_create` para
+Charlie's, contenido inicial tomado de `majambo.md` §3.1 (historia, contacto,
+redes, horario de delivery).
+
+### Columnas nuevas en tablas existentes
+
+| Tabla | Columna | Tipo | Notas |
+|---|---|---|---|
+| `producto_comercial` | `descripcion` | Text, nullable | Copy para la ficha pública del producto |
+| `articulo` | `descripcion` | Text, nullable | Copy para el diálogo de ingrediente |
+| `sucursal` | `telefono` | String(20), nullable | No existía ninguna columna de teléfono de sucursal |
+
+### Esquema de `sucursal.horario_atencion` (ya existía como JSONB libre)
+
+```json
+{
+  "lun": [["11:00", "23:00"]],
+  "mar": [["11:00", "23:00"]],
+  "mie": [], "jue": [], "vie": [], "sab": [], "dom": []
+}
+```
+
+Lista vacía = cerrado ese día; hasta 2 tramos por día (`HH:MM`, 24h). Filas
+con otra forma (heredadas) se toleran y el sitio muestra "consultar horario".
+
+### `archivo.entidad_tipo` nuevos (tabla `archivo`, `src/shared/models/archivo.py`)
+
+`"producto_comercial_foto"` y `"articulo_foto"` — foto principal = la más
+reciente no borrada de ese `entidad_id`.
+
 ## 9. Módulos futuros
 
 Revisado 2026-08-05: de la lista original casi nada sigue siendo futuro, y

@@ -203,6 +203,28 @@ jobs:
           docker logs provecho-web-ci
           exit 1
 
+      # Mismo criterio que el frontend, para el sitio de marca (ADR-103):
+      # un `storefront/Dockerfile` roto se descubre acá, no al desplegar.
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./storefront
+          target: runner
+          push: false
+          load: true
+          tags: provecho-charlies:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: La imagen del sitio de marca levanta y responde
+        run: |
+          docker run -d --name provecho-charlies-ci -p 3001:3000 provecho-charlies:ci
+          for intento in $(seq 1 30); do
+            if curl -fsS http://localhost:3001/salud > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          echo "La imagen del sitio de marca no respondió en /salud"
+          docker logs provecho-charlies-ci
+          exit 1
+
   seguridad:
     runs-on: ubuntu-latest
     steps:
@@ -248,6 +270,28 @@ jobs:
       # que el job `backend` verifica que esté al día. Los dos bugs de
       # ADR-025/026 habrían muerto acá, en milisegundos, en vez de en
       # producción.
+      - run: npm test
+      - run: npm run build
+
+  # Sitio de marca Charlie's Pizzas (ADR-103): app y build SEPARADOS del
+  # ERP. `npm run build` corre sin la API arriba —igual que el job
+  # `frontend`— porque `lib/api.ts::apiFetch` nunca lanza por un fallo de
+  # red, así que el prerender no revienta sin backend.
+  storefront:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: storefront
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: storefront/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
       - run: npm test
       - run: npm run build
 

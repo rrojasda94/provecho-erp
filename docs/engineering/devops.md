@@ -25,12 +25,13 @@ sobrevivía en el compose de la etapa anterior sin que una sola línea del
 frontend la leyera — y como `NEXT_PUBLIC_*` se hornea en el build, mantenerla
 habría obligado a reconstruir la imagen para cambiar de servidor.
 
-### Imágenes: dos, no una
+### Imágenes: tres, no dos
 
 | Imagen | Contexto | Etapa | Qué corre |
 |--------|----------|-------|-----------|
 | `ghcr.io/<repo>` | `.` | única | FastAPI, Celery worker, Celery beat, runner de sync |
-| `ghcr.io/<repo>-web` | `./frontend` | `runner` | Next.js en modo `standalone` |
+| `ghcr.io/<repo>-web` | `./frontend` | `runner` | Next.js en modo `standalone` (el ERP) |
+| `ghcr.io/<repo>-charlies` | `./storefront` | `runner` | Next.js en modo `standalone` (sitio de marca, ADR-103) — proceso y build separados de `-web`, comparten solo la API |
 
 `frontend/Dockerfile` es multietapa. `deps` instala con **`npm ci`** (el
 árbol exacto del lockfile, el mismo que resolvió CI — con `npm install` y sin
@@ -325,9 +326,9 @@ runner, no dentro de la imagen, así que un Dockerfile roto (estáticos sin
 copiar, `standalone` mal armado) se descubría al desplegar.
 
 **`release.yml`** — entrega continua del artefacto: cada push a `main`
-publica **dos** imágenes en GHCR, `ghcr.io/<repo>:latest` y
-`ghcr.io/<repo>-web:latest`; los tags `v*` publican además la versión exacta
-(`:1.2.3`, `:1.2`).
+publica **tres** imágenes en GHCR, `ghcr.io/<repo>:latest`,
+`ghcr.io/<repo>-web:latest` y `ghcr.io/<repo>-charlies:latest`; los tags `v*`
+publican además la versión exacta (`:1.2.3`, `:1.2`).
 
 ### Despliegue
 

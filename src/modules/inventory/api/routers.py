@@ -226,6 +226,7 @@ def crear_articulo(
         empresa_id=tenant.empresa(body.empresa_id),
         id_interno=body.id_interno,
         nombre=body.nombre,
+        descripcion=body.descripcion,
         unidad_medida_id=body.unidad_medida_id,
         tipo=body.tipo,
         categoria_id=body.categoria_id,

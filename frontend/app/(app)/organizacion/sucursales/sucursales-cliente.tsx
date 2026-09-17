@@ -33,9 +33,11 @@ export type Sucursal = {
   marca_id: string;
   nombre: string;
   direccion: string;
+  telefono: string | null;
   tenencia: string;
   estado: string;
   radio_marcaje_m: number | null;
+  horario_atencion: Record<string, [string, string][]> | null;
   ubicacion_place_id: string | null;
   ubicacion_lat: string | number | null;
   ubicacion_lng: string | number | null;
@@ -44,6 +46,61 @@ export type Sucursal = {
 };
 
 const TENENCIAS = ["propia", "alquilada", "del_grupo"] as const;
+
+const DIAS_HORARIO = [
+  { clave: "lun", etiqueta: "Lunes" },
+  { clave: "mar", etiqueta: "Martes" },
+  { clave: "mie", etiqueta: "Miércoles" },
+  { clave: "jue", etiqueta: "Jueves" },
+  { clave: "vie", etiqueta: "Viernes" },
+  { clave: "sab", etiqueta: "Sábado" },
+  { clave: "dom", etiqueta: "Domingo" },
+] as const;
+
+/**
+ * Horario de atención público (glosario), no el turno laboral de nadie. Lo
+ * lee el sitio de marca (storefront, ADR-103) para mostrar "abierto ahora"
+ * y la lista de locales. Un tramo por día — la forma admite varios; este
+ * formulario cubre el caso común (deuda: varios tramos por API).
+ */
+function EditorHorario({ horario }: { horario: Record<string, [string, string][]> | null }) {
+  return (
+    <fieldset className="flex flex-col gap-2 rounded border border-border p-3">
+      <legend className="px-1 text-xs font-semibold uppercase text-muted-foreground">
+        Horario de atención (sitio público)
+      </legend>
+      {DIAS_HORARIO.map(({ clave, etiqueta }) => {
+        const tramo = horario?.[clave]?.[0];
+        return (
+          <div key={clave} className="flex items-center gap-2 text-sm">
+            <span className="w-20 shrink-0">{etiqueta}</span>
+            <label className="flex items-center gap-1 text-xs font-normal text-gray">
+              <input
+                type="checkbox"
+                name={`horario_${clave}_cerrado`}
+                defaultChecked={!tramo}
+              />
+              Cerrado
+            </label>
+            <input
+              type="time"
+              name={`horario_${clave}_desde`}
+              defaultValue={tramo?.[0] ?? ""}
+              className="w-28"
+            />
+            <span className="text-gray">a</span>
+            <input
+              type="time"
+              name={`horario_${clave}_hasta`}
+              defaultValue={tramo?.[1] ?? ""}
+              className="w-28"
+            />
+          </div>
+        );
+      })}
+    </fieldset>
+  );
+}
 
 /**
  * De quién se abastece el local.
@@ -143,6 +200,20 @@ function CamposSucursal({
         ubicacion={sucursal ?? null}
       />
       <label className="flex flex-col gap-1 text-sm font-semibold">
+        Teléfono
+        <input
+          name="telefono"
+          type="tel"
+          maxLength={20}
+          placeholder="Sin teléfono publicado"
+          defaultValue={valor(s.telefono ?? "")}
+        />
+        <span className="text-xs font-normal text-gray">
+          Se muestra en el sitio público (charlies.majambo.com.pe) junto a la
+          dirección y el horario.
+        </span>
+      </label>
+      <label className="flex flex-col gap-1 text-sm font-semibold">
         Radio de marcaje (metros)
         <input
           type="number"
@@ -177,12 +248,16 @@ function CamposSucursal({
         </label>
       </div>
       {/* Solo al editar: en el alta la sucursal todavía no tiene almacén al
-          que colgarle la configuración. */}
+          que colgarle la configuración, y el horario no tiene sentido antes
+          de que el local exista. */}
       {sucursal && (
-        <Abastecimiento
-          propios={almacenes.filter((a) => a.sucursal_id === sucursal.id)}
-          almacenes={almacenes}
-        />
+        <>
+          <EditorHorario horario={sucursal.horario_atencion} />
+          <Abastecimiento
+            propios={almacenes.filter((a) => a.sucursal_id === sucursal.id)}
+            almacenes={almacenes}
+          />
+        </>
       )}
     </>
   );

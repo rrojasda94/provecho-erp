@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Factory,
   Gauge,
+  Globe,
   Inbox,
   KeyRound,
   Megaphone,
@@ -180,6 +181,18 @@ export const MODULOS: Modulo[] = [
     prefijoPermiso: "marketing.",
     area: "comercial",
     Icono: Megaphone,
+  },
+  {
+    // Sitio de marca (charlies.majambo.com.pe, ADR-103): contenido, fotos y
+    // carta que ve el cliente. Es una app aparte del ERP — esto solo edita
+    // lo que ese sitio muestra.
+    clave: "web",
+    nombre: "Sitio web",
+    descripcion: "Textos, fotos y carta del sitio público",
+    href: "/web",
+    prefijoPermiso: "storefront.",
+    area: "comercial",
+    Icono: Globe,
   },
   {
     clave: "compras",

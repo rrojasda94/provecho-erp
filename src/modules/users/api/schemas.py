@@ -184,6 +184,7 @@ class SucursalOut(UbicacionMixin):
     nombre: str
     estado: str
     direccion: str | None = None
+    telefono: str | None = None
     tenencia: str | None = None
     horario_atencion: dict | None = None
     radio_marcaje_m: int | None = None
@@ -286,6 +287,7 @@ class SucursalCreate(UbicacionMixin):
     empresa_id: uuid.UUID | None = None
     nombre: str = Field(min_length=1, max_length=100)
     direccion: str = Field(min_length=1, max_length=255)
+    telefono: str | None = Field(default=None, max_length=20)
     tenencia: TenenciaSucursal
     estado: EstadoSucursal = "activa"
     horario_atencion: dict | None = None
@@ -300,6 +302,7 @@ class SucursalUpdate(UbicacionMixin):
     marca_id: uuid.UUID | None = None
     nombre: str | None = Field(default=None, min_length=1, max_length=100)
     direccion: str | None = Field(default=None, min_length=1, max_length=255)
+    telefono: str | None = Field(default=None, max_length=20)
     tenencia: TenenciaSucursal | None = None
     estado: EstadoSucursal | None = None
     horario_atencion: dict | None = None

@@ -495,3 +495,30 @@ el problema y se descarta lo que choca con las reglas ya decididas.
   pantallas. **Mecanismo de navegación ya decidido** (ADR-013: home de apps
   + sidebar por módulo estilo Odoo) — pendiente es el contenido de cada
   menú, no la estructura.
+
+## Sitio de marca Charlie's (fuera del sistema visual de Provecho)
+
+`storefront/` (ADR-103) **no usa los tokens `--marca-*`/`--hue` de esta
+sección**: es la web pública de una marca del grupo, no una pantalla del
+ERP, y su paleta sale del brandbook propio de Charlie's Pizzas
+(`D:\Antropic\brand chp\`), no del brandboard de Provecho:
+
+| Token | Hex | Uso |
+|---|---|---|
+| `--chp-verde` | `#00A612` | Color principal (CTA, acentos) |
+| `--chp-crema` | `#F2EBDB` | Fondo de marca |
+| `--chp-rojo` | `#F73E3E` | Alertas / destacados |
+| `--chp-oliva` | `#85B73E` | Acento secundario |
+| `--chp-negro` | `#1A1A1A` | Texto de cuerpo |
+
+Tipografías: **Isidora Black** (display) y **Tusker Grotesk** (cuerpo/UI),
+comerciales — mientras no estén los archivos, cae a Anton + Archivo (Google
+Fonts) como fallback, igual criterio visual que el prototipo portado. Voz de
+marca: `docs/foundation/glossary.md` no la cubre — vive en
+`brand-voice-guidelines.md` del brandbook (cercano, natural, profesional;
+eslogan "A tu manera"; usted por defecto, nunca voseo).
+
+Esto es deliberado y no una inconsistencia: cada marca del grupo que tenga
+sitio propio define su propia paleta ahí, igual que el PDV/Kiosk ya
+sobreescriben tema por marca puertas adentro del ERP (sección "Sistema de
+skins y temas" arriba). El back office sigue siendo 100% Provecho.

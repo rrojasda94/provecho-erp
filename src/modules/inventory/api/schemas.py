@@ -139,6 +139,7 @@ class ArticuloCreate(BaseModel):
     empresa_id: uuid.UUID | None = None
     id_interno: str = Field(min_length=1, max_length=8)
     nombre: str = Field(min_length=1, max_length=150)
+    descripcion: str | None = None
     unidad_medida_id: uuid.UUID
     tipo: str = Field(max_length=30)
     categoria_id: uuid.UUID | None = None
@@ -161,6 +162,7 @@ class ArticuloUpdate(BaseModel):
     # era inmutable.
     id_interno: str | None = Field(default=None, min_length=1, max_length=8)
     nombre: str | None = Field(default=None, min_length=1, max_length=150)
+    descripcion: str | None = None
     categoria_id: uuid.UUID | None = None
     tipo: str | None = Field(default=None, max_length=30)
     costo_promedio: Decimal | None = None
@@ -175,6 +177,7 @@ class ArticuloOut(BaseModel):
     empresa_id: uuid.UUID
     id_interno: str
     nombre: str
+    descripcion: str | None = None
     unidad_medida_id: uuid.UUID
     tipo: str
     categoria_id: uuid.UUID | None

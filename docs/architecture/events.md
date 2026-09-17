@@ -191,3 +191,10 @@ accounting.asiento_generado
 > usuario tiene una sola campana.
 
 > Al agregar un evento: definir aquí su fila ANTES de publicarlo o consumirlo.
+
+> **Nota (2026-09-17, ADR-103)**: `storefront` no publica ni consume eventos
+> en su slice inicial (PR1, solo lectura pública + CMS). PR2 agrega
+> `storefront.cuenta_registrada` (consumido por `sales` para vincular/crear
+> `cliente`) y PR3 agrega `storefront.pedido_web_confirmado` (consumido por
+> `sales` para crear la `venta`). Se documentan aquí al implementarse, no
+> antes.

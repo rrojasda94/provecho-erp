@@ -1959,6 +1959,17 @@
             "title": "Combinaciones",
             "type": "array"
           },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
           "empaque_id": {
             "anyOf": [
               {
@@ -2388,6 +2399,17 @@
             "default": "0",
             "title": "Costo Promedio"
           },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
           "dias_alerta_vencimiento": {
             "anyOf": [
               {
@@ -2664,6 +2686,17 @@
             "title": "Costo Promedio",
             "type": "string"
           },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
           "dias_alerta_vencimiento": {
             "anyOf": [
               {
@@ -2903,6 +2936,17 @@
               }
             ],
             "title": "Costo Promedio"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
           },
           "dias_alerta_vencimiento": {
             "anyOf": [
@@ -5035,6 +5079,28 @@
         "title": "CartaItemOut",
         "type": "object"
       },
+      "CartaPublicaOut": {
+        "properties": {
+          "categorias": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CategoriaCartaOut"
+            },
+            "title": "Categorias",
+            "type": "array"
+          },
+          "productos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProductoCartaPublicaOut"
+            },
+            "title": "Productos",
+            "type": "array"
+          }
+        },
+        "title": "CartaPublicaOut",
+        "type": "object"
+      },
       "CatalogoEmisionesOut": {
         "properties": {
           "destinos": {
@@ -5096,6 +5162,25 @@
           "rangos"
         ],
         "title": "CatalogoOut",
+        "type": "object"
+      },
+      "CategoriaCartaOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "CategoriaCartaOut",
         "type": "object"
       },
       "CategoriaUdmCreate": {
@@ -7748,6 +7833,86 @@
         "title": "ConsumoSugeridoOut",
         "type": "object"
       },
+      "ContenidoIn": {
+        "properties": {
+          "valor": {
+            "additionalProperties": true,
+            "title": "Valor",
+            "type": "object"
+          }
+        },
+        "required": [
+          "valor"
+        ],
+        "title": "ContenidoIn",
+        "type": "object"
+      },
+      "ContenidoOut": {
+        "properties": {
+          "clave": {
+            "enum": [
+              "hero",
+              "nosotros",
+              "contacto",
+              "trabaja",
+              "pie",
+              "seo"
+            ],
+            "title": "Clave",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "valor": {
+            "additionalProperties": true,
+            "title": "Valor",
+            "type": "object"
+          }
+        },
+        "required": [
+          "clave",
+          "valor",
+          "updated_at"
+        ],
+        "title": "ContenidoOut",
+        "type": "object"
+      },
+      "ContenidoPublicoOut": {
+        "properties": {
+          "contenido": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Contenido",
+            "type": "object"
+          },
+          "marca": {
+            "$ref": "#/components/schemas/MarcaPublicaOut"
+          }
+        },
+        "required": [
+          "marca",
+          "contenido"
+        ],
+        "title": "ContenidoPublicoOut",
+        "type": "object"
+      },
       "ConteoAnulacion": {
         "properties": {
           "motivo": {
@@ -8680,6 +8845,69 @@
           "fecha_limite"
         ],
         "title": "ConvocatoriaPublicaOut",
+        "type": "object"
+      },
+      "ConvocatoriaPublicaWebOut": {
+        "properties": {
+          "fecha_limite": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Limite"
+          },
+          "jornada_horas_semana": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jornada Horas Semana"
+          },
+          "puesto": {
+            "title": "Puesto",
+            "type": "string"
+          },
+          "sucursal_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Nombre"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "url_postular": {
+            "title": "Url Postular",
+            "type": "string"
+          },
+          "vacantes": {
+            "title": "Vacantes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "token",
+          "puesto",
+          "vacantes",
+          "url_postular"
+        ],
+        "title": "ConvocatoriaPublicaWebOut",
         "type": "object"
       },
       "ConvocatoriaPublicar": {
@@ -13135,6 +13363,76 @@
         "title": "FiltrosIn",
         "type": "object"
       },
+      "FotoOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "url_storage": {
+            "title": "Url Storage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "mime_type",
+          "url_storage",
+          "created_at"
+        ],
+        "title": "FotoOut",
+        "type": "object"
+      },
+      "FotoRegistrarIn": {
+        "properties": {
+          "mime_type": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          },
+          "tamano_bytes": {
+            "exclusiveMinimum": 0.0,
+            "title": "Tamano Bytes",
+            "type": "integer"
+          },
+          "url_storage": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Url Storage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "mime_type",
+          "tamano_bytes",
+          "url_storage"
+        ],
+        "title": "FotoRegistrarIn",
+        "type": "object"
+      },
       "GenerarReporteJornadaIn": {
         "properties": {
           "almacen_id": {
@@ -14253,6 +14551,66 @@
           "cantidad"
         ],
         "title": "IngredienteImportadoIn",
+        "type": "object"
+      },
+      "IngredientePublicoOut": {
+        "properties": {
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "foto_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto Url"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "IngredientePublicoOut",
+        "type": "object"
+      },
+      "IngredienteResumenOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "IngredienteResumenOut",
         "type": "object"
       },
       "IngredienteRevisadoOut": {
@@ -15520,6 +15878,19 @@
           "tipo"
         ],
         "title": "MarcaCreate",
+        "type": "object"
+      },
+      "MarcaPublicaOut": {
+        "properties": {
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre"
+        ],
+        "title": "MarcaPublicaOut",
         "type": "object"
       },
       "MarcaUpdate": {
@@ -24909,6 +25280,126 @@
         "title": "PresignAdjuntoOut",
         "type": "object"
       },
+      "PresignFotoIn": {
+        "properties": {
+          "mime_type": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "nombre": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "mime_type"
+        ],
+        "title": "PresignFotoIn",
+        "type": "object"
+      },
+      "PresignFotoOut": {
+        "properties": {
+          "upload_url": {
+            "title": "Upload Url",
+            "type": "string"
+          },
+          "url_storage": {
+            "title": "Url Storage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_url",
+          "url_storage"
+        ],
+        "title": "PresignFotoOut",
+        "type": "object"
+      },
+      "ProductoCartaPublicaOut": {
+        "properties": {
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "disponible": {
+            "title": "Disponible",
+            "type": "boolean"
+          },
+          "foto_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto Url"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ingredientes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/IngredienteResumenOut"
+            },
+            "title": "Ingredientes",
+            "type": "array"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio_desde": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Desde",
+            "type": "string"
+          },
+          "variantes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VarianteCartaPublicaOut"
+            },
+            "title": "Variantes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "precio_desde",
+          "disponible"
+        ],
+        "title": "ProductoCartaPublicaOut",
+        "type": "object"
+      },
       "ProductoCreate": {
         "properties": {
           "categoria_id": {
@@ -24922,6 +25413,17 @@
               }
             ],
             "title": "Categoria Id"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
           },
           "empaque_id": {
             "anyOf": [
@@ -25027,6 +25529,17 @@
               }
             ],
             "title": "Categoria Id"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
           },
           "empaque_id": {
             "anyOf": [
@@ -25159,6 +25672,17 @@
             ],
             "title": "Categoria Id"
           },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
           "empaque_id": {
             "anyOf": [
               {
@@ -25248,6 +25772,102 @@
         "title": "ProductoOut",
         "type": "object"
       },
+      "ProductoPublicoDetalleOut": {
+        "properties": {
+          "categoria_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria Id"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "disponible": {
+            "title": "Disponible",
+            "type": "boolean"
+          },
+          "foto_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto Url"
+          },
+          "fotos": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Fotos",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ingredientes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/IngredienteResumenOut"
+            },
+            "title": "Ingredientes",
+            "type": "array"
+          },
+          "ingredientes_detalle": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/IngredientePublicoOut"
+            },
+            "title": "Ingredientes Detalle",
+            "type": "array"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio_desde": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Desde",
+            "type": "string"
+          },
+          "variantes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/VarianteCartaPublicaOut"
+            },
+            "title": "Variantes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "precio_desde",
+          "disponible"
+        ],
+        "title": "ProductoPublicoDetalleOut",
+        "type": "object"
+      },
       "ProductoUpdate": {
         "properties": {
           "activo": {
@@ -25272,6 +25892,17 @@
               }
             ],
             "title": "Categoria Id"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
           },
           "empaque_id": {
             "anyOf": [
@@ -25808,6 +26439,104 @@
           "vigencia_cupon_dias"
         ],
         "title": "PromocionPublicaOut",
+        "type": "object"
+      },
+      "PromocionPublicaWebOut": {
+        "properties": {
+          "beneficio": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beneficio"
+          },
+          "desde": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Desde"
+          },
+          "dias_semana": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dias Semana"
+          },
+          "hasta": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hasta"
+          },
+          "hora_desde": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Desde"
+          },
+          "hora_hasta": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Hasta"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "tipo": {
+            "title": "Tipo",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "tipo"
+        ],
+        "title": "PromocionPublicaWebOut",
         "type": "object"
       },
       "PromocionUpdate": {
@@ -32053,6 +32782,18 @@
             ],
             "title": "Radio Marcaje M"
           },
+          "telefono": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
           "tenencia": {
             "enum": [
               "propia",
@@ -32215,6 +32956,17 @@
             ],
             "title": "Radio Marcaje M"
           },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
           "tenencia": {
             "anyOf": [
               {
@@ -32297,6 +33049,94 @@
         "title": "SucursalOut",
         "type": "object"
       },
+      "SucursalPublicaOut": {
+        "properties": {
+          "abierto_ahora": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abierto Ahora"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "horario_atencion": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horario Atencion"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lng"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "SucursalPublicaOut",
+        "type": "object"
+      },
       "SucursalUpdate": {
         "description": "Cerrar un local es `estado=\"inactiva\"`; no hay DELETE de sucursal —\nsigue siendo el ancla de sus ventas, cajas y trabajadores.",
         "properties": {
@@ -32376,6 +33216,18 @@
               }
             ],
             "title": "Radio Marcaje M"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
           },
           "tenencia": {
             "anyOf": [
@@ -34960,6 +35812,44 @@
           "nombre"
         ],
         "title": "ValorSimpleOut",
+        "type": "object"
+      },
+      "VarianteCartaPublicaOut": {
+        "properties": {
+          "disponible": {
+            "title": "Disponible",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "ingredientes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/IngredienteResumenOut"
+            },
+            "title": "Ingredientes",
+            "type": "array"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "precio",
+          "disponible"
+        ],
+        "title": "VarianteCartaPublicaOut",
         "type": "object"
       },
       "VarianteDeCartaOut": {
@@ -66747,6 +67637,632 @@
         ]
       }
     },
+    "/api/v1/storefront/contenido": {
+      "get": {
+        "operationId": "listar_contenido_api_v1_storefront_contenido_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "marca_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Marca Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ContenidoOut"
+                  },
+                  "title": "Response Listar Contenido Api V1 Storefront Contenido Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Contenido",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/contenido/{clave}": {
+      "put": {
+        "operationId": "guardar_contenido_api_v1_storefront_contenido__clave__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "clave",
+            "required": true,
+            "schema": {
+              "enum": [
+                "hero",
+                "nosotros",
+                "contacto",
+                "trabaja",
+                "pie",
+                "seo"
+              ],
+              "title": "Clave",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "marca_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Marca Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContenidoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContenidoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Guardar Contenido",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/fotos/{archivo_id}": {
+      "delete": {
+        "operationId": "borrar_foto_api_v1_storefront_fotos__archivo_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "archivo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Archivo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Foto",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/fotos/{entidad}/{entidad_id}": {
+      "get": {
+        "operationId": "listar_fotos_api_v1_storefront_fotos__entidad___entidad_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entidad",
+            "required": true,
+            "schema": {
+              "enum": [
+                "producto",
+                "ingrediente"
+              ],
+              "title": "Entidad",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entidad_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entidad Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FotoOut"
+                  },
+                  "title": "Response Listar Fotos Api V1 Storefront Fotos  Entidad   Entidad Id  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Fotos",
+        "tags": [
+          "storefront"
+        ]
+      },
+      "post": {
+        "operationId": "registrar_foto_api_v1_storefront_fotos__entidad___entidad_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entidad",
+            "required": true,
+            "schema": {
+              "enum": [
+                "producto",
+                "ingrediente"
+              ],
+              "title": "Entidad",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entidad_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entidad Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FotoRegistrarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FotoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Registrar Foto",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/fotos/{entidad}/{entidad_id}/presign-upload": {
+      "post": {
+        "operationId": "presignar_foto_api_v1_storefront_fotos__entidad___entidad_id__presign_upload_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entidad",
+            "required": true,
+            "schema": {
+              "enum": [
+                "producto",
+                "ingrediente"
+              ],
+              "title": "Entidad",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entidad_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Entidad Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignFotoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresignFotoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Presignar Foto",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/publico/carta": {
+      "get": {
+        "operationId": "ver_carta_api_v1_storefront_publico_carta_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CartaPublicaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Ver Carta",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/publico/contenido": {
+      "get": {
+        "operationId": "ver_contenido_api_v1_storefront_publico_contenido_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContenidoPublicoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Ver Contenido",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/publico/convocatorias": {
+      "get": {
+        "operationId": "ver_convocatorias_api_v1_storefront_publico_convocatorias_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConvocatoriaPublicaWebOut"
+                  },
+                  "title": "Response Ver Convocatorias Api V1 Storefront Publico Convocatorias Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Ver Convocatorias",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/publico/ingredientes/{articulo_id}": {
+      "get": {
+        "operationId": "ver_ingrediente_api_v1_storefront_publico_ingredientes__articulo_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "articulo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Articulo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IngredientePublicoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Ver Ingrediente",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/publico/productos/{producto_id}": {
+      "get": {
+        "operationId": "ver_producto_api_v1_storefront_publico_productos__producto_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoPublicoDetalleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Ver Producto",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/publico/promociones": {
+      "get": {
+        "operationId": "ver_promociones_api_v1_storefront_publico_promociones_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PromocionPublicaWebOut"
+                  },
+                  "title": "Response Ver Promociones Api V1 Storefront Publico Promociones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Ver Promociones",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/publico/sucursales": {
+      "get": {
+        "operationId": "ver_sucursales_api_v1_storefront_publico_sucursales_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SucursalPublicaOut"
+                  },
+                  "title": "Response Ver Sucursales Api V1 Storefront Publico Sucursales Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Ver Sucursales",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
     "/api/v1/sucursales": {
       "get": {
         "description": "Catálogo de referencia (nombre/estado), mismo criterio que\n`/almacenes`: cualquier autenticado que tenga que elegir una sucursal lo\nnecesita — el filtro por sucursales del tablero de reportes, entre\notros. Escopado por tenant; el RBAC real lo aplica cada endpoint que\ndespués use ese `sucursal_id`.",
@@ -69598,6 +71114,10 @@
     {
       "description": "Perfil del usuario autenticado (`/users/me`).",
       "name": "users"
+    },
+    {
+      "description": "Sitio público de marca (charlies.majambo.com.pe, ADR-103): CMS de contenido y fotos (JWT) + carta/sucursales/promociones/convocatorias públicas (sin JWT, rate limit por IP).",
+      "name": "storefront"
     },
     {
       "description": "Party model transversal: base de trabajador/cliente/usuario natural.",

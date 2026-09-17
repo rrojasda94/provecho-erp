@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+/* Tokens de marca Charlie's Pizzas (brandbook `D:\Antropic\brand chp\`,
+   ADR-103 §12 — NO son los tokens de Provecho de `frontend/app/globals.css`,
+   ver `docs/product/ui-ux.md` § "Sitio de marca Charlie's"). */
+:root {
+  --chp-verde: #00a612;
+  --chp-verde-hover: #2fa23a;
+  --chp-crema: #f2ebdb;
+  --chp-crema-2: #f7f1e3;
+  --chp-rojo: #f73e3e;
+  --chp-oliva: #85b73e;
+  --chp-negro: #1a1a1a;
+  --chp-tinta: #505b52;
+  --chp-humo: #6f6857;
+
+  /* `next/font/google` (Anton + Archivo) inyecta estas dos variables en
+     `<html>` (`app/layout.tsx`); el fallback cubre el caso —hoy, mientras
+     no lleguen los archivos de Isidora Black/Tusker Grotesk del brandbook—
+     de que el layout raíz no las haya montado (una página renderizada
+     fuera de él, o un test de componente aislado). */
+  --fuente-cuerpo: var(--fuente-cuerpo-google, system-ui, sans-serif);
+  --fuente-display: var(--fuente-display-google, system-ui, sans-serif);
+
+  --transicion: 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@theme inline {
+  --color-verde: var(--chp-verde);
+  --color-crema: var(--chp-crema);
+  --color-rojo: var(--chp-rojo);
+  --color-oliva: var(--chp-oliva);
+  --color-negro: var(--chp-negro);
+  --color-tinta: var(--chp-tinta);
+  --font-display: var(--fuente-display);
+  --font-body: var(--fuente-cuerpo);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--chp-crema);
+  color: var(--chp-tinta);
+  font-family: var(--fuente-cuerpo);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--fuente-display);
+}
+
+/* Sombra dura de marca (del prototipo Claude Design portado, ver
+   `D:\Anthropic\charlies-pizzas\web\index.html`): tarjetas con borde grueso
+   y desplazamiento sólido, sin blur — más "letrero pintado" que "material
+   design". */
+.sombra-dura {
+  box-shadow: 5px 6px 0 var(--chp-tinta);
+  transition:
+    transform var(--transicion),
+    box-shadow var(--transicion);
+}
+.sombra-dura:hover {
+  transform: translateY(-3px);
+}
+
+/* Reveal al entrar en viewport (`IntersectionObserver` en `lib/revelar.ts`,
+   montado por cada página). Apagado si el visitante prefiere menos
+   movimiento. */
+.revelar {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 500ms ease,
+    transform 500ms ease;
+}
+.revelar.visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .revelar {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .sombra-dura {
+    transition: none;
+  }
+  .sombra-dura:hover {
+    transform: none;
+  }
+}
+
+@keyframes chpFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes chpUp {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+dialog::backdrop {
+  background: rgb(26 26 26 / 55%);
+  backdrop-filter: blur(2px);
+}
+
+dialog[open] {
+  animation: chpUp 220ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}

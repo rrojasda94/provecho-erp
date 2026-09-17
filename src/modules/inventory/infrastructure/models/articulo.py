@@ -3,7 +3,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -22,6 +22,9 @@ class Articulo(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     # empresas; los códigos ya asignados de 4 caracteres siguen valiendo.
     id_interno: Mapped[str] = mapped_column(String(8))
     nombre: Mapped[str] = mapped_column(String(150))
+    # Copy para el diálogo de ingrediente del sitio de marca (storefront,
+    # ADR-103). Nunca obligatoria.
+    descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
     categoria_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("categoria.id"), nullable=True
     )

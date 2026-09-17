@@ -24,6 +24,35 @@ function texto(formData: FormData, campo: string): string {
   return String(formData.get(campo) ?? "").trim();
 }
 
+const DIAS_HORARIO = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"] as const;
+
+/**
+ * Arma `sucursal.horario_atencion` (storefront, ADR-103) desde los campos
+ * `horario_<dia>_desde`/`_hasta`/`_cerrado` del formulario. Un tramo por
+ * día — la forma admite varios, pero el formulario de esta pantalla solo
+ * cubre el caso común; varios tramos se cargan por API si algún local lo
+ * necesita (deuda: `docs/roadmap/deuda/modulo-storefront.md`).
+ *
+ * `undefined` cuando ningún campo de horario vino en el formulario (el
+ * diálogo de alta no los tiene): PATCH con `undefined` es "no tocar"
+ * (ADR-096), y forzar `{}` ahí borraría un horario que ya se había
+ * cargado por otra vía.
+ */
+function horarioDe(formData: FormData): Record<string, [string, string][]> | undefined {
+  if (!formData.has("horario_lun_desde")) return undefined;
+  const horario: Record<string, [string, string][]> = {};
+  for (const dia of DIAS_HORARIO) {
+    if (formData.get(`horario_${dia}_cerrado`)) {
+      horario[dia] = [];
+      continue;
+    }
+    const desde = texto(formData, `horario_${dia}_desde`);
+    const hasta = texto(formData, `horario_${dia}_hasta`);
+    horario[dia] = desde && hasta ? [[desde, hasta]] : [];
+  }
+  return horario;
+}
+
 /**
  * Alta y corrección comparten forma en las cinco entidades de organización:
  * el `id` en el formulario decide si es POST sobre la colección o PATCH
@@ -145,12 +174,16 @@ export async function guardarSucursalAction(
       marca_id: marcaId,
       nombre,
       direccion,
+      // Lo pide el sitio de marca (storefront, ADR-103) para la lista de
+      // locales; vacío = no se muestra teléfono ahí.
+      telefono: texto(formData, "telefono") || null,
       tenencia: String(formData.get("tenencia") ?? "alquilada"),
       // Cerrar un local es `estado="inactiva"`: no hay baja de sucursal, sigue
       // siendo el ancla de sus ventas, cajas y trabajadores.
       estado: String(formData.get("estado") ?? "activa"),
       // Vacío = no evalúa distancia en el marcaje (RN-RRHH-024, ADR-079).
       radio_marcaje_m: radioTexto ? Number(radioTexto) : null,
+      horario_atencion: horarioDe(formData),
       ...ubicacionDe(formData),
     },
     "la sucursal",

@@ -275,6 +275,7 @@ export async function crearPromocionAction(
         hora_hasta: texto("hora_hasta"),
         sucursal_id: texto("sucursal_id"),
         modalidades: formData.getAll("modalidades").map(String),
+        canales: formData.getAll("canales").map(String),
         prioridad: Number(formData.get("prioridad") ?? 0),
         acumulable: formData.get("acumulable") === "on",
       },

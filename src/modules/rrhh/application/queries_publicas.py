@@ -18,8 +18,8 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.modules.rrhh.infrastructure.models import Asistencia, Trabajador
-from src.modules.users.infrastructure.models import Persona, Usuario
+from src.modules.rrhh.infrastructure.models import Asistencia, Convocatoria, Trabajador
+from src.modules.users.infrastructure.models import Persona, Sucursal, Usuario
 
 
 def nombres_por_usuario(
@@ -240,3 +240,43 @@ def cuenta_de_trabajador(session: Session, trabajador_id: uuid.UUID) -> dict | N
         "empresa_id": empresa_id,
         "sucursal_id": sucursal_id,
     }
+
+
+# --- Contrato del sitio de marca (storefront, ADR-103/RN-WEB-003) ----------
+
+def convocatorias_publicadas(
+    session: Session, *, empresa_ids: Sequence[uuid.UUID], hoy: date
+) -> list[dict]:
+    """Convocatorias abiertas al público: estado `publicada`, no vencidas
+    por `fecha_limite`, con token vigente. **Nunca** `remuneracion_min`/
+    `_max` (RN-WEB-003) — mismo recorte que el `GET` público por token
+    (ADR-087), acá para listar varias convocatorias de una vez en el sitio
+    de marca en vez de requerir el token de cada una."""
+    if not empresa_ids:
+        return []
+    stmt = (
+        select(Convocatoria, Sucursal.nombre)
+        .outerjoin(Sucursal, Sucursal.id == Convocatoria.sucursal_id)
+        .where(
+            Convocatoria.empresa_id.in_(list(empresa_ids)),
+            Convocatoria.estado == "publicada",
+            Convocatoria.deleted_at.is_(None),
+        )
+    )
+    resultado = []
+    for convocatoria, sucursal_nombre in session.execute(stmt):
+        if not convocatoria.token_publico:
+            continue
+        if convocatoria.fecha_limite is not None and convocatoria.fecha_limite < hoy:
+            continue
+        resultado.append(
+            {
+                "token": convocatoria.token_publico,
+                "puesto": convocatoria.puesto,
+                "sucursal_nombre": sucursal_nombre,
+                "vacantes": convocatoria.vacantes,
+                "jornada_horas_semana": convocatoria.jornada_horas_semana,
+                "fecha_limite": convocatoria.fecha_limite,
+            }
+        )
+    return resultado

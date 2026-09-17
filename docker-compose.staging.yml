@@ -149,8 +149,23 @@ services:
     depends_on:
       - api
 
-  # TLS automático (Let's Encrypt) y proxy hacia web/api. Único servicio
-  # con puertos publicados al exterior.
+  # Sitio de marca Charlie's Pizzas (charlies.majambo.com.pe, ADR-103):
+  # app Next SEPARADA de `web`, mismo criterio que ADR-080 rechazó para la
+  # landing pero que acá sí compensa (SEO, tema y CSP propios, superficie
+  # de ataque acotada — ver el ADR).
+  charlies:
+    image: ${PROVECHO_CHARLIES_IMAGE:-ghcr.io/rrojasda94/provecho-erp-charlies:latest}
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:8000
+      GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
+      GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
+      STOREFRONT_IMAGENES_HOST: ${STOREFRONT_IMAGENES_HOST:-}
+    depends_on:
+      - api
+
+  # TLS automático (Let's Encrypt) y proxy hacia web/api/charlies. Único
+  # servicio con puertos publicados al exterior.
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -164,6 +179,7 @@ services:
     depends_on:
       - web
       - api
+      - charlies
 
 volumes:
   pgdata:
