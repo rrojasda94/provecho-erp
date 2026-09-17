@@ -32,6 +32,7 @@ const RUTAS: Record<string, (id: string) => string> = {
   // Un documento no tiene ficha propia todavía: se resalta en la lista, como
   // "categoria" o "ajuste" del lado de inventario.
   documento_vigencia: (id) => `/activos/documentos?documento=${id}`,
+  informe_supervision: (id) => `/supervision/informes/${id}`,
 };
 
 export function rutaDestino(

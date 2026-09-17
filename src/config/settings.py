@@ -144,6 +144,21 @@ class Settings(BaseSettings):
     # Pasado el plazo la purga borra solo `marcacion.foto`; la fila y el
     # resto de la evidencia (terminal, IP, distancia) se quedan.
     rrhh_marcaje_foto_retencion_dias: int = 90
+    # Hora del negocio (no UTC) a partir de la cual el barrido de cierre de
+    # jornada de supervisión (RN-SUP-007) da por vencida toda tarea
+    # pendiente y genera el informe diario de cada sucursal — valor semilla,
+    # no configurable por empresa todavía (ver ROADMAP, deuda de
+    # `supervision`).
+    supervision_hora_cierre_jornada: str = "23:30"
+    # Días que se conserva la foto de evidencia de una tarea de supervisión
+    # (ADR-102). Mismo criterio que `rrhh_marcaje_foto_retencion_dias`: la
+    # purga borra solo el binario, la fila y el checklist se quedan.
+    supervision_foto_retencion_dias: int = 30
+    # Ventana de tolerancia entre la fecha EXIF de la foto y el instante en
+    # que se completó la tarea. Fuera de esta ventana no bloquea completar
+    # (RN-SUP-006): solo marca `foto_valida=false` para que el supervisor la
+    # revise en el informe.
+    supervision_foto_tolerancia_minutos: int = 15
     # Facturación electrónica (Factiliza → SUNAT). Por defecto apunta al
     # entorno QA: emitir contra producción exige cambiar la URL a conciencia.
     factiliza_base_url: str = "https://apife-qa.factiliza.com/api/v1"

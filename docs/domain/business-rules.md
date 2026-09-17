@@ -2061,6 +2061,51 @@ es a dónde va y quién puede abrirlo.
   rastro en `audit_log` (ADR-031), por lo mismo que RN-REP-007: decidir que
   algo sube de nivel —o que se da por resuelto— es un acto de autoridad.
 
+## Supervisión (módulo supervision, ADR-102)
+
+Tareas programadas de apertura y cierre de sucursal (los SOP de
+`docs/diagrams/Procesos/Operaciones/`), con checklist y evidencia
+fotográfica opcional.
+
+- **RN-SUP-001** Una plantilla de tarea alcanza a **una sucursal** o a
+  **toda una marca** (`sucursal_id` nulo, `marca_id` obligatorio en ese
+  caso), nunca a ninguna de las dos. La generación diaria fabrica una
+  instancia por cada sucursal de la marca cuando la plantilla es de marca:
+  una cadena no repite treinta veces el mismo checklist de apertura.
+- **RN-SUP-002** El `orden` de una tarea dentro de su plantilla **se puede
+  repetir**: dos tareas con el mismo orden se ejecutan en paralelo (ej.
+  encender las luces mientras se trae lo de limpieza). El orden ordena
+  turnos de trabajo, no una fila única.
+- **RN-SUP-003** Solo el trabajador **asignado** puede marcar el checklist,
+  subir la foto o completar su tarea. Una tarea sin asignar no la puede
+  ejecutar nadie — el supervisor la asigna primero desde el tablero. Un
+  trabajador de línea solo ve las tareas que tiene asignadas a sí mismo; ver
+  y gestionar la asignación de cualquiera es privilegio de
+  `supervision.gestionar`.
+- **RN-SUP-004** `completar` exige el checklist completo y, si la tarea la
+  pide, una foto adjunta. La hora de finalización es la del servidor
+  (`fechas.ahora()`), nunca la que declare el cliente.
+- **RN-SUP-005** La foto se comprime en el servidor (Pillow, JPEG ≤1280px,
+  sin EXIF en la copia guardada) y **antes** de eso se lee su
+  `DateTimeOriginal` para saber cuándo se tomó — el cliente nunca declara
+  esa fecha por su cuenta.
+- **RN-SUP-006** Que la foto no traiga fecha EXIF, o que esa fecha caiga
+  fuera de la ventana de tolerancia (`supervision_foto_tolerancia_minutos`)
+  respecto al instante de completar, **no bloquea** completar la tarea:
+  marca `foto_valida` en `false` (o `null` si no hay fecha que comparar)
+  para que el supervisor la revise en el informe. Mismo criterio que
+  RN-SUC-006: la meta es visibilidad, no un candado automático.
+- **RN-SUP-007** Al cerrar la jornada de una sucursal, toda tarea que siga
+  `pendiente` pasa a `vencida` — no hay ventana de gracia después del
+  cierre. El informe diario resultante (`total`, `completadas`, `vencidas`,
+  `fotos_invalidas`) es una entidad propia y se emite a `reports`
+  (`supervision.informe_diario_generado`) para que el supervisor lo escale
+  con el mecanismo ya existente (RN-REP-001..014) en vez de uno propio.
+- **RN-SUP-008** La foto de una tarea completada se purga a los
+  `supervision_foto_retencion_dias` (30 por defecto): se borra el binario,
+  la fila y su checklist se quedan — mismo criterio que
+  `rrhh_marcaje_foto_retencion_dias` y `delivery_evidencia_retencion_dias`.
+
 ## BI autoservicio (ADR-083)
 
 Reglas del BI (Superset) sobre las vistas `vw_bi_*`. No reemplazan las de
