@@ -40,7 +40,7 @@ dependencies = [
     # la ticketera y el navegador pintan sin perder nitidez.
     "segno>=1.6",
     # La foto de evidencia de una tarea de supervisión sí la justifica
-    # (ADR-101): el servidor necesita leer la fecha EXIF antes de tirarla y
+    # (ADR-102): el servidor necesita leer la fecha EXIF antes de tirarla y
     # comprimir la imagen, no solo generar una — nada del proyecto hacía eso
     # todavía.
     "Pillow>=10.4",

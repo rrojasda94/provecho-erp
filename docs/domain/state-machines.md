@@ -221,7 +221,7 @@ stateDiagram-v2
 Al `realizar` con `plan_id`, el plan actualiza `ultima_fecha`/`ultimo_km` y
 limpia sus avisos (RN-MNT-005).
 
-## Tarea de supervisión (módulo supervision, ADR-101)
+## Tarea de supervisión (módulo supervision, ADR-102)
 
 ```mermaid
 stateDiagram-v2

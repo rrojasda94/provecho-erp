@@ -71,6 +71,9 @@ export type ParadaReparto = {
   cliente_nombre: string | null;
   cliente_telefono: string | null;
   monto_a_cobrar: string | number | null;
+  /** `false` mientras el pedido sigue en cocina (RN-DLV-005): no se puede
+   * iniciar la ruta hasta que todas sus paradas lleguen a `true`. */
+  lista: boolean;
   eta_at: string | null;
   motivo_fallo: MotivoFallo | null;
   /** Mismo enlace que recibe el cliente por WhatsApp — `null` sin token o sin
@@ -106,6 +109,9 @@ export type VentaLista = {
   ubicacion_lat: string | number | null;
   ubicacion_lng: string | number | null;
   distancia_entrega_km: string | number | null;
+  /** `false` mientras el pedido sigue en cocina (RN-DLV-001/005): se puede
+   * rutear igual, pero la ruta no sale hasta que sea `true`. */
+  lista: boolean;
 };
 
 export type Tablero = {
@@ -114,6 +120,31 @@ export type Tablero = {
   /** Si es `false`, el aviso automático por WhatsApp no está configurado:
    * el tablero solo puede ofrecer copiar el enlace o mandarlo por `wa.me`. */
   whatsapp_habilitado: boolean;
+};
+
+/** Una fila de `GET /delivery/avisos` (ADR-101): sin datos del cliente,
+ * solo lo que hace falta para un toast en KDS/caja. */
+export type AvisoEntrega = {
+  entrega_id: string;
+  numero_orden: number | null;
+  repartidor_nombre: string | null;
+  monto_a_cobrar: string | number | null;
+  fecha_entrega: string | null;
+};
+
+export type AvisoRuta = {
+  ruta_id: string;
+  repartidor_nombre: string | null;
+  entregadas: number;
+  fallidas: number;
+  hora_fin: string | null;
+};
+
+export type Avisos = {
+  /** Reloj del servidor — se guarda como el `desde` del próximo sondeo. */
+  ahora: string;
+  entregas: AvisoEntrega[];
+  rutas_finalizadas: AvisoRuta[];
 };
 
 export type VehiculoTipo = "moto" | "bicicleta" | "auto" | "a_pie";
@@ -283,13 +314,18 @@ export const apiDelivery = {
   tablero: (sucursalId: string, fecha?: string) =>
     pedir<Tablero>(`/delivery/tablero?${query({ sucursal_id: sucursalId, fecha })}`),
 
+  avisos: (sucursalId: string, desde?: string) =>
+    pedir<Avisos>(`/delivery/avisos?${query({ sucursal_id: sucursalId, desde })}`),
+
   crearRuta: (cuerpo: RutaEnvio) => pedir<RutaAck>("/delivery/rutas", { metodo: "POST", cuerpo }),
 
   cancelarRuta: (rutaId: string) =>
     pedir<RutaAck>(`/delivery/rutas/${rutaId}/cancelar`, { metodo: "POST" }),
 
-  editarParadas: (rutaId: string, cuerpo: { venta_ids: string[]; optimizar?: boolean }) =>
-    pedir<RutaAck>(`/delivery/rutas/${rutaId}/paradas`, { metodo: "PUT", cuerpo }),
+  editarParadas: (
+    rutaId: string,
+    cuerpo: { venta_ids: string[]; optimizar?: boolean; repartidor_id?: string | null },
+  ) => pedir<RutaAck>(`/delivery/rutas/${rutaId}/paradas`, { metodo: "PUT", cuerpo }),
 
   candidatosRepartidor: (empresaId: string) =>
     pedir<RepartidorCandidato[]>(

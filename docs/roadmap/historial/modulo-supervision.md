@@ -3,7 +3,7 @@
 Bitácora narrativa completa. El estado vigente y el resumen ejecutivo
 viven en [`ROADMAP.md`](../../../ROADMAP.md) → Estado por módulo.
 
-## 2026-09-17 — Slice core (ADR-101)
+## 2026-09-17 — Slice core (ADR-102)
 
 Módulo nuevo: programación de tareas de apertura y cierre de sucursal por
 categoría y frecuencia, con checklist y evidencia fotográfica opcional.

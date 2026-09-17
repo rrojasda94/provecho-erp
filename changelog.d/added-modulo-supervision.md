@@ -11,4 +11,4 @@
   que entra al catálogo centralizado de `reports` y se escala con el
   mecanismo ya existente. La foto se purga a los 30 días; la fila y el
   checklist se conservan. Costo aceptado: Pillow como dependencia nueva de
-  la API, para leer EXIF y comprimir en el servidor (ADR-101).
+  la API, para leer EXIF y comprimir en el servidor (ADR-102).

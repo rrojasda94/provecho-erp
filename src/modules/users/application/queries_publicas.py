@@ -20,7 +20,13 @@ from src.modules.users.application.errors import (
     UsuarioBloqueado,
 )
 from src.modules.users.domain import rules
-from src.modules.users.infrastructure.models import Usuario
+from src.modules.users.infrastructure.models import (
+    Permiso,
+    RolPermiso,
+    Usuario,
+    UsuarioRol,
+    UsuarioSucursal,
+)
 from src.modules.users.infrastructure.repositories import UsuarioRepo
 
 
@@ -43,6 +49,26 @@ def permisos_de(session: Session, usuario_id: uuid.UUID) -> set[str]:
     return set(UsuarioRepo(session).permiso_codigos(usuario_id))
 
 
+def usuarios_con_permiso(session: Session, codigo: str, sucursal_id: uuid.UUID) -> list[uuid.UUID]:
+    """Ids de los usuarios con el permiso `codigo` (o el comodín `*`) en
+    esta sucursal — mismo criterio de alcance que
+    `reports.destinatarios._usuarios_de_rol`, pero por permiso: quien avisa
+    (hoy `delivery`, al terminar una entrega o una ruta) no tiene por qué
+    conocer el catálogo de roles, solo qué puede hacer quien lo recibe."""
+    q = (
+        select(UsuarioSucursal.usuario_id)
+        .join(UsuarioRol, UsuarioRol.usuario_id == UsuarioSucursal.usuario_id)
+        .join(RolPermiso, RolPermiso.rol_id == UsuarioRol.rol_id)
+        .join(Permiso, Permiso.id == RolPermiso.permiso_id)
+        .where(
+            UsuarioSucursal.sucursal_id == sucursal_id,
+            Permiso.codigo.in_((codigo, rules.PERMISO_TODO)),
+        )
+        .distinct()
+    )
+    return list(session.scalars(q))
+
+
 def obtener_usuario(session: Session, usuario_id: uuid.UUID) -> Usuario | None:
     """Para cuando otro módulo necesita el `Usuario` completo de un id que
     ya validó por otra vía (ej. `autorizacion.verificar`, que solo devuelve
@@ -50,9 +76,7 @@ def obtener_usuario(session: Session, usuario_id: uuid.UUID) -> Usuario | None:
     return UsuarioRepo(session).get(usuario_id)
 
 
-def nombres_de_usuarios(
-    session: Session, usuario_ids: Sequence[uuid.UUID]
-) -> dict[uuid.UUID, str]:
+def nombres_de_usuarios(session: Session, usuario_ids: Sequence[uuid.UUID]) -> dict[uuid.UUID, str]:
     """`usuario_id` → nombre para mostrar, mismo patrón que
     `inventory.nombres_de_articulos`: para módulos que guardan un
     `usuario_id` (quién solicitó, quién aprobó, quién cerró) y tienen que

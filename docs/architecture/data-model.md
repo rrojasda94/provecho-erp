@@ -1984,7 +1984,7 @@ No hay tabla de mapeo hub-id↔nube-id: `venta`, `pago` y
 `movimiento_inventario` conservan el mismo UUID en ambos lados porque el
 `id` se genera en la aplicación (`UuidPkMixin`) y viaja en el lote.
 
-## 15. Supervisión (módulo supervision, ADR-101)
+## 15. Supervisión (módulo supervision, ADR-102)
 
 Tareas programadas de apertura y cierre de sucursal, con checklist y
 evidencia fotográfica opcional (RN-SUP-001..008).

@@ -151,7 +151,7 @@ class Settings(BaseSettings):
     # `supervision`).
     supervision_hora_cierre_jornada: str = "23:30"
     # Días que se conserva la foto de evidencia de una tarea de supervisión
-    # (ADR-101). Mismo criterio que `rrhh_marcaje_foto_retencion_dias`: la
+    # (ADR-102). Mismo criterio que `rrhh_marcaje_foto_retencion_dias`: la
     # purga borra solo el binario, la fila y el checklist se quedan.
     supervision_foto_retencion_dias: int = 30
     # Ventana de tolerancia entre la fecha EXIF de la foto y el instante en

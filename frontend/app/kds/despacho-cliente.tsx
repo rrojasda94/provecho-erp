@@ -9,6 +9,7 @@ import {
   type PedidoCola,
   type Semaforo,
 } from "@/lib/kds";
+import { useAvisosReparto } from "@/lib/use-avisos-reparto";
 
 import NombreDeLinea from "./nombre-linea";
 import { Espera, coloresDe, nivelDelPedido } from "./semaforo";
@@ -190,7 +191,11 @@ function Tarjeta({
       <footer className="kds-acciones">
         {puedeEntregar && completo && (
           <button type="button" className="kds-boton pri" onClick={onEntregar}>
-            Entregar
+            {/* Un pedido delivery no se "entrega" desde acá — lo entrega el
+                repartidor. Esto lo saca de la cola de cocina/despacho y lo
+                deja listo para rutear (ADR-101); `sales.venta_entregada`
+                sigue siendo el mismo evento, delivery ya no lo escucha. */}
+            {pedido.modalidad === "delivery" ? "Despachar" : "Entregar"}
           </button>
         )}
       </footer>
@@ -206,11 +211,18 @@ export default function DespachoCliente({
   alVolver,
 }: Props) {
   const { pedidos, aviso, setAviso, avisarDe, cargado, refrescar } = useCola(pantalla.id);
+  // Solo rutas: despacho no cobra, así que no le interesa "entrega
+  // registrada" — le interesa que un repartidor volvió (ADR-101).
+  useAvisosReparto(sucursalId, { soloRutas: true });
 
   const entregar = async (pedido: PedidoCola) => {
     try {
       await apiKds.entregar(pedido.venta_id);
-      setAviso(`Pedido #${pedido.numero_orden} entregado`);
+      setAviso(
+        pedido.modalidad === "delivery"
+          ? `Pedido #${pedido.numero_orden} despachado`
+          : `Pedido #${pedido.numero_orden} entregado`,
+      );
     } catch (e) {
       avisarDe(e, "No se pudo registrar la entrega");
     } finally {

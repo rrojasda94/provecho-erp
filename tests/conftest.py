@@ -321,7 +321,7 @@ MODULOS_CON_SESSION_FACTORY = (
     # demás barridos de la lista de arriba.
     "src.modules.delivery.application.tasks",
     # Generación diaria, cierre de jornada y purga de fotos de supervisión
-    # (ADR-101) — mismo motivo que los demás barridos de la lista.
+    # (ADR-102) — mismo motivo que los demás barridos de la lista.
     "src.modules.supervision.application.tasks",
 )
 

@@ -1,4 +1,4 @@
-# ADR-101 — Módulo supervision: tareas de apertura/cierre, checklist y foto
+# ADR-102 — Módulo supervision: tareas de apertura/cierre, checklist y foto
 
 - Estado: aceptado
 - Fecha: 2026-09-17

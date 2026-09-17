@@ -24,18 +24,28 @@ dispara `delivery` por evento, nunca importando el dominio de `sales`
 `posicion_repartidor` (el trazo GPS de una ruta en curso). Detalle en
 `docs/architecture/data-model.md` §6b.
 
-## Estado (slice 6 implementado 2026-09-09, ADR-098)
+## Estado (slice 6 implementado 2026-09-09, ADR-098; revisado 2026-09-17, ADR-101)
 
 Operativo en `/api/v1/delivery`: alta y edición de repartidores propios,
 tablero de despacho, ciclo completo de una ruta (crear con ruteo real u
-heurístico → editar paradas → iniciar → entregar/fallar cada parada →
+heurístico → editar paradas y repartidor, planificada o en curso →
+iniciar (exige todas sus paradas `lista`) → entregar/fallar cada parada →
 reintentar o cerrar la fallida → finalizar o cancelar), evidencia
-fotográfica, GPS del repartidor en ruta, seguimiento público con mapa, la
-convergencia por evento con `sales` en los dos sentidos
-(`delivery.entrega_registrada` marca la venta entregada;
-`sales.venta_entregada`/`venta_anulada` cierran o cancelan la entrega), y
+fotográfica, GPS del repartidor en ruta, seguimiento público con mapa, y
 el aviso al cliente por WhatsApp en cada hito (en camino, entregado,
 fallida) con fallback copiable/`wa.me` en el tablero.
+
+La convergencia con `sales` es **de un solo sentido desde ADR-101**:
+`delivery.entrega_registrada` marca la venta entregada
+(`sales.listeners` sigue llamando a `cumplimiento.registrar_entrega`, sin
+cambios), pero `delivery` ya **no** escucha `sales.venta_entregada` —
+despachar un pedido desde el KDS ya no cierra su entrega (RN-DLV-009).
+`sales.venta_anulada` sigue escuchado igual que antes (cancela la entrega
+`pendiente`/`asignada`, o notifica al despacho si ya iba `en_ruta`).
+`GET /delivery/avisos` (sondeado por el KDS y el PDV) y dos notificaciones
+de bandeja nuevas avisan a caja/cocina cuando se registra una entrega o
+termina una ruta, resueltas por permiso (`users.usuarios_con_permiso`, no
+por rol).
 Capas `domain/rules.py`, `application/` (`repartidores.py`, `rutas.py`,
 `ruteo.py`, `posiciones.py`, `entregas.py`, `seguimiento.py`, `tablero.py`,
 `parametros.py`, `notificaciones.py`, `listeners.py`, `tasks.py`),
@@ -88,15 +98,20 @@ fotográfica.
 - **Alta de repartidor**: elegir un trabajador activo con cuenta propia
   (`rrhh.trabajadores_con_cuenta`) que aún no sea repartidor, y darle
   vehículo y sucursal.
-- **Tablero de despacho**: ver los pedidos delivery ya listos sin asignar
-  (`sales.ventas_listas_para_reparto`) y las rutas en curso con su última
-  posición conocida.
-- **Crear una ruta**: elegir repartidor y uno o más pedidos; con
-  `optimizar=true` el servidor pide el orden y la ruta a Google
+- **Tablero de despacho**: ver los pedidos delivery sin asignar
+  (`sales.ventas_para_reparto`, estén o no `lista` — RN-DLV-001) y las
+  rutas vivas con su última posición conocida.
+- **Crear una ruta**: elegir repartidor y uno o más pedidos, listos o no;
+  con `optimizar=true` el servidor pide el orden y la ruta a Google
   (`ruta_optima`) y cae a la heurística vecino-más-cercano si no hay
   clave o Google falla; calcula distancia y ETA por parada.
-  `PUT .../paradas` reemplaza el conjunto de una ruta que no salió todavía.
-- **Iniciar / finalizar / cancelar una ruta**.
+- **Editar paradas y repartidor** (`PUT .../paradas`): agrega o quita
+  paradas no resueltas de una ruta `planificada` o `en_curso`, y puede
+  cambiarle el repartidor — lo ya resuelto (entregada, fallida, cancelada)
+  queda fijo. Agregar a una ruta en curso exige que la parada esté
+  `lista` (RN-DLV-005).
+- **Iniciar** (exige todas las paradas `lista`) **/ finalizar / cancelar
+  una ruta**.
 - **Registrar un ping GPS** (`POST .../posiciones`) mientras la ruta está
   en curso: guarda el trazo y refresca el ETA de la próxima parada.
 - **Entregar / fallar una parada**, con ubicación y foto opcional; un
@@ -109,9 +124,12 @@ fotográfica.
   cliente, teléfono, monto a cobrar), iniciar la ruta, entregar o fallar
   cada parada con foto y ubicación, y finalizar — todo desde el teléfono,
   con GPS en vivo mientras reparte.
-- **El tablero de despacho**: ver lo sin asignar y las rutas vivas con su
-  repartidor, sus paradas y su mapa; crear una ruta eligiendo repartidor y
-  pedidos; cancelar una que no salió todavía.
+- **El tablero de despacho**: ver lo sin asignar (con badge "En cocina"
+  para lo que no está `lista` todavía) y las rutas vivas con su
+  repartidor, sus paradas y su mapa; crear o editar una ruta eligiendo
+  repartidor y pedidos, iniciarla, marcar entregada una parada en camino
+  desde el propio tablero, finalizarla o cancelar una que no salió
+  todavía.
 - **Repartidores y su historial**: alta, edición (vehículo, placa,
   teléfono, sucursal, activo) y el historial de entregas con filtros por
   estado, repartidor y fecha, con la foto de evidencia cuando la hay.
@@ -134,10 +152,11 @@ fotográfica.
 | GET | `/delivery/repartidores` | `delivery.leer` o `delivery.despachar` — con el nombre resuelto |
 | PATCH | `/delivery/repartidores/{id}` | `delivery.gestionar_repartidores` |
 | GET | `/delivery/tablero` | `delivery.despachar` — con repartidor y paradas resueltos, enlace de seguimiento por parada y si el envío automático está habilitado |
+| GET | `/delivery/avisos` | `delivery.leer` o `kds.operar` — entregas y rutas finalizadas desde `desde`, para el toast/sonido de KDS y caja (ADR-101) |
 | POST | `/delivery/rutas` | `delivery.despachar` |
 | GET | `/delivery/rutas` | `delivery.leer` |
 | GET | `/delivery/rutas/{id}` | `delivery.leer` (o ruta propia) |
-| PUT | `/delivery/rutas/{id}/paradas` | `delivery.despachar` |
+| PUT | `/delivery/rutas/{id}/paradas` | `delivery.despachar` — agrega/quita paradas no resueltas y opcionalmente cambia el repartidor; funciona con la ruta `planificada` o `en_curso` (ADR-101) |
 | POST | `/delivery/rutas/{id}/iniciar\|finalizar` | `delivery.despachar` o repartidor dueño de la ruta |
 | POST | `/delivery/rutas/{id}/cancelar` | `delivery.despachar` |
 | POST | `/delivery/rutas/{id}/posiciones` | repartidor dueño de la ruta, `en_curso` |
@@ -193,23 +212,25 @@ automático es un atajo, nunca la única vía.
 
 ## Relaciones
 
-**Escucha**: `sales.venta_entregada` (cierra una entrega abierta si la
-venta se marcó entregada desde el KDS), `sales.venta_anulada` (cancela la
-entrega si seguía `pendiente`/`asignada`; si ya estaba `en_ruta`, avisa
-in-app a quien despachó en vez de cancelar). También sus propios hechos
-(`delivery.ruta_iniciada`, `entrega_registrada`, `entrega_fallida`) para
-encolar el aviso al cliente.
+**Escucha**: `sales.venta_anulada` (cancela la entrega si seguía
+`pendiente`/`asignada`; si ya estaba `en_ruta`, avisa in-app a quien
+despachó en vez de cancelar). Ya **no** escucha `sales.venta_entregada`
+desde ADR-101 (RN-DLV-009). También sus propios hechos
+(`delivery.ruta_iniciada`, `entrega_registrada`, `entrega_fallida`,
+`ruta_finalizada`) para encolar el aviso al cliente y notificar a
+caja/cocina.
 
 **Publica**: `delivery.ruta_iniciada`, `delivery.entrega_registrada`
-(consumido por `sales` para avanzar la venta a entregada, ADR-098),
-`delivery.entrega_fallida`, `delivery.ruta_finalizada`. `ruta_finalizada`
-no tiene consumidor todavía.
+(consumido por `sales` para avanzar la venta a entregada, ADR-098, y por
+`delivery` mismo desde ADR-101 para avisar a caja), `delivery.entrega_fallida`,
+`delivery.ruta_finalizada` (desde ADR-101, avisa a caja y cocina — antes
+sin consumidor).
 
 **Contratos públicos consumidos**: `sales.queries_publicas.venta_para_reparto`,
-`ventas_listas_para_reparto` y `contacto_de_cliente`;
+`ventas_para_reparto` y `contacto_de_cliente`;
 `rrhh.queries_publicas.trabajadores_con_cuenta` y `cuenta_de_trabajador`;
 `users.queries_publicas.notificar_a` (bandeja in-app del repartidor y de
-quien despacha).
+quien despacha) y `usuarios_con_permiso` (bandeja de caja/cocina, ADR-101).
 
 **Contratos públicos expuestos**: ninguno todavía — nada más consume de
 `delivery` hoy.

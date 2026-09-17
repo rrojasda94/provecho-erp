@@ -10,7 +10,7 @@ fue asignado. Al cerrar la jornada se emite un informe diario por
 sucursal, que entra al catálogo centralizado del módulo `reports` (ADR-033)
 y se escala con el mecanismo ya existente (ADR-036).
 
-Detalle de diseño: ADR-101. Reglas: `docs/domain/business-rules.md`
+Detalle de diseño: ADR-102. Reglas: `docs/domain/business-rules.md`
 §Supervisión (RN-SUP-001..008). Modelo de datos:
 `docs/architecture/data-model.md` §15.
 

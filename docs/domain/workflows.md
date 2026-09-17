@@ -321,8 +321,10 @@ Si el reparto a domicilio llega a tener ruteo, flota propia y liquidación
 de repartidores, se separa entonces como versión MAYOR. **Ocurrió**
 (2026-09-09, ADR-098): ruteo, GPS de flota propia y seguimiento público
 viven en el módulo `delivery`, que se comunica con este proceso solo por
-evento (`delivery.entrega_registrada` avanza la venta a entregada) y por
-contrato de lectura (`sales.queries_publicas.ventas_listas_para_reparto`).
+evento (`delivery.entrega_registrada` avanza la venta a entregada — el
+camino inverso, `sales.venta_entregada` cerrando la entrega, se quitó en
+ADR-101: despachar desde el KDS ya no cierra el reparto) y por contrato de
+lectura (`sales.queries_publicas.ventas_para_reparto`).
 El avance del ítem (`venta_item.estado_preparacion`) sigue siendo el único
 registro de preparación; `delivery` no lo toca ni lo duplica.
 

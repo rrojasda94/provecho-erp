@@ -12,17 +12,20 @@ from sqlalchemy.orm import Session
 
 from src.modules.delivery.application.mi_reparto import ruta_con_paradas
 from src.modules.delivery.infrastructure.repositories import EntregaRepo, RutaRepo
-from src.modules.sales.application.queries_publicas import ventas_listas_para_reparto
+from src.modules.sales.application.queries_publicas import ventas_para_reparto
 
 
 def sin_asignar(
     session: Session, sucursal_ids: Sequence[uuid.UUID], *, fecha: date | None = None
 ) -> list[dict]:
-    listas = ventas_listas_para_reparto(session, sucursal_ids, fecha=fecha)
-    if not listas:
+    """Ventas delivery ruteables que todavía no tienen una entrega abierta
+    — listas o no (RN-DLV-001): el despacho arma la ruta desde que se toma
+    el pedido, no cuando llega a cocina."""
+    candidatas = ventas_para_reparto(session, sucursal_ids, fecha=fecha)
+    if not candidatas:
         return []
-    abiertas = EntregaRepo(session).venta_ids_con_entrega_abierta([v["id"] for v in listas])
-    return [v for v in listas if v["id"] not in abiertas]
+    ruteadas = EntregaRepo(session).venta_ids_ya_ruteadas([v["id"] for v in candidatas])
+    return [v for v in candidatas if v["id"] not in ruteadas]
 
 
 def rutas_vivas(session: Session, sucursal_ids: Sequence[uuid.UUID]) -> list[dict]:

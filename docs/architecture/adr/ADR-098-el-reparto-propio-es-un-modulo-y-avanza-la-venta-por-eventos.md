@@ -44,6 +44,12 @@ referencia `purchases`): `domain/`, `application/`, `infrastructure/`,
 
 ### 2. La venta se marca entregada por evento, nunca por import
 
+> **Revisado por ADR-101** (2026-09-17): el "camino inverso" que este
+> punto describía —`delivery` escuchando `sales.venta_entregada` para
+> cerrar su propia entrega— se eliminó. Cerrar una entrega es, desde
+> ADR-101, solo de `delivery`; el párrafo que sigue queda como registro
+> histórico de la decisión original.
+
 `delivery` no importa `sales.application.cumplimiento`. Al registrar una
 entrega, `delivery` publica `delivery.entrega_registrada`
 (`{entrega_id, venta_id, sucursal_id, ruta_id, repartidor_id,

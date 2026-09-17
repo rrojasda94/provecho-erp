@@ -7,7 +7,7 @@ vive aparte, en `api/publico_routers.py` — es la única superficie de
 import base64
 import binascii
 import uuid
-from datetime import date
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
@@ -15,7 +15,13 @@ from sqlalchemy.orm import Session
 from src.core.rate_limit import consumir
 from src.core.tenant import Tenant
 from src.modules.delivery.api import schemas
-from src.modules.delivery.application import entregas, mi_reparto, posiciones, repartidores
+from src.modules.delivery.application import (
+    avisos,
+    entregas,
+    mi_reparto,
+    posiciones,
+    repartidores,
+)
 from src.modules.delivery.application import rutas as rutas_uc
 from src.modules.delivery.application import tablero as tablero_uc
 from src.modules.delivery.application.scope import (
@@ -183,6 +189,23 @@ def ver_tablero(
     }
 
 
+# --- Avisos (KDS y caja) --------------------------------------------------------
+@router.get("/avisos", response_model=schemas.AvisosOut)
+def ver_avisos(
+    sucursal_id: uuid.UUID,
+    desde: datetime | None = None,
+    usuario: Usuario = Depends(get_current_user),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    # `kds.operar` alcanza (el cocinero solo tiene ese permiso, no
+    # `delivery.leer`) — es la misma pantalla la que necesita saber cuándo
+    # terminó una ruta, aunque no pueda ver el resto del módulo.
+    check_permission(session, usuario, LEER, "kds.operar")
+    tenant.exigir_sucursal(sucursal_id)
+    return avisos.avisos_desde(session, [sucursal_id], desde or datetime.now(UTC))
+
+
 # --- Rutas ----------------------------------------------------------------------
 @router.post("/rutas", response_model=schemas.RutaOut, status_code=201)
 def crear_ruta(
@@ -242,10 +265,13 @@ def editar_paradas(
     session: Session = Depends(get_db),
 ):
     exigir_ruta(session, ruta_id, tenant)
+    if body.repartidor_id is not None:
+        exigir_repartidor(session, body.repartidor_id, tenant)
     ruta = rutas_uc.editar_paradas(
         session,
         ruta_id,
         venta_ids=body.venta_ids,
+        repartidor_id=body.repartidor_id,
         optimizar=body.optimizar,
         empresa_id=tenant.empresa(),
         actor_id=actor.id,

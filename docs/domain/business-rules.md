@@ -1840,8 +1840,10 @@ módulo aparte de `sales` según ya preveía
 - **RN-DLV-001** Una venta tiene como máximo una `entrega` (RN-CUP-005): se
   crea al asignarla a una `ruta_reparto`, no antes. Solo entran ventas en
   modalidad delivery, sin `repartidor_externo_plataforma` (RN-PER-003 las
-  excluye — esas no son reparto propio), no anuladas y con todos sus ítems
-  en `listo`.
+  excluye — esas no son reparto propio) y no anuladas — **no** hace falta
+  que esté `lista` todavía (ADR-101): se rutea desde que se toma el
+  pedido, y quién sale con qué se decide recién al iniciar la ruta
+  (RN-DLV-005).
 - **RN-DLV-002** Toda parada de una ruta necesita coordenadas ancladas
   (`UbicacionMixin` de la venta, ADR-053): una dirección sin anclar no
   puede rutearse ni mostrar posición en vivo. El tablero lo rechaza al
@@ -1856,10 +1858,14 @@ módulo aparte de `sales` según ya preveía
   estado anterior queda en `audit_log`. Cerrar una entrega fallida o
   pendiente (`cancelada`) es una decisión explícita del despacho, distinta
   de reintentar.
-- **RN-DLV-005** Una ruta se inicia solo con al menos una parada y un
-  repartidor activo; al iniciar, todas sus entregas pasan a `en_ruta` y
-  quedan con la hora de salida real. Una ruta ya iniciada no se cancela:
-  se resuelve parada por parada (RN-CUP-008 aplica a cada una).
+- **RN-DLV-005** Una ruta se inicia solo con al menos una parada, un
+  repartidor activo y **todas sus paradas `lista`** (ADR-101) — un pedido
+  a medio preparar no sale a la calle. Al iniciar, todas sus entregas
+  pasan a `en_ruta` y quedan con la hora de salida real. Una ruta ya
+  iniciada no se cancela: se resuelve parada por parada (RN-CUP-008 aplica
+  a cada una) — pero sí se le pueden agregar o quitar paradas no resueltas
+  y cambiarle el repartidor (`PUT /delivery/rutas/{id}/paradas`, ADR-101);
+  sumar una parada a una ruta ya en curso exige que también esté `lista`.
 - **RN-DLV-006** Si se anula una venta con entrega `pendiente` o
   `asignada`, la entrega se cancela sola. Si ya estaba `en_ruta`, no se
   cancela automáticamente — se notifica a quien creó la ruta para que
@@ -1877,6 +1883,16 @@ módulo aparte de `sales` según ya preveía
   entrega llega a un resultado (`entregada`, `fallida` o `cancelada`); un
   token vencido, cancelado o inexistente responde exactamente igual (404),
   para no confirmarle a quien lo reenvía que existió.
+- **RN-DLV-009** Despachar un pedido delivery desde el KDS
+  (`POST /sales/ventas/{id}/entrega`) **no** cierra su `entrega` de
+  reparto (ADR-101): cierra la comanda de cocina y saca el pedido de la
+  cola, nada más. Solo el repartidor (desde su PWA) o el despacho en su
+  nombre (desde `/delivery`, `POST /delivery/entregas/{id}/entregar`)
+  cierran la entrega — y solo cuando de verdad está `en_ruta`. Los dos
+  estados pueden divergir un rato (la venta `entregada` en `sales`, la
+  entrega todavía `en_ruta` en `delivery`): es el costo aceptado de que
+  `delivery`, y no `sales`, sea la única fuente de verdad de si el reparto
+  se completó.
 
 ## Comercial — estrategia
 
@@ -2045,7 +2061,7 @@ es a dónde va y quién puede abrirlo.
   rastro en `audit_log` (ADR-031), por lo mismo que RN-REP-007: decidir que
   algo sube de nivel —o que se da por resuelto— es un acto de autoridad.
 
-## Supervisión (módulo supervision, ADR-101)
+## Supervisión (módulo supervision, ADR-102)
 
 Tareas programadas de apertura y cierre de sucursal (los SOP de
 `docs/diagrams/Procesos/Operaciones/`), con checklist y evidencia

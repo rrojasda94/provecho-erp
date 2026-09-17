@@ -1,6 +1,6 @@
 """modulo supervision: tareas de apertura/cierre, checklist y evidencia
 
-Módulo nuevo (ADR-101): programación de tareas de apertura y cierre de
+Módulo nuevo (ADR-102): programación de tareas de apertura y cierre de
 sucursal por categoría y frecuencia, con checklist y evidencia fotográfica
 opcional. Cuatro tablas, todas aditivas.
 

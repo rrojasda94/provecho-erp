@@ -3927,6 +3927,151 @@
         "title": "AvanzarIn",
         "type": "object"
       },
+      "AvisoEntregaOut": {
+        "description": "Una fila del aviso de caja (ADR-101): entrega registrada. Sin datos\ndel cliente — solo lo que hace falta para una línea de toast.",
+        "properties": {
+          "entrega_id": {
+            "format": "uuid",
+            "title": "Entrega Id",
+            "type": "string"
+          },
+          "fecha_entrega": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Entrega"
+          },
+          "monto_a_cobrar": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monto A Cobrar"
+          },
+          "numero_orden": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Orden"
+          },
+          "repartidor_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repartidor Nombre"
+          }
+        },
+        "required": [
+          "entrega_id",
+          "numero_orden",
+          "repartidor_nombre",
+          "monto_a_cobrar",
+          "fecha_entrega"
+        ],
+        "title": "AvisoEntregaOut",
+        "type": "object"
+      },
+      "AvisoRutaOut": {
+        "description": "Una fila del aviso de KDS y caja: una ruta terminó.",
+        "properties": {
+          "entregadas": {
+            "title": "Entregadas",
+            "type": "integer"
+          },
+          "fallidas": {
+            "title": "Fallidas",
+            "type": "integer"
+          },
+          "hora_fin": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hora Fin"
+          },
+          "repartidor_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repartidor Nombre"
+          },
+          "ruta_id": {
+            "format": "uuid",
+            "title": "Ruta Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ruta_id",
+          "repartidor_nombre",
+          "entregadas",
+          "fallidas",
+          "hora_fin"
+        ],
+        "title": "AvisoRutaOut",
+        "type": "object"
+      },
+      "AvisosOut": {
+        "properties": {
+          "ahora": {
+            "format": "date-time",
+            "title": "Ahora",
+            "type": "string"
+          },
+          "entregas": {
+            "items": {
+              "$ref": "#/components/schemas/AvisoEntregaOut"
+            },
+            "title": "Entregas",
+            "type": "array"
+          },
+          "rutas_finalizadas": {
+            "items": {
+              "$ref": "#/components/schemas/AvisoRutaOut"
+            },
+            "title": "Rutas Finalizadas",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ahora",
+          "entregas",
+          "rutas_finalizadas"
+        ],
+        "title": "AvisosOut",
+        "type": "object"
+      },
       "BalanceComprobacionOut": {
         "properties": {
           "cuadra": {
@@ -21325,6 +21470,10 @@
             ],
             "title": "Eta At"
           },
+          "lista": {
+            "title": "Lista",
+            "type": "boolean"
+          },
           "monto_a_cobrar": {
             "anyOf": [
               {
@@ -21383,6 +21532,7 @@
           "estado",
           "numero_orden",
           "direccion_entrega",
+          "lista",
           "destino_lat",
           "destino_lng",
           "cliente_nombre",
@@ -30200,12 +30350,24 @@
             "title": "Optimizar",
             "type": "boolean"
           },
+          "repartidor_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repartidor Id"
+          },
           "venta_ids": {
             "items": {
               "format": "uuid",
               "type": "string"
             },
-            "minItems": 1,
+            "minItems": 0,
             "title": "Venta Ids",
             "type": "array"
           }
@@ -35496,6 +35658,10 @@
             "title": "Id",
             "type": "string"
           },
+          "lista": {
+            "title": "Lista",
+            "type": "boolean"
+          },
           "numero_orden": {
             "title": "Numero Orden",
             "type": "integer"
@@ -35539,7 +35705,8 @@
           "direccion_entrega",
           "ubicacion_lat",
           "ubicacion_lng",
-          "distancia_entrega_km"
+          "distancia_entrega_km",
+          "lista"
         ],
         "title": "VentaListaOut",
         "type": "object"
@@ -42767,6 +42934,71 @@
         "summary": "Ver Decision Gerencial",
         "tags": [
           "gerencia"
+        ]
+      }
+    },
+    "/api/v1/delivery/avisos": {
+      "get": {
+        "operationId": "ver_avisos_api_v1_delivery_avisos_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sucursal_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Sucursal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvisosOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Avisos",
+        "tags": [
+          "delivery"
         ]
       }
     },
