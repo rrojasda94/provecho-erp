@@ -307,6 +307,7 @@ function DialogoEditarSucursal({
       claseDisparador={BOTON_FILA}
       accion={guardarSucursalAction}
       ayuda="Cerrar un local es dejarlo 'inactiva': no se da de baja, sigue siendo el ancla de sus ventas, cajas y trabajadores."
+      testId={`dialogo-editar-sucursal-${sucursal.id}`}
     >
       <input type="hidden" name="id" value={sucursal.id} />
       <CamposSucursal marcas={marcas} almacenes={almacenes} sucursal={sucursal} />
