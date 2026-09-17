@@ -28,7 +28,7 @@ def abierto_ahora(horario: dict | None, ahora: datetime.datetime) -> bool | None
 
     `None` cuando el horario no existe o no tiene la forma esperada
     (`{"lun": [["HH:MM","HH:MM"]], ...}`) — filas heredadas del JSONB libre
-    que precedía a este esquema (ADR-101). El sitio muestra "consultar
+    que precedía a este esquema (ADR-103). El sitio muestra "consultar
     horario" en ese caso, nunca un booleano adivinado.
     """
     if not isinstance(horario, dict):

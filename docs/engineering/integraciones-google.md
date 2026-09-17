@@ -63,7 +63,7 @@ sea correcta y el crédito gratuito esté disponible.
    - `http://localhost:3001/*` — `storefront` en dev (docker-compose.yml)
    - `https://staging.majambo.com.pe/*`
    - `https://clientes.majambo.com.pe/*` — la landing del QR (ADR-080)
-   - `https://charlies.majambo.com.pe/*` — el sitio de marca (ADR-101),
+   - `https://charlies.majambo.com.pe/*` — el sitio de marca (ADR-103),
      mapa de locales (`storefront/app/locales/`)
 
    El puerto cuenta. Levantar el front en otro (`npm run dev` cuando 3000 está

@@ -98,6 +98,9 @@ DESTINOS: dict[str, Destino] = {
     "trabajador": Destino(
         "/rrhh/trabajadores/{id}", "rrhh.leer", "Ver al trabajador"
     ),
+    "informe_supervision": Destino(
+        "/supervision/informes/{id}", "supervision.leer", "Ver el informe de supervisión"
+    ),
 }
 
 

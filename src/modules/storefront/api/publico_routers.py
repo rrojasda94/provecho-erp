@@ -1,6 +1,6 @@
 """Superficie pública del sitio de marca: sin JWT, protegida solo por rate
 limit por IP (mismo patrón que `sales.api.publico_routers` y
-`delivery.api.publico_routers`, ADR-101).
+`delivery.api.publico_routers`, ADR-103).
 
 Regla de oro (RN-WEB-001): cada respuesta pasa por un `*PublicoOut` que
 enumera sus campos — nunca se serializa un dict/ORM de otro módulo tal

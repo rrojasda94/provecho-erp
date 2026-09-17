@@ -27,7 +27,7 @@ function texto(formData: FormData, campo: string): string {
 const DIAS_HORARIO = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"] as const;
 
 /**
- * Arma `sucursal.horario_atencion` (storefront, ADR-101) desde los campos
+ * Arma `sucursal.horario_atencion` (storefront, ADR-103) desde los campos
  * `horario_<dia>_desde`/`_hasta`/`_cerrado` del formulario. Un tramo por
  * día — la forma admite varios, pero el formulario de esta pantalla solo
  * cubre el caso común; varios tramos se cargan por API si algún local lo
@@ -174,7 +174,7 @@ export async function guardarSucursalAction(
       marca_id: marcaId,
       nombre,
       direccion,
-      // Lo pide el sitio de marca (storefront, ADR-101) para la lista de
+      // Lo pide el sitio de marca (storefront, ADR-103) para la lista de
       // locales; vacío = no se muestra teléfono ahí.
       telefono: texto(formData, "telefono") || null,
       tenencia: String(formData.get("tenencia") ?? "alquilada"),

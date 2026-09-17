@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* Tokens de marca Charlie's Pizzas (brandbook `D:\Antropic\brand chp\`,
-   ADR-101 §12 — NO son los tokens de Provecho de `frontend/app/globals.css`,
+   ADR-103 §12 — NO son los tokens de Provecho de `frontend/app/globals.css`,
    ver `docs/product/ui-ux.md` § "Sitio de marca Charlie's"). */
 :root {
   --chp-verde: #00a612;

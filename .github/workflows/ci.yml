@@ -203,7 +203,7 @@ jobs:
           docker logs provecho-web-ci
           exit 1
 
-      # Mismo criterio que el frontend, para el sitio de marca (ADR-101):
+      # Mismo criterio que el frontend, para el sitio de marca (ADR-103):
       # un `storefront/Dockerfile` roto se descubre acá, no al desplegar.
       - uses: docker/build-push-action@v7
         with:
@@ -273,7 +273,7 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  # Sitio de marca Charlie's Pizzas (ADR-101): app y build SEPARADOS del
+  # Sitio de marca Charlie's Pizzas (ADR-103): app y build SEPARADOS del
   # ERP. `npm run build` corre sin la API arriba —igual que el job
   # `frontend`— porque `lib/api.ts::apiFetch` nunca lanza por un fallo de
   # red, así que el prerender no revienta sin backend.

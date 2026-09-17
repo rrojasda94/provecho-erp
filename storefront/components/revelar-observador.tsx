@@ -4,7 +4,7 @@ import { useEffect } from "react";
 
 /**
  * Anima la entrada de todo elemento `.revelar` cuando cruza el viewport
- * (ADR-101 decisión 10 — CSS + `IntersectionObserver`, sin librería).
+ * (ADR-103 decisión 10 — CSS + `IntersectionObserver`, sin librería).
  *
  * Un `MutationObserver` re-observa lo que el router de Next agregue al
  * navegar entre páginas del sitio (mismo layout, `<main>` reemplazado):

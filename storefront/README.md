@@ -1,6 +1,6 @@
 # `storefront` — Sitio público de Charlie's Pizzas
 
-App Next.js **aparte** de `frontend/` (ADR-101): sirve
+App Next.js **aparte** de `frontend/` (ADR-103): sirve
 `charlies.majambo.com.pe`. No comparte proceso, tema, CSP ni build con el
 ERP — el único punto de contacto es la API, y solo con
 `/api/v1/storefront/publico/*` (sin JWT, backend `src/modules/storefront/`).

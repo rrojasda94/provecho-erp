@@ -221,6 +221,19 @@ stateDiagram-v2
 Al `realizar` con `plan_id`, el plan actualiza `ultima_fecha`/`ultimo_km` y
 limpia sus avisos (RN-MNT-005).
 
+## Tarea de supervisión (módulo supervision, ADR-102)
+
+```mermaid
+stateDiagram-v2
+    [*] --> pendiente
+    pendiente --> completada: completar (checklist completo + foto si la exige)
+    pendiente --> vencida: cierre de jornada (RN-SUP-007)
+```
+
+Sin retorno: una tarea `vencida` no vuelve a `pendiente` ni se completa
+después — el informe del día ya la contó como incumplida. Una tarea
+`completada` es terminal.
+
 ## Documento de vigencia
 
 ```mermaid

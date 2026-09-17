@@ -2,7 +2,7 @@
 
 Dueño del contenido editable, las fotos de catálogo y (a partir del PR2) las
 cuentas de cliente web, direcciones, favoritos y pedidos del sitio de marca
-(`charlies.majambo.com.pe`, ADR-101). Es la única puerta por la que la app
+(`charlies.majambo.com.pe`, ADR-103). Es la única puerta por la que la app
 `storefront/` (un proceso Next.js aparte, sin JWT de ERP) lee al ERP.
 
 ## Alcance de este slice (PR1)

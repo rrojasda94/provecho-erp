@@ -1,5 +1,5 @@
 /**
- * Único cliente de la API para todo el sitio (ADR-101). Solo llama a
+ * Único cliente de la API para todo el sitio (ADR-103). Solo llama a
  * `/api/v1/storefront/publico/*` — el proceso de Next habla con la API por
  * la red interna de Docker (`API_INTERNAL_URL`), nunca el navegador.
  *

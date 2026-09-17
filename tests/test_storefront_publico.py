@@ -1,5 +1,5 @@
 """Superficie pública del sitio de marca (`/storefront/publico/*`,
-ADR-101): forma de la respuesta, RN-WEB-001 (nada de lo privado sale),
+ADR-103): forma de la respuesta, RN-WEB-001 (nada de lo privado sale),
 RN-WEB-002/003/004 (qué se filtra) y el rate limit por IP.
 """
 

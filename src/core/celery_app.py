@@ -30,6 +30,7 @@ celery_app = Celery(
         "src.modules.production.application.tasks",
         "src.modules.rrhh.application.tasks",
         "src.modules.sales.application.tasks",
+        "src.modules.supervision.application.tasks",
     ],
 )
 
@@ -162,6 +163,28 @@ celery_app.conf.beat_schedule = {
     "purgar-evidencias-de-entrega": {
         "task": "delivery.purgar_evidencias",
         "schedule": crontab(hour=4, minute=50),
+    },
+    # Genera las tareas de apertura/cierre del día en cada sucursal activa,
+    # poco después de medianoche hora Perú. Una vez al día alcanza: es
+    # idempotente por `(plantilla_id, fecha)`, así que un reintento o la
+    # generación manual del supervisor no duplican nada.
+    "generar-tareas-de-supervision-del-dia": {
+        "task": "supervision.generar_tareas_del_dia",
+        "schedule": crontab(hour=0, minute=10),
+    },
+    # `supervision_hora_cierre_jornada` es un valor semilla y no (todavía)
+    # configurable por empresa — mismo motivo que el barrido de producción:
+    # cada 15 min alcanza para que el cierre real quede como mucho un
+    # cuarto de hora tarde.
+    "cerrar-jornadas-de-supervision-vencidas": {
+        "task": "supervision.cerrar_jornadas_vencidas",
+        "schedule": 900.0,
+    },
+    # Foto de evidencia de una tarea de supervisión — mismo criterio que
+    # `purgar-fotos-de-marcacion` y `purgar-evidencias-de-entrega`.
+    "purgar-fotos-de-supervision": {
+        "task": "supervision.purgar_fotos",
+        "schedule": crontab(hour=4, minute=55),
     },
 }
 

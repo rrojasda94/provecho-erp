@@ -5,6 +5,7 @@ import {
   Building2,
   Calculator,
   ChefHat,
+  ClipboardCheck,
   ClipboardList,
   Factory,
   Gauge,
@@ -139,6 +140,15 @@ export const MODULOS: Modulo[] = [
     Icono: Factory,
   },
   {
+    clave: "supervision",
+    nombre: "Supervisión",
+    descripcion: "Tareas de apertura y cierre, checklist y foto",
+    href: "/supervision/mis-tareas",
+    prefijoPermiso: "supervision.",
+    area: "operacion",
+    Icono: ClipboardCheck,
+  },
+  {
     clave: "ventas",
     nombre: "Ventas",
     descripcion: "Jornada, comprobantes y punto de venta",
@@ -173,7 +183,7 @@ export const MODULOS: Modulo[] = [
     Icono: Megaphone,
   },
   {
-    // Sitio de marca (charlies.majambo.com.pe, ADR-101): contenido, fotos y
+    // Sitio de marca (charlies.majambo.com.pe, ADR-103): contenido, fotos y
     // carta que ve el cliente. Es una app aparte del ERP — esto solo edita
     // lo que ese sitio muestra.
     clave: "web",

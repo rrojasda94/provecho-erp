@@ -88,7 +88,7 @@ const DIAS = [
 ] as const;
 
 const MODALIDADES = ["mesa", "takeout", "delivery"] as const;
-// `web` es el sitio de marca (storefront, ADR-101): una promoción con este
+// `web` es el sitio de marca (storefront, ADR-103): una promoción con este
 // canal aparece en charlies.majambo.com.pe (RN-WEB-002).
 const CANALES = ["pdv", "agente_ia", "delivery", "web"] as const;
 

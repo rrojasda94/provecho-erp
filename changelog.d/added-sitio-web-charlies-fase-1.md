@@ -1,5 +1,5 @@
 - **Sitio público de Charlie's Pizzas: `charlies.majambo.com.pe`, PR1**
-  (2026-09-17, ADR-101). App Next.js **separada** del ERP (`storefront/`,
+  (2026-09-17, ADR-103). App Next.js **separada** del ERP (`storefront/`,
   propia imagen de contenedor y bloque de Caddy) — a diferencia de la
   landing del QR (ADR-080), este sitio necesita SEO real, tema propio y
   una superficie de ataque acotada. Solo lectura por ahora: home con

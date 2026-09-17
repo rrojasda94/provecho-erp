@@ -231,23 +231,6 @@ def cerrar(session: Session, entrega_id: uuid.UUID, *, actor_id: uuid.UUID) -> E
     return entrega
 
 
-def cerrar_por_venta_entregada(
-    session: Session, venta_id: uuid.UUID, *, entregado_por: uuid.UUID | None
-) -> None:
-    """`sales.venta_entregada` llegó por el KDS, no por el tablero de
-    reparto: si había una `entrega` abierta, se cierra sola (ADR-098) —
-    los dos caminos convergen sin que ninguno importe al otro."""
-    entrega = EntregaRepo(session).get_por_venta(venta_id)
-    if entrega is None or entrega.estado in ("entregada", "cancelada"):
-        return
-    ahora = datetime.now(UTC)
-    entrega.estado = "entregada"
-    entrega.fecha_entrega = ahora
-    entrega.entregado_por = entregado_por
-    entrega.token_expira_at = token_expira_en(ahora)
-    session.flush()
-
-
 def cancelar_por_venta_anulada(session: Session, venta_id: uuid.UUID) -> None:
     """RN-DLV-006: si la entrega seguía `pendiente`/`asignada`, se cancela
     sola. `en_ruta` no se toca acá — el repartidor puede estar a mitad de
@@ -313,9 +296,7 @@ def _nombre_repartidor(session: Session, repartidor_id: uuid.UUID | None) -> str
 def _con_venta_y_repartidor(session: Session, entrega: Entrega) -> dict:
     venta = venta_para_reparto(session, entrega.venta_id)
     contacto = (
-        contacto_de_cliente(session, venta["cliente_id"])
-        if venta and venta["cliente_id"]
-        else None
+        contacto_de_cliente(session, venta["cliente_id"]) if venta and venta["cliente_id"] else None
     )
     return {
         "id": entrega.id,

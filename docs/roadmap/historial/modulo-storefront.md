@@ -1,6 +1,6 @@
 # Historial — Módulo `storefront`
 
-Estado vigente: 🔶 En curso — PR1 implementado (2026-09-17, ADR-101): sitio
+Estado vigente: 🔶 En curso — PR1 implementado (2026-09-17, ADR-103): sitio
 público de solo lectura para Charlie's Pizzas en `charlies.majambo.com.pe`,
 servido por una app Next.js separada del ERP (`storefront/`). Cuentas de
 cliente, direcciones/favoritos, carrito y checkout con pagos (Izipay) quedan
@@ -9,7 +9,7 @@ para PR2/PR3; Playwright del sitio y SEO (sitemap, OG) para PR4. Ver
 
 ## Cronología
 
-### 2026-09-17 — PR1: sitio público, CMS y fotos (ADR-101)
+### 2026-09-17 — PR1: sitio público, CMS y fotos (ADR-103)
 
 Encargo del usuario: una web de marca completa para Charlie's Pizzas
 (catálogo con fotos e ingredientes, promos web, locales en mapa, cuentas
@@ -18,7 +18,7 @@ insumos externos: brand guideline de Charlie's (`brand-voice-guidelines.md`,
 `majambo.md` §3.1, `Brandbook_CharliesPizza.pdf`) y un prototipo de
 storefront ya construido con Claude Design, portado a HTML/JS estándar.
 
-Decisión de arquitectura central (ADR-101): el sitio vive en una **app Next
+Decisión de arquitectura central (ADR-103): el sitio vive en una **app Next
 separada** (`storefront/`), no en una ruta más del proceso `web` compartido
 con el ERP como hizo ADR-080 para la landing del QR — el sitio de marca
 necesita SEO real, tema y CSP propios (paleta verde/crema del brandbook de

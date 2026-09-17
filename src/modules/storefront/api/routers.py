@@ -1,5 +1,5 @@
 """Gestión del sitio de marca: CMS de contenido y fotos de catálogo
-(JWT + `storefront.leer`/`storefront.editar`, ADR-101)."""
+(JWT + `storefront.leer`/`storefront.editar`, ADR-103)."""
 
 import uuid
 

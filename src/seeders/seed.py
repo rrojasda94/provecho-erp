@@ -370,7 +370,15 @@ PERMISOS = [
     ),
     (
         "storefront.editar",
-        "Editar textos, fotos y disponibilidad del sitio de marca (ADR-101)",
+        "Editar textos, fotos y disponibilidad del sitio de marca (ADR-103)",
+        "supervision.gestionar",
+        "Administrar categorías, plantillas de tarea y asignación de "
+        "tareas de apertura/cierre de sucursal",
+    ),
+    ("supervision.leer", "Consultar tareas, plantillas e informes de supervisión"),
+    (
+        "supervision.ejecutar",
+        "Ver y completar las tareas de supervisión que le fueron asignadas",
     ),
 ] + [
     # Un permiso por módulo: cada área propone parámetros de lo suyo y de nada
@@ -466,6 +474,11 @@ ROLES = {
         # Lee el acta pero no la firma: decidir es de Gerencia (RN-GER-002),
         # ejecutar es del área (RN-GER-005).
         "gerencia.leer_decisiones",
+        # Programa las tareas de apertura/cierre de su local y de su marca,
+        # las reasigna y revisa el checklist y la foto de cada una — es
+        # justo el encargado/supervisor de los SOP de apertura y limpieza.
+        "supervision.gestionar",
+        "supervision.leer",
     ],
     "cajero": [
         "sales.crear",
@@ -477,15 +490,19 @@ ROLES = {
         # Ve el tablero para saber si un pedido delivery ya salió, no
         # despacha (eso es del encargado/despachador).
         "delivery.leer",
+        # Ve y completa sus propias tareas de apertura/cierre de salón
+        # (checklist de limpieza, caja) — nunca las de otro (RN-SUP-003).
+        "supervision.ejecutar",
     ],
     # Cocina avanza la preparación pero NO cierra la entrega (RN-CUP-006).
-    "cocinero": ["kds.operar", "sales.leer"],
+    "cocinero": ["kds.operar", "sales.leer", "supervision.ejecutar"],
     "despachador": [
         "kds.operar",
         "sales.leer",
         "sales.entregar_pedido",
         "delivery.leer",
         "delivery.despachar",
+        "supervision.ejecutar",
     ],
     # Repartidor propio (ADR-098): solo ve y resuelve sus propias rutas —
     # `delivery.repartir` sin `delivery.despachar` no alcanza la de nadie
@@ -509,6 +526,7 @@ ROLES = {
         # da de baja, eso es de quien administra o del encargado del local.
         "assets.leer",
         "assets.mantener",
+        "supervision.ejecutar",
     ],
     "agente_ia": ["sales.crear_pedido"],
     # Cuenta de servicio del hub de sucursal (ADR-009): lo mínimo para
@@ -548,6 +566,12 @@ ROLES = {
         "production.planificar",
         "production.verificar_inocuidad",
         "production.visar_reporte_jornada",
+        # Revisa el checklist de apertura/cierre de cocina de su turno
+        # (mismo criterio que `checklist_inocuidad_turno`) y completa las
+        # tareas que le asignen — no gestiona plantillas, eso es del
+        # supervisor.
+        "supervision.leer",
+        "supervision.ejecutar",
     ],
     "contador": [
         "accounting.cuenta_administrar",
@@ -610,7 +634,7 @@ ROLES = {
         "marketing.agencia_evaluar",
         "sales.leer_clientes_externos",
         # El sitio de marca es la vitrina digital: mismo dueño que el resto
-        # de contenido/campañas (ADR-101).
+        # de contenido/campañas (ADR-103).
         "storefront.leer",
         "storefront.editar",
     ],
@@ -987,7 +1011,7 @@ def _seed_promocion_cupon(session: Session) -> None:
 
 
 def _seed_storefront_contenido(session: Session) -> None:
-    """Contenido inicial del sitio de marca (ADR-101), tomado de
+    """Contenido inicial del sitio de marca (ADR-103), tomado de
     `majambo.md` §3.1 — historia, contacto y horario público de delivery.
     `_get_or_create` no toca lo ya editado desde el ERP: correr el seeder
     de nuevo no pisa lo que Marketing haya cambiado a mano."""

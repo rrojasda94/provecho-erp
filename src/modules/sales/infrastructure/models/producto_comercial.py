@@ -45,7 +45,7 @@ class ProductoComercial(Base, UuidPkMixin, TimestampMixin):
     id_interno: Mapped[str] = mapped_column(String(8), unique=True)
     marca_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("marca.id"))
     nombre: Mapped[str] = mapped_column(String(150))
-    # Copy para la ficha pública del sitio de marca (storefront, ADR-101).
+    # Copy para la ficha pública del sitio de marca (storefront, ADR-103).
     # Nunca obligatoria: un producto sin descripción sigue vendiéndose en
     # el PDV igual que hoy.
     descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)

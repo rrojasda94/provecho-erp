@@ -1,4 +1,4 @@
-"""Fotos de catalogo del sitio de marca (`/storefront/fotos/*`, ADR-101):
+"""Fotos de catalogo del sitio de marca (`/storefront/fotos/*`, ADR-103):
 presign a S3, registro, listado y borrado. Mismo patron que
 `test_assets.py::test_presign_adjunto_y_registro_completo`.
 """

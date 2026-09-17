@@ -158,7 +158,7 @@ services:
     depends_on:
       - api
 
-  # Sitio de marca Charlie's Pizzas (ADR-101), app Next SEPARADA de `web`:
+  # Sitio de marca Charlie's Pizzas (ADR-103), app Next SEPARADA de `web`:
   # proceso, tema y CSP propios — no comparte nada con el ERP salvo la API.
   charlies:
     build:

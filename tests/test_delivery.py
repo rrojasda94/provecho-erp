@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
 import src.core.models_registry  # noqa: F401
@@ -298,7 +298,9 @@ def test_tablero_muestra_venta_lista_y_la_saca_al_asignar(env):
     assert venta_id not in [v["id"] for v in r3.json()["sin_asignar"]]
 
 
-def test_tablero_no_muestra_pedido_a_medio_preparar(env):
+def test_tablero_muestra_pedido_a_medio_preparar_como_no_listo(env):
+    """RN-DLV-001: el despacho rutea desde que se toma el pedido, esté o no
+    listo — solo `lista=False` avisa que sigue en cocina."""
     client, ids, headers, TestSession = env
     with TestSession() as s:
         _crear_venta_delivery(s, ids, estados_items=("pendiente",))
@@ -308,7 +310,31 @@ def test_tablero_no_muestra_pedido_a_medio_preparar(env):
         params={"sucursal_id": ids["sucursal_id"]},
         headers=headers["aprobador1"],
     )
-    assert r.json()["sin_asignar"] == []
+    sin_asignar = r.json()["sin_asignar"]
+    assert len(sin_asignar) == 1
+    assert sin_asignar[0]["lista"] is False
+
+
+def test_no_se_inicia_una_ruta_con_un_pedido_en_cocina(env):
+    client, ids, headers, TestSession = env
+    with TestSession() as s:
+        venta = _crear_venta_delivery(s, ids, estados_items=("pendiente",))
+        venta_id = str(venta.id)
+
+    r = client.post(
+        "/api/v1/delivery/rutas",
+        headers=headers["aprobador1"],
+        json={
+            "sucursal_id": ids["sucursal_id"],
+            "repartidor_id": ids["repartidor1_id"],
+            "venta_ids": [venta_id],
+        },
+    )
+    assert r.status_code == 201, r.text
+    ruta_id = r.json()["id"]
+
+    r2 = client.post(f"/api/v1/delivery/rutas/{ruta_id}/iniciar", headers=headers["aprobador1"])
+    assert r2.status_code == 409
 
 
 def test_tablero_muestra_el_repartidor_y_las_paradas_de_cada_ruta(env):
@@ -676,12 +702,183 @@ def test_no_se_cancela_una_ruta_en_curso(env):
     assert r.status_code == 409
 
 
+def test_se_puede_rutear_de_nuevo_una_venta_cuya_ruta_se_cancelo(env):
+    """Bug latente cerrado: cancelar dejaba la `entrega` en `pendiente`, que
+    contaba como "ya ruteada" y chocaba con `uq_entrega_venta` al volver a
+    crear una ruta con la misma venta."""
+    client, ids, headers, TestSession = env
+    venta_id, ruta_id, entrega_id = _crear_y_asignar_ruta(client, ids, headers, TestSession)
+    client.post(f"/api/v1/delivery/rutas/{ruta_id}/cancelar", headers=headers["aprobador1"])
+
+    r = client.get(
+        "/api/v1/delivery/tablero",
+        params={"sucursal_id": ids["sucursal_id"]},
+        headers=headers["aprobador1"],
+    )
+    assert venta_id in [v["id"] for v in r.json()["sin_asignar"]]
+
+    r2 = client.post(
+        "/api/v1/delivery/rutas",
+        headers=headers["aprobador1"],
+        json={
+            "sucursal_id": ids["sucursal_id"],
+            "repartidor_id": ids["repartidor1_id"],
+            "venta_ids": [venta_id],
+        },
+    )
+    assert r2.status_code == 201, r2.text
+
+    with TestSession() as s:
+        # Misma fila reusada, no una segunda (`uq_entrega_venta`).
+        assert s.get(Entrega, uuid.UUID(entrega_id)).ruta_id == uuid.UUID(r2.json()["id"])
+        cuenta = s.scalar(
+            select(func.count()).select_from(Entrega).where(Entrega.venta_id == uuid.UUID(venta_id))
+        )
+        assert cuenta == 1
+
+
+# --- Editar paradas --------------------------------------------------------------
+def test_editar_paradas_quita_una_no_resuelta_y_la_deja_pendiente(env):
+    client, ids, headers, TestSession = env
+    with TestSession() as s:
+        venta_a = _crear_venta_delivery(s, ids)
+        venta_b = _crear_venta_delivery(s, ids)
+
+    r = client.post(
+        "/api/v1/delivery/rutas",
+        headers=headers["aprobador1"],
+        json={
+            "sucursal_id": ids["sucursal_id"],
+            "repartidor_id": ids["repartidor1_id"],
+            "venta_ids": [str(venta_a.id), str(venta_b.id)],
+        },
+    )
+    assert r.status_code == 201, r.text
+    ruta_id = r.json()["id"]
+
+    r2 = client.put(
+        f"/api/v1/delivery/rutas/{ruta_id}/paradas",
+        headers=headers["aprobador1"],
+        json={"venta_ids": [str(venta_a.id)]},
+    )
+    assert r2.status_code == 200
+    with TestSession() as s:
+        entrega_b = s.scalar(select(Entrega).where(Entrega.venta_id == venta_b.id))
+        assert entrega_b.estado == "pendiente"
+        assert entrega_b.ruta_id is None
+
+
+def test_editar_paradas_cambia_el_repartidor(env):
+    client, ids, headers, TestSession = env
+    venta_id, ruta_id, entrega_id = _crear_y_asignar_ruta(client, ids, headers, TestSession)
+
+    r = client.put(
+        f"/api/v1/delivery/rutas/{ruta_id}/paradas",
+        headers=headers["aprobador1"],
+        json={"venta_ids": [venta_id], "repartidor_id": ids["repartidor2_id"]},
+    )
+    assert r.status_code == 200
+    assert r.json()["repartidor_id"] == ids["repartidor2_id"]
+    with TestSession() as s:
+        assert s.get(Entrega, uuid.UUID(entrega_id)).repartidor_id == uuid.UUID(
+            ids["repartidor2_id"]
+        )
+
+    # El nuevo repartidor puede entregar; `kevinrep` (el original) ya no.
+    r2 = client.post(
+        f"/api/v1/delivery/entregas/{entrega_id}/entregar",
+        headers=headers["kevinrep"],
+        json={},
+    )
+    assert r2.status_code == 403
+
+
+def test_editar_paradas_en_ruta_en_curso_quita_y_agrega(env):
+    """RN-DLV-005 extendida: una ruta en curso se edita — se le puede sacar
+    una parada no resuelta y agregarle un pedido nuevo ya listo — y lo
+    resuelto no se toca."""
+    client, ids, headers, TestSession = env
+    with TestSession() as s:
+        venta_a = _crear_venta_delivery(s, ids)
+        venta_b = _crear_venta_delivery(s, ids)
+        venta_c = _crear_venta_delivery(s, ids)
+
+    r = client.post(
+        "/api/v1/delivery/rutas",
+        headers=headers["aprobador1"],
+        json={
+            "sucursal_id": ids["sucursal_id"],
+            "repartidor_id": ids["repartidor1_id"],
+            "venta_ids": [str(venta_a.id), str(venta_b.id)],
+            "optimizar": False,
+        },
+    )
+    assert r.status_code == 201, r.text
+    ruta_id = r.json()["id"]
+    client.post(f"/api/v1/delivery/rutas/{ruta_id}/iniciar", headers=headers["aprobador1"])
+
+    with TestSession() as s:
+        entrega_a = s.scalar(select(Entrega).where(Entrega.venta_id == venta_a.id))
+        entregar_a_id = str(entrega_a.id)
+    r2 = client.post(
+        f"/api/v1/delivery/entregas/{entregar_a_id}/entregar",
+        headers=headers["kevinrep"],
+        json={},
+    )
+    assert r2.status_code == 200
+
+    # Saca B (no resuelta) y agrega C — A (ya entregada) queda intacta.
+    r3 = client.put(
+        f"/api/v1/delivery/rutas/{ruta_id}/paradas",
+        headers=headers["aprobador1"],
+        json={"venta_ids": [str(venta_c.id)]},
+    )
+    assert r3.status_code == 200
+
+    with TestSession() as s:
+        entrega_a = s.scalar(select(Entrega).where(Entrega.venta_id == venta_a.id))
+        entrega_b = s.scalar(select(Entrega).where(Entrega.venta_id == venta_b.id))
+        entrega_c = s.scalar(select(Entrega).where(Entrega.venta_id == venta_c.id))
+        assert entrega_a.estado == "entregada"
+        assert entrega_a.ruta_id == uuid.UUID(ruta_id)
+        assert entrega_b.estado == "pendiente"
+        assert entrega_b.ruta_id is None
+        assert entrega_c.estado == "en_ruta"
+        assert entrega_c.ruta_id == uuid.UUID(ruta_id)
+
+
+def test_no_se_agrega_a_una_ruta_en_curso_un_pedido_en_cocina(env):
+    client, ids, headers, TestSession = env
+    with TestSession() as s:
+        venta_lista = _crear_venta_delivery(s, ids)
+        venta_en_cocina = _crear_venta_delivery(s, ids, estados_items=("pendiente",))
+
+    r = client.post(
+        "/api/v1/delivery/rutas",
+        headers=headers["aprobador1"],
+        json={
+            "sucursal_id": ids["sucursal_id"],
+            "repartidor_id": ids["repartidor1_id"],
+            "venta_ids": [str(venta_lista.id)],
+        },
+    )
+    ruta_id = r.json()["id"]
+    client.post(f"/api/v1/delivery/rutas/{ruta_id}/iniciar", headers=headers["aprobador1"])
+
+    r2 = client.put(
+        f"/api/v1/delivery/rutas/{ruta_id}/paradas",
+        headers=headers["aprobador1"],
+        json={"venta_ids": [str(venta_lista.id), str(venta_en_cocina.id)]},
+    )
+    assert r2.status_code == 409
+
+
 # --- Convergencia con sales (KDS y anulación) ------------------------------------
-def test_entrega_desde_el_kds_cierra_la_entrega_de_delivery(env):
-    """El despacho marca la venta entregada por `POST
-    /sales/ventas/{id}/entrega` (el botón del KDS) en vez de por el
-    tablero de reparto: `delivery` se entera por `sales.venta_entregada`
-    y cierra la entrega abierta sola (ADR-098)."""
+def test_despachar_desde_el_kds_no_cierra_la_entrega_de_delivery(env):
+    """ADR-101: `POST /sales/ventas/{id}/entrega` (el botón del KDS) ya no
+    cierra la `entrega` de reparto — solo saca el pedido de la cola de
+    cocina/despacho. Cerrarla es del repartidor (o de despacho en su
+    nombre), nunca de un evento de `sales`."""
     client, ids, headers, TestSession = env
     venta_id, ruta_id, entrega_id = _crear_y_asignar_ruta(client, ids, headers, TestSession)
     client.post(f"/api/v1/delivery/rutas/{ruta_id}/iniciar", headers=headers["aprobador1"])
@@ -691,7 +888,14 @@ def test_entrega_desde_el_kds_cierra_la_entrega_de_delivery(env):
 
     with TestSession() as s:
         entrega = s.get(Entrega, uuid.UUID(entrega_id))
-        assert entrega.estado == "entregada"
+        assert entrega.estado == "en_ruta"
+
+    r2 = client.get(
+        "/api/v1/delivery/tablero",
+        params={"sucursal_id": ids["sucursal_id"]},
+        headers=headers["aprobador1"],
+    )
+    assert any(ruta["id"] == ruta_id for ruta in r2.json()["rutas"])
 
 
 def test_anular_la_venta_cancela_la_entrega_pendiente(env):

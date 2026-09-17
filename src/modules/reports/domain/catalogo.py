@@ -649,6 +649,39 @@ CATALOGO: tuple[Emision, ...] = (
         # cargo — y el recordatorio le llega a él por su propia bandeja.
         clave_actor="",
     ),
+    # --- supervision -----------------------------------------------------------
+    # `clave_actor=""` a propósito, mismo criterio que `production.
+    # reporte_produccion_generado`: lo genera el barrido de cierre de
+    # jornada (o el endpoint manual), y cerrar el día no es un acto de
+    # autoridad de una persona.
+    Emision(
+        codigo="supervision.informe_diario_generado",
+        nombre="Informe diario de supervisión",
+        descripcion=(
+            "Se cerró la jornada de tareas de apertura/cierre de una "
+            "sucursal (RN-SUP-007): cuántas se completaron, cuántas "
+            "quedaron vencidas y cuántas fotos de evidencia no cayeron "
+            "dentro de la ventana esperada."
+        ),
+        permiso="supervision.leer",
+        nivel="aviso",
+        ambito="sucursal",
+        campos=(
+            "informe_id",
+            "sucursal_id",
+            "fecha",
+            "total",
+            "completadas",
+            "vencidas",
+            "fotos_invalidas",
+        ),
+        titulo="Informe de supervisión del {fecha}: {completadas}/{total} completadas",
+        cuerpo="{vencidas} vencida(s), {fotos_invalidas} foto(s) fuera de ventana.",
+        areas_sugeridas=("gerencia",),
+        referencia_tipo="informe_supervision",
+        clave_referencia="informe_id",
+        clave_actor="",
+    ),
     Emision(
         codigo="reports.escalamiento_resuelto",
         nombre="Escalamiento resuelto",

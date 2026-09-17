@@ -1,5 +1,5 @@
 """Gestion del CMS minimo del sitio de marca (`/storefront/contenido`,
-ADR-101): permisos (`storefront.leer`/`storefront.editar`) y validacion
+ADR-103): permisos (`storefront.leer`/`storefront.editar`) y validacion
 de forma por clave.
 """
 

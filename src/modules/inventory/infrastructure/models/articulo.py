@@ -23,7 +23,7 @@ class Articulo(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     id_interno: Mapped[str] = mapped_column(String(8))
     nombre: Mapped[str] = mapped_column(String(150))
     # Copy para el diálogo de ingrediente del sitio de marca (storefront,
-    # ADR-101). Nunca obligatoria.
+    # ADR-103). Nunca obligatoria.
     descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)
     categoria_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("categoria.id"), nullable=True

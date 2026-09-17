@@ -3,7 +3,7 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
-- ✅ 2026-09-17 **PR1** (ADR-101): módulo `storefront`, app `storefront/`
+- ✅ 2026-09-17 **PR1** (ADR-103): módulo `storefront`, app `storefront/`
   separada del ERP, sitio público de solo lectura de
   `charlies.majambo.com.pe` (home, carta con búsqueda/filtros/ingredientes
   clicables, mapa de locales, "Nosotros", "Trabaja con nosotros"), CMS de
@@ -15,7 +15,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   - ⬜ **Fuentes de marca sin llegar.** Isidora Black/Tusker Grotesk
     (brandbook) todavía no están en `storefront/public/fonts/`: el sitio
     corre con el fallback Anton+Archivo (Google Fonts) declarado en
-    ADR-101 §12. Reemplazar cuando el brandbook las entregue como
+    ADR-103 §12. Reemplazar cuando el brandbook las entregue como
     archivos, sin tocar el resto de `globals.css`.
   - ⬜ **Logo provisional.** `storefront/public/marcas/logo.png` viene del
     prototipo portado, no del brandbook oficial — ver

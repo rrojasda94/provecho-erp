@@ -46,6 +46,7 @@ from src.modules.sales.api.routers import router as sales_router
 from src.modules.sales.application import listeners as sales_listeners
 from src.modules.storefront.api.publico_routers import router as storefront_publico_router
 from src.modules.storefront.api.routers import router as storefront_router
+from src.modules.supervision.api.routers import router as supervision_router
 from src.modules.users.api import error_handlers as users_error_handlers
 from src.modules.users.api.routers import router as users_router
 from src.modules.users.application import listeners as users_listeners
@@ -72,7 +73,7 @@ TAGS_METADATA = [
     {
         "name": "storefront",
         "description": (
-            "Sitio público de marca (charlies.majambo.com.pe, ADR-101): "
+            "Sitio público de marca (charlies.majambo.com.pe, ADR-103): "
             "CMS de contenido y fotos (JWT) + carta/sucursales/promociones/"
             "convocatorias públicas (sin JWT, rate limit por IP)."
         ),
@@ -139,6 +140,14 @@ TAGS_METADATA = [
     {
         "name": "production",
         "description": "Órdenes de producción (fabricación) y costeo.",
+    },
+    {
+        "name": "supervision",
+        "description": (
+            "Tareas programadas de apertura y cierre de local, por categoría "
+            "y frecuencia, con checklist y evidencia fotográfica. El informe "
+            "diario por sucursal se emite al módulo `reports`."
+        ),
     },
     {
         "name": "accounting",
@@ -354,6 +363,7 @@ def create_app() -> FastAPI:
     app.include_router(rrhh_router, prefix="/api/v1")
     app.include_router(storefront_router, prefix="/api/v1")
     app.include_router(marketing_router, prefix="/api/v1")
+    app.include_router(supervision_router, prefix="/api/v1")
     # Sin JWT a propósito: el cliente que contesta la encuesta no es usuario
     # del ERP, y Meta tampoco. Cada uno trae su propia credencial — el token
     # del enlace y la firma HMAC del webhook.
@@ -368,7 +378,7 @@ def create_app() -> FastAPI:
     # el rate limit por IP es lo que impide probar tokens a fuerza bruta.
     app.include_router(delivery_publico_router, prefix="/api/v1")
     # Sin JWT: el sitio de marca es una app aparte que ningún cliente del
-    # restaurante loguea como personal del ERP (ADR-101). Rate limit por IP,
+    # restaurante loguea como personal del ERP (ADR-103). Rate limit por IP,
     # nunca escribe.
     app.include_router(storefront_publico_router, prefix="/api/v1")
     app.include_router(marketing_webhook_router, prefix="/api/v1")
