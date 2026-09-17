@@ -7307,6 +7307,193 @@
         "title": "ComprobanteRecibidoOut",
         "type": "object"
       },
+      "ConfirmarPedidoIn": {
+        "properties": {
+          "direccion_entrega": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion Entrega"
+          },
+          "email_contacto": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Contacto"
+          },
+          "idempotency_key": {
+            "maxLength": 100,
+            "minLength": 8,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemPedidoIn"
+            },
+            "maxItems": 30,
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          },
+          "medio_pago": {
+            "enum": [
+              "efectivo",
+              "izipay"
+            ],
+            "title": "Medio Pago",
+            "type": "string"
+          },
+          "modalidad": {
+            "enum": [
+              "takeout",
+              "delivery"
+            ],
+            "title": "Modalidad",
+            "type": "string"
+          },
+          "nombre_contacto": {
+            "maxLength": 150,
+            "minLength": 2,
+            "title": "Nombre Contacto",
+            "type": "string"
+          },
+          "nombre_o_razon_social": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre O Razon Social"
+          },
+          "numero_documento": {
+            "anyOf": [
+              {
+                "maxLength": 15,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "telefono_contacto": {
+            "maxLength": 20,
+            "minLength": 6,
+            "title": "Telefono Contacto",
+            "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
+          }
+        },
+        "required": [
+          "modalidad",
+          "items",
+          "nombre_contacto",
+          "telefono_contacto",
+          "medio_pago",
+          "idempotency_key"
+        ],
+        "title": "ConfirmarPedidoIn",
+        "type": "object"
+      },
       "ConformidadComprobanteCreate": {
         "properties": {
           "correlativo": {
@@ -9086,6 +9273,153 @@
           "derivar_a_externo"
         ],
         "title": "CotizacionDeliveryOut",
+        "type": "object"
+      },
+      "CotizacionOut": {
+        "properties": {
+          "costo_delivery": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Delivery"
+          },
+          "distancia_km": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distancia Km"
+          },
+          "eta_max": {
+            "title": "Eta Max",
+            "type": "integer"
+          },
+          "eta_min": {
+            "title": "Eta Min",
+            "type": "integer"
+          },
+          "sucursal_id": {
+            "format": "uuid",
+            "title": "Sucursal Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sucursal_id",
+          "eta_min",
+          "eta_max"
+        ],
+        "title": "CotizacionOut",
+        "type": "object"
+      },
+      "CotizarPedidoIn": {
+        "properties": {
+          "modalidad": {
+            "enum": [
+              "takeout",
+              "delivery"
+            ],
+            "title": "Modalidad",
+            "type": "string"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
+          }
+        },
+        "required": [
+          "modalidad"
+        ],
+        "title": "CotizarPedidoIn",
         "type": "object"
       },
       "CriterioIn": {
@@ -15283,6 +15617,51 @@
           "estado"
         ],
         "title": "ItemColaOut",
+        "type": "object"
+      },
+      "ItemPedidoIn": {
+        "properties": {
+          "cantidad": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 20.0,
+            "title": "Cantidad",
+            "type": "integer"
+          },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto_comercial_id",
+          "cantidad"
+        ],
+        "title": "ItemPedidoIn",
+        "type": "object"
+      },
+      "ItemPedidoOut": {
+        "properties": {
+          "cantidad": {
+            "title": "Cantidad",
+            "type": "integer"
+          },
+          "nombre_congelado": {
+            "title": "Nombre Congelado",
+            "type": "string"
+          },
+          "precio_unitario_congelado": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Unitario Congelado",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre_congelado",
+          "cantidad",
+          "precio_unitario_congelado"
+        ],
+        "title": "ItemPedidoOut",
         "type": "object"
       },
       "LeadAtribuir": {
@@ -22829,6 +23208,147 @@
           "entregado_en"
         ],
         "title": "PedidoHistorialOut",
+        "type": "object"
+      },
+      "PedidoOut": {
+        "properties": {
+          "costo_delivery_estimado": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Costo Delivery Estimado"
+          },
+          "estado": {
+            "enum": [
+              "pendiente",
+              "confirmado",
+              "fallido"
+            ],
+            "title": "Estado",
+            "type": "string"
+          },
+          "eta_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta Max"
+          },
+          "eta_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eta Min"
+          },
+          "fallo_motivo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallo Motivo"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ItemPedidoOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "medio_pago": {
+            "enum": [
+              "efectivo",
+              "izipay"
+            ],
+            "title": "Medio Pago",
+            "type": "string"
+          },
+          "modalidad": {
+            "enum": [
+              "takeout",
+              "delivery"
+            ],
+            "title": "Modalidad",
+            "type": "string"
+          },
+          "numero_orden": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Orden"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          },
+          "token_acceso": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token Acceso"
+          },
+          "total_estimado": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Estimado",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "estado",
+          "numero_orden",
+          "fallo_motivo",
+          "modalidad",
+          "sucursal_id",
+          "medio_pago",
+          "total_estimado",
+          "costo_delivery_estimado",
+          "eta_min",
+          "eta_max"
+        ],
+        "title": "PedidoOut",
         "type": "object"
       },
       "PeriodoContableCreate": {
@@ -68509,6 +69029,145 @@
           }
         },
         "summary": "Ver Ingrediente",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/publico/pedidos": {
+      "post": {
+        "operationId": "confirmar_pedido_api_v1_storefront_publico_pedidos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmarPedidoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PedidoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Confirmar Pedido",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/publico/pedidos/cotizar": {
+      "post": {
+        "operationId": "cotizar_pedido_api_v1_storefront_publico_pedidos_cotizar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CotizarPedidoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CotizacionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Cotizar Pedido",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/publico/pedidos/{pedido_id}": {
+      "get": {
+        "operationId": "ver_pedido_api_v1_storefront_publico_pedidos__pedido_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "pedido_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Pedido Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PedidoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Ver Pedido",
         "tags": [
           "storefront"
         ]

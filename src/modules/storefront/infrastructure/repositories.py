@@ -10,6 +10,8 @@ from src.modules.storefront.infrastructure.models import (
     StorefrontCuenta,
     StorefrontDireccion,
     StorefrontFavorito,
+    StorefrontPedido,
+    StorefrontPedidoItem,
     StorefrontRefreshToken,
 )
 
@@ -150,3 +152,54 @@ class FavoritoRepo:
 
     def borrar(self, favorito: StorefrontFavorito) -> None:
         self.s.delete(favorito)
+
+
+class PedidoRepo:
+    def __init__(self, session: Session):
+        self.s = session
+
+    def get(self, pedido_id: uuid.UUID) -> StorefrontPedido | None:
+        return self.s.get(StorefrontPedido, pedido_id)
+
+    def get_by_idempotency(self, key: str) -> StorefrontPedido | None:
+        return self.s.scalar(
+            select(StorefrontPedido).where(StorefrontPedido.idempotency_key == key)
+        )
+
+    def get_by_venta(self, venta_id: uuid.UUID) -> StorefrontPedido | None:
+        return self.s.scalar(
+            select(StorefrontPedido).where(StorefrontPedido.venta_id == venta_id)
+        )
+
+    def listar_de_cuenta(self, cuenta_id: uuid.UUID) -> list[StorefrontPedido]:
+        return list(
+            self.s.scalars(
+                select(StorefrontPedido)
+                .where(StorefrontPedido.cuenta_id == cuenta_id)
+                .order_by(StorefrontPedido.created_at.desc())
+            )
+        )
+
+    def add(self, pedido: StorefrontPedido) -> StorefrontPedido:
+        self.s.add(pedido)
+        self.s.flush()
+        return pedido
+
+
+class PedidoItemRepo:
+    def __init__(self, session: Session):
+        self.s = session
+
+    def listar(self, pedido_id: uuid.UUID) -> list[StorefrontPedidoItem]:
+        return list(
+            self.s.scalars(
+                select(StorefrontPedidoItem).where(
+                    StorefrontPedidoItem.pedido_id == pedido_id
+                )
+            )
+        )
+
+    def add(self, item: StorefrontPedidoItem) -> StorefrontPedidoItem:
+        self.s.add(item)
+        self.s.flush()
+        return item

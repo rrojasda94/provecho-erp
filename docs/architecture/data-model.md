@@ -2146,6 +2146,26 @@ Credencial separada del ERP — ver ADR-102 para el detalle del aislamiento.
 | `storefront_favorito` | `cuenta_id` (FK), `producto_comercial_id` (FK) | `UNIQUE(cuenta_id, producto_comercial_id)`, sin soft delete |
 | `storefront_refresh_token` | `cuenta_id` (FK), `token_hash` (único), `sesion_id`, `expira_en`, `revocado` | Mismo mecanismo de rotación que `refresh_token` del ERP, tabla propia |
 
+### Pedido del sitio de marca (ADR-103, PR3)
+
+`storefront` es dueño del pedido hasta que `sales` lo confirma como
+`Venta` (canal `web`, ver más abajo) — ver ADR-103 para el flujo por
+eventos y por qué el efectivo no llama a `registrar_pago` de inmediato.
+
+| Tabla | Columnas propias | Notas |
+|---|---|---|
+| `storefront_pedido` | `marca_id` (FK), `cuenta_id` (FK, nullable — invitado), `nombre_contacto`, `telefono_contacto`, `email_contacto`, `modalidad` (`takeout`\|`delivery`), `sucursal_id` (FK, nullable hasta asignarse), `direccion_entrega`, `medio_pago` (`efectivo`\|`izipay`), `numero_documento`, `nombre_o_razon_social`, `total_estimado`, `costo_delivery_estimado`, `distancia_km_estimada`, `eta_min`, `eta_max`, `estado` (`pendiente`\|`confirmado`\|`fallido`), `fallo_motivo`, `venta_id` (FK `venta`, único, nullable), `numero_orden`, `idempotency_key` (único), `token_acceso` (único) + `UbicacionMixin` (destino del delivery) | `token_acceso` deja que un invitado sin cuenta consulte su pedido sin login |
+| `storefront_pedido_item` | `pedido_id` (FK), `producto_comercial_id` (FK), `nombre_congelado`, `cantidad`, `precio_unitario_congelado` | Foto del checkout para mostrar; el precio real lo vuelve a fijar `sales` al confirmar (RN-PRC-003) |
+
+### `venta.canal`/`lista_precio.canal` ganan `web` (ADR-103, PR3)
+
+`sales.domain.rules.CANALES` pasa de `{pdv, agente_ia, delivery}` a
+`{pdv, agente_ia, delivery, web}` — el `CheckConstraint`/`Enum` de ambas
+tablas se actualiza en la migración `3070159f64bd` (drop + create del
+`CHECK`, Postgres no permite alterarlo in place). `PuntoVenta.canal` ya
+admitía `web` desde antes (ADR-080/PR1); lo nuevo es que una `Venta` puede
+tener ese mismo valor.
+
 ### `archivo.entidad_tipo` nuevos (tabla `archivo`, `src/shared/models/archivo.py`)
 
 `"producto_comercial_foto"` y `"articulo_foto"` — foto principal = la más

@@ -1,4 +1,4 @@
-# Deuda técnica — Módulo storefront (sitio de marca, PR1+PR2 — deuda declarada)
+# Deuda técnica — Módulo storefront (sitio de marca, PR1+PR2+PR3 — deuda declarada)
 
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
@@ -65,3 +65,37 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     `storefront_direccion` deben poder anonimizarse igual que `persona`,
     pero el flujo real de solicitudes ARCO (`rrhh`/`users`) todavía no
     conoce estas tablas.
+
+- ✅ 2026-09-17 **PR3** (ADR-103/ADR-104): carrito, checkout invitado o
+  logueado, asignación automática de local, ETA, boleta/factura, efectivo
+  e Izipay, canal `web` en `venta`. Lo que deja abierto:
+  - ⬜ **`IzipayReal` es un esqueleto.** `src/shared/integrations/izipay/`
+    define el `Protocol` y `IzipayFake` (aprueba siempre); `IzipayReal`
+    lanza `NotImplementedError` en sus dos métodos. Sin una cuenta de
+    comercio real no hay contra qué probar el intercambio (redirección,
+    firma del webhook) — completar antes de aceptar un pago real.
+  - ⬜ **Sin extras ni Mitad x Mitad.** El carrito es "producto/tamaño +
+    cantidad"; `sales` no tiene todavía un concepto de extra/combo del que
+    colgarse (ver ADR-103 §6). Necesita diseño conjunto con el negocio
+    antes de construirse.
+  - ⬜ **Boleta/factura del checkout no llega al cajero en efectivo.** La
+    preferencia de comprobante que el cliente tecleó vive en
+    `storefront_pedido`, pero ninguna pantalla del ERP se la muestra a
+    quien cobra al entregar/recoger — hoy hay que volver a pedirla, igual
+    que en cualquier pedido telefónico.
+  - ⬜ **Sin outbox/reconciliación real.** Si el proceso muere entre crear
+    el `storefront_pedido` y publicar el evento (crash, no una excepción de
+    negocio), el pedido queda `pendiente` para siempre y nadie lo repara
+    solo — ADR-103 documenta por qué se prefirió no construir un outbox
+    real todavía (mismo criterio que ADR-016), pero el hueco es real.
+  - ⬜ **ETA y saturación fijos por `.env`, no `parametro_empresa`.** A
+    diferencia de la tarifa de delivery (`delivery_radio_km`), Gerencia no
+    puede tunear `STOREFRONT_ETA_*`/`STOREFRONT_SATURACION_PEDIDOS` sin un
+    despliegue — aceptado para la primera versión, ver ADR-103 §4.
+  - ⬜ **La cotización de delivery evalúa cada sucursal candidata por
+    separado.** Bien para las dos sucursales actuales de Charlie's; una
+    marca con muchas más necesitaría una versión que cotice en lote en vez
+    de una llamada a `tarifa_delivery` por candidata.
+  - ⬜ **Sin Playwright de checkout ni SEO de `/carrito`, `/checkout`,
+    `/pedido/{id}`.** Queda para PR4 (hardening), junto con el resto de la
+    verificación de punta a punta del sitio.

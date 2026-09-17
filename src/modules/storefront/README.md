@@ -41,16 +41,26 @@ a `cliente`. PR3 agrega pedidos (`storefront.pedido_web_confirmado`).
 La superficie pública **nunca** devuelve: `empresa_id`/`grupo_id`, costos,
 datos de `persona` (DNI, teléfono, dirección de terceros), remuneración,
 usuarios/proveedores, cantidades de receta. Solo los campos enumerados en
-cada `*PublicoOut`/`*Out` de `api/schemas.py` y `api/cuentas_schemas.py`.
-Ver `docs/domain/business-rules.md` RN-WEB-001..008.
+cada `*PublicoOut`/`*Out` de `api/schemas.py`, `api/cuentas_schemas.py` y
+`api/pedidos_schemas.py`. Ver `docs/domain/business-rules.md` RN-WEB-001..015.
 
 ## Dependencias (contrato público, nunca dominio ajeno)
 
 - `sales.application.queries_publicas`: `carta_publica`, `marca_de_producto`,
-  `promociones_web_vigentes`, `marca_publica`, `ultimo_pedido_de_cliente`.
+  `promociones_web_vigentes`, `marca_publica`, `ultimo_pedido_de_cliente`,
+  `carga_activa_por_sucursal`, `puntos_venta_web_de_sucursales`,
+  `cotizar_delivery_publico` (los tres últimos, ADR-104/PR3: asignación
+  automática de local y cotización de delivery del checkout).
 - `inventory.application.queries_publicas`: `insumos_de_recetas`, `articulos_publicos`.
 - `users.application.queries_publicas`: `sucursales_publicas_de_marca`, `empresas_de_marca`.
 - `rrhh.application.queries_publicas`: `convocatorias_publicadas`.
+- `users.infrastructure.models.Sucursal` (excepción cruzada global de
+  `tests/test_arquitectura.py`, no un contrato propio): la asignación de
+  local lee `estado`/`marca_id`/`ubicacion_*` directo, igual que cualquier
+  otro módulo del ERP.
+
+`sales` a su vez consume `storefront.pedido_web_confirmado` (ADR-103) —
+ver `docs/architecture/events.md`.
 
 ## Endpoints
 
@@ -67,17 +77,38 @@ Cuenta de cliente (sin JWT del ERP — trae el suyo propio, prefix
 últimos).
 
 Públicos de solo lectura (sin JWT, prefix `/api/v1/storefront/publico`,
-`rate_limit("storefront_publico", 120, 60)`): `GET /contenido`, `/carta`,
+`rate_limit("storefront_publico", 120, 3600)`): `GET /contenido`, `/carta`,
 `/productos/{id}`, `/ingredientes/{id}`, `/sucursales`, `/promociones`,
 `/convocatorias`.
+
+Checkout (sin JWT del ERP; JWT de cuenta **opcional** — invitado admitido,
+RN-WEB-009; rate limit propio `rate_limit("storefront_pedidos", 20,
+3600)` en la confirmación, ADR-103/ADR-104): `POST /publico/pedidos/cotizar`
+(vista previa: sucursal, ETA, costo de delivery), `POST /publico/pedidos`
+(confirma, crea la `Venta` por evento y devuelve el estado final —
+síncrono en la práctica), `GET /publico/pedidos/{id}?token=...` (consulta
+por el `token_acceso` que devolvió la confirmación, para un invitado sin
+cuenta).
 
 ## Configuración
 
 `STOREFRONT_MARCA_ID` (vacío ⇒ públicos responden 404 — "sitio no configurado"),
 `STOREFRONT_SUCURSAL_ID` (vacío ⇒ primera sucursal activa de la marca),
 `STOREFRONT_CANAL`/`STOREFRONT_MODALIDAD` (con qué lista de precios se resuelve
-la carta pública — `delivery`/`delivery` por defecto), `STOREFRONT_URL_POSTULAR_BASE`,
+la carta pública — `web`/`delivery` por defecto desde PR3), `STOREFRONT_URL_POSTULAR_BASE`,
 `STOREFRONT_JWT_SECRET`/`STOREFRONT_ACCESS_TOKEN_MINUTES`/
 `STOREFRONT_REFRESH_TOKEN_DAYS` (credencial de cuenta, ADR-102 — el secreto
 nunca debe coincidir con `JWT_SECRET`), `GOOGLE_OAUTH_CLIENT_ID` (vacío ⇒
-"Continuar con Google" no se ofrece).
+"Continuar con Google" no se ofrece), `STOREFRONT_ETA_BASE_MINUTOS`/
+`STOREFRONT_ETA_MINUTOS_POR_PEDIDO`/`STOREFRONT_SATURACION_PEDIDOS` (ETA y
+asignación de local, ADR-103/104), `IZIPAY_API_KEY`/`IZIPAY_WEBHOOK_SECRET`
+(vacío ⇒ checkout usa `IzipayFake`, ver `src/shared/integrations/izipay/`).
+
+## Prerrequisito de despliegue (PR3)
+
+Cada sucursal que deba recibir pedidos del sitio necesita un
+`PuntoVenta(canal="web")` dado de alta a mano en el ERP (`POST /api/v1/
+sales/puntos-venta`, `politica_pago="adelantado"` obligatorio por
+RN-POS-005) con `modalidades_habilitadas` incluyendo `delivery`/`takeout`
+según corresponda — una sucursal sin ese punto de venta simplemente no
+aparece como candidata, sin error visible en el sitio.

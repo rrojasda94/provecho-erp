@@ -39,6 +39,13 @@ def _marca_id() -> uuid.UUID:
     return uuid.UUID(str(settings.storefront_marca_id))
 
 
+def marca_actual_id() -> uuid.UUID:
+    """La marca que sirve este sitio, para quien necesite resolverla fuera
+    de una respuesta pública (ej. `application/pedidos.py` al confirmar un
+    checkout). Mismo chequeo que `_marca_id()`, expuesto sin el guion bajo."""
+    return _marca_id()
+
+
 def _sucursal_id(session) -> uuid.UUID:
     if settings.storefront_sucursal_id:
         return uuid.UUID(str(settings.storefront_sucursal_id))

@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, get_args
 
-CANALES = {"pdv", "agente_ia", "delivery"}
+CANALES = {"pdv", "agente_ia", "delivery", "web"}
 MODALIDADES = {"mesa", "takeout", "delivery"}
 
 # --- Estado de la venta -------------------------------------------------------

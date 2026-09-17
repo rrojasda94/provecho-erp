@@ -1,8 +1,10 @@
-"""Listeners de `storefront`: cierra el enlace cuenta↔cliente (ADR-102).
+"""Listeners de `storefront`: cierra el enlace cuenta↔cliente (ADR-102) y el
+resultado de un pedido web confirmado (ADR-103).
 
-`sales` escucha `storefront.cuenta_registrada` y publica de vuelta
-`sales.cliente_vinculado` cuando termina — este módulo nunca importa
-`sales.application.clientes`, solo reacciona al segundo evento.
+`sales` escucha `storefront.cuenta_registrada`/`storefront.pedido_web_
+confirmado` y publica de vuelta `sales.cliente_vinculado`/`sales.pedido_web_
+procesado` cuando termina — este módulo nunca importa `sales.application.*`,
+solo reacciona a esos eventos.
 """
 
 import logging
@@ -10,7 +12,7 @@ import uuid
 
 from src.core.database import SessionLocal
 from src.core.events import event_bus
-from src.modules.storefront.infrastructure.repositories import CuentaRepo
+from src.modules.storefront.infrastructure.repositories import CuentaRepo, PedidoRepo
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +40,31 @@ def on_cliente_vinculado(payload: dict) -> None:
         )
 
 
+def on_pedido_web_procesado(payload: dict) -> None:
+    """`sales` terminó de convertir (o rechazar) el pedido en una `Venta`
+    real — acá solo se refleja el resultado en la fila que el cliente ya
+    está mirando en `/pedido/{id}`."""
+    pedido_id = uuid.UUID(payload["pedido_id"])
+    try:
+        with session_factory() as session:
+            pedido = PedidoRepo(session).get(pedido_id)
+            if pedido is None:
+                return
+            if payload.get("ok"):
+                pedido.estado = "confirmado"
+                pedido.venta_id = uuid.UUID(payload["venta_id"])
+                pedido.numero_orden = payload.get("numero_orden")
+            else:
+                pedido.estado = "fallido"
+                pedido.fallo_motivo = payload.get("motivo") or "no se pudo confirmar"
+            session.commit()
+    except Exception:
+        log.exception(
+            "No se pudo actualizar el estado del pedido web",
+            extra={"pedido_id": str(pedido_id)},
+        )
+
+
 def register() -> None:
     """Idempotente: create_app puede llamarse varias veces (tests)."""
     global _registrado
@@ -45,3 +72,4 @@ def register() -> None:
         return
     _registrado = True
     event_bus.subscribe("sales.cliente_vinculado", on_cliente_vinculado)
+    event_bus.subscribe("sales.pedido_web_procesado", on_pedido_web_procesado)

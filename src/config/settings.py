@@ -318,15 +318,34 @@ class Settings(BaseSettings):
     storefront_sucursal_id: str = ""
     # Con qué `canal`/`modalidad` de `lista_precio` se resuelve la carta
     # pública (mismo vocabulario que `sales.domain.rules.CANALES`/
-    # `MODALIDADES`). El canal `web` no existe todavía en `venta` (llega en
-    # un slice posterior) — hasta entonces la carta pública se cotiza con un
-    # canal/modalidad ya existente.
-    storefront_canal: str = "delivery"
+    # `MODALIDADES`). Desde PR3 (ADR-104) `venta.canal` admite `web`: una
+    # lista de precios general (`canal=None`) sigue aplicando igual
+    # (`especificidad_lista`), así que cambiar esto no rompe nada mientras
+    # no se cree una lista específica para otro canal.
+    storefront_canal: str = "web"
     storefront_modalidad: str = "delivery"
     # Base del enlace de postulación pública (ADR-087) que arma
     # `GET /storefront/publico/convocatorias`. Vive en `clientes.majambo.com.pe`,
     # no en el sitio de marca — mismo dominio que ya sirve `/postular/{token}`.
     storefront_url_postular_base: str = "https://clientes.majambo.com.pe/postular"
+    # --- Pedidos del sitio de marca (checkout, ADR-103/ADR-104) ---------------
+    # Estimado de espera que ve el cliente: base + minutos por cada pedido
+    # `orden` que ya tiene la sucursal delante del suyo (RN-WEB-011). Semilla
+    # por `.env`, no `parametro_empresa` todavía — a diferencia de la tarifa
+    # de delivery, es una primera versión y se prefirió no sumarle el paso de
+    # aprobación de Gerencia antes de tener un solo pedido real que mirar.
+    storefront_eta_base_minutos: int = 30
+    storefront_eta_minutos_por_pedido: int = 5
+    # A partir de cuántos pedidos `orden` una sucursal se considera saturada:
+    # la asignación automática de local prueba otra candidata dentro del
+    # radio de delivery antes de insistir en la más cercana (RN-WEB-010).
+    storefront_saturacion_pedidos: int = 4
+    # --- Pasarela de pagos Izipay (ADR-003, checkout ADR-103) -----------------
+    # Vacío = el checkout usa `IzipayFake` (aprueba cualquier cobro de
+    # inmediato): no hay cuenta de comercio real todavía. Ver
+    # `src/shared/integrations/izipay/__init__.py`.
+    izipay_api_key: str = ""
+    izipay_webhook_secret: str = ""
     # Cola de emisión de comprobantes (Celery). Por defecto reusa Redis.
     celery_broker_url: str = ""
     # --- Observabilidad -----------------------------------------------------
