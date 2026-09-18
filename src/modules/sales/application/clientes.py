@@ -232,6 +232,30 @@ def _crear_juridico(
     )
 
 
+def crear_o_encontrar_cliente(session: Session, **kwargs) -> Cliente:
+    """`crear_cliente`, pero devuelve el existente en vez de fallar cuando
+    la persona (por documento) ya es cliente de este grupo.
+
+    Lo necesita quien crea una cuenta desde afuera de `sales` (el sitio de
+    marca, ADR-104: una cuenta web se vincula al `cliente` por evento) y no
+    puede tratar "ya comprabas en el mostrador" como un error — es
+    exactamente el caso que se espera que pase seguido.
+    """
+    try:
+        return crear_cliente(session, **kwargs)
+    except Conflicto:
+        numero_documento = (kwargs.get("numero_documento") or "").strip()
+        if not numero_documento:
+            raise
+        persona = _persona_por_documento(session, numero_documento)
+        if persona is None:
+            raise
+        existente = ClienteRepo(session).por_persona(kwargs["grupo_id"], persona.id)
+        if existente is None:
+            raise
+        return existente
+
+
 def actualizar_documento(
     session: Session,
     *,

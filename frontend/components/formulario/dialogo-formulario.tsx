@@ -45,6 +45,7 @@ export function DialogoFormulario({
   ancho = "max-w-md",
   alAbrir,
   alCerrar,
+  testId,
 }: {
   titulo: string;
   /** Contenido del botón que abre el diálogo. */
@@ -58,6 +59,15 @@ export function DialogoFormulario({
   ayuda?: React.ReactNode;
   /** Para el caso "no se puede crear todavía" (sin unidades de medida, por ej.). */
   envioDeshabilitado?: boolean;
+  /** `data-testid` del `<dialog>`. Opcional — solo hace falta en pantallas
+   * que renderizan más de uno de este molde a la vez (una fila = un
+   * diálogo, ej. "Editar" por fila de una tabla): ahí `dialog[open]` sin
+   * calificar puede alcanzar a más de un nodo mientras React reconcilia,
+   * y Playwright lo reporta como violación de modo estricto. Un `testid`
+   * por fila hace que el recorrido apunte al diálogo correcto sin
+   * depender de que solo uno esté "open" en el instante exacto en que
+   * Playwright vuelve a mirar el DOM. */
+  testId?: string;
   /** Clase `max-w-*` del panel. El molde nació con un ancho fijo porque las
    * siete pantallas que lo estrenaron eran formularios de una columna; un
    * asiento contable o una recepción de OC llevan una tabla de líneas
@@ -115,6 +125,7 @@ export function DialogoFormulario({
       </button>
       <dialog
         ref={dialogRef}
+        data-testid={testId}
         className={`dialogo w-full ${ancho} rounded-xl border border-border bg-card p-0 text-card-foreground shadow-[var(--sombra-3)]`}
         onClose={() => {
           // El reset va al cerrar, no al enviar (ver `onSubmit`).

@@ -11,6 +11,22 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 JWT_SECRET_MIN_LEN = 32
 _PLACEHOLDER_SECRETO = "change-me"
 _PASSWORD_DB_POR_DEFECTO = "provecho:provecho@"
+
+
+def _fallas_de_secreto(
+    nombre: str, valor: str, otro_secreto: str | None = None
+) -> list[str]:
+    """Mismo chequeo para `JWT_SECRET` y `STOREFRONT_JWT_SECRET` (ADR-104):
+    ni el placeholder, ni demasiado corto, y —solo para el segundo— nunca
+    igual al primero, porque de eso depende que un token de cuenta web no
+    decodifique contra el secreto del ERP."""
+    if valor == _PLACEHOLDER_SECRETO:
+        return [f"{nombre} sigue siendo el placeholder"]
+    if len(valor) < JWT_SECRET_MIN_LEN:
+        return [f"{nombre} debe tener al menos {JWT_SECRET_MIN_LEN} caracteres"]
+    if otro_secreto is not None and valor == otro_secreto:
+        return [f"{nombre} no puede ser igual a JWT_SECRET"]
+    return []
 #: Cuando se corre desde el fuente sin instalar el paquete (no pasa ni en la
 #: imagen ni con `pip install -e ".[dev]"`, que es el primer paso del README).
 _VERSION_DESCONOCIDA = "0.0.0"
@@ -79,6 +95,21 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 15
     refresh_token_days: int = 7
+    # Secreto y `aud` propios del JWT de cuenta web (storefront, ADR-104):
+    # nunca el mismo que `jwt_secret`. Un token firmado con este secreto no
+    # decodifica contra el del ERP ni viceversa — es la mitad "criptográfica"
+    # del aislamiento de credenciales; la otra mitad es que ningún endpoint
+    # del ERP acepta `aud="storefront"` (y viceversa).
+    storefront_jwt_secret: str = _PLACEHOLDER_SECRETO
+    storefront_access_token_minutes: int = 30
+    storefront_refresh_token_days: int = 30
+    # Client ID de Google Cloud (OAuth 2.0, tipo "Web") para "Continuar con
+    # Google" en el sitio de marca. Es público por diseño —viaja al
+    # navegador para que el botón de Google lo use—, pero el servidor igual
+    # lo valida como `aud` del `id_token` que llega (nunca confía en lo que
+    # el navegador dice que autenticó). Vacío = el botón de Google no se
+    # ofrece; el registro por email/clave sigue funcionando igual.
+    google_oauth_client_id: str = ""
     # Cuánto puede estar quieta una sesión antes de darse por cerrada
     # (ADR-084). El plazo del refresh es el techo absoluto; esto es el de
     # inactividad, y es el que corta la sesión de una PC que se apagó.
@@ -446,11 +477,10 @@ class Settings(BaseSettings):
         Un ERP que bootea con `JWT_SECRET=change-me` es un ERP sin auth."""
         if not self.es_produccion:
             return self
-        fallas = []
-        if self.jwt_secret == _PLACEHOLDER_SECRETO:
-            fallas.append("JWT_SECRET sigue siendo el placeholder")
-        elif len(self.jwt_secret) < JWT_SECRET_MIN_LEN:
-            fallas.append(f"JWT_SECRET debe tener al menos {JWT_SECRET_MIN_LEN} caracteres")
+        fallas = _fallas_de_secreto("JWT_SECRET", self.jwt_secret)
+        fallas += _fallas_de_secreto(
+            "STOREFRONT_JWT_SECRET", self.storefront_jwt_secret, self.jwt_secret
+        )
         if self.debug:
             fallas.append("DEBUG debe ser false")
         if _PASSWORD_DB_POR_DEFECTO in self.database_url:

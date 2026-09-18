@@ -18,6 +18,42 @@ export class ApiError extends Error {
   }
 }
 
+async function leerError(respuesta: Response): Promise<string> {
+  try {
+    const cuerpo = await respuesta.json();
+    if (typeof cuerpo?.detail === "string") return cuerpo.detail;
+  } catch {
+    // sin cuerpo JSON legible
+  }
+  return `Error ${respuesta.status}`;
+}
+
+/**
+ * Para mutaciones de cuenta (registro, login, direcciones, favoritos):
+ * **lanza** `ApiError` en vez de degradar a `null` — acá sí hay un usuario
+ * esperando una respuesta concreta, a diferencia del contenido público que
+ * `apiFetch` sirve mientras el backend puede estar caído.
+ */
+export async function apiAuth<T>(
+  ruta: string,
+  opciones: { token?: string; metodo?: string; cuerpo?: unknown } = {},
+): Promise<T> {
+  const respuesta = await fetch(`${API_INTERNAL_URL}${ruta}`, {
+    method: opciones.metodo ?? "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(opciones.token ? { Authorization: `Bearer ${opciones.token}` } : {}),
+    },
+    body: opciones.cuerpo !== undefined ? JSON.stringify(opciones.cuerpo) : undefined,
+    cache: "no-store",
+  });
+  if (!respuesta.ok) {
+    throw new ApiError(respuesta.status, await leerError(respuesta));
+  }
+  if (respuesta.status === 204) return undefined as T;
+  return (await respuesta.json()) as T;
+}
+
 /**
  * `revalidate` en segundos: el sitio no necesita datos al segundo, y
  * revalidar cada minuto mantiene el catálogo/promos/horarios al día sin

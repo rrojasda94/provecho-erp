@@ -2168,3 +2168,20 @@ específicas de la parte **sin JWT**.
   Nunca se expone `remuneracion_min`/`remuneracion_max`.
 - **RN-WEB-004** Una sucursal `inactiva` o borrada (`deleted_at`) no aparece
   en `GET /storefront/publico/sucursales` ni en la carta pública.
+
+- **RN-WEB-005** Una cuenta nueva del sitio (email/clave o Google) exige
+  nombres, apellidos, tipo y número de documento, teléfono y fecha de
+  nacimiento — Google solo confirma el email, nunca reemplaza esos datos.
+  Sin ellos no hay con qué vincular un `cliente` (RN-PTS-002).
+- **RN-WEB-006** La cuenta del sitio y el `usuario` del ERP son credenciales
+  completamente separadas: secreto de JWT y `aud` propios (ADR-104). Ningún
+  endpoint del ERP acepta un token de cuenta web, y ninguno de
+  `/storefront/cuentas/*` acepta uno del ERP.
+- **RN-WEB-007** El enlace `storefront_cuenta.cliente_id` se resuelve por
+  evento (`storefront.cuenta_registrada` → `sales.cliente_vinculado`,
+  ADR-016 best-effort): una cuenta puede quedar temporalmente sin
+  `cliente_id` si el listener falla, y eso no bloquea el registro ni el
+  login.
+- **RN-WEB-008** Un email ya registrado con Google que intenta crear cuenta
+  con clave (o viceversa) se vincula a la cuenta existente en vez de
+  duplicarla — el email verificado por Google es la misma identidad.

@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { apiFetch } from "@/lib/api";
+import { obtenerSesion } from "@/lib/auth";
 import { RevelarObservador } from "@/components/revelar-observador";
 
 import "./globals.css";
@@ -51,7 +52,10 @@ const NAV = [
 ];
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const datos = await apiFetch<Contenido>("/api/v1/storefront/publico/contenido");
+  const [datos, sesion] = await Promise.all([
+    apiFetch<Contenido>("/api/v1/storefront/publico/contenido"),
+    obtenerSesion(),
+  ]);
   const contacto = datos?.contenido?.contacto;
 
   return (
@@ -68,6 +72,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {n.etiqueta}
               </Link>
             ))}
+            <Link href={sesion ? "/cuenta" : "/cuenta/ingresar"} className="hover:text-verde">
+              {sesion ? "Mi cuenta" : "Ingresar"}
+            </Link>
           </nav>
         </header>
 

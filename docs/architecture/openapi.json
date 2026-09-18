@@ -762,6 +762,50 @@
         "title": "ActivoUpdate",
         "type": "object"
       },
+      "ActualizarPerfilIn": {
+        "properties": {
+          "apellidos": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellidos"
+          },
+          "nombres": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombres"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          }
+        },
+        "title": "ActualizarPerfilIn",
+        "type": "object"
+      },
       "AdjuntoCreate": {
         "properties": {
           "mime_type": {
@@ -9398,6 +9442,94 @@
         "title": "CuentaContableUpdate",
         "type": "object"
       },
+      "CuentaOut": {
+        "properties": {
+          "apellidos": {
+            "title": "Apellidos",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "fecha_nacimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Nacimiento"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombres": {
+            "title": "Nombres",
+            "type": "string"
+          },
+          "numero_documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "tiene_google": {
+            "default": false,
+            "title": "Tiene Google",
+            "type": "boolean"
+          },
+          "tiene_password": {
+            "default": false,
+            "title": "Tiene Password",
+            "type": "boolean"
+          },
+          "tipo_documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Documento"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "nombres",
+          "apellidos",
+          "tipo_documento",
+          "numero_documento",
+          "telefono",
+          "fecha_nacimiento"
+        ],
+        "title": "CuentaOut",
+        "type": "object"
+      },
       "CuponCanjeadoOut": {
         "properties": {
           "codigo": {
@@ -10515,6 +10647,315 @@
           "piezas"
         ],
         "title": "DiaCalendarioOut",
+        "type": "object"
+      },
+      "DireccionIn": {
+        "properties": {
+          "direccion": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Direccion",
+            "type": "string"
+          },
+          "etiqueta": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta"
+          },
+          "predeterminada": {
+            "default": false,
+            "title": "Predeterminada",
+            "type": "boolean"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
+          }
+        },
+        "required": [
+          "direccion"
+        ],
+        "title": "DireccionIn",
+        "type": "object"
+      },
+      "DireccionOut": {
+        "properties": {
+          "direccion": {
+            "title": "Direccion",
+            "type": "string"
+          },
+          "etiqueta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "predeterminada": {
+            "title": "Predeterminada",
+            "type": "boolean"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          }
+        },
+        "required": [
+          "id",
+          "etiqueta",
+          "direccion",
+          "referencia",
+          "predeterminada"
+        ],
+        "title": "DireccionOut",
+        "type": "object"
+      },
+      "DireccionUpdateIn": {
+        "properties": {
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "etiqueta": {
+            "anyOf": [
+              {
+                "maxLength": 50,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etiqueta"
+          },
+          "predeterminada": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predeterminada"
+          },
+          "referencia": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Referencia"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
+          }
+        },
+        "title": "DireccionUpdateIn",
         "type": "object"
       },
       "DivisaCreate": {
@@ -13306,6 +13747,20 @@
         "title": "FallarIn",
         "type": "object"
       },
+      "FavoritoIn": {
+        "properties": {
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto_comercial_id"
+        ],
+        "title": "FavoritoIn",
+        "type": "object"
+      },
       "FiltrosIn": {
         "properties": {
           "desde": {
@@ -13457,6 +13912,173 @@
           "almacen_id"
         ],
         "title": "GenerarReporteJornadaIn",
+        "type": "object"
+      },
+      "GoogleLoginIn": {
+        "properties": {
+          "apellidos": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellidos"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "fecha_nacimiento": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Nacimiento"
+          },
+          "id_token": {
+            "title": "Id Token",
+            "type": "string"
+          },
+          "nombres": {
+            "anyOf": [
+              {
+                "maxLength": 150,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombres"
+          },
+          "numero_documento": {
+            "anyOf": [
+              {
+                "maxLength": 15,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "tipo_documento": {
+            "anyOf": [
+              {
+                "maxLength": 10,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tipo Documento"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
+          }
+        },
+        "required": [
+          "id_token"
+        ],
+        "title": "GoogleLoginIn",
         "type": "object"
       },
       "GrupoCreate": {
@@ -15512,24 +16134,6 @@
           "activa"
         ],
         "title": "ListaPrecioOut",
-        "type": "object"
-      },
-      "LoginIn": {
-        "properties": {
-          "pin": {
-            "title": "Pin",
-            "type": "string"
-          },
-          "username": {
-            "title": "Username",
-            "type": "string"
-          }
-        },
-        "required": [
-          "username",
-          "pin"
-        ],
-        "title": "LoginIn",
         "type": "object"
       },
       "LoteCreate": {
@@ -28942,6 +29546,148 @@
         "title": "RefreshIn",
         "type": "object"
       },
+      "RegistroIn": {
+        "properties": {
+          "apellidos": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Apellidos",
+            "type": "string"
+          },
+          "direccion": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direccion"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "fecha_nacimiento": {
+            "format": "date",
+            "title": "Fecha Nacimiento",
+            "type": "string"
+          },
+          "nombres": {
+            "maxLength": 150,
+            "minLength": 1,
+            "title": "Nombres",
+            "type": "string"
+          },
+          "numero_documento": {
+            "maxLength": 15,
+            "minLength": 8,
+            "title": "Numero Documento",
+            "type": "string"
+          },
+          "password": {
+            "maxLength": 255,
+            "minLength": 8,
+            "title": "Password",
+            "type": "string"
+          },
+          "telefono": {
+            "maxLength": 20,
+            "minLength": 6,
+            "title": "Telefono",
+            "type": "string"
+          },
+          "tipo_documento": {
+            "default": "dni",
+            "maxLength": 10,
+            "title": "Tipo Documento",
+            "type": "string"
+          },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
+          "ubicacion_lat": {
+            "anyOf": [
+              {
+                "maximum": 90.0,
+                "minimum": -90.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lat"
+          },
+          "ubicacion_lng": {
+            "anyOf": [
+              {
+                "maximum": 180.0,
+                "minimum": -180.0,
+                "type": "number"
+              },
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "maxLength": 20,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "nombres",
+          "apellidos",
+          "numero_documento",
+          "telefono",
+          "fecha_nacimiento"
+        ],
+        "title": "RegistroIn",
+        "type": "object"
+      },
       "RegistroPublicoIn": {
         "description": "Lo que la landing pública manda al registrar a un cliente.\n\nEl nombre viaja aunque RENIEC lo haya completado en el navegador: si el\nproveedor no contesta, el cliente lo escribe a mano y el alta **no se\nbloquea** (RN-PTS-004). El servidor vuelve a consultar por su cuenta —\nlo que llega de una página pública no decide qué nombre queda guardado.\n\n`acepta_terminos` es obligatorio y tiene que venir en `true`: el\nconsentimiento del titular es lo que habilita el uso comercial del dato\n(Ley 29733), y sin dejarlo registrado la promoción no tendría con qué\nsostenerlo.",
         "properties": {
@@ -34259,6 +35005,29 @@
         "title": "TokenPair",
         "type": "object"
       },
+      "TokensOut": {
+        "properties": {
+          "access_token": {
+            "title": "Access Token",
+            "type": "string"
+          },
+          "refresh_token": {
+            "title": "Refresh Token",
+            "type": "string"
+          },
+          "token_type": {
+            "title": "Token Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "refresh_token",
+          "token_type"
+        ],
+        "title": "TokensOut",
+        "type": "object"
+      },
       "TrabajadorCese": {
         "properties": {
           "fecha_cese": {
@@ -35338,6 +36107,79 @@
           }
         },
         "title": "TurnoUpdate",
+        "type": "object"
+      },
+      "UltimoPedidoItemOut": {
+        "properties": {
+          "cantidad": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cantidad",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "cantidad"
+        ],
+        "title": "UltimoPedidoItemOut",
+        "type": "object"
+      },
+      "UltimoPedidoOut": {
+        "properties": {
+          "canal": {
+            "title": "Canal",
+            "type": "string"
+          },
+          "estado": {
+            "title": "Estado",
+            "type": "string"
+          },
+          "fecha_orden": {
+            "format": "date",
+            "title": "Fecha Orden",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UltimoPedidoItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "modalidad": {
+            "title": "Modalidad",
+            "type": "string"
+          },
+          "numero_orden": {
+            "title": "Numero Orden",
+            "type": "integer"
+          },
+          "total": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "numero_orden",
+          "fecha_orden",
+          "estado",
+          "total",
+          "canal",
+          "modalidad",
+          "items"
+        ],
+        "title": "UltimoPedidoOut",
         "type": "object"
       },
       "UnidadMedidaCreate": {
@@ -38007,6 +38849,24 @@
         "title": "ResultadoImportacionOut",
         "type": "object"
       },
+      "src__modules__storefront__api__cuentas_schemas__LoginIn": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "password": {
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginIn",
+        "type": "object"
+      },
       "src__modules__supervision__api__schemas__CategoriaCreate": {
         "properties": {
           "empresa_id": {
@@ -38389,6 +39249,24 @@
           "activa"
         ],
         "title": "PlantillaOut",
+        "type": "object"
+      },
+      "src__modules__users__api__schemas__LoginIn": {
+        "properties": {
+          "pin": {
+            "title": "Pin",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "pin"
+        ],
+        "title": "LoginIn",
         "type": "object"
       },
       "src__modules__users__api__schemas__MarcaOut": {
@@ -43280,7 +44158,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/LoginIn"
+                "$ref": "#/components/schemas/src__modules__users__api__schemas__LoginIn"
               }
             }
           },
@@ -67759,6 +68637,633 @@
           }
         ],
         "summary": "Guardar Contenido",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/google": {
+      "post": {
+        "operationId": "login_google_api_v1_storefront_cuentas_google_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GoogleLoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokensOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Login Google",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/login": {
+      "post": {
+        "operationId": "login_api_v1_storefront_cuentas_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/src__modules__storefront__api__cuentas_schemas__LoginIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokensOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Login",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/logout": {
+      "post": {
+        "operationId": "logout_api_v1_storefront_cuentas_logout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/me": {
+      "get": {
+        "operationId": "ver_perfil_api_v1_storefront_cuentas_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ver Perfil",
+        "tags": [
+          "storefront"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_perfil_api_v1_storefront_cuentas_me_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActualizarPerfilIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CuentaOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Perfil",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/me/direcciones": {
+      "get": {
+        "operationId": "listar_direcciones_api_v1_storefront_cuentas_me_direcciones_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DireccionOut"
+                  },
+                  "title": "Response Listar Direcciones Api V1 Storefront Cuentas Me Direcciones Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Direcciones",
+        "tags": [
+          "storefront"
+        ]
+      },
+      "post": {
+        "operationId": "crear_direccion_api_v1_storefront_cuentas_me_direcciones_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DireccionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DireccionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Crear Direccion",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/me/direcciones/{direccion_id}": {
+      "delete": {
+        "operationId": "borrar_direccion_api_v1_storefront_cuentas_me_direcciones__direccion_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "direccion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Direccion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Direccion",
+        "tags": [
+          "storefront"
+        ]
+      },
+      "patch": {
+        "operationId": "editar_direccion_api_v1_storefront_cuentas_me_direcciones__direccion_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "direccion_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Direccion Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DireccionUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DireccionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Editar Direccion",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/me/favoritos": {
+      "get": {
+        "operationId": "listar_favoritos_api_v1_storefront_cuentas_me_favoritos_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "title": "Response Listar Favoritos Api V1 Storefront Cuentas Me Favoritos Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Favoritos",
+        "tags": [
+          "storefront"
+        ]
+      },
+      "post": {
+        "operationId": "agregar_favorito_api_v1_storefront_cuentas_me_favoritos_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FavoritoIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Agregar Favorito",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/me/favoritos/{producto_comercial_id}": {
+      "delete": {
+        "operationId": "quitar_favorito_api_v1_storefront_cuentas_me_favoritos__producto_comercial_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "producto_comercial_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Producto Comercial Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Quitar Favorito",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/me/ultimo-pedido": {
+      "get": {
+        "operationId": "ultimo_pedido_api_v1_storefront_cuentas_me_ultimo_pedido_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/UltimoPedidoOut"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Ultimo Pedido Api V1 Storefront Cuentas Me Ultimo Pedido Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ultimo Pedido",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/refresh": {
+      "post": {
+        "operationId": "refresh_api_v1_storefront_cuentas_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokensOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Refresh",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/registro": {
+      "post": {
+        "operationId": "registrar_api_v1_storefront_cuentas_registro_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistroIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokensOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Registrar",
         "tags": [
           "storefront"
         ]

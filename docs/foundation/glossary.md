@@ -212,5 +212,7 @@ documentación. Prohibido usar sinónimos ambiguos.
 
 | **Storefront (sitio de marca)** | Sitio web público de una marca (`charlies.majambo.com.pe`), servido por una app Next.js aparte (ADR-103) y alimentado por el módulo `storefront` a través de contratos públicos de lectura de los demás módulos. No confundir con la landing `clientes.majambo.com.pe` (ADR-080), que es un formulario único del QR de mesa. | Landing del QR (`reconocerte`) |
 
+| **Cuenta del sitio** | Credencial de autoservicio web (`storefront_cuenta`, ADR-104): email/clave o Google, completamente separada del `usuario` del ERP. Se enlaza a un `cliente` de `sales` por evento, nunca comparte tabla ni secreto de JWT con el personal. | Usuario (staff del ERP, con rol y permisos) |
+
 > Al introducir un concepto nuevo del negocio, primero se agrega aquí, luego se
 > usa en código.

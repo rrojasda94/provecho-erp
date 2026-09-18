@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 
-import { apiFetch } from "@/lib/api";
+import { apiAuth, apiFetch } from "@/lib/api";
+import { obtenerSesion } from "@/lib/auth";
 
 type Contenido = {
   contenido: { hero?: { titulo?: string; subtitulo?: string; cta_texto?: string; cta_url?: string } };
@@ -16,17 +17,43 @@ type Producto = {
   disponible: boolean;
 };
 type Carta = { productos: Producto[] };
+type UltimoPedido = {
+  numero_orden: number;
+  estado: string;
+  items: { nombre: string; cantidad: string }[];
+} | null;
+
+async function ultimoPedidoDe(token: string): Promise<UltimoPedido> {
+  try {
+    return await apiAuth<UltimoPedido>("/api/v1/storefront/cuentas/me/ultimo-pedido", { token });
+  } catch {
+    return null;
+  }
+}
+
+async function favoritosDe(token: string): Promise<string[]> {
+  try {
+    return await apiAuth<string[]>("/api/v1/storefront/cuentas/me/favoritos", { token });
+  } catch {
+    return [];
+  }
+}
 
 export default async function HomePage() {
-  const [datos, promos, carta] = await Promise.all([
+  const sesion = await obtenerSesion();
+  const [datos, promos, carta, ultimoPedido, favoritosIds] = await Promise.all([
     apiFetch<Contenido>("/api/v1/storefront/publico/contenido"),
     apiFetch<Promocion[]>("/api/v1/storefront/publico/promociones"),
     apiFetch<Carta>("/api/v1/storefront/publico/carta"),
+    sesion ? ultimoPedidoDe(sesion.token) : Promise.resolve(null),
+    sesion ? favoritosDe(sesion.token) : Promise.resolve([] as string[]),
   ]);
 
   const hero = datos?.contenido?.hero;
   const promoActiva = promos?.[0];
-  const destacados = (carta?.productos ?? []).slice(0, 3);
+  const favoritos = (carta?.productos ?? []).filter((p) => favoritosIds.includes(p.id));
+  const destacados = favoritos.length > 0 ? favoritos.slice(0, 3) : (carta?.productos ?? []).slice(0, 3);
+  const tituloDestacados = favoritos.length > 0 ? "Tus favoritas" : "Las favoritas";
 
   return (
     <div className="flex flex-col gap-12 pb-16">
@@ -61,6 +88,23 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {ultimoPedido && (
+        <section className="revelar mx-auto w-full max-w-3xl px-4">
+          <div className="sombra-dura rounded-lg border-2 border-negro bg-white p-4">
+            <p className="text-xs font-bold uppercase text-humo">Tu último pedido</p>
+            <p className="font-bold">
+              Pedido #{ultimoPedido.numero_orden} — {ultimoPedido.estado}
+            </p>
+            <p className="text-sm text-humo">
+              {ultimoPedido.items.map((it) => `${it.cantidad}x ${it.nombre}`).join(", ")}
+            </p>
+            <Link href="/cuenta" className="mt-2 inline-block text-sm font-bold text-verde underline">
+              Ver mi cuenta
+            </Link>
+          </div>
+        </section>
+      )}
+
       <section className="revelar mx-auto grid max-w-4xl grid-cols-1 gap-6 px-4 text-center sm:grid-cols-3">
         {[
           { n: "1", t: "Elige tu pizza", d: "Arma tu pedido a tu manera desde la carta." },
@@ -77,7 +121,7 @@ export default async function HomePage() {
 
       {destacados.length > 0 && (
         <section className="mx-auto w-full max-w-5xl px-4">
-          <h2 className="revelar font-display text-2xl uppercase text-negro">Las favoritas</h2>
+          <h2 className="revelar font-display text-2xl uppercase text-negro">{tituloDestacados}</h2>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
             {destacados.map((p) => (
               <Link

@@ -21,6 +21,7 @@ from src.modules.users.application.errors import (
 )
 from src.modules.users.domain import rules
 from src.modules.users.infrastructure.models import (
+    Marca,
     Permiso,
     RolPermiso,
     Sucursal,
@@ -209,3 +210,10 @@ def empresas_de_marca(session: Session, marca_id: uuid.UUID) -> list[uuid.UUID]:
             .distinct()
         )
     )
+
+
+def grupo_de_marca(session: Session, marca_id: uuid.UUID) -> uuid.UUID | None:
+    """El `grupo_id` dueño de una marca — lo necesita `sales` para crear un
+    `cliente` (transversal al grupo, RN-PTS-001) a partir de una cuenta del
+    sitio de marca, que solo conoce su `marca_id` (ADR-104)."""
+    return session.scalar(select(Marca.grupo_id).where(Marca.id == marca_id))

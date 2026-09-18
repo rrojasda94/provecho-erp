@@ -44,8 +44,11 @@ from src.modules.sales.api.kds_routers import router as kds_router
 from src.modules.sales.api.publico_routers import router as sales_publico_router
 from src.modules.sales.api.routers import router as sales_router
 from src.modules.sales.application import listeners as sales_listeners
+from src.modules.storefront.api import error_handlers as storefront_error_handlers
+from src.modules.storefront.api.cuentas_routers import router as storefront_cuentas_router
 from src.modules.storefront.api.publico_routers import router as storefront_publico_router
 from src.modules.storefront.api.routers import router as storefront_router
+from src.modules.storefront.application import listeners as storefront_listeners
 from src.modules.supervision.api.routers import router as supervision_router
 from src.modules.users.api import error_handlers as users_error_handlers
 from src.modules.users.api.routers import router as users_router
@@ -246,6 +249,7 @@ def create_app() -> FastAPI:
     # por MRO), pero se lee mejor de lo general a lo particular.
     error_handlers.registrar(app)
     users_error_handlers.registrar(app)
+    storefront_error_handlers.registrar(app)
     # La validación de entrada no es un error de dominio: la levanta FastAPI
     # antes de que corra el endpoint, y por eso tiene su propio traductor.
     validacion.registrar(app)
@@ -362,6 +366,9 @@ def create_app() -> FastAPI:
     app.include_router(accounting_router, prefix="/api/v1")
     app.include_router(rrhh_router, prefix="/api/v1")
     app.include_router(storefront_router, prefix="/api/v1")
+    # Sin JWT del ERP: la cuenta de cliente web trae la suya propia
+    # (STOREFRONT_JWT_SECRET, ADR-104). Rate limit por IP en cada endpoint.
+    app.include_router(storefront_cuentas_router, prefix="/api/v1")
     app.include_router(marketing_router, prefix="/api/v1")
     app.include_router(supervision_router, prefix="/api/v1")
     # Sin JWT a propósito: el cliente que contesta la encuesta no es usuario
@@ -402,4 +409,5 @@ def create_app() -> FastAPI:
     # orden es leer la cadena.
     reports_listeners.register()
     users_listeners.register()
+    storefront_listeners.register()
     return app

@@ -13,6 +13,7 @@ directamente, publica el evento y este handler hace la llamada real.
 
 import logging
 import uuid
+from datetime import date
 
 from src.core.database import SessionLocal
 from src.core.events import event_bus
@@ -45,6 +46,83 @@ def on_venta_confirmada(payload: dict) -> None:
         # para eso existe.
         log.exception(
             "No se pudo programar la revisión de demora", extra={"venta_id": venta_id}
+        )
+
+
+def on_cuenta_registrada(payload: dict) -> None:
+    """Una cuenta nueva del sitio de marca se enlaza a un `cliente` de
+    `sales` (ADR-104): el sitio no importa `application.clientes` —publica
+    el evento y este handler hace la llamada real, mismo patrón que
+    `on_entrega_registrada`.
+
+    Sin `marca_id` en el payload (sitio sin marca configurada, no debería
+    pasar) o sin poder resolver el grupo, no hay nada que crear: la cuenta
+    se queda sin `cliente_id` hasta que alguien la revise a mano — RN-PTS-001
+    exige el grupo, y RN-PTS-002 el teléfono o RUC para poder registrar.
+    """
+    from src.modules.sales.application import clientes
+    from src.modules.sales.application.errors import ReglaNegocio
+    from src.modules.users.application.queries_publicas import grupo_de_marca
+
+    cuenta_id = payload["cuenta_id"]
+    marca_id = payload.get("marca_id")
+    if not marca_id:
+        log.warning("cuenta_registrada sin marca_id; no se vincula a cliente")
+        return
+
+    ubicacion = payload.get("ubicacion") or {}
+    try:
+        with session_factory() as session:
+            grupo_id = grupo_de_marca(session, uuid.UUID(marca_id))
+            if grupo_id is None:
+                log.warning(
+                    "No se pudo resolver el grupo de la marca del sitio",
+                    extra={"marca_id": marca_id},
+                )
+                return
+            try:
+                cliente = clientes.crear_o_encontrar_cliente(
+                    session,
+                    grupo_id=grupo_id,
+                    nombre=f"{payload['nombres']} {payload['apellidos']}".strip(),
+                    telefono=payload.get("telefono"),
+                    numero_documento=payload.get("numero_documento"),
+                    email=payload.get("email"),
+                    direccion=payload.get("direccion"),
+                    fecha_nacimiento=(
+                        date.fromisoformat(payload["fecha_nacimiento"])
+                        if payload.get("fecha_nacimiento")
+                        else None
+                    ),
+                    tipo_documento=payload.get("tipo_documento") or "dni",
+                    ubicacion_place_id=ubicacion.get("ubicacion_place_id"),
+                    ubicacion_lat=ubicacion.get("ubicacion_lat"),
+                    ubicacion_lng=ubicacion.get("ubicacion_lng"),
+                    ubicacion_plus_code=ubicacion.get("ubicacion_plus_code"),
+                    ubicacion_distrito=ubicacion.get("ubicacion_distrito"),
+                )
+            except ReglaNegocio:
+                # Datos insuficientes para un cliente de `sales` (sin
+                # teléfono ni documento, por ejemplo un registro mínimo).
+                # La cuenta del sitio sigue funcionando sin `cliente_id`.
+                log.info(
+                    "Cuenta del sitio sin datos suficientes para vincular cliente",
+                    extra={"cuenta_id": cuenta_id},
+                )
+                return
+            # Publicar ANTES del commit (`core/events.py`): el evento se
+            # bufferiza en la sesión y recién se despacha en `after_commit`
+            # — publicarlo después de commitear no lo despacharía nunca.
+            event_bus.publish(
+                "sales.cliente_vinculado",
+                {"cuenta_id": cuenta_id, "cliente_id": str(cliente.id)},
+                session=session,
+            )
+            session.commit()
+    except Exception:
+        log.exception(
+            "No se pudo vincular la cuenta del sitio a un cliente",
+            extra={"cuenta_id": cuenta_id},
         )
 
 
@@ -87,3 +165,4 @@ def register() -> None:
     _registrado = True
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
     event_bus.subscribe("delivery.entrega_registrada", on_entrega_registrada)
+    event_bus.subscribe("storefront.cuenta_registrada", on_cuenta_registrada)
