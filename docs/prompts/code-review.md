@@ -21,5 +21,6 @@ Revisar contra `/CLAUDE.md` y los docs de `docs/`. Rechazar si falla algo de:
 
 - [ ] Tests incluidos y pasando; linters limpios.
 - [ ] Migración Alembic si cambió esquema (+ `architecture/data-model.md` actualizado).
-- [ ] README del módulo, CHANGELOG y ROADMAP actualizados.
+- [ ] README del módulo y ROADMAP actualizados; changelog como fragmento en
+      `changelog.d/`, nunca `CHANGELOG.md` a mano.
 - [ ] Commit en Conventional Commits.

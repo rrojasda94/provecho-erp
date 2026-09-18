@@ -22,7 +22,7 @@ import { aTitulo } from "@/lib/texto";
  * De los seis tipos de artículo (`data-model.md` §Artículo) solo estos tres
  * son algo que el plato lleva adentro. Los otros quedan fuera por razones
  * distintas: el **empaque** no va en la receta sino en el producto comercial
- * —su consumo depende de la modalidad, RN-EMP-003—, y **repuesto** y
+ * —su consumo depende de la modalidad, RN-EMB-003—, y **repuesto** y
  * **suministro** no se consumen por plato. Ofrecerlos era invitar a que la
  * caja de pizza se descontara dos veces, una por acá y otra por modalidad. */
 const TIPOS_DE_INSUMO = new Set(["insumo", "subreceta", "mercaderia"]);

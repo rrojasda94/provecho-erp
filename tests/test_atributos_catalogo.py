@@ -688,7 +688,7 @@ def _articulo(session, base):
     )
 
 
-# --- El empaque tiene que ser un empaque (RN-EMP-003) --------------------------
+# --- El empaque tiene que ser un empaque (RN-EMB-003) --------------------------
 def _articulo_tipo(session, base, tipo, nombre, id_interno):
     from src.modules.inventory.application import catalogo as inv_catalogo
 

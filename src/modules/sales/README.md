@@ -1178,7 +1178,7 @@ Producto comercial → receta → confirmar venta → evento `sales.venta_confir
 
 ## Relaciones
 
-- Publica: `sales.venta_confirmada`, `sales.venta_anulada`, `sales.pago_registrado`,
+- Publica: `sales.venta_confirmada`, `sales.venta_anulada`, `sales.venta_pagada`,
   `sales.comprobante_emitido` (comprobante aceptado por SUNAT vía Factiliza),
   `sales.descuento_aplicado` (RN-COM-017 — alimenta el reporte de
   descuentos), `sales.lineas_anuladas` (RN-COM-020 — inventory repone lo

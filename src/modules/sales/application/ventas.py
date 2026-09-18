@@ -119,7 +119,7 @@ def _armar_item(
         # es la tanda 1, y `agregar_lineas` la pisa con la del envío.
         tanda=int(it.get("tanda") or 1),
     )
-    # Empaque se descuenta solo en las modalidades configuradas (RN-EMP-003).
+    # Empaque se descuenta solo en las modalidades configuradas (RN-EMB-003).
     con_empaque = bool(prod.empaque_id and modalidad in (prod.modalidades_empaque or []))
     detalle = {
         "receta_id": str(prod.receta_id),

@@ -17,7 +17,8 @@ Lee primero [CLAUDE.md](CLAUDE.md) — contiene las reglas obligatorias.
    `feat(inventory): agregar transferencias entre almacenes`.
 7. Pull request; CI debe estar en verde. No se aceptan cambios importantes sin documentación.
 
-`main` está protegida: los seis jobs del CI son obligatorios y la rama tiene
+`main` está protegida: seis jobs del CI son obligatorios (`backend`,
+`migraciones`, `imagen`, `seguridad`, `frontend`, `e2e`) y la rama tiene
 que estar al día con `main` antes de mergear. No hay "merge igual" — el
 2026-08-07 un PR entró en rojo y dejó `main` rota un día.
 

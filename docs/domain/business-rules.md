@@ -935,7 +935,7 @@ producción se hace en cocinas de sucursal. Ver
   tampoco se repone al anularla: nunca salió. Cada tramo del producto
   configurado —tamaño, combinación, extras— aporta **su propia receta** y el
   consumo del plato es la suma de todas menos las restas; el empaque se
-  suma aparte, según la modalidad (RN-EMP-003), porque no es parte de la
+  suma aparte, según la modalidad (RN-EMB-003), porque no es parte de la
   receta.
 - **RN-PRD-020** Una subreceta puede llevar otra subreceta como insumo
   (BOM de varios niveles, sin tope de anidamiento). Si el consumo sugerido
@@ -1012,11 +1012,11 @@ producción se hace en cocinas de sucursal. Ver
 
 ## Empaques
 
-- **RN-EMP-001** La compra de empaque se planifica con anticipación: lead
+- **RN-EMB-001** La compra de empaque se planifica con anticipación: lead
   time típico mayor a 15 días entre cotización aceptada y recepción.
-- **RN-EMP-002** Un empaque solo se vende directo al cliente en POS
+- **RN-EMB-002** Un empaque solo se vende directo al cliente en POS
   operado por trabajador; no está disponible en kiosko ni web.
-- **RN-EMP-003** El consumo de empaque en una venta depende de la
+- **RN-EMB-003** El consumo de empaque en una venta depende de la
   configuración del producto comercial (`empaque_id` + modalidades mesa/
   takeout/delivery marcadas); no se incluye en la receta.
   `empaque_id` solo acepta un artículo de **tipo `empaque`** y no archivado:
@@ -1025,7 +1025,7 @@ producción se hace en cocinas de sucursal. Ver
   catálogo entero, así que un producto podía quedar descontando harina por
   cada venta como si fuera una caja de pizza. Por la misma regla, el editor
   de recetas no ofrece empaques como insumo: se descontarían dos veces.
-- **RN-EMP-004** El empaque consumido junto a una venta no aparece en el
+- **RN-EMB-004** El empaque consumido junto a una venta no aparece en el
   comprobante, salvo que se venda como producto comercial independiente.
 
 ## Categoría
@@ -1137,21 +1137,21 @@ producción se hace en cocinas de sucursal. Ver
 
 ## Documento de vigencia
 
-- **RN-DOC-001** Un permiso, certificado o licencia con fecha de
+- **RN-VIG-001** Un permiso, certificado o licencia con fecha de
   vencimiento (SOAT, revisión técnica, licencia de funcionamiento,
   certificado de Defensa Civil, fumigación, registro sanitario, carné de
   sanidad, licencia de conducir) se registra ligado a su sujeto: un activo,
   una sucursal, la empresa, o un trabajador (`assets`, ADR-099).
-- **RN-DOC-002** El aviso de un documento próximo a vencer se dispara con
+- **RN-VIG-002** El aviso de un documento próximo a vencer se dispara con
   una anticipación configurable por documento, y otra vez al vencer —una
   vez por cada uno de los dos avisos, no repetido mientras la ventana no
   cambie.
-- **RN-DOC-003** Renovar un documento no reescribe su fecha de vencimiento:
+- **RN-VIG-003** Renovar un documento no reescribe su fecha de vencimiento:
   crea un documento nuevo y encadena el anterior como renovado. El vencido
   sigue disponible para consulta (una inspección puede pedirlo).
-- **RN-DOC-004** Un documento ya renovado no admite una segunda renovación
+- **RN-VIG-004** Un documento ya renovado no admite una segunda renovación
   sobre la misma fila; la cadena avanza siempre desde la punta vigente.
-- **RN-DOC-005** Un documento admite adjuntar su escaneo (PDF o imagen,
+- **RN-VIG-005** Un documento admite adjuntar su escaneo (PDF o imagen,
   máx. 20 MB): el binario se sube directo a S3 con una URL prefirmada que
   el backend genera (`assets`, 2026-09-09); el ERP solo guarda el vínculo y
   los metadatos (mismo patrón que `marketing.application.adjuntos`).

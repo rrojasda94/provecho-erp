@@ -85,7 +85,7 @@ Llegar a `cerrada` desde `pagada` o `facturada` no existe: lo que se cobró
 se anula con nota de crédito.
 
 Eventos: `sales.venta_confirmada`, `sales.consumo_personal_registrado`,
-`sales.pago_registrado`, `sales.comprobante_emitido`,
+`sales.venta_pagada`, `sales.comprobante_emitido`,
 `sales.venta_anulada`.
 
 ## Cumplimiento de pedido
@@ -239,16 +239,16 @@ después — el informe del día ya la contó como incumplida. Una tarea
 ```mermaid
 stateDiagram-v2
     [*] --> vigente
-    vigente --> proximo: entra en la ventana de aviso (RN-DOC-002)
+    vigente --> proximo: entra en la ventana de aviso (RN-VIG-002)
     proximo --> vencido
-    vigente --> renovado: se registra el reemplazo (RN-DOC-003)
+    vigente --> renovado: se registra el reemplazo (RN-VIG-003)
     proximo --> renovado
     vencido --> renovado
 ```
 
 `vigente`/`proximo`/`vencido` son derivados (nunca columna); `renovado` es
 el único estado real: `renovado_por_id` apunta al documento que lo
-reemplazó y la fila vieja no se toca (RN-DOC-004).
+reemplazó y la fila vieja no se toca (RN-VIG-004).
 
 > Al dar estados a una entidad nueva: modelar aquí su máquina antes de
 > implementar las transiciones.

@@ -1011,10 +1011,31 @@ contaminación cruzada) y homologación con el resto de cocinas del grupo.
 Detalle completo en [../foundation/vision.md](../foundation/vision.md#cocina-de-producción)
 y reglas en [business-rules.md](business-rules.md#cocina-de-producción).
 Estado actual: no existen cocinas de producción (planeada la primera en
-2027); toda la producción se hace en sucursales.
+2027); toda la producción se hace en sucursales. El módulo `production` ya
+existe en código y se adelantó a la operación.
 
 ## Módulos del dominio (visión completa)
 
 Ventas, Clientes, Productos, Inventario, Compras, Caja, Contabilidad, RRHH,
 Producción, CRM, Tesorería, Activos, Proyectos, BI, Reportes, Transporte,
 Supervisión. Estado e índice en [../product/modules.md](../product/modules.md).
+
+Cómo caen en los trece módulos de código (`src/modules/`):
+
+| Módulo | Áreas del dominio que cubre |
+|--------|-----------------------------|
+| `users` | Usuarios, roles y permisos; estructura del grupo (empresa, marca, sucursal) |
+| `sales` | Ventas, Clientes, Productos (catálogo comercial y precios), Promociones, Comprobante de Pago |
+| `inventory` | Inventario, Almacenes, Lote, Merma y Desperdicio, Guía de Remisión |
+| `purchases` | Compras (proveedor, orden de compra, recepción, compra de activos) |
+| `accounting` | Contabilidad, Caja y Tesorería (tesorería vive acá, no en un módulo aparte) |
+| `production` | Producción de subrecetas y Cocina de Producción (orden, calidad, inocuidad, costeo) |
+| `rrhh` | RRHH (trabajador, contrato, asistencia, nómina, documentos de recursos humanos) |
+| `marketing` | CRM y marketing (campañas, contenido, leads, encuestas) |
+| `reports` | Reportes (emisión, distribución y escalamiento); el BI vive en `core/reportes` |
+| `assets` | Activos (equipamiento, vehículo, mantenimiento, documentos con vencimiento) |
+| `delivery` | Transporte del pedido: reparto propio a domicilio |
+| `supervision` | Supervisión (tareas de apertura y cierre de sucursal) |
+| `storefront` | Sitio web público de marca (canal web) |
+
+Proyectos no tiene módulo: el grupo no ejecuta obra ni proyectos facturables.

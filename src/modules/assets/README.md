@@ -29,7 +29,7 @@ o adelanto por avería — RN-MNT-002/003/004), `orden_mantenimiento_repuesto`
 (repuestos consumidos al realizar una orden, RN-MNT-006),
 `repuesto_compatibilidad` (qué artículos de `inventory` sirven para un
 activo — catálogo de sugerencias, no bloquea), `documento_vigencia`
-(polimórfico: sujeto `activo`/`sucursal`/`empresa`/`trabajador` — RN-DOC-001..004).
+(polimórfico: sujeto `activo`/`sucursal`/`empresa`/`trabajador` — RN-VIG-001..004).
 
 `flota` queda diferida (deuda declarada, `docs/roadmap/deuda/modulo-assets.md`).
 Detalle completo en `docs/architecture/data-model.md` §Recursos.
@@ -113,7 +113,7 @@ Permisos: `assets.leer`, `assets.gestionar` (activos, planes, documentos),
 ## Reglas
 
 RN-VEH-001..007, RN-MNT-001..005, RN-EQP-001..004, RN-RPT-001..004,
-RN-DOC-001..004 en `docs/domain/business-rules.md`.
+RN-VIG-001..004 en `docs/domain/business-rules.md`.
 
 ## Dependencias
 
