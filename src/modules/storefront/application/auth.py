@@ -41,6 +41,7 @@ from src.modules.storefront.infrastructure.security import (
     refresh_expira_en,
     verify_password,
 )
+from src.shared import auditoria
 
 
 def _aware(dt: datetime | None) -> datetime | None:
@@ -130,6 +131,18 @@ def _crear_cuenta(
                 predeterminada=True, **(ubicacion or {}),
             )
         )
+    # `usuario_id=None`: nadie del ERP actúa acá, es autoservicio del sitio.
+    auditoria.registrar(
+        session,
+        usuario_id=None,
+        entidad="storefront_cuenta",
+        entidad_id=cuenta.id,
+        accion="crear_cuenta",
+        datos_despues={
+            "email": email,
+            "via": "google" if google_sub else "clave",
+        },
+    )
     _publicar_cuenta_registrada(session, cuenta, direccion=direccion, ubicacion=ubicacion)
     return cuenta
 

@@ -22,6 +22,7 @@ from src.modules.storefront.application.errors import (
     TokenInvalido,
 )
 from src.modules.storefront.infrastructure.models import StorefrontCuenta
+from src.shared import auditoria
 from src.shared.ubicacion import CAMPOS as CAMPOS_UBICACION
 
 router = APIRouter(prefix="/storefront/cuentas", tags=["storefront"])
@@ -140,12 +141,32 @@ def editar_perfil(
     cuenta: StorefrontCuenta = Depends(get_cuenta_actual),
     session=Depends(get_db),
 ):
+    antes = {
+        "nombres": cuenta.nombres,
+        "apellidos": cuenta.apellidos,
+        "telefono": cuenta.telefono,
+    }
     if body.nombres is not None:
         cuenta.nombres = body.nombres
     if body.apellidos is not None:
         cuenta.apellidos = body.apellidos
     if body.telefono is not None:
         cuenta.telefono = body.telefono
+    # `usuario_id=None`: quien actúa es la propia cuenta del sitio, no un
+    # `usuario` del ERP — `entidad_id` identifica cuál cuenta se editó.
+    auditoria.registrar(
+        session,
+        usuario_id=None,
+        entidad="storefront_cuenta",
+        entidad_id=cuenta.id,
+        accion="editar_perfil",
+        datos_antes=antes,
+        datos_despues={
+            "nombres": cuenta.nombres,
+            "apellidos": cuenta.apellidos,
+            "telefono": cuenta.telefono,
+        },
+    )
     session.commit()
     return _cuenta_out(cuenta)
 

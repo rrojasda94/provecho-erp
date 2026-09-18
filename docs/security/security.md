@@ -115,6 +115,63 @@ Autenticación, endurecimiento, auditoría y backups. El control de acceso
 - Idempotency keys en operaciones de dinero (ver
   [../engineering/api-guidelines.md](../engineering/api-guidelines.md)).
 
+## Sitio de marca (storefront)
+
+Charlie's Pizzas (`storefront/`) es una app Next aparte del back office, sin
+JWT en su superficie pública, y con cuentas de cliente separadas de los
+usuarios del ERP. Ver [ADR-103](../architecture/adr/ADR-103-el-sitio-de-marca-es-un-modulo-storefront-y-una-app-aparte.md),
+[ADR-104](../architecture/adr/ADR-104-la-cuenta-del-sitio-es-una-credencial-aparte-vinculada-por-evento.md)
+y [ADR-105](../architecture/adr/ADR-105-el-pedido-web-es-canal-propio-y-el-efectivo-sigue-siendo-adelantado.md).
+
+- **Credenciales aisladas del ERP** (RN-WEB-006): la cuenta del sitio
+  (`storefront_cuenta`) firma su JWT con `STOREFRONT_JWT_SECRET` (distinto de
+  `JWT_SECRET`) y `aud="storefront"`. El decoder del ERP rechaza un token de
+  cuenta web por firma; el decoder del sitio exige el `aud` y rechaza un
+  token del ERP aunque comparta secreto por accidente de configuración —
+  probado en `tests/test_storefront_aislamiento_credenciales.py` con
+  secretos forjados a propósito, no solo con el valor por defecto de
+  desarrollo (`jwt_secret`/`storefront_jwt_secret` comparten placeholder en
+  dev/test, y un test que no fuerce secretos distintos puede pasar por la
+  razón equivocada).
+- **El navegador nunca habla con la API**: `storefront/lib/api.ts` es el
+  único cliente, corre server-side, y solo llama a
+  `/api/v1/storefront/publico/*` y `/api/v1/storefront/cuentas/*`. No hay
+  proxy genérico (a diferencia de `frontend/app/api/proxy/[...ruta]`) — el
+  navegador no puede pedir nada que ese archivo no haya decidido exponer
+  primero.
+- **Allowlist de campos, no serialización directa** (RN-WEB-001): la
+  superficie pública (`src/modules/storefront/api/publico_routers.py`) nunca
+  devuelve `empresa_id`/`grupo_id`, costos, datos de `persona` de terceros
+  (proveedores, trabajadores), remuneración ni cantidades de receta — solo
+  nombres de ingrediente, nunca cuánto lleva cada uno. Cada respuesta sale de
+  un schema `*PublicoOut` enumerado; ningún endpoint público serializa un
+  modelo ORM directamente. `application/sitio.py` solo llama a los
+  `queries_publicas.py` de otros módulos (nunca a su dominio ni
+  infraestructura), así que ampliar lo que el sitio muestra exige tocar el
+  contrato público del módulo dueño, no solo el storefront.
+- **Rate limit y respuesta ante extracción**: `storefront_publico`
+  (120/hora por IP) y `storefront_pedidos` (20/hora por IP) reusan
+  `src.core.rate_limit` — mismo mecanismo que `/auth/login`, mismo
+  fail-open si Redis no responde (una caída de Redis no puede tumbar el
+  sitio) y mismo flujo `seguridad` para la alerta: un scraping del catálogo
+  o un bombardeo de pedidos falsos deja "Rate limit superado" en ese log,
+  no en silencio.
+- **Auditoría de cambios propios**: `contenido`, `fotos`, `direcciones`,
+  `pedidos` y `cuentas` (perfil, alta) escriben en `audit_log` vía
+  `src.shared.auditoria.registrar`, en la misma transacción que el cambio.
+  Una acción de cliente (no de staff del ERP) audita con `usuario_id=None`
+  y pone el id de la propia cuenta/pedido en `entidad_id` — `audit_log.usuario_id`
+  es FK a `usuario.id`, que no existe para un cliente del sitio.
+- **CSP propia** (`storefront/middleware.ts`, nonce por request,
+  `'strict-dynamic'`), separada de la del ERP — el sitio no debe poder cargar
+  ni ejecutar nada del back office ni viceversa.
+- **Runbook de dominio productivo**: `charlies.majambo.com.pe` necesita su
+  registro DNS A creado **antes** del bloque en el `Caddyfile` (Let's Encrypt
+  corta el certificado a los 5 fallos) — mismo procedimiento que
+  [staging.md](../engineering/staging.md). El dominio nunca va en
+  `ALLOWED_HOSTS`/CORS de la API: el sitio solo la llama por
+  `API_INTERNAL_URL` en la red interna de Docker, nunca desde el navegador.
+
 ## Backups
 
 Copia de seguridad exacta de los datos y archivos del ERP y del grupo

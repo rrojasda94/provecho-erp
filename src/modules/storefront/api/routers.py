@@ -114,8 +114,8 @@ def listar_fotos(
 @router.delete("/fotos/{archivo_id}", status_code=204)
 def borrar_foto(
     archivo_id: uuid.UUID,
-    _: Usuario = Depends(require_permission(EDITAR)),
+    actor: Usuario = Depends(require_permission(EDITAR)),
     session: Session = Depends(get_db),
 ):
-    fotos.borrar(session, archivo_id=archivo_id)
+    fotos.borrar(session, archivo_id=archivo_id, actor_id=actor.id)
     session.commit()

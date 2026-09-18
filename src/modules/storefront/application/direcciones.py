@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from src.modules.storefront.application.errors import NoEncontrado
 from src.modules.storefront.infrastructure.models import StorefrontDireccion
 from src.modules.storefront.infrastructure.repositories import DireccionRepo
+from src.shared import auditoria
 
 
 def listar(session: Session, cuenta_id: uuid.UUID) -> list[StorefrontDireccion]:
@@ -36,13 +37,22 @@ def crear(
     # La primera dirección de la cuenta es predeterminada aunque no se pida:
     # sin ninguna marcada, el checkout de F3 no tendría cuál preseleccionar.
     ya_tiene_alguna = bool(DireccionRepo(session).listar(cuenta_id))
-    return DireccionRepo(session).add(
+    creada = DireccionRepo(session).add(
         StorefrontDireccion(
             cuenta_id=cuenta_id, etiqueta=etiqueta, direccion=direccion,
             referencia=referencia, predeterminada=predeterminada or not ya_tiene_alguna,
             **(ubicacion or {}),
         )
     )
+    auditoria.registrar(
+        session,
+        usuario_id=None,
+        entidad="storefront_cuenta",
+        entidad_id=cuenta_id,
+        accion="agregar_direccion",
+        datos_despues={"direccion_id": str(creada.id), "etiqueta": etiqueta},
+    )
+    return creada
 
 
 def _exigir_propia(
@@ -85,3 +95,11 @@ def editar(
 def borrar(session: Session, *, cuenta_id: uuid.UUID, direccion_id: uuid.UUID) -> None:
     d = _exigir_propia(session, cuenta_id, direccion_id)
     d.deleted_at = datetime.now(UTC)
+    auditoria.registrar(
+        session,
+        usuario_id=None,
+        entidad="storefront_cuenta",
+        entidad_id=cuenta_id,
+        accion="borrar_direccion",
+        datos_antes={"direccion_id": str(direccion_id), "etiqueta": d.etiqueta},
+    )

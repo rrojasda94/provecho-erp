@@ -40,6 +40,7 @@ from src.modules.storefront.infrastructure.repositories import (
     PedidoRepo,
 )
 from src.modules.users.infrastructure.models import Sucursal
+from src.shared import auditoria
 
 
 @dataclass(frozen=True)
@@ -321,6 +322,19 @@ def confirmar(
             idempotency_key=idempotency_key,
             token_acceso=secrets.token_urlsafe(32),
         )
+    )
+    auditoria.registrar(
+        session,
+        usuario_id=None,
+        entidad="storefront_pedido",
+        entidad_id=pedido.id,
+        accion="confirmar",
+        datos_despues={
+            "cuenta_id": str(cuenta_id) if cuenta_id else None,
+            "modalidad": modalidad,
+            "medio_pago": medio_pago,
+            "total_estimado": str(total),
+        },
     )
     item_repo = PedidoItemRepo(session)
     for producto_id, nombre, cantidad, precio in items_congelados:
