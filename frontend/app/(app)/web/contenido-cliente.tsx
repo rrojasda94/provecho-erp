@@ -2,7 +2,9 @@
 
 import { useActionState } from "react";
 
-import { guardarContenidoAction, ESTADO_INICIAL } from "./actions";
+import { ESTADO_INICIAL } from "@/lib/errores";
+
+import { guardarContenidoAction } from "./actions";
 
 export type Contenido = {
   hero?: {

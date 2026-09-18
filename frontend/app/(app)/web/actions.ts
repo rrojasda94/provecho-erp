@@ -6,9 +6,8 @@ import { redirect } from "next/navigation";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
-import { ESTADO_INICIAL, estadoDeError, type EstadoFormulario } from "@/lib/errores";
+import { estadoDeError, type EstadoFormulario } from "@/lib/errores";
 
-export { ESTADO_INICIAL };
 export type { EstadoFormulario };
 
 async function token(): Promise<string> {

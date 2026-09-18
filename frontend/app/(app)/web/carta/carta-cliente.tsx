@@ -2,11 +2,12 @@
 
 import { useActionState, useTransition } from "react";
 
+import { ESTADO_INICIAL } from "@/lib/errores";
+
 import {
   borrarFotoAction,
   guardarDescripcionProductoAction,
   subirFotoAction,
-  ESTADO_INICIAL,
 } from "../actions";
 
 export type Producto = {
