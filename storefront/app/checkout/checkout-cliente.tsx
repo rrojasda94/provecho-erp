@@ -3,7 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { obtenerCarrito, totalDelCarrito, vaciarCarrito, type LineaCarrito } from "@/lib/carrito";
+import {
+  alCambiarCarrito,
+  obtenerCarrito,
+  totalDelCarrito,
+  vaciarCarrito,
+  type LineaCarrito,
+} from "@/lib/carrito";
 
 import { confirmarPedido, cotizarPedido, type Cotizacion } from "./actions";
 
@@ -122,7 +128,20 @@ export function CheckoutCliente({
   direcciones: Direccion[];
 }) {
   const router = useRouter();
-  const [lineas] = useState<LineaCarrito[]>(() => obtenerCarrito());
+  // Estado inicial vacío a propósito: `obtenerCarrito()` lee `localStorage`,
+  // que en el render del servidor no existe. Arrancar en `[]` y recién leer
+  // el carrito real en un efecto mantiene el primer render del cliente
+  // idéntico al del servidor — leerlo directo en el `useState` (como estaba
+  // antes) hidrataba con datos distintos a los del HTML del servidor y
+  // React descartaba el árbol entero (mismo síntoma que el `<a>` anidado:
+  // el botón "Confirmar pedido" desaparecía un instante y el e2e nunca lo
+  // encontraba a tiempo).
+  const [lineas, setLineas] = useState<LineaCarrito[]>([]);
+  useEffect(() => {
+    const actualizar = () => setLineas(obtenerCarrito());
+    actualizar();
+    return alCambiarCarrito(actualizar);
+  }, []);
   const [modalidad, setModalidad] = useState<Modalidad>("delivery");
   const [sucursalId, setSucursalId] = useState(sucursales[0]?.id ?? "");
   const [direccionTexto, setDireccionTexto] = useState("");

@@ -20,6 +20,7 @@ from src.modules.storefront.domain.rules import (
     MIME_FOTO,
     TAMANO_MAXIMO_FOTO_BYTES,
 )
+from src.shared import auditoria
 from src.shared.adjuntos import crear_archivo
 from src.shared.integrations.storage import s3
 from src.shared.models import Archivo
@@ -65,7 +66,7 @@ def registrar(
     subido_por: uuid.UUID,
 ) -> Archivo:
     _validar_entidad(session, entidad, entidad_id)
-    return crear_archivo(
+    archivo = crear_archivo(
         session,
         nombre=nombre,
         mime_type=mime_type,
@@ -77,6 +78,15 @@ def registrar(
         mime_permitidos=MIME_FOTO,
         tamano_maximo_bytes=TAMANO_MAXIMO_FOTO_BYTES,
     )
+    auditoria.registrar(
+        session,
+        usuario_id=subido_por,
+        entidad=ENTIDADES_FOTO[entidad],
+        entidad_id=entidad_id,
+        accion="subir_foto",
+        datos_despues={"archivo_id": str(archivo.id), "nombre": nombre},
+    )
+    return archivo
 
 
 def listar(session, *, entidad: str, entidad_id: uuid.UUID) -> list[Archivo]:
@@ -100,10 +110,18 @@ def foto_principal_url(session, *, entidad: str, entidad_id: uuid.UUID) -> str |
     return fotos[0].url_storage if fotos else None
 
 
-def borrar(session, *, archivo_id: uuid.UUID) -> None:
+def borrar(session, *, archivo_id: uuid.UUID, actor_id: uuid.UUID) -> None:
     archivo = session.scalar(
         select(Archivo).where(Archivo.id == archivo_id, Archivo.deleted_at.is_(None))
     )
     if archivo is None:
         raise NoEncontrado("foto no encontrada")
     archivo.deleted_at = datetime.now(UTC)
+    auditoria.registrar(
+        session,
+        usuario_id=actor_id,
+        entidad=archivo.entidad_tipo,
+        entidad_id=archivo.entidad_id,
+        accion="borrar_foto",
+        datos_antes={"archivo_id": str(archivo.id), "nombre": archivo.nombre},
+    )

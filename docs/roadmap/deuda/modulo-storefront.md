@@ -9,9 +9,9 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   clicables, mapa de locales, "Nosotros", "Trabaja con nosotros"), CMS de
   contenido (`storefront_contenido`) y fotos de catálogo desde el ERP
   (`/web`). Lo que deja abierto:
-  - ⬜ **Sin Playwright del sitio.** `frontend/e2e`/`frontend/uso` no cubren
-    `storefront/` — queda para PR4 (hardening), junto con el resto de la
-    verificación de punta a punta.
+  - ✅ 2026-09-18 **Playwright del sitio.** Suite propia `storefront/e2e`
+    (ADR-047, puertos 8110/3110): carrito → checkout de invitado → recojo en
+    efectivo → confirmación, job `storefront-e2e` en CI.
   - ⬜ **Fuentes de marca sin llegar.** Isidora Black/Tusker Grotesk
     (brandbook) todavía no están en `storefront/public/fonts/`: el sitio
     corre con el fallback Anton+Archivo (Google Fonts) declarado en
@@ -35,9 +35,10 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     hasta], ...]`), pero `organizacion/sucursales-cliente.tsx` solo edita
     uno. Un local con horario partido (ej. cierra a mediodía) necesita
     cargarse por API hasta que el formulario gane más filas.
-  - ⬜ **Sin sitemap ni OG tags.** `storefront/app/robots.ts` permite
-    indexar, pero no hay `sitemap.ts` ni metadata Open Graph por producto —
-    parte de PR4 (SEO).
+  - ✅ 2026-09-18 **Sitemap y OG tags.** `storefront/app/sitemap.ts` (una
+    entrada por producto), `metadataBase`/`openGraph`/`twitter` en
+    `app/layout.tsx`, JSON-LD Restaurant en el layout y en `/locales`,
+    JSON-LD Product en `/carta/[id]` con `openGraph.images`.
   - ⬜ **`docker-compose.prod.yml` no tiene servicio `charlies`.** Solo se
     agregó a `docker-compose.yml` (dev) y `docker-compose.staging.yml`,
     que es el único ambiente desplegado hoy (`docs/engineering/staging.md`).
@@ -96,6 +97,16 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     separado.** Bien para las dos sucursales actuales de Charlie's; una
     marca con muchas más necesitaría una versión que cotice en lote en vez
     de una llamada a `tarifa_delivery` por candidata.
-  - ⬜ **Sin Playwright de checkout ni SEO de `/carrito`, `/checkout`,
-    `/pedido/{id}`.** Queda para PR4 (hardening), junto con el resto de la
-    verificación de punta a punta del sitio.
+  - ✅ 2026-09-18 **Playwright de checkout.** Cubierto por
+    `storefront/e2e/checkout.spec.ts` (arriba, PR1). SEO de `/carrito`,
+    `/checkout`, `/pedido/{id}` no aplica: son pasos de un flujo transaccional
+    con datos del cliente, no páginas que deban indexarse.
+
+- ✅ 2026-09-18 **PR4** (hardening): Playwright del sitio, SEO
+  (`sitemap.ts`, OG, JSON-LD), auditoría (`storefront_pedido`,
+  `storefront_contenido`, fotos, direcciones, cuenta) y aislamiento de
+  credenciales probado a propósito con secretos forjados distintos —
+  `tests/test_storefront_aislamiento_credenciales.py`. Sección propia en
+  `docs/security/security.md`. No tocó la deuda de diseño ya declarada en
+  PR2/PR3 (ARCO, outbox, `IzipayReal`, ETA por `.env`) — el alcance fue
+  pruebas y superficie pública, no ese trabajo de producto.

@@ -198,3 +198,63 @@ Verificado antes de abrir el PR: suite completa de `pytest` en verde
 (2801 pasados, 3 saltados), `ruff check` limpio, `openapi.json`
 regenerado, `npm run lint`/`typecheck`/`test`/`build` en verde en
 `storefront/`.
+
+### 2026-09-18 — PR4: Playwright, SEO y aislamiento de credenciales
+
+Cierre del sitio de marca: hardening, no funcionalidad nueva. Sin ADR
+propio — nada acá cambia una decisión arquitectónica de PR1-3.
+
+- **`storefront/e2e`** (ADR-047, mismo patrón que `frontend/e2e`/`uso`):
+  suite propia con su SQLite desechable y sus puertos (8110/3110, no
+  8100/3100 — `docs/engineering/trabajo-en-paralelo.md`). Un solo
+  recorrido, mismo criterio que la suite `e2e` del ERP: "el flujo del
+  dinero funciona de punta a punta", nada más — carrito → checkout de
+  invitado → recojo en efectivo → confirmación. Job `storefront-e2e`
+  agregado a `.github/workflows/ci.yml`.
+- **Dos bugs reales encontrados construyendo la suite, no simulados**:
+  - `<a>` anidado dentro de otro `<a>` en la tarjeta de producto de la
+    carta (`BotonFavorito` para un visitante sin sesión era un `Link`
+    dentro del `Link` de la tarjeta) — HTML inválido que React detecta en
+    hidratación y regenera el árbol entero; el e2e lo agarró como carrera
+    de verdad, un ojo humano casi nunca lo nota. Se cambió a `<button>` +
+    `router.push`.
+  - `CheckoutCliente` leía el carrito de `localStorage` directo en el
+    `useState` inicial — en el servidor `localStorage` no existe, así que
+    el primer render del cliente (con datos reales) no coincidía con el
+    HTML del servidor (carrito vacío) y React descartaba el árbol,
+    haciendo desaparecer un instante el botón "Confirmar pedido". Mismo
+    patrón que el bug anterior, causa distinta: arrancar en `[]` y leer el
+    carrito real en un efecto después del montaje.
+  - Ninguno de los dos era visible en desarrollo manual — solo un e2e que
+    espera por el elemento exacto (no solo por la navegación) los agarra.
+- **Trampa de entorno documentada, no un bug de la app**: si `storefront/.next`
+  tiene una build de **producción** vieja (de un `npm run build` de
+  verificación anterior), `next dev` arranca en caliente con ese HTML/RSC
+  ya prerenderizado — sirve la carta/checkout de un `marca_id`/`producto_id`
+  que ya no existe en la base recién sembrada, aunque el sitio y la API
+  arranquen de cero. `e2e/preparar-bd.mjs` ahora borra `storefront/.next`
+  entero antes de cada corrida, no solo `.next/cache` (que no alcanza).
+- **SEO**: `app/sitemap.ts` (una entrada por producto),
+  `metadataBase`/`openGraph`/`twitter` en `app/layout.tsx`, JSON-LD
+  Restaurant en el layout y en `/locales` (una por sucursal, con
+  coordenadas), JSON-LD Product en `/carta/[id]` con `offers.price` y
+  `availability`, `sitemap` agregado a `app/robots.ts`.
+- **Auditoría** (`src.shared.auditoria.registrar`, misma transacción que el
+  cambio): contenido (crear/editar), fotos (subir/borrar), perfil de cuenta,
+  alta de cuenta, direcciones (agregar/borrar), pedido (confirmar). Acción
+  de cliente del sitio (no de staff del ERP) audita con `usuario_id=None`
+  — `audit_log.usuario_id` es FK a `usuario.id`, que no existe para una
+  cuenta web — y pone el id de la propia entidad en `entidad_id`.
+- **Aislamiento de credenciales probado, no solo declarado**
+  (`tests/test_storefront_aislamiento_credenciales.py`, 11 tests): token de
+  cuenta web contra endpoints del ERP, token del ERP contra endpoints de
+  cuenta, decoder cruzado (firma inválida), token sin `aud`, y — el caso que
+  un test ingenuo deja pasar por la razón equivocada— `aud` correcto
+  forjado con el secreto del ERP, con `jwt_secret`/`storefront_jwt_secret`
+  monkeypateados a valores **distintos** a propósito (comparten placeholder
+  por defecto en dev/test).
+- Sección nueva "Sitio de marca (storefront)" en `docs/security/security.md`.
+
+Verificado antes de abrir el PR: `storefront/e2e` en verde de punta a
+punta, `pytest`/`ruff` en verde, `npm run lint`/`typecheck`/`test`/`build`
+en verde en `storefront/` y `frontend/`.
