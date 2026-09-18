@@ -19,18 +19,22 @@ Estas reglas son obligatorias durante todo el desarrollo.
   (repositorios SQLAlchemy), `api/` (routers FastAPI).
 - **Crear un módulo nuevo: seguir `docs/engineering/module-guide.md`** — la
   estructura se copia de `purchases`, pero activarlo son 7 registros fuera
-  del módulo.
+  del módulo, más hasta 5 condicionales (tareas programadas, router público,
+  reportes, destinos, settings).
 
 ## Estructura de carpetas
 
 ```
 src/
-  modules/        # inventory, sales, purchases, accounting, users (+ futuros)
+  modules/        # users, inventory, sales, purchases, accounting, production,
+                  # rrhh, marketing, reports, assets, delivery, supervision,
+                  # storefront (+ futuros)
   shared/         # utilidades transversales sin lógica de negocio
   core/           # app factory, db, event bus, auth
   config/         # settings (pydantic-settings, lee .env)
 tests/
-frontend/         # Next.js + TypeScript
+frontend/         # Next.js + TypeScript (el ERP)
+storefront/       # Next.js aparte: sitio público de Charlie's Pizzas (ADR-103)
 docs/             # arquitectura, ADRs, dominio, modelo de datos
 ```
 
@@ -56,8 +60,10 @@ su dominio. Bajo acoplamiento, alta cohesión.
    escribe como fragmento en `changelog.d/` (`<tipo>-<slug>.md`), nunca
    editando `CHANGELOG.md` a mano — ver `changelog.d/README.md`.
 6. Actualizar `ROADMAP.md` al construir algo nuevo.
-7. `main` está protegida por ruleset: PR obligatorio, los seis jobs del CI en
-   verde y la rama al día con `main`. No existe el merge en rojo.
+7. `main` está protegida por ruleset: PR obligatorio, los seis checks
+   obligatorios del CI en verde (`backend`, `migraciones`, `imagen`,
+   `seguridad`, `frontend`, `e2e`) y la rama al día con `main`. No existe el
+   merge en rojo.
 
 ## Formato
 
@@ -83,7 +89,8 @@ APIs externas desde el dominio.
 ## Datos de prueba
 
 Usuarios: `admin` (rol admin), `cajero1` (rol cajero), `almacen1`
-(almacenero), `aprobador1` (supervisor) y `jefecocina1` (jefe de cocina),
+(almacenero), `aprobador1` (supervisor), `jefecocina1` (jefe de cocina) y
+`repartidor1` (repartidor; sin `trabajador`, solo prueba login y permiso),
 todos PIN `123456` (solo entornos no productivos, vía `python -m
 src.seeders.seed`). Ese mismo seeder crea el almacén de producción
 (`WH-PROD`), abastecido por el central. La receta BOM que fabrica algo en

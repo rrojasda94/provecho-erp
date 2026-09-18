@@ -802,7 +802,7 @@ entre `aprobada` y `despachada` no cambia qué se puede hacer (ADR-020).
   modelo de recetas) y `articulo_resumen` (identidad y **tipo** de un
   artículo, para que quien lo recibe valide que sirve: lo usa `sales` antes
   de guardar `producto_comercial.empaque_id`, que solo admite tipo `empaque`
-  — RN-EMP-003). Mismo criterio que `sales.queries_publicas`: devuelve
+  — RN-EMB-003). Mismo criterio que `sales.queries_publicas`: devuelve
   dicts, nunca el ORM, y nadie importa `inventory.infrastructure` desde
   afuera.
 

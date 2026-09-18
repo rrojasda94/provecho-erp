@@ -457,7 +457,7 @@ erDiagram
   se elimina), margen_contribucion (calculado; revisado por comercial/
   contabilidad para pricing), empaque_id (FK articulo tipo=empaque,
   nullable), modalidades_empaque (array `mesa`|`takeout`|`delivery` — en
-  cuáles se descuenta stock del empaque, RN-EMP-003). Precios en
+  cuáles se descuenta stock del empaque, RN-EMB-003). Precios en
   **lista_precio** / **precio** (por sucursal/canal/modalidad de consumo,
   RN-MDC-003). Puede formar parte de uno o más **combo** (N:N).
 - ~~**modificador**~~ / ~~**variante_producto**~~: **reemplazados por
@@ -499,7 +499,10 @@ descuenta stock vía la receta (ver [../domain/domain-model.md](../domain/domain
   `rotacion_inventario` | `ticket_promedio`), lista_precio_id (opcional),
   material_promocional (URL/JSONB), guion_atencion (texto, RN-PRM-002),
   canales (array), horarios/fechas de vigencia, capacitacion_requerida
-  (bool).
+  (bool). **La tabla `promocion` implementada (ADR-076) es otra cosa**: la
+  promoción condicional que se aplica sola (`nxm` | `cantidad` | `combo` |
+  `monto_minimo`, con vigencia, ámbito marca/sucursal/canal y prioridad);
+  lo que aplicó queda en `venta_promocion` (§6).
 - **precio** (implementada 2026-07-27): producto_comercial_id,
   lista_precio_id, monto. Fijo e innegociable en POS (RN-PRC-003); fuera
   de POS (ej. cotización) admite rango_negociacion_min/max definido por el
@@ -1048,6 +1051,23 @@ Solicitud.
   ningún grupo queda con saldo, RN-COM-018/ADR-018), pasarela (izipay),
   referencia externa, idempotency_key (obligatoria al registrar pago,
   RN-COM-002), estado.
+- **pedido_borrador** (ADR-074): id (lo genera el PDV — es el uuid de la
+  pestaña, así guardar es un upsert), sucursal_id (FK), punto_venta_id (FK,
+  indexado), usuario_id (FK — quién lo tocó por última vez, no restringe
+  quién lo sigue), contenido (JSONB — tipo de orden, mesa, comensales,
+  cliente y líneas con extras, restas y atributos), timestamps. El ticket a
+  medio armar de una caja, guardado en el servidor para sobrevivir recargas y
+  relevos de turno: es **del punto de venta**, no del usuario. No es una
+  `venta` en estado borrador a propósito: no consume `numero_orden` (que
+  dejaría huecos en la serie) ni descuenta, asienta o cobra nada.
+- **venta_promocion** (ADR-076): venta_id (FK, indexado), promocion_id (FK
+  `promocion`), nombre (`VARCHAR(120)`, congelado al aplicarse), monto
+  `NUMERIC(10,2)` (lo que descontó), detalle (JSONB opcional —
+  `{venta_item_id: unidades}` que la activaron), timestamps. Una fila por
+  promoción condicional aplicada a la venta; se recalcula entera en cada
+  cambio del pedido (`recalcular_promociones`), así que no lleva actor: no
+  la aplicó nadie. Tabla propia y no `venta.descuento_*` para que el reporte
+  de descuentos distinga lo que regaló una persona de lo que aplicó una regla.
 - **custodia_efectivo**: apertura_caja_id, monto, responsable_actual_id,
   estado (`en_caja` | `en_supervisor` | `en_contabilidad` | `disponible`),
   timestamps por relevo (RN-MDP-002). **Máquina de estados desde ADR-025**:
@@ -1107,7 +1127,7 @@ Solicitud.
   (ADR-036), no en `shared`**. Esta entrada se escribió el 2026-07-20, cuatro
   meses antes de que existiera el módulo, y decía `shared` porque entonces el
   escalamiento no tenía dueño. Hoy lo tiene: un solo escritor y un solo lector.
-  La definición vigente está en §16.
+  La definición vigente está en §10.
 
   Dos diferencias con lo que este párrafo pedía originalmente, argumentadas en
   ADR-036:
@@ -1363,10 +1383,13 @@ Ver `docs/domain/state-machines.md#reparto-propio` y
 `docs/architecture/events.md` para las transiciones y los eventos que
 publica cada una.
 
-## 7. Producción (módulo futuro production)
+## 7. Producción (módulo production)
 
-Spec a futuro (2026-07-20) — primera cocina de producción planeada 2027,
-sin operación real hoy. Ver [docs/produccion/README.md](../produccion/README.md).
+Implementado en `src/modules/production/` (slice core 2026-07-25, ampliado
+el 2026-09-09 con plan, checklist de inocuidad, reporte de jornada, costeo
+real y trabajadores por orden). La primera cocina de producción central
+sigue planeada para 2027: el módulo existe antes que la operación. Ver
+[docs/produccion/README.md](../produccion/README.md).
 
 - **plan_produccion**: cocina_produccion_id (almacén tipo `produccion`),
   fecha, turno, linea_produccion/tipo_receta (RN-PRD-012, evita
@@ -1390,6 +1413,13 @@ sin operación real hoy. Ver [docs/produccion/README.md](../produccion/README.md
   horas_hombre × tarifa_hora_produccion, definida por Contabilidad
   [[ COMPLETAR ]]), costo_real_unitario (= (costo_insumos +
   costo_mano_obra) / cantidad producida aprovechable).
+- **orden_produccion_trabajador** (RN-PRD-018): orden_produccion_id (FK),
+  trabajador_id (FK `trabajador`), horas `NUMERIC(8,2)`. Quién trabajó en
+  la orden y cuántas horas, tomadas de su asistencia real del día
+  (`rrhh.application.queries_publicas.horas_asistidas`) en vez del número
+  libre que antes se tipeaba. `orden_produccion.horas_hombre` se mantiene
+  como el agregado (Σ horas) para no romper el costeo que ya lo multiplica
+  por la tarifa.
 - **consumo_produccion_item**: orden_produccion_id, articulo_id (insumo o
   subreceta consumido), cantidad_consumida, costo_unitario (snapshot al
   momento del consumo), peso_desperdicio_real (opcional), tipo_desperdicio
@@ -1481,14 +1511,29 @@ presentación peruano y no una decisión de la empresa.
   (evento `accounting.pago_ejecutado`).
 - **declaracion_itan**: empresa_id, periodo, activos_netos, umbral_legal,
   base_imponible (excedente), monto, credito_ir_aplicado (RN-IMP-006).
+- **asiento_omitido** (ADR-089, 2026-09-05): empresa_id (FK), evento
+  (`VARCHAR(64)` — el evento operativo que pedía el asiento), referencia_origen
+  (`VARCHAR(64)`, texto y no FK: el documento vive en otro módulo), motivo
+  (`periodo_cerrado` | `sin_cuentas` | `sin_plantilla`, CHECK
+  `motivo_asiento_omitido`), fecha (la que habría tenido el asiento — dice en
+  qué periodo falta la plata), detalle (`VARCHAR(300)`, opcional — ej. los
+  códigos de cuenta ausentes). Un asiento automático que el sistema decidió
+  **no** escribir: la omisión no bloquea la operación de origen, pero tiene
+  que quedar consultable. Gemela de `incidencia_inventario`, y como ella sin
+  cierre (`atendida_at`): una configuración rota vuelve a aparecer mañana.
+  No registra `duplicado` ni `monto_cero`, que son omisiones correctas.
 
-Pendiente (deuda técnica, ver ROADMAP): generación automática de asientos
-operativos solo cubre los 4 eventos que sus módulos de origen ya publican
-en código (`purchases.oc_emitida`, `purchases.compra_recibida`,
-`sales.venta_confirmada`, `purchases.comprobante_conforme`) — el resto de
-eventos documentados en `events.md` (pago de venta, comprobante emitido,
-transferencia, merma, ajuste, caja chica) no se generan aún porque esos
-módulos todavía no los publican. La detracción SPOT se calcula pero el
+Asientos automáticos (2026-09-18): `accounting` escucha
+`purchases.oc_emitida`, `purchases.compra_recibida`,
+`purchases.comprobante_conforme`, `sales.venta_confirmada`,
+`sales.venta_pagada`, `sales.comprobante_emitido`, `sales.venta_anulada`,
+`sales.lineas_anuladas`, `inventory.transferencia_recibida`,
+`inventory.merma_registrada`, `inventory.consumo_personal_valorizado`,
+`inventory.consumo_personal_reversado` y `production.orden_desechada` (más
+`organizacion.empresa_creada`, que siembra el PCGE). Lo que no se asienta
+queda en `asiento_omitido`. Pendiente (deuda técnica, ver ROADMAP): ajuste
+fuera de margen, caja chica (su evento no se publica todavía) y planilla
+(`rrhh.boleta_pago_emitida` se publica sin consumidor). La detracción SPOT se calcula pero el
 asiento de pago no la desglosa en una cuenta propia (queda en el debe/haber
 único del total); `purchases.orden_compra` no queda marcada como pagada;
 conciliación bancaria y arqueo backend también quedan para un slice de
@@ -1984,7 +2029,7 @@ No hay tabla de mapeo hub-id↔nube-id: `venta`, `pago` y
 `movimiento_inventario` conservan el mismo UUID en ambos lados porque el
 `id` se genera en la aplicación (`UuidPkMixin`) y viaja en el lote.
 
-## 15. Supervisión (módulo supervision, ADR-102)
+## 9. Supervisión (módulo supervision, ADR-102)
 
 Tareas programadas de apertura y cierre de sucursal, con checklist y
 evidencia fotográfica opcional (RN-SUP-001..008).
@@ -2014,7 +2059,7 @@ evidencia fotográfica opcional (RN-SUP-001..008).
   de `reports` (`supervision.informe_diario_generado`) al cerrar la
   jornada — es la entidad a la que apunta ese reporte (RN-SUP-007).
 
-## 16. Emisión y distribución de reportes (módulo reports, ADR-033)
+## 10. Emisión y distribución de reportes (módulo reports, ADR-033)
 
 Seis tablas que responden «qué reporta el ERP, a quién le llega y qué se
 entregó». **No confundir con `core/reportes`** (ADR-024), que es el motor de
@@ -2091,7 +2136,7 @@ Una emisión sin destinatarios **se persiste igual**, con cero entregas, y sale
 como hueco en la matriz (RN-REP-005). Las entregas no son retroactivas:
 `regla_id` y `motivo` se congelan al emitir (RN-REP-004).
 
-## 17. Vistas del BI autoservicio (ADR-083)
+## 11. Vistas del BI autoservicio (ADR-083)
 
 No son tablas: son `CREATE VIEW` sobre las tablas de arriba, creadas por
 `alembic/versions/832ff01ed33f_vistas_bi_y_rol_de_solo_lectura.py`. Existen
@@ -2123,7 +2168,7 @@ remuneración).
 (`src/core/tenant.py`, ADR-004): mismas tablas de origen, no una copia. Su
 equivalencia la congela `tests/test_bi_alcance.py` (RN-BI-002).
 
-## 18. Sitio de marca (módulo `storefront`, ADR-103)
+## 12. Sitio de marca (módulo `storefront`, ADR-103)
 
 Contenido editable y fotos del sitio público de una marca. La superficie
 pública se lee por `storefront/application/queries_publicas` de los demás
@@ -2170,7 +2215,7 @@ con otra forma (heredadas) se toleran y el sitio muestra "consultar horario".
 `"producto_comercial_foto"` y `"articulo_foto"` — foto principal = la más
 reciente no borrada de ese `entidad_id`.
 
-## 9. Módulos futuros
+## 13. Módulos futuros
 
 Revisado 2026-08-05: de la lista original casi nada sigue siendo futuro, y
 dos cosas nunca van a ser un módulo.
@@ -2179,11 +2224,12 @@ dos cosas nunca van a ser un módulo.
   `reserva_stock`, `transferencia`/`transferencia_item`. El picking reparte
   por FEFO y emite una línea por lote tomado. Un módulo aparte habría
   necesitado el dominio de `inventory` para hacer eso mismo.
-- **Ruta / flota (dentro de `vehiculo`)** ⬜ sigue sin dueño: `flota` como
-  agrupador queda diferida (deuda de `assets`), y el ruteo/tracking de una
-  operación de reparto propia sigue sin caso real que lo pida. Lo pendiente
-  del transporte de hoy sigue siendo la **guía de remisión**, que es un
-  comprobante (deuda de `inventory` y de `sales`), no un módulo.
+- **Reparto propio** ✅ módulo `delivery` (ADR-098, §6b): `ruta_reparto`,
+  `entrega`, `repartidor` y el tablero de despacho, con sus eventos
+  `delivery.*`. **Flota (dentro de `vehiculo`)** ⬜ sigue sin dueño: `flota`
+  como agrupador queda diferida (deuda de `assets`). La **guía de remisión**
+  del traslado entre almacenes es un comprobante (deuda de `inventory` y de
+  `sales`), no un módulo.
 - **Tesorería** ✅ dentro de `accounting` por decisión del usuario:
   `movimiento_dinero`, caja, `custodia_efectivo`.
 - **BI/reportes** ✅ en `core/reportes` (ADR-024): catálogo de reportes +

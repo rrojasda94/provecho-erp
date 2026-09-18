@@ -10,14 +10,19 @@ duplica en CLAUDE.md.
 Construir lo mínimo que resuelve el problema real. Especificar antes de
 implementar. Cada capacidad, agregable sin romper el resto — y removible sin
 que su ausencia se sienta en el dominio de los demás (hoy sacar un módulo
-todavía obliga a limpiar sus siete registros en `core`, seeder y frontend;
+todavía obliga a limpiar sus registros en `core`, seeder y frontend —siete
+fijos y hasta cinco condicionales—;
 ver [module-guide.md](module-guide.md)).
 Principios de negocio en [../foundation/business-philosophy.md](../foundation/business-philosophy.md).
 
 ## Arquitectura y patrones obligatorios
 
 - Modular Monolith + Clean Architecture + DDD por módulo
-  ([../architecture/overview.md](../architecture/overview.md)).
+  ([../architecture/overview.md](../architecture/overview.md)). Trece
+  módulos en `src/modules/`: `users`, `inventory`, `sales`, `purchases`,
+  `production`, `accounting` (incluye tesorería), `rrhh`, `marketing`,
+  `reports`, `assets`, `delivery`, `storefront` y `supervision` — estado de
+  cada uno en [../product/modules.md](../product/modules.md).
 - Repository Pattern + Unit of Work para datos.
 - Dependencias: `api → application → domain`; `infrastructure` implementa
   interfaces del dominio. El dominio no conoce FastAPI ni SQLAlchemy.
@@ -60,11 +65,15 @@ py -3.12 -m venv .venv && .venv/Scripts/python -m pip install -e ".[dev,backups]
    y estados en [../domain/state-machines.md](../domain/state-machines.md).
 3. Capas: `domain/` → `application/` → `infrastructure/` → `api/`.
 4. Activar el módulo: router, tag OpenAPI, listeners, modelos, migración,
-   permisos y entrada de frontend son **siete registros fuera del módulo**.
+   permisos y entrada de frontend son **siete registros fuera del módulo**;
+   tareas Celery, router público, emisiones de reporte, destinos y
+   `settings` suman hasta **cinco más** si el módulo los necesita (doce en
+   total).
 
 Checklist completo, archivo por archivo, y módulo de referencia
-(`purchases`): [module-guide.md](module-guide.md). Tres de esos siete
-registros los exige `tests/test_arquitectura.py`.
+(`purchases`): [module-guide.md](module-guide.md). Siete de esos doce
+registros los exige algún test (`tests/test_arquitectura.py`,
+`test_celery_beat.py`, `test_destinos.py`, `test_settings.py`).
 
 ## Reglas para generar APIs
 

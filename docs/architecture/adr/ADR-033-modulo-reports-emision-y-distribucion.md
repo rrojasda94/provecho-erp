@@ -85,7 +85,7 @@ misma emisión.
 `area` + `area_miembro` (roles y/o personas, opcionalmente acotadas a una
 sucursal) · `regla_distribucion` + `regla_destinatario` (el gobierno) ·
 `reporte_emitido` + `entrega_reporte` (el rastro). Detalle en
-`docs/architecture/data-model.md` §16.
+`docs/architecture/data-model.md` §10.
 
 **El área no es un rol.** Un rol dice qué puede hacer alguien; un área dice de
 qué se tiene que enterar. Se parecen tanto que la tentación es fusionarlos, y
@@ -238,6 +238,6 @@ ningún lado.
   transversal), ADR-016 (eventos post-commit), ADR-004 (tenant desde el JWT),
   ADR-022 (restricciones de permiso), ADR-026 (paginación).
 - `src/modules/reports/README.md`, `docs/architecture/events.md`,
-  `docs/architecture/data-model.md` §16.
+  `docs/architecture/data-model.md` §10.
 - Reglas: `RN-REP-001` … `RN-REP-008` en `docs/domain/business-rules.md`.
 - Tests: `tests/test_reports.py` (no confundir con `tests/test_reportes.py`).

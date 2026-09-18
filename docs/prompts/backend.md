@@ -7,7 +7,13 @@ Leer antes de tocar código:
 3. [architecture/overview.md](../architecture/overview.md) — capas y dependencias.
 4. [architecture/data-model.md](../architecture/data-model.md) — modelo de datos.
 5. [domain/business-rules.md](../domain/business-rules.md) y [foundation/glossary.md](../foundation/glossary.md).
-6. README del módulo afectado (`src/modules/<módulo>/README.md`).
+6. README del módulo afectado (`src/modules/<módulo>/README.md`). Los módulos
+   hoy son 13: `accounting`, `assets`, `delivery`, `inventory`, `marketing`,
+   `production`, `purchases`, `reports`, `rrhh`, `sales`, `storefront`,
+   `supervision` y `users`. Uno nuevo se crea siguiendo
+   [engineering/module-guide.md](../engineering/module-guide.md).
+   `storefront` tiene además un frontend propio fuera de `frontend/`: la app
+   Next.js `storefront/` en la raíz (ADR-103).
 
 ## Reglas duras
 
@@ -25,5 +31,7 @@ Leer antes de tocar código:
 - [ ] Migración Alembic si cambió el esquema.
 - [ ] Reglas nuevas en `domain/business-rules.md`, estados en `domain/state-machines.md`,
       eventos nuevos en `architecture/events.md`.
-- [ ] README del módulo, `CHANGELOG.md` y `ROADMAP.md` actualizados.
+- [ ] README del módulo y `ROADMAP.md` actualizados, y un fragmento en
+      `changelog.d/<tipo>-<slug>.md` — nunca `CHANGELOG.md` a mano (ver
+      `changelog.d/README.md`).
 - [ ] Docstrings en público nuevo; sin código duplicado ni muerto.

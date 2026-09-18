@@ -201,5 +201,5 @@ consulta (no cuando se carga por id y se valida después).
 - `docs/roadmap/deuda/modulo-assets.md`,
   `docs/roadmap/historial/modulo-assets.md`.
 - Reglas: `RN-VEH-001..007`, `RN-MNT-001..005`, `RN-EQP-001..004`,
-  `RN-DOC-001..004` en `docs/domain/business-rules.md`.
+  `RN-VIG-001..004` en `docs/domain/business-rules.md`.
 - `src/modules/assets/README.md`, `docs/architecture/events.md`.

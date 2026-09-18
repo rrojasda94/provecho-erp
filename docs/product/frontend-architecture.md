@@ -71,7 +71,6 @@ frontend/app/
   (app)/
     layout.tsx          # lee /users/me una vez, guarda sesión+permisos en contexto
     page.tsx            # home de apps (grilla filtrada por permiso)
-    apps.config.ts
     sales/
       layout.tsx         # guard de permiso + sidebar del módulo
       page.tsx
@@ -84,6 +83,8 @@ frontend/components/
   ui/                    # componentes shadcn/ui (copiados, editables) sobre Base UI
   shell/                 # AppGrid, Sidebar, Breadcrumb — layout, no de un módulo
 frontend/lib/
+  modulos.ts             # MODULOS: la grilla de apps (antes apps.config.ts)
+  navegacion.ts          # SUBMENUS de cada módulo
 ```
 
 Un módulo de frontend no importa componentes internos de otro, solo lo
@@ -597,6 +598,85 @@ movimiento cuelga de `--transicion` y se apaga entero con
 ⬜ **Falta**: indicador de sincronización para el PDV offline (ADR-009), que
 depende del motor de sync y no de esta capa.
 
+## F2.32 Mapa de rutas por módulo *(agregado local)*
+
+✅ **Estado real al 2026-09-18.** F2.2 describe la convención; esto es lo que
+hay en `frontend/app/`. Las carpetas de `(app)/` están en español porque son
+la URL que ve el usuario — no repiten el nombre del módulo backend. El orden
+del sidebar y los rótulos viven en `SUBMENUS` (`lib/navegacion.ts`) y el
+ícono del home en `MODULOS` (`lib/modulos.ts`); esta tabla no los reemplaza.
+
+**Shell `(app)/`** — tras login, con sidebar, guard de permiso por
+`layout.tsx` y `loading.tsx` por módulo:
+
+| Ruta | Módulo backend | Propósito |
+|------|----------------|-----------|
+| `/dashboard` | `core` (dashboard) | Tablero de inicio; cada bloque falla por su cuenta (F2.10) |
+| `/ventas` (`[id]`, `clientes`, `mesas`, `promociones`) | `sales` | Jornada de ventas y ficha de venta, clientes, plano de mesas del salón, cupones y promociones |
+| `/catalogo` (`productos[/id]`, `atributos`, `recetas[/id]`, `recetas/matriz`, `medios-pago`) | `sales` + `inventory` | Catálogo comercial: productos, atributos/variantes, recetas BOM y recetario en grilla (ADR-057), medios de pago |
+| `/inventario` (`stock`, `solicitudes[/id]`, `transferencias`, `guias-remision`, `conteos[/id]`, `articulos[/id]`, `skus/[id]`, `categorias`, `unidades-medida`, `lotes`, `ajustes`, `devoluciones[/id]`, `mermas`, `reservas`) | `inventory` | Stock por almacén, requerimientos al abastecedor, traslados y guías, conteo cíclico, maestro de artículos/SKU, lotes FEFO, ajustes, devoluciones, mermas y reservas |
+| `/compras` (`ordenes-compra[/id]`, `directas`, `facturas`, `proveedores`) | `purchases` | Órdenes de compra, compra directa (ADR-082), conformidad de facturas y proveedores |
+| `/produccion` (`ordenes[/id]`, `plan`, `inocuidad`, `reportes`) | `production` | Órdenes de producción, plan por turno, checklist de inocuidad y reporte de jornada |
+| `/contabilidad` (`asientos[/id]`, `caja`, `comprobantes`, `estados-financieros`, `libro-mayor`, `pagos`, `periodos`, `plan-cuentas`, `reglas-asiento`) | `accounting` | Libro contable, caja/custodia, registro de comprobantes emitidos, estados financieros, pago a proveedor (tesorería) y reglas de asiento automático |
+| `/rrhh` (`contratacion`, `trabajadores[/id]`, `permisos`, `turnos`, `terminales`) | `rrhh` | Convocatorias y contratación, legajo, permisos, turnos y terminales de marcaje |
+| `/marketing` (`contenido`, `leads`, `encuestas`, `agencias`) | `marketing` | Campañas, calendario de contenido, leads con atribución, encuestas y evaluación de agencias |
+| `/web` (`carta`, `ingredientes`) | `storefront` | "Sitio web": CMS del sitio de marca, fotos de la carta e ingredientes (ADR-103; ver F2.33) |
+| `/activos` (`cronograma`, `activos[/id]`, `mantenimientos`, `documentos`) | `assets` | Cronograma de mantenimiento, ficha de activo/vehículo, órdenes de mantenimiento y documentos con vencimiento |
+| `/delivery` (`repartidores`, `entregas`) | `delivery` | Tablero de despacho con mapa de ruta, repartidores e historial de entregas (ADR-098/101) |
+| `/supervision` (`mis-tareas`, `tablero`, `plantillas`, `categorias`, `informes[/id]`) | `supervision` | Checklist + foto del turno, tablero del supervisor, plantillas y categorías de tareas, informe diario (ADR-102) |
+| `/reportes` (`escalamientos[/id]`, `distribucion`, `areas`, `emitidos[/id]`) | `reports` + `core/reportes` | Bandeja de reportes, escalamientos, reglas de distribución, áreas y reportes emitidos |
+| `/gerencia` (`parametros`, `delivery`, `kds`, `decisiones`, `divisas`) | `users` + `core` | Parámetros operativos por empresa (ADR-014), tarifas de delivery, tiempos del KDS, actas de decisión y divisas |
+| `/usuarios` (`roles`, `personas`) | `users` | Cuentas, roles/permisos y fichas de persona |
+| `/organizacion` (`empresas`, `marcas`, `sucursales`, `puntos-venta`, `almacenes`) | `users` | Estructura empresa → marca → sucursal → punto de venta / almacén |
+| `/bi` | `core` (BI) | Entrada al BI autoservicio en Superset (ADR-083) |
+| `/auditoria` | `core` (auditoría) | Consulta del registro de auditoría: quién, qué, cuándo, valor anterior/nuevo (ADR-031) |
+
+**Pantallas completas fuera del shell** — cuelgan del layout raíz, sin
+sidebar, pensadas para táctil:
+
+| Ruta | Módulo backend | Propósito |
+|------|----------------|-----------|
+| `/pdv` | `sales` + `accounting` | Punto de venta y cobro con caja abierta (ADR-025) |
+| `/kds` | `sales` | Pantalla de cocina por estaciones |
+| `/asistencia` | `rrhh` | Pad de marcaje de asistencia en el local (ADR-065) |
+| `/reparto` | `delivery` | PWA instalable del repartidor: rutas, paradas y GPS |
+| `/login`, `/cambiar-pin` | `users` | Ingreso con pinpad y cambio de PIN (ADR-050) |
+| `/oauth/authorize` | `core` (OAuth) | Route handler del flujo OAuth (SSO hacia Superset, ADR-083) |
+| `/api/proxy/[...ruta]` | — | Proxy del navegador a la API que adjunta el token de sesión (F2.9) |
+
+**Públicas `(publico)/`** — sin sesión del ERP; el enlace o el rate limit es
+la credencial. Se sirven bajo `clientes.majambo.com.pe` (ADR-080):
+
+| Ruta | Módulo backend | Propósito |
+|------|----------------|-----------|
+| `/reconocerte` (`terminos`) | `sales` | Landing del QR: registro de cliente con descuento y sus términos (ADR-061) |
+| `/seguimiento/[token]` | `delivery` | Seguimiento público del pedido con mapa (RN-DLV-008) |
+| `/postular/[token]` | `rrhh` | Postulación a una convocatoria (ADR-087) |
+
+## F2.33 Sitio de marca: la app `storefront/` *(agregado local)*
+
+🔶 **PR1 construido 2026-09-17 (ADR-103).** El sitio público de Charlie's
+Pizzas (`charlies.majambo.com.pe`) **no es una ruta de `frontend/`**: es una
+segunda app Next.js en `storefront/`, hermana de esta, con su propio
+`package.json`, `Dockerfile`, imagen (`-charlies`), CSP y tema de la marca
+(no los tokens de Provecho). ADR-080 había resuelto la landing del QR con un
+solo proceso para todos los dominios; ADR-103 elige lo contrario acá por SEO
+(el sitio se indexa, la landing no), tema propio y superficie de ataque — que
+los chunks del back office no sean descargables desde un dominio de
+e-commerce.
+
+- **Único contacto con el ERP: la API**, y solo `/api/v1/storefront/publico/*`
+  (sin JWT, rate limit por IP, nunca escribe) desde el servidor Next vía
+  `API_INTERNAL_URL`. No hay proxy genérico como `app/api/proxy/`: el
+  navegador no habla con la API.
+- **Rutas**: home (promos web y destacados), `/carta` y `/carta/[id]`
+  (búsqueda tolerante, filtros, ingredientes clicables), `/locales` (mapa y
+  "abierto ahora"), `/nosotros`, `/trabaja-con-nosotros` (enlaza a
+  `/postular/[token]` de esta app) y `/salud` (la sonda del job `imagen`).
+- **El contenido se edita aquí**, en `/web` (F2.32); `storefront/` solo lee.
+- Cuentas de cliente, carrito y pagos quedan para PR2/PR3; su Playwright,
+  para PR4. Cómo correrla: [`storefront/README.md`](../../storefront/README.md).
+
 ## Resumen — qué cerrar antes de los diseños finales del alfa
 
 **Actualizado 2026-08-02**: las 6 prioridades originales están resueltas
@@ -613,6 +693,6 @@ pantallas construidas no necesitaron overlay/combobox/dialog complejo
 (el `<dialog>` nativo de alta de proveedor cubrió el caso); shadcn se
 instala cuando una pantalla real lo pida, no antes.
 
-El resto de las 31 secciones tiene decisión tomada, está correctamente
+El resto de las 33 secciones tiene decisión tomada, está correctamente
 diferido, o depende de un módulo backend que todavía no llega a pantalla —
 no bloquean seguir construyendo pantallas.

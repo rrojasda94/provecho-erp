@@ -339,7 +339,7 @@ export const catalogoApi = {
       /** Único modo de dejarlo sin receta: `receta_id: null` sería
        * indistinguible de "no lo mandé". */
       quitar_receta: boolean;
-      /** Artículo de empaque y en qué modalidades se descuenta (RN-EMP-003). */
+      /** Artículo de empaque y en qué modalidades se descuenta (RN-EMB-003). */
       empaque_id: string | null;
       modalidades_empaque: string[] | null;
     }>,

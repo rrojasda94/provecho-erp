@@ -32,7 +32,7 @@ configurable por días y/o kilometraje, RN-MNT-001..005) y
 `documento_vigencia` (polimórfico entre activo/sucursal/empresa/trabajador,
 catálogo cerrado de tipos — SOAT, revisión técnica, licencia de
 funcionamiento, Defensa Civil, fumigación, registro sanitario, carné de
-sanidad, licencia de conducir — RN-DOC-001..004).
+sanidad, licencia de conducir — RN-VIG-001..004).
 
 Las alertas no inventaron mecanismo: se agregaron cinco emisiones al
 catálogo cerrado de `reports` (ADR-033) —

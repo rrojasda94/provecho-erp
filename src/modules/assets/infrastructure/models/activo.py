@@ -1,8 +1,10 @@
 """Activo: equipamiento o vehículo de la empresa (data-model.md §Recursos).
 
 `flota` y `repuesto_compatibilidad` quedan diferidos (deuda técnica, ver
-`docs/roadmap/deuda/modulo-assets.md`): no hay reparto propio con flota que
-los necesite hoy, y agregarlos habría sido un formulario sin quien lo llene.
+`docs/roadmap/deuda/modulo-assets.md`). El reparto propio existe desde
+2026-09-09 (módulo `delivery`, ADR-098), pero el repartidor solo declara su
+`vehiculo_tipo` y no apunta a un activo: nada agrupa vehículos todavía, y
+agregarlos habría sido un formulario sin quien lo llene.
 """
 
 import uuid

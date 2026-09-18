@@ -208,7 +208,9 @@ demás en cero, que no cuadra contra el mayor. Deuda anotada.
   balance cuadra igual —el activo está en «cuentas por cobrar» en vez de en
   «efectivo»— pero mientras el evento no exista, el efectivo del ciclo de
   caja y el libro contable no se tocan. Deuda ya anotada, ahora con
-  consecuencia visible en el balance.
+  consecuencia visible en el balance. *(Resuelto 2026-09-05: el evento
+  real se llama `sales.venta_pagada` y `accounting` lo escucha en
+  `on_venta_pagada`.)*
 - **El costo de ventas (69) no se genera solo.** Necesita un evento
   valorizado de consumo por venta que `inventory` no publica
   (`inventory.stock_consumido` viaja sin monto). Mientras tanto el consumo se
