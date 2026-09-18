@@ -466,6 +466,11 @@ producto y cantidad, y `crear_venta` resuelve el precio contra
   revertir a mano.
 - **Sin precio vigente no hay venta**: `PrecioNoDefinido` → 409. Un
   producto sin precio tampoco aparece en la carta.
+- **UI**: crear una lista (con `canal`, ej. `web` para el sitio de marca —
+  ADR-105) y fijarle un precio a un producto se hace desde la ficha del
+  producto en `/catalogo/productos/{id}` (`frontend/app/(app)/catalogo/
+  productos/[id]/ficha-cliente.tsx`, componentes `NuevaListaForm`/
+  `PrecioDelProducto`), no hay pantalla aparte para administrar listas.
 - **Descuentos**: salen de listas promocionales, no del cliente; hoy el
   ítem nace en 0.
 
