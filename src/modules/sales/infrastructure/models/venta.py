@@ -46,7 +46,7 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
         # índice, un año completo hace table scan.
         Index("ix_venta_fecha_orden_estado", "fecha_orden", "estado"),
         CheckConstraint(
-            "canal IN ('pdv', 'agente_ia', 'delivery')", name="canal_venta"
+            "canal IN ('pdv', 'agente_ia', 'delivery', 'web')", name="canal_venta"
         ),
         CheckConstraint(
             "modalidad IN ('mesa', 'takeout', 'delivery')", name="modalidad_venta"
@@ -76,7 +76,7 @@ class Venta(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     numero_orden: Mapped[int] = mapped_column(Integer)
     punto_venta_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("punto_venta.id"))
     canal: Mapped[str] = mapped_column(
-        Enum("pdv", "agente_ia", "delivery", name="canal_venta", native_enum=False)
+        Enum("pdv", "agente_ia", "delivery", "web", name="canal_venta", native_enum=False)
     )
     modalidad: Mapped[str] = mapped_column(
         Enum("mesa", "takeout", "delivery", name="modalidad_venta", native_enum=False)

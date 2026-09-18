@@ -783,7 +783,7 @@ def categoria_de_productos(
     return dict(filas)
 
 
-# --- Contrato del sitio de marca (storefront, ADR-103/RN-WEB-001..002) -----
+# --- Contrato del sitio de marca (storefront, ADR-105/RN-WEB-001..002) -----
 
 def marca_de_producto(
     session: Session, producto_id: uuid.UUID
@@ -947,4 +947,78 @@ def ultimo_pedido_de_cliente(session: Session, cliente_id: uuid.UUID) -> dict | 
         "canal": venta.canal,
         "modalidad": venta.modalidad,
         "items": [{"nombre": nombre, "cantidad": cantidad} for cantidad, nombre in items],
+    }
+
+
+def carga_activa_por_sucursal(
+    session: Session, sucursal_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """Cuántas ventas siguen `orden` (aún en cocina/mostrador, sin cerrar) por
+    cada sucursal — la señal de "qué tan ocupada está" que usa la asignación
+    automática de local del sitio de marca (ADR-104) y su estimado de tiempo
+    de espera. Una sucursal sin ninguna venta abierta no aparece en el dict
+    (léase como 0, no como "sucursal desconocida")."""
+    if not sucursal_ids:
+        return {}
+    filas = session.execute(
+        select(Venta.sucursal_id, func.count(Venta.id))
+        .where(Venta.sucursal_id.in_(list(sucursal_ids)), Venta.estado == "orden")
+        .group_by(Venta.sucursal_id)
+    )
+    return dict(filas.all())
+
+
+def puntos_venta_web_de_sucursales(
+    session: Session, sucursal_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, dict]:
+    """El punto de venta `canal=web` de cada sucursal, con las modalidades que
+    admite (ADR-104). El sitio de marca lo usa para saber a qué sucursales
+    les puede enviar un pedido y con qué modalidad — una sucursal sin punto
+    de venta web configurado simplemente no aparece: todavía no hay dónde
+    facturarle el pedido (alta manual en el ERP, ver `sales/README.md`)."""
+    if not sucursal_ids:
+        return {}
+    filas = session.scalars(
+        select(PuntoVenta).where(
+            PuntoVenta.sucursal_id.in_(list(sucursal_ids)),
+            PuntoVenta.canal == "web",
+        )
+    )
+    return {
+        p.sucursal_id: {
+            "punto_venta_id": p.id,
+            # `None` significa las tres modalidades (RN-MDC-001).
+            "modalidades_habilitadas": p.modalidades_habilitadas
+            or ["mesa", "takeout", "delivery"],
+        }
+        for p in filas
+    }
+
+
+def cotizar_delivery_publico(
+    session: Session,
+    *,
+    sucursal_id: uuid.UUID,
+    destino_lat: Decimal,
+    destino_lng: Decimal,
+    destino_distrito: str | None = None,
+) -> dict:
+    """La misma cotización de delivery que hace `crear_venta` al confirmar
+    (`tarifa_delivery.cotizar`), expuesta de antemano para que el checkout
+    del sitio de marca (ADR-104) muestre costo, distancia y elegibilidad
+    ANTES de que el cliente confirme el pedido — y para que la asignación
+    automática de local descarte candidatas fuera de radio."""
+    from src.modules.sales.application import tarifa_delivery
+
+    origen, empresa_id = tarifa_delivery.contexto_de_sucursal(session, sucursal_id)
+    destino = tarifa_delivery.coordenada(destino_lat, destino_lng)
+    tarifa = tarifa_delivery.tarifa_de(session, empresa_id)
+    cotizacion = tarifa_delivery.cotizar(origen, destino, destino_distrito, tarifa)
+    return {
+        "sucursal_id": sucursal_id,
+        "distancia_km": cotizacion.distancia_km,
+        "costo": cotizacion.costo,
+        "aproximada": cotizacion.aproximada,
+        "derivar_a_externo": cotizacion.derivar_a_externo,
+        "motivo": cotizacion.motivo,
     }

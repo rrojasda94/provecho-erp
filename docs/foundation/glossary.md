@@ -210,7 +210,11 @@ documentación. Prohibido usar sinónimos ambiguos.
 > [marco-legal-contabilidad.md](../contabilidad/marco-legal-contabilidad.md).
 > Los importes/tasas concretos viven en configuración, no en el glosario.
 
-| **Storefront (sitio de marca)** | Sitio web público de una marca (`charlies.majambo.com.pe`), servido por una app Next.js aparte (ADR-103) y alimentado por el módulo `storefront` a través de contratos públicos de lectura de los demás módulos. No confundir con la landing `clientes.majambo.com.pe` (ADR-080), que es un formulario único del QR de mesa. | Landing del QR (`reconocerte`) |
+| **Storefront (sitio de marca)** | Sitio web público de una marca (`charlies.majambo.com.pe`), servido por una app Next.js aparte (ADR-105) y alimentado por el módulo `storefront` a través de contratos públicos de lectura de los demás módulos. No confundir con la landing `clientes.majambo.com.pe` (ADR-080), que es un formulario único del QR de mesa. | Landing del QR (`reconocerte`) |
+
+| **Cuenta del sitio** | Credencial de autoservicio web (`storefront_cuenta`, ADR-104): email/clave o Google, completamente separada del `usuario` del ERP. Se enlaza a un `cliente` de `sales` por evento, nunca comparte tabla ni secreto de JWT con el personal. | Usuario (staff del ERP, con rol y permisos) |
+
+| **Pedido web** | Lo que confirma un cliente en el checkout del sitio de marca (`storefront_pedido`, ADR-105): existe primero como registro propio de `storefront` (`pendiente`) y se convierte en una `Venta` real de canal `web` por evento. No es lo mismo que la `Venta`: el pedido web es la intención del cliente, la venta es lo que `sales` confirmó y cobra. | Venta (canal `pdv`/`agente_ia`/`delivery`) |
 
 | **Cuenta del sitio** | Credencial de autoservicio web (`storefront_cuenta`, ADR-104): email/clave o Google, completamente separada del `usuario` del ERP. Se enlaza a un `cliente` de `sales` por evento, nunca comparte tabla ni secreto de JWT con el personal. | Usuario (staff del ERP, con rol y permisos) |
 

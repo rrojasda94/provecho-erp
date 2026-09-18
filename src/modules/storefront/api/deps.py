@@ -21,9 +21,10 @@ from src.modules.storefront.infrastructure.repositories import CuentaRepo
 from src.modules.storefront.infrastructure.security import decode_access_token
 from src.modules.users.api.deps import get_db
 
-__all__ = ["get_claims", "get_cuenta_actual", "get_db"]
+__all__ = ["get_claims", "get_cuenta_actual", "get_cuenta_opcional", "get_db"]
 
 _bearer = HTTPBearer(auto_error=True)
+_bearer_opcional = HTTPBearer(auto_error=False)
 
 
 def get_claims(creds: HTTPAuthorizationCredentials = Depends(_bearer)) -> dict:
@@ -42,3 +43,19 @@ def get_cuenta_actual(
     if cuenta is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Cuenta inválida")
     return cuenta
+
+
+def get_cuenta_opcional(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_opcional),
+    session: Session = Depends(get_db),
+) -> StorefrontCuenta | None:
+    """El checkout público (`publico_routers.py::confirmar_pedido`) admite
+    invitados: sin `Authorization` o con un token inválido/expirado no es un
+    401 — es un pedido de invitado (RN-WEB-012), nunca se le exige cuenta."""
+    if creds is None:
+        return None
+    try:
+        claims = decode_access_token(creds.credentials)
+    except jwt.PyJWTError:
+        return None
+    return CuentaRepo(session).get(uuid.UUID(claims["sub"]))

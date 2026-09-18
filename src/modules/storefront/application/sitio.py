@@ -1,5 +1,5 @@
 """Compone las respuestas de la superficie pública del sitio de marca
-(ADR-103). Solo llama a `application/queries_publicas.py` de otros
+(ADR-105). Solo llama a `application/queries_publicas.py` de otros
 módulos — nunca a su dominio ni infraestructura (RN-WEB-001).
 """
 
@@ -37,6 +37,13 @@ def _marca_id() -> uuid.UUID:
     if not settings.storefront_marca_id:
         raise SitioNoConfigurado("sitio no configurado")
     return uuid.UUID(str(settings.storefront_marca_id))
+
+
+def marca_actual_id() -> uuid.UUID:
+    """La marca que sirve este sitio, para quien necesite resolverla fuera
+    de una respuesta pública (ej. `application/pedidos.py` al confirmar un
+    checkout). Mismo chequeo que `_marca_id()`, expuesto sin el guion bajo."""
+    return _marca_id()
 
 
 def _sucursal_id(session) -> uuid.UUID:

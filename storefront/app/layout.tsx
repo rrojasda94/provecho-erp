@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 
 import { apiFetch } from "@/lib/api";
 import { obtenerSesion } from "@/lib/auth";
+import { CarritoBadge } from "@/components/carrito-badge";
 import { RevelarObservador } from "@/components/revelar-observador";
 
 import "./globals.css";
@@ -75,6 +76,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Link href={sesion ? "/cuenta" : "/cuenta/ingresar"} className="hover:text-verde">
               {sesion ? "Mi cuenta" : "Ingresar"}
             </Link>
+            <CarritoBadge />
           </nav>
         </header>
 

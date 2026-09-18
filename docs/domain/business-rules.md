@@ -2151,7 +2151,7 @@ segunda puerta de análisis, no el dashboard operativo.
 ## Sitio de marca (módulo `storefront`)
 
 Reglas de la superficie pública del sitio web de Charlie's Pizzas
-(`charlies.majambo.com.pe`, ADR-103). `storefront` es un módulo más: sus
+(`charlies.majambo.com.pe`, ADR-105). `storefront` es un módulo más: sus
 casos de uso de gestión (CMS, fotos) siguen RBAC normal; estas reglas son
 específicas de la parte **sin JWT**.
 
@@ -2185,3 +2185,34 @@ específicas de la parte **sin JWT**.
 - **RN-WEB-008** Un email ya registrado con Google que intenta crear cuenta
   con clave (o viceversa) se vincula a la cuenta existente en vez de
   duplicarla — el email verificado por Google es la misma identidad.
+
+- **RN-WEB-009** El checkout web nunca exige cuenta: un invitado (sin
+  `Authorization`) confirma un pedido igual que un cliente logueado, con
+  nombre/teléfono tecleados en el formulario en vez de leídos del perfil
+  (ADR-105).
+- **RN-WEB-010** Un pedido de delivery se asigna a la sucursal más cercana
+  dentro del radio de delivery (`DELIVERY_DISTANCIA_MAXIMA_KM`) que tenga un
+  punto de venta `web` habilitado para esa modalidad, salvo que esté
+  saturada (`STOREFRONT_SATURACION_PEDIDOS` pedidos `orden` en curso) y otra
+  candidata dentro de radio no lo esté — ahí gana la no saturada. Un
+  recojo lo elige el propio cliente, no la asignación automática.
+- **RN-WEB-011** El estimado de espera que ve el cliente es
+  `STOREFRONT_ETA_BASE_MINUTOS + carga × STOREFRONT_ETA_MINUTOS_POR_PEDIDO`,
+  con 15 minutos de colchón en el máximo del rango — nunca un número fijo
+  sin importar cuántos pedidos tenga la sucursal delante.
+- **RN-WEB-012** El precio del carrito se vuelve a fijar server-side contra
+  la carta pública al confirmar (RN-PRC-003): un producto que ya no está
+  disponible, o cuyo precio cambió desde que se agregó al carrito, rechaza
+  el pedido en vez de cobrar lo que el navegador tenía guardado.
+- **RN-WEB-013** Un pedido pagado en efectivo nace `Venta.estado='orden'`
+  sin ningún pago registrado — se cobra al entregar/recoger, con el flujo de
+  caja normal. Un pedido pagado con Izipay se cobra de inmediato y su pago
+  se registra sin exigir caja abierta en el punto de venta `web` (ADR-105,
+  excepción explícita a ADR-025 §1).
+- **RN-WEB-014** Todo pedido web es idempotente por `idempotency_key`
+  (tecleada por el cliente, generada por el navegador): confirmar dos veces
+  con la misma clave devuelve el mismo pedido, nunca lo duplica.
+- **RN-WEB-015** Un invitado sin cuenta consulta su propio pedido con el
+  `token_acceso` que recibió al confirmarlo (`GET /storefront/publico/
+  pedidos/{id}?token=...`) — nunca con su número de pedido solo, que no es
+  secreto.

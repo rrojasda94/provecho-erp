@@ -1,16 +1,19 @@
 # Historial — Módulo `storefront`
 
-Estado vigente: 🔶 En curso — PR1 (2026-09-17, ADR-103): sitio público de
+Estado vigente: 🔶 En curso — PR1 (2026-09-17, ADR-105): sitio público de
 solo lectura para Charlie's Pizzas en `charlies.majambo.com.pe`, servido por
 una app Next.js separada del ERP (`storefront/`). PR2 (2026-09-17, ADR-104):
 cuentas de cliente (email/clave + Google), direcciones, favoritos y "tu
-último pedido", con credencial separada de la del ERP. Carrito, checkout y
-pagos (Izipay) quedan para PR3; Playwright del sitio y SEO (sitemap, OG)
-para PR4. Ver `docs/roadmap/deuda/modulo-storefront.md`.
+último pedido", con credencial separada de la del ERP. PR3 (2026-09-17,
+ADR-105): carrito, checkout invitado o logueado, asignación
+automática de local, ETA, boleta/factura, efectivo e Izipay (adaptador
+falso), canal `web` en `venta`. Playwright del sitio, SEO (sitemap, OG) y
+hardening de seguridad quedan para PR4. Ver
+`docs/roadmap/deuda/modulo-storefront.md`.
 
 ## Cronología
 
-### 2026-09-17 — PR1: sitio público, CMS y fotos (ADR-103)
+### 2026-09-17 — PR1: sitio público, CMS y fotos (ADR-105)
 
 Encargo del usuario: una web de marca completa para Charlie's Pizzas
 (catálogo con fotos e ingredientes, promos web, locales en mapa, cuentas
@@ -19,7 +22,7 @@ insumos externos: brand guideline de Charlie's (`brand-voice-guidelines.md`,
 `majambo.md` §3.1, `Brandbook_CharliesPizza.pdf`) y un prototipo de
 storefront ya construido con Claude Design, portado a HTML/JS estándar.
 
-Decisión de arquitectura central (ADR-103): el sitio vive en una **app Next
+Decisión de arquitectura central (ADR-105): el sitio vive en una **app Next
 separada** (`storefront/`), no en una ruta más del proceso `web` compartido
 con el ERP como hizo ADR-080 para la landing del QR — el sitio de marca
 necesita SEO real, tema y CSP propios (paleta verde/crema del brandbook de
@@ -123,5 +126,75 @@ de Charlie's Pizzas, separadas de las credenciales del ERP.
 
 Verificado antes de abrir el PR: suite completa de `pytest` en verde
 (2786 pasados, 3 saltados), `ruff check` limpio, `openapi.json`
+regenerado, `npm run lint`/`typecheck`/`test`/`build` en verde en
+`storefront/`.
+
+### 2026-09-17 — PR3: carrito, checkout y pago (ADR-105)
+
+Sobre la rama de PR2, sin pausa (mismo encargo de PRs encadenados). Alcance:
+carrito, checkout (invitado o con cuenta), asignación automática de local,
+estimado de espera, boleta/factura, pago en efectivo o Izipay.
+
+- **`venta.canal`/`lista_precio.canal` ganan `web`** (migración
+  `3070159f64bd`): `sales.domain.rules.CANALES` pasa a
+  `{pdv, agente_ia, delivery, web}`. `storefront_canal` (semilla de la
+  carta pública) pasa de `delivery` a `web`.
+- **RN-POS-005 releída por lo que protege**: la autoatención cobra por
+  adelantado porque nadie persigue al cliente — pero en delivery/recojo web
+  el repartidor o el mostrador sí cobran en el momento de la entrega, la
+  misma garantía que un cajero. Efectivo: la `Venta` nace `orden` sin pago,
+  se cobra al entregar/recoger con el flujo normal de caja. Izipay: se cobra
+  de inmediato con `registrar_pago(..., exigir_caja_abierta=False)` —
+  excepción explícita a ADR-025 §1, documentada en ADR-105.
+- **Flujo por eventos** (mismo patrón que ADR-102):
+  `storefront.pedido_web_confirmado` → `sales.application.listeners::
+  on_pedido_web_confirmado` crea la `Venta` (y el pago si es Izipay) →
+  `sales.pedido_web_procesado` → `storefront.application.listeners::
+  on_pedido_web_procesado` marca el pedido `confirmado`/`fallido`. El bus es
+  síncrono en proceso: para cuando el checkout responde, la cadena ya
+  corrió — sin necesidad de polling en el caso normal. Se descartó
+  deliberadamente construir un outbox real + reconciliación por Celery
+  (mismo análisis costo/beneficio que ADR-016 ya hizo).
+- **Asignación automática de local** (`storefront/domain/asignacion.py`,
+  puro): la sucursal más cercana dentro del radio de delivery
+  (`DELIVERY_DISTANCIA_MAXIMA_KM`) con un `PuntoVenta(canal=web)` habilitado
+  para la modalidad pedida, salvo que esté saturada
+  (`STOREFRONT_SATURACION_PEDIDOS`, semilla 4 pedidos `orden` en curso) y
+  otra candidata dentro de radio no lo esté. Recojo: el cliente elige el
+  local. Tres funciones nuevas en el contrato público de `sales`
+  (`carga_activa_por_sucursal`, `puntos_venta_web_de_sucursales`,
+  `cotizar_delivery_publico`, esta última reutiliza `tarifa_delivery`
+  internamente — mismo cálculo que usa `crear_venta`, expuesto de
+  antemano).
+- **ETA**: `base + carga × minutos_por_pedido` (`STOREFRONT_ETA_*`, semilla
+  30/5, con 15 min de colchón en el máximo) — mismo orden que los 30-45/
+  45-55 min que Charlie's ya cotiza por teléfono.
+- **Usuario de servicio**: `users.application.queries_publicas::
+  usuario_servicio_storefront` (única función de escritura en ese archivo,
+  por lo demás de solo lectura) crea/encuentra el usuario `tipo=agente_ia`
+  `storefront_web` que autoría las ventas del sitio — `Venta.usuario_id` es
+  NOT NULL y ningún cliente del sitio tiene cuenta de trabajador.
+- **Izipay**: `src/shared/integrations/izipay/` — `Protocol` `Pasarela`,
+  `IzipayFake` (aprueba siempre) e `IzipayReal` (esqueleto,
+  `NotImplementedError`); `izipay_habilitado()` decide cuál se usa según
+  `IZIPAY_API_KEY`, mismo criterio que `comprobantes.emision_habilitada()`.
+- **Idempotencia**: `storefront_pedido.idempotency_key` (tecleada por el
+  cliente) evita duplicar un pedido si el checkout se reintenta; un
+  invitado sin cuenta consulta su pedido con `token_acceso`
+  (`GET /storefront/publico/pedidos/{id}?token=...`).
+- **Frontend `storefront/`**: `lib/carrito.ts` (carrito en `localStorage`,
+  sin llegar al servidor hasta confirmar), botón "Agregar al carrito" en la
+  ficha de producto, `/carrito`, `/checkout` (modalidad, dirección con
+  geolocalización del navegador o sucursal elegida para recojo, contacto,
+  comprobante, medio de pago) y `/pedido/{id}` (confirmación, con el
+  `token_acceso` en la URL para un invitado).
+- **Simplificación deliberada**: sin extras ni Mitad x Mitad (no existe
+  concepto de extra/combo en `sales` todavía — ver ADR-105 §6), y la
+  boleta/factura elegida en el checkout no llega a la pantalla del cajero
+  para pedidos en efectivo (se vuelve a pedir al cobrar, igual que
+  cualquier pedido telefónico de hoy).
+
+Verificado antes de abrir el PR: suite completa de `pytest` en verde
+(2801 pasados, 3 saltados), `ruff check` limpio, `openapi.json`
 regenerado, `npm run lint`/`typecheck`/`test`/`build` en verde en
 `storefront/`.

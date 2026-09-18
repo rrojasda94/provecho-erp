@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useState } from "react";
 
+import { AgregarCarrito } from "@/components/agregar-carrito";
+
 import { IngredienteDialogo, type IngredienteDetalle } from "./ingrediente-dialogo";
 
 type Variante = { id: string; nombre: string; precio: string; disponible: boolean };
@@ -76,6 +78,22 @@ export function DetalleProducto({ producto }: { producto: ProductoDetalle }) {
         ) : (
           <p className="font-display text-2xl text-verde">S/ {producto.precio_desde}</p>
         )}
+
+        <AgregarCarrito
+          fotoUrl={foto ?? null}
+          opciones={
+            producto.variantes.length > 0
+              ? producto.variantes
+              : [
+                  {
+                    id: producto.id,
+                    nombre: producto.nombre,
+                    precio: producto.precio_desde,
+                    disponible: producto.disponible,
+                  },
+                ]
+          }
+        />
       </div>
 
       <IngredienteDialogo ingrediente={ingredienteAbierto} onCerrar={() => setIngredienteAbierto(null)} />

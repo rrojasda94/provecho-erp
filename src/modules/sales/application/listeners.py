@@ -126,6 +126,175 @@ def on_cuenta_registrada(payload: dict) -> None:
         )
 
 
+def _medio_pago_izipay(session, sucursal_id: uuid.UUID) -> uuid.UUID:
+    """El medio de pago 'Izipay' de la empresa de esa sucursal, creándolo la
+    primera vez que hace falta (ADR-105) — igual que el usuario de servicio
+    del sitio, exigir un alta manual antes del primer pedido pagado en
+    línea sería un paso de despliegue más para olvidar."""
+    from sqlalchemy import func, select
+
+    from src.modules.sales.application import catalogo
+    from src.modules.sales.infrastructure.models import MedioPago
+    from src.modules.users.infrastructure.models import Sucursal
+
+    sucursal = session.get(Sucursal, sucursal_id)
+    existente = session.scalar(
+        select(MedioPago).where(
+            MedioPago.empresa_id == sucursal.empresa_id,
+            func.lower(MedioPago.nombre) == "izipay",
+        )
+    )
+    if existente is not None:
+        return existente.id
+    creado = catalogo.crear_medio_pago(
+        session,
+        empresa_id=sucursal.empresa_id,
+        nombre="Izipay",
+        direccion="cobro",
+        tipo="billetera_digital",
+    )
+    return creado.id
+
+
+def on_pedido_web_confirmado(payload: dict) -> None:
+    """Un pedido confirmado en el sitio de marca (ADR-105) se
+    convierte en una `Venta` real de canal `web` — el sitio no importa
+    `application.ventas`, publica el evento y este handler hace la llamada
+    real, mismo patrón que `on_cuenta_registrada`.
+
+    Efectivo: la venta queda `orden` y se cobra al entregar/recoger, como
+    cualquier delivery telefónico — no hay pago que registrar acá.
+
+    Izipay: se cobra de inmediato contra la pasarela activa (`IzipayFake`
+    hoy, aprueba siempre) y se registra el pago **sin exigir caja abierta**
+    — excepción explícita a RN-POS-005/ADR-025 documentada en ADR-105: en
+    delivery/recojo web alguien SÍ cobra en el momento de la entrega (el
+    repartidor o el mostrador), la misma garantía que un cajero, así que la
+    razón de ser de "cobra por adelantado" (nadie persigue al cliente) no
+    aplica igual que en un kiosko de autoservicio dentro del local.
+
+    Si `crear_venta` falla (canal cerrado, producto ya no existe, etc.) el
+    pedido del sitio queda `fallido` con el motivo — nunca se reintenta
+    solo, el cliente tiene que volver a intentar desde el sitio.
+    """
+    from decimal import Decimal
+
+    from src.modules.sales.application import ventas
+    from src.modules.sales.application.errors import AppError
+    from src.modules.users.application.queries_publicas import (
+        usuario_servicio_storefront,
+    )
+
+    pedido_id = payload["pedido_id"]
+    ubicacion = payload.get("ubicacion") or {}
+    try:
+        with session_factory() as session:
+            usuario_id = usuario_servicio_storefront(session)
+            try:
+                venta = ventas.crear_venta(
+                    session,
+                    sucursal_id=uuid.UUID(payload["sucursal_id"]),
+                    punto_venta_id=uuid.UUID(payload["punto_venta_id"]),
+                    canal="web",
+                    modalidad=payload["modalidad"],
+                    usuario_id=usuario_id,
+                    idempotency_key=payload["idempotency_key"],
+                    items=[
+                        {
+                            "producto_comercial_id": uuid.UUID(i["producto_comercial_id"]),
+                            "cantidad": i["cantidad"],
+                        }
+                        for i in payload["items"]
+                    ],
+                    cliente_id=(
+                        uuid.UUID(payload["cliente_id"]) if payload.get("cliente_id") else None
+                    ),
+                    referencia_atencion=payload.get("nombre_contacto"),
+                    direccion_entrega=payload.get("direccion_entrega"),
+                    ubicacion_place_id=ubicacion.get("ubicacion_place_id"),
+                    ubicacion_lat=(
+                        Decimal(ubicacion["ubicacion_lat"])
+                        if ubicacion.get("ubicacion_lat")
+                        else None
+                    ),
+                    ubicacion_lng=(
+                        Decimal(ubicacion["ubicacion_lng"])
+                        if ubicacion.get("ubicacion_lng")
+                        else None
+                    ),
+                    ubicacion_plus_code=ubicacion.get("ubicacion_plus_code"),
+                    ubicacion_distrito=ubicacion.get("ubicacion_distrito"),
+                    distancia_entrega_km=(
+                        Decimal(payload["distancia_entrega_km"])
+                        if payload.get("distancia_entrega_km")
+                        else None
+                    ),
+                    costo_entrega=(
+                        Decimal(payload["costo_entrega"])
+                        if payload.get("costo_entrega")
+                        else None
+                    ),
+                )
+            except AppError as e:
+                event_bus.publish(
+                    "sales.pedido_web_procesado",
+                    {"pedido_id": pedido_id, "ok": False, "motivo": str(e)},
+                    session=session,
+                )
+                session.commit()
+                return
+
+            if payload.get("medio_pago") == "izipay":
+                from src.shared.integrations.izipay import pasarela_activa
+
+                intento = pasarela_activa().crear_intento(
+                    monto=venta.total,
+                    moneda="PEN",
+                    referencia=str(venta.id),
+                    medio="izipay",
+                )
+                if intento.estado == "aprobado":
+                    try:
+                        ventas.registrar_pago(
+                            session,
+                            venta_id=venta.id,
+                            medio_pago_id=_medio_pago_izipay(session, venta.sucursal_id),
+                            monto=venta.total,
+                            idempotency_key=f"{payload['idempotency_key']}:pago",
+                            referencia_externa=intento.id_externo,
+                            receptor_num_doc=payload.get("numero_documento"),
+                            receptor_nombre=payload.get("nombre_o_razon_social"),
+                            exigir_caja_abierta=False,
+                        )
+                    except AppError:
+                        # La venta ya existe y sale a cocina igual; el cobro
+                        # se revisa a mano. No se le informa "fallido" al
+                        # sitio por esto — el pedido SÍ se va a preparar.
+                        log.exception(
+                            "No se pudo registrar el pago Izipay de un pedido web",
+                            extra={"venta_id": str(venta.id)},
+                        )
+                # `intento.estado == "pendiente"` (redirección real, no
+                # implementada todavía): la venta queda `orden` y el cobro
+                # se completa cuando exista el webhook de IzipayReal.
+
+            event_bus.publish(
+                "sales.pedido_web_procesado",
+                {
+                    "pedido_id": pedido_id,
+                    "ok": True,
+                    "venta_id": str(venta.id),
+                    "numero_orden": venta.numero_orden,
+                },
+                session=session,
+            )
+            session.commit()
+    except Exception:
+        log.exception(
+            "No se pudo procesar el pedido web", extra={"pedido_id": pedido_id}
+        )
+
+
 def on_entrega_registrada(payload: dict) -> None:
     """`delivery` registró la entrega de una venta: se marca entregada acá,
     con la misma `cumplimiento.registrar_entrega` que usa el botón
@@ -166,3 +335,4 @@ def register() -> None:
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
     event_bus.subscribe("delivery.entrega_registrada", on_entrega_registrada)
     event_bus.subscribe("storefront.cuenta_registrada", on_cuenta_registrada)
+    event_bus.subscribe("storefront.pedido_web_confirmado", on_pedido_web_confirmado)
