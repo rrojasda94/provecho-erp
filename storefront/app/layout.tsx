@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 
 import { apiFetch } from "@/lib/api";
 import { obtenerSesion } from "@/lib/auth";
+import { URL_SITIO } from "@/lib/sitio";
 import { CarritoBadge } from "@/components/carrito-badge";
 import { RevelarObservador } from "@/components/revelar-observador";
 
@@ -22,13 +23,29 @@ const archivo = Archivo({
   display: "swap",
 });
 
+const TITULO = "Charlie's Pizzas — Pizza de barrio en Tarapoto";
+const DESCRIPCION =
+  "Charlie's Pizzas: pizza de barrio horneada al momento en Tarapoto desde 2006. Pide delivery o visita nuestros locales.";
+
 export const metadata: Metadata = {
-  title: {
-    default: "Charlie's Pizzas — Pizza de barrio en Tarapoto",
-    template: "%s | Charlie's Pizzas",
+  metadataBase: new URL(URL_SITIO),
+  title: { default: TITULO, template: "%s | Charlie's Pizzas" },
+  description: DESCRIPCION,
+  openGraph: {
+    type: "website",
+    locale: "es_PE",
+    siteName: "Charlie's Pizzas",
+    title: TITULO,
+    description: DESCRIPCION,
+    url: URL_SITIO,
+    images: ["/marcas/logo.png"],
   },
-  description:
-    "Charlie's Pizzas: pizza de barrio horneada al momento en Tarapoto desde 2006. Pide delivery o visita nuestros locales.",
+  twitter: {
+    card: "summary_large_image",
+    title: TITULO,
+    description: DESCRIPCION,
+    images: ["/marcas/logo.png"],
+  },
 };
 
 type Contenido = {
@@ -58,10 +75,37 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     obtenerSesion(),
   ]);
   const contacto = datos?.contenido?.contacto;
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Restaurant",
+    name: "Charlie's Pizzas",
+    url: URL_SITIO,
+    image: `${URL_SITIO}/marcas/logo.png`,
+    servesCuisine: "Pizza",
+    priceRange: "S/",
+    ...(contacto?.whatsapp ? { telephone: contacto.whatsapp } : {}),
+    ...(contacto
+      ? {
+          sameAs: [
+            contacto.instagram && `https://instagram.com/${contacto.instagram}`,
+            contacto.facebook && `https://facebook.com/${contacto.facebook}`,
+            contacto.tiktok && `https://tiktok.com/@${contacto.tiktok}`,
+          ].filter(Boolean),
+        }
+      : {}),
+  };
 
   return (
     <html lang="es" className={`${anton.variable} ${archivo.variable}`}>
       <body>
+        {/* Restaurant, no LocalBusiness por sucursal: cada local con su
+            dirección y horario vive en el JSON-LD de `/locales`, no acá —
+            este es el de la marca en general, en cada página. */}
+        <script
+          type="application/ld+json"
+           
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <RevelarObservador />
         <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b-4 border-negro bg-crema px-4 py-3 sm:px-8">
           <Link href="/" className="flex items-center gap-2">

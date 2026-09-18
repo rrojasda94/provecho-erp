@@ -216,7 +216,5 @@ documentación. Prohibido usar sinónimos ambiguos.
 
 | **Pedido web** | Lo que confirma un cliente en el checkout del sitio de marca (`storefront_pedido`, ADR-105): existe primero como registro propio de `storefront` (`pendiente`) y se convierte en una `Venta` real de canal `web` por evento. No es lo mismo que la `Venta`: el pedido web es la intención del cliente, la venta es lo que `sales` confirmó y cobra. | Venta (canal `pdv`/`agente_ia`/`delivery`) |
 
-| **Cuenta del sitio** | Credencial de autoservicio web (`storefront_cuenta`, ADR-104): email/clave o Google, completamente separada del `usuario` del ERP. Se enlaza a un `cliente` de `sales` por evento, nunca comparte tabla ni secreto de JWT con el personal. | Usuario (staff del ERP, con rol y permisos) |
-
 > Al introducir un concepto nuevo del negocio, primero se agrega aquí, luego se
 > usa en código.

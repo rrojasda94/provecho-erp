@@ -8,7 +8,8 @@
         "start": "next start",
         "lint": "eslint .",
         "typecheck": "tsc --noEmit",
-        "test": "node --test lib/*.test.ts"
+        "test": "node --test lib/*.test.ts",
+        "test:e2e": "node e2e/preparar-bd.mjs && playwright test"
     },
     "dependencies": {
         "next": "^16.3.2",
@@ -16,6 +17,7 @@
         "react-dom": "^19.2.8"
     },
     "devDependencies": {
+        "@playwright/test": "^1.62.1",
         "@tailwindcss/postcss": "^4.3.3",
         "@types/google.maps": "^3.65.5",
         "@types/node": "^24.13.3",

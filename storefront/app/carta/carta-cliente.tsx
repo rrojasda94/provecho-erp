@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import { buscar, type Buscable } from "@/lib/busqueda";
@@ -50,17 +51,27 @@ function BotonFavorito({
   onCambio: (id: string, favorito: boolean) => void;
 }) {
   const [pendiente, startTransition] = useTransition();
+  const router = useRouter();
 
   if (!sesionActiva) {
     return (
-      <Link
-        href="/cuenta/ingresar"
-        onClick={(e) => e.stopPropagation()}
+      // `<button>` y no `<Link>`: esta tarjeta ya es un `<Link>` de la
+      // carta, y un `<a>` anidado dentro de otro `<a>` es HTML inválido —
+      // React lo detecta en hidratación y regenera el árbol entero, que es
+      // el tipo de parpadeo que un e2e agarra como carrera y un ojo humano
+      // casi nunca nota.
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          router.push("/cuenta/ingresar");
+        }}
         className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs"
         title="Ingresa para guardar favoritos"
       >
         ♡
-      </Link>
+      </button>
     );
   }
 
