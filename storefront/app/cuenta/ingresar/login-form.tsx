@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 
-import { ESTADO_INICIAL, loginAction } from "../actions";
+import { ESTADO_INICIAL } from "@/lib/estado-formulario";
+import { loginAction } from "../actions";
 
 export function LoginForm() {
   const [estado, formAction, pendiente] = useActionState(loginAction, ESTADO_INICIAL);

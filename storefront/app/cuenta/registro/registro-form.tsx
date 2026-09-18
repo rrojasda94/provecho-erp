@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 
-import { ESTADO_INICIAL, registrarAction } from "../actions";
+import { ESTADO_INICIAL } from "@/lib/estado-formulario";
+import { registrarAction } from "../actions";
 
 const CAMPO = "rounded border-2 border-negro px-3 py-2";
 

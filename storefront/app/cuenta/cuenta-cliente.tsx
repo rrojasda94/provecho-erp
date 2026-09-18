@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useActionState, useTransition } from "react";
 
+import { ESTADO_INICIAL } from "@/lib/estado-formulario";
+
 import {
   agregarDireccionAction,
   borrarDireccionAction,
   logoutAction,
-  ESTADO_INICIAL,
 } from "./actions";
 
 export type Perfil = {

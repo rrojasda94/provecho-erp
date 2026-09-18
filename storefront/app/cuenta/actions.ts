@@ -5,9 +5,7 @@ import { redirect } from "next/navigation";
 
 import { ApiError, apiAuth } from "@/lib/api";
 import { COOKIE_REFRESH, COOKIE_TOKEN, opcionesCookie } from "@/lib/auth";
-
-export type Estado = { error: string; ok: boolean };
-export const ESTADO_INICIAL: Estado = { error: "", ok: false };
+import type { Estado } from "@/lib/estado-formulario";
 
 type Tokens = { access_token: string; refresh_token: string };
 
