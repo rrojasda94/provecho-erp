@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
@@ -56,7 +57,16 @@ export default async function PedidoPage({
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 py-16">
+    <div className="relative mx-auto max-w-lg px-4 py-16">
+      {/* Marca de agua: el logo corto (brandbook p. 37), a baja opacidad. */}
+      <Image
+        src="/marcas/logo-corto.png"
+        alt=""
+        width={800}
+        height={619}
+        aria-hidden
+        className="pointer-events-none absolute -bottom-6 right-2 -z-10 w-40 opacity-10"
+      />
       {pedido.estado === "confirmado" && (
         <div className="flex flex-col items-center gap-3 text-center">
           <span className="text-5xl">🍕</span>

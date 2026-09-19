@@ -12,14 +12,19 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   - ✅ 2026-09-18 **Playwright del sitio.** Suite propia `storefront/e2e`
     (ADR-047, puertos 8110/3110): carrito → checkout de invitado → recojo en
     efectivo → confirmación, job `storefront-e2e` en CI.
-  - ⬜ **Fuentes de marca sin llegar.** Isidora Black/Tusker Grotesk
-    (brandbook) todavía no están en `storefront/public/fonts/`: el sitio
-    corre con el fallback Anton+Archivo (Google Fonts) declarado en
-    ADR-105 §12. Reemplazar cuando el brandbook las entregue como
-    archivos, sin tocar el resto de `globals.css`.
-  - ⬜ **Logo provisional.** `storefront/public/marcas/logo.png` viene del
-    prototipo portado, no del brandbook oficial — ver
-    `storefront/public/marcas/README.md`.
+  - ✅ 2026-09-19 **Tusker Grotesk y logos oficiales** (ADR-103 §12): el sitio usa
+    Tusker Grotesk 4500/5800 servida desde `storefront/app/fonts/` y los tres
+    logos del brandbook (horizontal, vertical, CH'S), con favicon, ícono de la app
+    e imagen para compartir el enlace. Lo que deja abierto:
+    - ⬜ **Isidora Black** (titulares) no vino en el paquete: los títulos usan la
+      Super de Tusker hasta entonces (`storefront/app/fonts/README.md`).
+    - ⬜ **Logos en SVG y en negativo.** Solo hay PNG (el horizontal mide 47 px de
+      alto) y ninguna versión para fondo oscuro; por eso el pie negro no lleva
+      logo (`storefront/public/marcas/README.md`).
+    - ⬜ **Licencia web de Tusker Grotesk** sin confirmar: el paquete no la trae.
+    - ⬜ **`frontend/public/marcas/charlies.svg`** (texto provisional) sigue siendo el
+      logo de los tickets térmicos (ADR-067): necesita una versión monocroma
+      real, no este PNG.
   - ⬜ **`storefront_marca_id` sin resolver `articulo`/`producto_comercial`
     por otra marca.** El sitio sirve una sola marca a la vez
     (`STOREFRONT_MARCA_ID`); si el grupo abre un segundo sitio de marca,

@@ -511,9 +511,19 @@ ERP, y su paleta sale del brandbook propio de Charlie's Pizzas
 | `--chp-oliva` | `#85B73E` | Acento secundario |
 | `--chp-negro` | `#1A1A1A` | Texto de cuerpo |
 
-Tipografías: **Isidora Black** (display) y **Tusker Grotesk** (cuerpo/UI),
-comerciales — mientras no estén los archivos, cae a Anton + Archivo (Google
-Fonts) como fallback, igual criterio visual que el prototipo portado. Voz de
+Tipografía: **Tusker Grotesk** (brandbook p. 47-49: «encabezados y cuerpos de
+texto», tres pesos como máximo). El sitio usa el corte **4500 Medium** para el
+texto y el **5800 Super** para el énfasis y los títulos, servidos desde el propio
+sitio (`next/font/local`, `storefront/app/fonts/`): ya no se le pide nada a Google
+Fonts ni se depende de Anton/Archivo. **Isidora Black** (la fuente de titulares del
+brandbook) todavía no llegó: los títulos usan la Super de Tusker hasta entonces, y
+cuando llegue solo cambia `--fuente-display`. Logos (brandbook p. 28-41): el
+**horizontal** va en la cabecera, el **vertical** en la landing del QR y donde se
+necesite el logo completo, y el **CH'S** (logo responsive, p. 37) como favicon,
+ícono de la app y marca de agua; la imagen que se ve al compartir el enlace
+(`opengraph-image.png`) junta los tres con el eslogan. No hay versión en negativo
+(para fondo oscuro) ni SVG todavía: el logo no se coloca sobre el pie negro.
+Voz de
 marca: `docs/foundation/glossary.md` no la cubre — vive en
 `brand-voice-guidelines.md` del brandbook (cercano, natural, profesional;
 eslogan "A tu manera"; usted por defecto, nunca voseo).
