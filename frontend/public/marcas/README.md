@@ -1,10 +1,12 @@
 # Logotipos
 
-`charlies-vertical.svg` es el logotipo **oficial** de Charlie's Pizzas (entregado por la
-marca, mismo archivo que `storefront/public/marcas/logo-vertical.svg`); lo usa la landing
-`/reconocerte`.
+`charlies-vertical.svg` (landing `/reconocerte`, aceituna negra `#505b52`) y `charlies.svg`
+(**ticket térmico**, negro puro) son el logotipo **oficial vertical** de Charlie's Pizzas,
+entregado por la marca; mismo trazado que `storefront/public/marcas/logo-vertical*.svg`,
+solo cambia el relleno. En la térmica va negro puro (una sola tinta) y `.tk-logo` le
+aplica `grayscale + contrast` (`app/impresion.css`).
 
-**Los dos SVG de esta carpeta son provisionales.** Están armados con
+**`majambo.svg` es provisional.** Está armado con
 tipografía y los colores de marca de `app/globals.css` (brasa `#c6390f`,
 tinta `currentColor`), no con los originales.
 
