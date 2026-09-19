@@ -8,6 +8,7 @@ import {
   actualizarCantidad,
   alCambiarCarrito,
   obtenerCarrito,
+  precioDeLinea,
   totalDelCarrito,
   type LineaCarrito,
 } from "@/lib/carrito";
@@ -40,7 +41,7 @@ export function CarritoCliente() {
       <ul className="flex flex-col gap-3">
         {lineas.map((l) => (
           <li
-            key={l.productoComercialId}
+            key={l.clave}
             className="flex items-center gap-3 rounded-lg border-2 border-negro bg-white p-3"
           >
             <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded bg-crema-2">
@@ -48,12 +49,22 @@ export function CarritoCliente() {
             </div>
             <div className="flex-1">
               <p className="font-bold">{l.nombre}</p>
-              <p className="text-sm text-humo">S/ {l.precio}</p>
+              {l.valores.length > 0 && (
+                <p className="text-xs text-humo">
+                  {l.valores.map((v) => `${v.atributo}: ${v.nombre}`).join(" · ")}
+                </p>
+              )}
+              {l.extras.length > 0 && (
+                <p className="text-xs text-humo">
+                  {l.extras.map((e) => `${e.cantidad}× ${e.nombre}`).join(" · ")}
+                </p>
+              )}
+              <p className="text-sm text-humo">S/ {precioDeLinea(l).toFixed(2)}</p>
             </div>
             <div className="flex items-center rounded border-2 border-negro">
               <button
                 type="button"
-                onClick={() => actualizarCantidad(l.productoComercialId, l.cantidad - 1)}
+                onClick={() => actualizarCantidad(l.clave, l.cantidad - 1)}
                 className="px-2 py-1 font-bold"
                 aria-label="Menos"
               >
@@ -62,7 +73,7 @@ export function CarritoCliente() {
               <span className="w-6 text-center">{l.cantidad}</span>
               <button
                 type="button"
-                onClick={() => actualizarCantidad(l.productoComercialId, l.cantidad + 1)}
+                onClick={() => actualizarCantidad(l.clave, l.cantidad + 1)}
                 className="px-2 py-1 font-bold"
                 aria-label="Más"
               >
@@ -71,7 +82,7 @@ export function CarritoCliente() {
             </div>
             <button
               type="button"
-              onClick={() => actualizarCantidad(l.productoComercialId, 0)}
+              onClick={() => actualizarCantidad(l.clave, 0)}
               className="text-xs text-rojo hover:underline"
             >
               Quitar

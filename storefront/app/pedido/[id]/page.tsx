@@ -6,7 +6,19 @@ import { apiFetch } from "@/lib/api";
 
 export const metadata: Metadata = { title: "Tu pedido" };
 
-type ItemPedido = { nombre_congelado: string; cantidad: number; precio_unitario_congelado: string };
+type ItemPedido = {
+  nombre_congelado: string;
+  cantidad: number;
+  precio_unitario_congelado: string;
+  extras: { nombre: string; cantidad: number; precio: string }[];
+  valores: string[];
+};
+
+/** Lo que cuesta la línea: (producto con sabores + extras) x cantidad. */
+const totalDeItem = (it: ItemPedido): number =>
+  (Number(it.precio_unitario_congelado) +
+    it.extras.reduce((acc, e) => acc + Number(e.precio) * e.cantidad, 0)) *
+  it.cantidad;
 type Pedido = {
   id: string;
   estado: "pendiente" | "confirmado" | "fallido";
@@ -79,11 +91,19 @@ export default async function PedidoPage({
 
       <ul className="mt-6 flex flex-col gap-2 rounded-lg border-2 border-negro bg-white p-4 text-sm">
         {pedido.items.map((it, i) => (
-          <li key={i} className="flex justify-between">
+          <li key={i} className="flex justify-between gap-3">
             <span>
               {it.cantidad}x {it.nombre_congelado}
+              {it.valores.length > 0 && (
+                <span className="block text-xs text-humo">{it.valores.join(" + ")}</span>
+              )}
+              {it.extras.length > 0 && (
+                <span className="block text-xs text-humo">
+                  {it.extras.map((e) => `${e.cantidad}× ${e.nombre}`).join(" · ")}
+                </span>
+              )}
             </span>
-            <span>S/ {(Number(it.precio_unitario_congelado) * it.cantidad).toFixed(2)}</span>
+            <span>S/ {totalDeItem(it).toFixed(2)}</span>
           </li>
         ))}
         {pedido.costo_delivery_estimado && (

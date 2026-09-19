@@ -2178,7 +2178,9 @@ específicas de la parte **sin JWT**.
   devuelve `empresa_id`/`grupo_id`, costos, datos de `persona` de terceros,
   remuneración, usuarios/proveedores ni cantidades de receta — solo los
   campos enumerados en cada `*PublicoOut`. Ningún endpoint público serializa
-  un modelo ORM directamente.
+  un modelo ORM directamente. Los **extras, sabores (atributos) y pares
+  excluidos** de un producto sí son carta —hacen falta para venderlo, RN-WEB-017—
+  y salen solo en el detalle de cada producto, no en la lista.
 - **RN-WEB-002** Solo se publican promociones (`sales.promocion`) cuya
   columna `canales` incluye `"web"`, vigentes por fecha/hora/día, y cuya
   `marca_id` (si tiene) coincide con `STOREFRONT_MARCA_ID`.
@@ -2252,6 +2254,20 @@ específicas de la parte **sin JWT**.
   usa la pasarela de prueba (el cliente aprueba o rechaza en la pantalla de
   pago); esa vía no existe en producción y allí, sin credenciales, el checkout
   no ofrece Izipay.
+- **RN-WEB-017** **Una línea del carrito puede llevar extras y sabores, con las
+  mismas reglas que el PDV.** Los extras son productos comerciales que el
+  producto admite (RN-COM-021), con tope por extra y mínimo/máximo por grupo
+  (RN-COM-023); los sabores son atributos de los que se elige **uno por
+  atributo** (las dos mitades de una Mitad x Mitad, RN-COM-040), sin combinar los
+  pares excluidos (RN-COM-038) y con el recargo que declare cada valor
+  (RN-COM-036). La API valida todo esto **antes de cobrar** contra la carta
+  pública —con Izipay el pago va primero y una línea que `sales` rechazara
+  después dejaría al cliente con el pago hecho y sin pedido— y el precio nunca
+  viene del navegador. Regla propia de la marca, no del ERP: **como mucho 3
+  extras de pago por producto**; el sabor de un grupo obligatorio forma parte de
+  la pizza y no cuenta. El total del pedido es `(precio + recargo de sabores +
+  extras) × cantidad` por línea, el mismo número que `sales` cobra al crear la
+  venta. La misma pizza con otros sabores o extras es otra línea del carrito.
 - **RN-WEB-015** Un invitado sin cuenta consulta su propio pedido con el
   `token_acceso` que recibió al confirmarlo (`GET /storefront/publico/
   pedidos/{id}?token=...`) — nunca con su número de pedido solo, que no es

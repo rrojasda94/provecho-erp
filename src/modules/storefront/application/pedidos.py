@@ -31,7 +31,7 @@ from src.modules.sales.application.queries_publicas import (
     tiempos_preparacion,
 )
 from src.modules.storefront.application.errors import NoEncontrado, ReglaNegocio
-from src.modules.storefront.domain import asignacion, carrito
+from src.modules.storefront.domain import asignacion, carrito, opciones
 from src.modules.storefront.infrastructure.models import (
     StorefrontPedido,
     StorefrontPedidoItem,
@@ -216,14 +216,57 @@ def cotizar(
     }
 
 
-def _precios_de_carta(
+@dataclass(frozen=True)
+class NodoCarta:
+    """Un producto vendible tal como lo muestra la carta pública: su precio,
+    si está disponible y qué opciones (extras/sabores) admite."""
+
+    precio: Decimal
+    disponible: bool
+    nombre: str
+    opciones: opciones.OpcionesNodo
+
+
+def _opciones_de(nodo: dict) -> opciones.OpcionesNodo:
+    extras: dict[uuid.UUID, opciones.ExtraOfrecido] = {}
+    grupos: dict[uuid.UUID, opciones.GrupoOfrecido] = {}
+    for e in nodo.get("extras", []):
+        extras[e["producto_comercial_id"]] = opciones.ExtraOfrecido(
+            id=e["producto_comercial_id"],
+            nombre=e["nombre"],
+            precio=e["precio_unitario"],
+            maximo=e["maximo"],
+            grupo_id=e["grupo_id"],
+        )
+        if e["grupo_id"] is not None:
+            grupos[e["grupo_id"]] = opciones.GrupoOfrecido(
+                id=e["grupo_id"],
+                nombre=e["grupo_nombre"],
+                minimo=e["grupo_minimo"],
+                maximo=e["grupo_maximo"],
+            )
+    atributos = tuple(
+        opciones.AtributoOfrecido(
+            nombre=a["nombre"],
+            valores={
+                v["id"]: opciones.ValorOfrecido(v["nombre"], v["precio_extra"])
+                for v in a["valores"]
+            },
+        )
+        for a in nodo.get("atributos", [])
+    )
+    exclusiones = frozenset(frozenset(par) for par in nodo.get("exclusiones", []))
+    return opciones.OpcionesNodo(extras, grupos, atributos, exclusiones)
+
+
+def _nodos_de_carta(
     session: Session, *, marca_id: uuid.UUID, sucursal_id: uuid.UUID, modalidad: str
-) -> dict[uuid.UUID, tuple[Decimal, bool, str]]:
-    """`{producto_comercial_id: (precio_unitario, disponible, nombre)}` de
-    todo lo que aparece en la carta pública de esa sucursal — el mismo
-    precio que ve el cliente al armar el carrito. Es una foto para mostrar,
-    no la fuente de verdad: `crear_venta` vuelve a fijar el precio server-
-    side al confirmar (RN-PRC-003)."""
+) -> dict[uuid.UUID, NodoCarta]:
+    """`{producto_comercial_id: NodoCarta}` de todo lo que aparece en la carta
+    pública de esa sucursal — el mismo precio y las mismas opciones que ve el
+    cliente al armar el carrito. Es lo que el pedido puede pedir: cualquier
+    otra cosa se rechaza. `crear_venta` vuelve a fijar el precio server-side al
+    confirmar (RN-PRC-003)."""
     items = carta_publica(
         session,
         marca_id=marca_id,
@@ -231,20 +274,66 @@ def _precios_de_carta(
         canal=settings.storefront_canal,
         modalidad=modalidad,
     )
-    precios: dict[uuid.UUID, tuple[Decimal, bool, str]] = {}
+    nodos: dict[uuid.UUID, NodoCarta] = {}
     for item in items:
-        precios[item["producto_comercial_id"]] = (
-            item["precio_unitario"],
-            not item["stock_bajo"],
-            item["nombre"],
-        )
-        for variante in item.get("variantes", []):
-            precios[variante["producto_comercial_id"]] = (
-                variante["precio_unitario"],
-                not variante["stock_bajo"],
-                variante["nombre"],
+        for nodo in (item, *item.get("variantes", [])):
+            nodos[nodo["producto_comercial_id"]] = NodoCarta(
+                precio=nodo["precio_unitario"],
+                disponible=not nodo["stock_bajo"],
+                nombre=nodo["nombre"],
+                opciones=_opciones_de(nodo),
             )
-    return precios
+    return nodos
+
+
+def _congelar_lineas(
+    nodos: dict[uuid.UUID, NodoCarta], lineas: list[carrito.LineaCarrito]
+) -> tuple[Decimal, list[dict]]:
+    """Valida cada línea contra la carta y arma lo que se guarda: total (sin
+    delivery) y las filas de `storefront_pedido_item`.
+
+    El total de una línea es `(precio + recargo de sabores + extras) × cantidad`,
+    lo mismo que suma `sales`: la línea a `precio + recargo` y cada extra como
+    línea propia por `cantidad × cantidad del extra` (RN-COM-021, RN-COM-036).
+    """
+    total = Decimal("0")
+    filas = []
+    for linea in lineas:
+        nodo = nodos.get(linea.producto_comercial_id)
+        if nodo is None:
+            raise NoEncontrado("un producto del carrito ya no está en la carta")
+        if not nodo.disponible:
+            raise ReglaNegocio(f"'{nodo.nombre}' no está disponible ahora mismo")
+        try:
+            elegido = opciones.evaluar(nodo.opciones, linea.extras, linea.valores)
+        except ValueError as e:
+            raise ReglaNegocio(f"'{nodo.nombre}': {e}") from e
+        unitario = nodo.precio + elegido.recargo_valores
+        total += (unitario + elegido.extras_por_unidad) * linea.cantidad
+        filas.append(
+            {
+                "producto_comercial_id": linea.producto_comercial_id,
+                "nombre_congelado": nodo.nombre,
+                "cantidad": linea.cantidad,
+                "precio_unitario_congelado": unitario,
+                "extras": [
+                    {
+                        "producto_comercial_id": str(e.id),
+                        "nombre": e.nombre,
+                        "cantidad": c,
+                        "precio": str(e.precio),
+                    }
+                    for e, c in elegido.extras
+                ]
+                or None,
+                "valores": [
+                    {"id": str(v_id), "nombre": v.nombre, "precio_extra": str(v.precio_extra)}
+                    for v_id, v in elegido.valores
+                ]
+                or None,
+            }
+        )
+    return total, filas
 
 
 def confirmar(
@@ -290,20 +379,10 @@ def confirmar(
         lineas=lineas,
     )
 
-    precios = _precios_de_carta(
+    nodos = _nodos_de_carta(
         session, marca_id=marca_id, sucursal_id=r.sucursal_id, modalidad=modalidad
     )
-    total = Decimal("0")
-    items_congelados = []
-    for linea in lineas:
-        datos = precios.get(linea.producto_comercial_id)
-        if datos is None:
-            raise NoEncontrado("un producto del carrito ya no está en la carta")
-        precio, disponible, nombre = datos
-        if not disponible:
-            raise ReglaNegocio(f"'{nombre}' no está disponible ahora mismo")
-        total += precio * linea.cantidad
-        items_congelados.append((linea.producto_comercial_id, nombre, linea.cantidad, precio))
+    total, items_congelados = _congelar_lineas(nodos, lineas)
     if r.costo_delivery:
         total += r.costo_delivery
 
@@ -349,16 +428,8 @@ def confirmar(
         },
     )
     item_repo = PedidoItemRepo(session)
-    for producto_id, nombre, cantidad, precio in items_congelados:
-        item_repo.add(
-            StorefrontPedidoItem(
-                pedido_id=pedido.id,
-                producto_comercial_id=producto_id,
-                nombre_congelado=nombre,
-                cantidad=cantidad,
-                precio_unitario_congelado=precio,
-            )
-        )
+    for fila in items_congelados:
+        item_repo.add(StorefrontPedidoItem(pedido_id=pedido.id, **fila))
 
     if medio_pago == "izipay":
         _iniciar_cobro(session, pedido)
@@ -431,6 +502,14 @@ def publicar_confirmacion(session: Session, pedido: StorefrontPedido) -> None:
                 {
                     "producto_comercial_id": str(i.producto_comercial_id),
                     "cantidad": i.cantidad,
+                    "valores_variante_ids": [v["id"] for v in (i.valores or [])],
+                    "extras": [
+                        {
+                            "producto_comercial_id": e["producto_comercial_id"],
+                            "cantidad": e["cantidad"],
+                        }
+                        for e in (i.extras or [])
+                    ],
                 }
                 for i in PedidoItemRepo(session).listar(pedido.id)
             ],

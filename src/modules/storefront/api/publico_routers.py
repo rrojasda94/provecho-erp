@@ -115,6 +115,15 @@ def ver_convocatorias(
     return sitio.convocatorias(session)
 
 
+def _linea_de(item: pedidos_schemas.ItemPedidoIn) -> LineaCarrito:
+    return LineaCarrito(
+        producto_comercial_id=item.producto_comercial_id,
+        cantidad=item.cantidad,
+        extras=tuple((e.producto_comercial_id, e.cantidad) for e in item.extras),
+        valores=tuple(item.valores_variante_ids),
+    )
+
+
 def _pedido_out(session: Session, pedido, *, incluir_token: bool) -> dict:
     items = PedidoItemRepo(session).listar(pedido.id)
     simulado = pedido.pago_estado is not None and not izipay_habilitado()
@@ -141,6 +150,11 @@ def _pedido_out(session: Session, pedido, *, incluir_token: bool) -> dict:
                 "nombre_congelado": i.nombre_congelado,
                 "cantidad": i.cantidad,
                 "precio_unitario_congelado": i.precio_unitario_congelado,
+                "extras": [
+                    {"nombre": e["nombre"], "cantidad": e["cantidad"], "precio": e["precio"]}
+                    for e in (i.extras or [])
+                ],
+                "valores": [v["nombre"] for v in (i.valores or [])],
             }
             for i in items
         ],
@@ -161,10 +175,7 @@ def cotizar_pedido(
         destino_lat=datos.ubicacion_lat,
         destino_lng=datos.ubicacion_lng,
         destino_distrito=datos.ubicacion_distrito,
-        lineas=[
-            LineaCarrito(producto_comercial_id=i.producto_comercial_id, cantidad=i.cantidad)
-            for i in datos.items
-        ],
+        lineas=[_linea_de(i) for i in datos.items],
     )
     return resultado
 
@@ -186,10 +197,7 @@ def confirmar_pedido(
         telefono_contacto=datos.telefono_contacto,
         email_contacto=datos.email_contacto,
         modalidad=datos.modalidad,
-        lineas=[
-            LineaCarrito(producto_comercial_id=i.producto_comercial_id, cantidad=i.cantidad)
-            for i in datos.items
-        ],
+        lineas=[_linea_de(i) for i in datos.items],
         medio_pago=datos.medio_pago,
         numero_documento=datos.numero_documento,
         nombre_o_razon_social=datos.nombre_o_razon_social,

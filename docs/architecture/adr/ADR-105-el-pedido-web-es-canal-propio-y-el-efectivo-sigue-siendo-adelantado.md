@@ -177,14 +177,23 @@ explícita, no como "ya funciona".
 
 ### 6. Extras y Mitad x Mitad quedan fuera de este slice
 
-El carrito de PR3 es "un producto/tamaño (ya un `producto_comercial_id`
+> **Corregido (2026-09-19)**: este apartado estaba mal diagnosticado y está
+> superado. `sales` **sí** tenía el concepto —extras como productos
+> (`producto_comercial_extra` + `producto_opcion_grupo`, ADR-018) y sabores como
+> atributos (`atributo` → `producto_atributo_valor`, ADR-055/056/063), los
+> mismos que usa el PDV—: lo que faltaba era enchufarlo al sitio, y `carta_publica`
+> lo recortaba a propósito. Consecuencia real, peor que "queda fuera": un
+> producto con sabores obligatorios **no se podía pedir por la web** (`crear_venta`
+> lo rechazaba con "falta elegir…"). Ahora la línea del carrito lleva extras y
+> sabores (RN-WEB-017); se ofrecen desde el detalle del producto, se validan antes
+> de cobrar y viajan por el evento hasta `crear_venta` como lo hace el PDV. No se
+> inventó ningún modelo de datos: solo dos columnas JSON en
+> `storefront_pedido_item` para mostrar lo elegido en `/pedido/{id}`.
+
+El carrito de PR3 era "un producto/tamaño (ya un `producto_comercial_id`
 propio, por variante) + una cantidad". Extras (máx. 3) y Mitad x Mitad de
-la carta de Charlie's (`brand-voice-guidelines.md`, `majambo.md` §3.1.8)
-necesitarían un concepto de extra/combo que hoy no existe en `sales` —
-construirlo a ciegas dentro de este PR, sin que el negocio lo valide,
-habría sido inventar un modelo de datos nuevo sin encargo. Se documenta
-como deuda con la forma del hueco (qué falta en `sales`, no cómo se
-resuelve).
+la carta de Charlie's (`brand-voice-guidelines.md`, `majambo.md` §3.1.8) se
+habían dejado afuera creyendo que exigían un concepto nuevo en `sales`.
 
 ## Consecuencias
 

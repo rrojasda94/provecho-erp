@@ -199,6 +199,8 @@ export function CheckoutCliente({
       items: lineas.map((l) => ({
         producto_comercial_id: l.productoComercialId,
         cantidad: l.cantidad,
+        extras: l.extras.map((e) => ({ producto_comercial_id: e.id, cantidad: e.cantidad })),
+        valores_variante_ids: l.valores.map((v) => v.id),
       })),
       nombre_contacto: nombre,
       telefono_contacto: telefono,
