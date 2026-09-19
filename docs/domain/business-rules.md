@@ -2226,7 +2226,10 @@ específicas de la parte **sin JWT**.
   que cocinar** (una botella de agua no espera detrás de las pizzas); el
   *viaje* es, en delivery, `distancia_km × STOREFRONT_ETA_MINUTOS_POR_KM`.
   Piso de 5 minutos. El máximo del rango suma 15 minutos de colchón si la
-  preparación llega a 20 (pasa por horno) y 5 si no.
+  preparación llega a 20 (pasa por horno) y 5 si no. La `carga` cuenta solo
+  las ventas `orden` de las últimas 3 horas: una comanda que nadie cerró
+  (pedido de prueba, olvido del cajero) no es cola de cocina, y contarla
+  dejaba el estimado en 70-80 minutos para siempre.
 - **RN-WEB-012** El precio del carrito se vuelve a fijar server-side contra
   la carta pública al confirmar (RN-PRC-003): un producto que ya no está
   disponible, o cuyo precio cambió desde que se agregó al carrito, rechaza

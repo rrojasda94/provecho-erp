@@ -235,3 +235,11 @@ accounting.asiento_generado
 > `extras` (`[{producto_comercial_id, cantidad por unidad}]`). `sales.application.
 > listeners.on_pedido_web_confirmado` los pasa tal cual a `crear_venta`, que los
 > valida y cobra igual que las líneas del PDV (RN-WEB-017).
+>
+> **Enmienda (2026-09-19)**: el payload suma `telefono_contacto`. Con él,
+> `on_pedido_web_confirmado` deja de crear la venta de un invitado con
+> `cliente_id=NULL`: reutiliza el `cliente` del grupo con ese teléfono o lo
+> registra solo con nombre y teléfono (`clientes.cliente_de_contacto`,
+> RN-PTS-002). Sin eso `delivery` —que lee nombre y teléfono del `cliente`—
+> mostraba la parada del repartidor sin nombre ni botón de llamar, y el aviso
+> por WhatsApp quedaba en `SIN_TELEFONO`.

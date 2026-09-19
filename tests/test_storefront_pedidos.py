@@ -228,8 +228,48 @@ def test_confirmar_pedido_recojo_efectivo_con_cuenta(env):
         assert venta is not None
         assert venta.canal == "web"
         assert venta.modalidad == "takeout"
-        assert venta.cliente_id is not None  # el de la cuenta
         assert venta.estado == "orden"  # efectivo: se cobra al recoger, no ahora
+        assert venta.cliente_id is not None  # el de la cuenta
+        assert venta.referencia_atencion == "Carlos Pérez"
+
+
+def test_pedido_de_invitado_reutiliza_el_cliente_del_mismo_telefono(env):
+    from src.modules.sales.application.queries_publicas import contacto_de_cliente
+
+    client, ids, TestSession = env
+    for clave in ("invitado-001", "invitado-002"):
+        pedido = _pedido_izipay(client, ids, clave)
+        assert _webhook(client, pedido["pago_id_externo"]).status_code == 200
+
+    with TestSession() as s:
+        ventas = s.scalars(select(Venta).where(Venta.canal == "web")).all()
+        assert len(ventas) == 2
+        assert ventas[0].cliente_id == ventas[1].cliente_id
+        contacto = contacto_de_cliente(s, ventas[0].cliente_id)
+        assert contacto["nombre"] == "Carlos Pérez"
+        assert contacto["telefono"] == "987654321"
+
+
+def test_carga_de_cocina_ignora_ordenes_viejas_sin_cerrar(env):
+    from datetime import UTC, datetime, timedelta
+
+    from src.modules.sales.application.queries_publicas import carga_activa_por_sucursal
+
+    client, ids, TestSession = env
+    for n in range(2):
+        r = client.post(
+            PEDIDOS, headers=_auth(ids), json=_body_takeout(ids, f"carga-cocina-{n}")
+        )
+        assert r.status_code == 201
+
+    ch1 = uuid.UUID(ids["ch1_id"])
+    with TestSession() as s:
+        assert carga_activa_por_sucursal(s, [ch1]) == {ch1: 2}
+        # Una comanda de hace 5 horas que nadie cerró ya no es cola de cocina.
+        vieja = s.scalars(select(Venta).where(Venta.canal == "web")).first()
+        vieja.created_at = datetime.now(UTC) - timedelta(hours=5)
+        s.commit()
+        assert carga_activa_por_sucursal(s, [ch1]) == {ch1: 1}
 
 
 def test_confirmar_pedido_delivery_asigna_la_sucursal_mas_cercana(env):
