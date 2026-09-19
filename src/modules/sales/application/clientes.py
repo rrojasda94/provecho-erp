@@ -256,6 +256,41 @@ def crear_o_encontrar_cliente(session: Session, **kwargs) -> Cliente:
         return existente
 
 
+def cliente_de_contacto(
+    session: Session, *, grupo_id: uuid.UUID, nombre: str, telefono: str
+) -> Cliente:
+    """El cliente de quien compró por el sitio sin cuenta (RN-WEB-012): se
+    reutiliza el que ya tenga ese teléfono en el grupo y, si no hay ninguno,
+    se registra solo con nombre y teléfono (RN-PTS-002).
+
+    Sin esto el pedido de un invitado nacía sin `cliente_id`, y el repartidor
+    veía la parada sin nombre ni botón de llamar. No se toca la persona del
+    cliente existente: el teléfono identifica al cliente, no reescribe sus
+    datos (ADR-061).
+    """
+    telefono = (telefono or "").strip()
+    existente = session.scalar(
+        select(Cliente)
+        .join(Persona, Persona.id == Cliente.persona_id)
+        .where(
+            Cliente.grupo_id == grupo_id,
+            Cliente.deleted_at.is_(None),
+            Persona.telefono == telefono,
+        )
+        .order_by(Cliente.created_at)
+        .limit(1)
+    )
+    if existente is not None:
+        return existente
+    return crear_cliente(
+        session,
+        grupo_id=grupo_id,
+        nombre=nombre,
+        telefono=telefono,
+        consultar_documento=False,
+    )
+
+
 def actualizar_documento(
     session: Session,
     *,

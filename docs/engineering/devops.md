@@ -102,6 +102,17 @@ Costo aceptado: **dos pools de conexiones** en vez de uno. A cambio, una
 consulta pesada de reportes tampoco se come las conexiones que necesita la
 caja. Poner `0` desactiva el límite de ese engine.
 
+**Tamaño de los pools (2026-09-19).** El pool por defecto de SQLAlchemy (5+10)
+se agotaba con una pantalla que dispara decenas de peticiones a la vez
+(`QueuePool limit reached`, y el ERP "se caía" hasta que se liberaba). Ahora
+se configura por `.env`: `DB_POOL_SIZE`/`DB_MAX_OVERFLOW` (operación, 10+10) y
+`DB_POOL_SIZE_REPORTES`/`DB_MAX_OVERFLOW_REPORTES` (reportes, 2+3). El tope de
+conexiones es `(pool + overflow) × procesos de la API × engines`: con 2
+procesos, 2 × (20 + 5) = 50, bajo el `max_connections` de 100 de Postgres,
+con margen para Celery. En staging la API corre con `WEB_CONCURRENCY=2` y
+cada servicio tiene `mem_limit` (`docker-compose.staging.yml`) para que un
+proceso desbocado no tumbe todo el droplet.
+
 En la API el plazo se elige por dependencia: `get_db` (corto) o
 `get_db_reportes` (largo), ambas en `src/modules/users/api/deps.py`.
 `tests/test_arquitectura.py::test_los_reportes_consultan_por_el_engine_de_plazo_largo`

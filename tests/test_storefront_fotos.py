@@ -3,6 +3,7 @@ presign a S3, registro, listado y borrado. Mismo patron que
 `test_assets.py::test_presign_adjunto_y_registro_completo`.
 """
 
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -138,6 +139,18 @@ def test_presign_registro_listado_y_borrado_completo(env, monkeypatch):
     assert listado.status_code == 200
     assert len(listado.json()) == 1
     assert listado.json()[0]["id"] == archivo_id
+
+    # En lote: una sola llamada para muchas entidades (las pantallas `/web`
+    # del ERP pedían una por producto). Toda id pedida aparece, con o sin fotos.
+    otro = str(uuid.uuid4())
+    lote = client.get(
+        FOTOS,
+        headers=h,
+        params=[("entidad", "producto"), ("ids", ids["producto_id"]), ("ids", otro)],
+    )
+    assert lote.status_code == 200, lote.text
+    assert [f["id"] for f in lote.json()[ids["producto_id"]]] == [archivo_id]
+    assert lote.json()[otro] == []
 
     borrar = client.delete(FOTOS + "/" + archivo_id, headers=h)
     assert borrar.status_code == 204

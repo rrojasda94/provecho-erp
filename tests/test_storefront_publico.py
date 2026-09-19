@@ -174,6 +174,26 @@ def test_carta_trae_producto_con_ingredientes_y_sin_campos_prohibidos(env):
         assert prohibido not in crudo, prohibido + " se filtro a la carta publica"
 
 
+def test_las_categorias_de_la_carta_traen_su_nombre(env):
+    """Sin nombre, los chips de categoría del sitio salían como puntos vacíos."""
+    from src.modules.inventory.infrastructure.models import Categoria
+
+    client, ids, TestSession = env
+    with TestSession() as s:
+        categoria = Categoria(empresa_id=uuid.UUID(ids["empresa_id"]), nombre="Pizzas")
+        s.add(categoria)
+        s.flush()
+        producto = s.get(ProductoComercial, uuid.UUID(ids["producto_id"]))
+        producto.categoria_id = categoria.id
+        s.commit()
+        categoria_id = str(categoria.id)
+
+    _crear_lista_y_precio(client, _token(client), ids)
+    body = client.get(f"{PUBLICO}/carta").json()
+    assert body["categorias"] == [{"id": categoria_id, "nombre": "Pizzas"}]
+    assert body["productos"][0]["categoria_id"] == categoria_id
+
+
 def test_detalle_de_producto_trae_ingrediente_con_descripcion_y_foto_null(env):
     client, ids, _ = env
     headers = _token(client)

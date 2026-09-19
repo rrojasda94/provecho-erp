@@ -54,9 +54,14 @@ export default async function TrabajaPage() {
             </span>
           </a>
         ))}
-        {(!convocatorias || convocatorias.length === 0) && (
+        {convocatorias?.length === 0 && (
           <p className="text-sm text-humo">
             No hay vacantes abiertas en este momento. Vuelve a mirar pronto.
+          </p>
+        )}
+        {convocatorias === null && (
+          <p className="text-sm text-humo">
+            No pudimos cargar las vacantes. Intenta de nuevo en unos minutos.
           </p>
         )}
       </div>

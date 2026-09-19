@@ -217,7 +217,16 @@ accounting.asiento_generado
 > on_pedido_web_procesado` para marcar el pedido `confirmado`/`fallido`.
 > Payload de `storefront.pedido_web_confirmado`: `{pedido_id,
 > idempotency_key, sucursal_id, punto_venta_id, cliente_id, nombre_
-> contacto, modalidad, items, direccion_entrega, ubicacion, distancia_
-> entrega_km, costo_entrega, medio_pago, numero_documento, nombre_o_razon_
-> social}`. Payload de `sales.pedido_web_procesado`: `{pedido_id, ok,
-> venta_id?, numero_orden?, motivo?}`.
+> contacto, telefono_contacto, modalidad, items, direccion_entrega,
+> ubicacion, distancia_entrega_km, costo_entrega, medio_pago,
+> numero_documento, nombre_o_razon_social}`. Payload de
+> `sales.pedido_web_procesado`: `{pedido_id, ok, venta_id?, numero_orden?,
+> motivo?}`.
+>
+> **Enmienda (2026-09-19)**: el payload suma `telefono_contacto`. Con él,
+> `on_pedido_web_confirmado` deja de crear la venta de un invitado con
+> `cliente_id=NULL`: reutiliza el `cliente` del grupo con ese teléfono o lo
+> registra solo con nombre y teléfono (`clientes.cliente_de_contacto`,
+> RN-PTS-002). Sin eso `delivery` —que lee nombre y teléfono del `cliente`—
+> mostraba la parada del repartidor sin nombre ni botón de llamar, y el aviso
+> por WhatsApp quedaba en `SIN_TELEFONO`.

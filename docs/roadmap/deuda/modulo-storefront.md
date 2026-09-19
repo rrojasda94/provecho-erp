@@ -102,6 +102,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     `/checkout`, `/pedido/{id}` no aplica: son pasos de un flujo transaccional
     con datos del cliente, no páginas que deban indexarse.
 
+- ✅ 2026-09-19 **Ronda 2** (uso real en staging): categorías con nombre,
+  contacto del invitado hasta el repartidor, fotos en lote, pool/workers,
+  carga de cocina acotada a 3 h, plazo de 8 s en el cliente del sitio. Lo que
+  deja abierto:
+  - ⬜ **Carga de cocina por ventana fija de 3 h.** La señal fina sería
+    `venta_item.estado_preparacion` (cuándo cada línea salió de cocina),
+    válida solo si el KDS se usa en todos los locales.
+  - ⬜ **El sitio no refleja "en preparación / en camino".** `sales.pedido_listo`
+    y los eventos `delivery.*` ya se publican, pero `storefront` solo escucha
+    `sales.cliente_vinculado` y `sales.pedido_web_procesado`; el pedido queda
+    `confirmado` hasta el final.
+
 - ✅ 2026-09-18 **PR4** (hardening): Playwright del sitio, SEO
   (`sitemap.ts`, OG, JSON-LD), auditoría (`storefront_pedido`,
   `storefront_contenido`, fotos, direcciones, cuenta) y aislamiento de
