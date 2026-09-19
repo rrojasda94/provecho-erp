@@ -41,3 +41,16 @@ def test_los_barridos_siguen_programados() -> None:
         entrada["task"] for entrada in celery_app.conf.beat_schedule.values()
     }
     assert ESPERADAS <= programadas
+
+
+def test_encolar_con_redis_caido_falla_rapido_tambien_en_el_backend_de_resultados():
+    """`apply_async(retry=False)` solo apaga los reintentos del broker: el
+    backend de resultados es otra conexión con su propia política (20
+    reintentos por defecto), y con Redis caído dejaba colgado al request que
+    confirmaba una venta. Sin este tope, el e2e del sitio pasaba o no según
+    cuánto tardara Redis en negarse."""
+    from src.core.celery_app import celery_app
+
+    politica = celery_app.conf.result_backend_transport_options["retry_policy"]
+    assert politica["max_retries"] <= 1
+    assert celery_app.conf.redis_socket_connect_timeout <= 1

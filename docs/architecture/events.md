@@ -221,3 +221,11 @@ accounting.asiento_generado
 > entrega_km, costo_entrega, medio_pago, numero_documento, nombre_o_razon_
 > social}`. Payload de `sales.pedido_web_procesado`: `{pedido_id, ok,
 > venta_id?, numero_orden?, motivo?}`.
+>
+> **Enmienda (2026-09-19)**: con Izipay, `storefront.pedido_web_confirmado` ya no
+> se publica al confirmar el checkout sino cuando el webhook de la pasarela
+> aprueba el pago (`storefront.application.pagos.registrar_resultado`,
+> RN-WEB-016); en efectivo sigue saliendo al confirmar. El payload se arma desde
+> el `storefront_pedido` guardado —no desde la petición original, que ya
+> terminó— y suma `pago_id_externo` (solo con pago aprobado: `sales` registra el
+> pago con esa referencia) y `telefono_contacto`.

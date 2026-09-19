@@ -23,6 +23,7 @@ from src.modules.storefront.domain.carrito import LineaCarrito
 from src.modules.storefront.infrastructure.models import StorefrontCuenta
 from src.modules.storefront.infrastructure.repositories import PedidoItemRepo
 from src.modules.users.api.deps import get_db
+from src.shared.integrations.izipay import izipay_habilitado
 
 router = APIRouter(prefix="/storefront/publico", tags=["storefront"])
 
@@ -116,6 +117,7 @@ def ver_convocatorias(
 
 def _pedido_out(session: Session, pedido, *, incluir_token: bool) -> dict:
     items = PedidoItemRepo(session).listar(pedido.id)
+    simulado = pedido.pago_estado is not None and not izipay_habilitado()
     return {
         "id": pedido.id,
         "estado": pedido.estado,
@@ -124,6 +126,11 @@ def _pedido_out(session: Session, pedido, *, incluir_token: bool) -> dict:
         "modalidad": pedido.modalidad,
         "sucursal_id": pedido.sucursal_id,
         "medio_pago": pedido.medio_pago,
+        "pago_estado": pedido.pago_estado,
+        "pago_simulado": simulado,
+        "pago_id_externo": (
+            pedido.pago_id_externo if simulado and pedido.pago_estado == "pendiente" else None
+        ),
         "total_estimado": pedido.total_estimado,
         "costo_delivery_estimado": pedido.costo_delivery_estimado,
         "eta_min": pedido.eta_min,

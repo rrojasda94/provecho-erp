@@ -43,6 +43,7 @@ from src.modules.storefront.infrastructure.repositories import (
 )
 from src.modules.users.infrastructure.models import Sucursal
 from src.shared import auditoria
+from src.shared.integrations.izipay import izipay_disponible, pasarela_activa
 
 
 @dataclass(frozen=True)
@@ -274,8 +275,7 @@ def confirmar(
         return existente
 
     carrito.validar(lineas)
-    if medio_pago not in ("efectivo", "izipay"):
-        raise ReglaNegocio(f"medio de pago inválido: {medio_pago}")
+    _validar_medio_de_pago(medio_pago, con_cuenta=cuenta_id is not None)
     if modalidad == "delivery" and not direccion_entrega:
         raise ReglaNegocio("falta la dirección de entrega")
 
@@ -294,7 +294,6 @@ def confirmar(
         session, marca_id=marca_id, sucursal_id=r.sucursal_id, modalidad=modalidad
     )
     total = Decimal("0")
-    items_payload = []
     items_congelados = []
     for linea in lineas:
         datos = precios.get(linea.producto_comercial_id)
@@ -304,20 +303,9 @@ def confirmar(
         if not disponible:
             raise ReglaNegocio(f"'{nombre}' no está disponible ahora mismo")
         total += precio * linea.cantidad
-        items_payload.append(
-            {
-                "producto_comercial_id": str(linea.producto_comercial_id),
-                "cantidad": linea.cantidad,
-            }
-        )
         items_congelados.append((linea.producto_comercial_id, nombre, linea.cantidad, precio))
     if r.costo_delivery:
         total += r.costo_delivery
-
-    cliente_id = None
-    if cuenta_id is not None:
-        cuenta = CuentaRepo(session).get(cuenta_id)
-        cliente_id = cuenta.cliente_id if cuenta else None
 
     pedido = repo.add(
         StorefrontPedido(
@@ -372,42 +360,109 @@ def confirmar(
             )
         )
 
-    # Publicar ANTES del commit (`core/events.py`): se bufferiza en la
-    # sesión y recién se despacha en `after_commit`.
+    if medio_pago == "izipay":
+        _iniciar_cobro(session, pedido)
+    else:
+        publicar_confirmacion(session, pedido)
+    session.commit()
+    session.refresh(pedido)
+    return pedido
+
+
+def _validar_medio_de_pago(medio_pago: str, *, con_cuenta: bool) -> None:
+    if medio_pago not in ("efectivo", "izipay"):
+        raise ReglaNegocio(f"medio de pago inválido: {medio_pago}")
+    if medio_pago == "efectivo" and not con_cuenta:
+        # RN-WEB-013: sin cuenta no hay a quién reclamarle un pedido que no se
+        # recoge o no se paga. Un invitado paga por adelantado con Izipay.
+        raise ReglaNegocio(
+            "Para pagar en efectivo necesitas una cuenta: regístrate o paga con Izipay."
+        )
+    if medio_pago == "izipay" and not izipay_disponible():
+        raise ReglaNegocio("El pago con Izipay todavía no está disponible.")
+
+
+def _iniciar_cobro(session: Session, pedido: StorefrontPedido) -> None:
+    """Cobra ANTES de crear la venta: con la pasarela real el cliente paga en
+    su pantalla y el resultado llega por webhook (`application/pagos.py`). El
+    pedido queda pendiente y nada llega a cocina hasta que el pago se apruebe."""
+    intento = pasarela_activa().crear_intento(
+        monto=pedido.total_estimado,
+        moneda="PEN",
+        referencia=str(pedido.id),
+        medio="izipay",
+    )
+    pedido.pago_id_externo = intento.id_externo
+    pedido.pago_estado = intento.estado
+    if intento.estado == "aprobado":
+        publicar_confirmacion(session, pedido)
+
+
+def publicar_confirmacion(session: Session, pedido: StorefrontPedido) -> None:
+    """Publica `storefront.pedido_web_confirmado`, que `sales` convierte en
+    una `Venta`. Sale de la fila ya guardada y no de lo que llegó en la
+    petición, porque con Izipay se llama **después**: cuando el webhook aprueba
+    el pago, la petición original terminó hace rato.
+
+    Publicar ANTES del commit (`core/events.py`): el evento se bufferiza en la
+    sesión y recién se despacha en `after_commit`."""
+    cliente_id = None
+    if pedido.cuenta_id is not None:
+        cuenta = CuentaRepo(session).get(pedido.cuenta_id)
+        cliente_id = cuenta.cliente_id if cuenta else None
+    punto_venta = puntos_venta_web_de_sucursales(session, [pedido.sucursal_id]).get(
+        pedido.sucursal_id
+    )
+    if punto_venta is None:
+        raise ReglaNegocio("la sucursal del pedido ya no admite pedidos web")
+    es_delivery = pedido.modalidad == "delivery"
     event_bus.publish(
         "storefront.pedido_web_confirmado",
         {
             "pedido_id": str(pedido.id),
-            "idempotency_key": idempotency_key,
-            "sucursal_id": str(r.sucursal_id),
-            "punto_venta_id": str(r.punto_venta_id),
+            "idempotency_key": pedido.idempotency_key,
+            "sucursal_id": str(pedido.sucursal_id),
+            "punto_venta_id": str(punto_venta["punto_venta_id"]),
             "cliente_id": str(cliente_id) if cliente_id else None,
-            "nombre_contacto": nombre_contacto,
-            "modalidad": modalidad,
-            "items": items_payload,
-            "direccion_entrega": direccion_entrega,
+            "nombre_contacto": pedido.nombre_contacto,
+            "telefono_contacto": pedido.telefono_contacto,
+            "modalidad": pedido.modalidad,
+            "items": [
+                {
+                    "producto_comercial_id": str(i.producto_comercial_id),
+                    "cantidad": i.cantidad,
+                }
+                for i in PedidoItemRepo(session).listar(pedido.id)
+            ],
+            "direccion_entrega": pedido.direccion_entrega,
             "ubicacion": (
                 {
-                    "ubicacion_place_id": ubicacion_place_id,
-                    "ubicacion_lat": str(ubicacion_lat) if ubicacion_lat else None,
-                    "ubicacion_lng": str(ubicacion_lng) if ubicacion_lng else None,
-                    "ubicacion_plus_code": ubicacion_plus_code,
-                    "ubicacion_distrito": ubicacion_distrito,
+                    "ubicacion_place_id": pedido.ubicacion_place_id,
+                    "ubicacion_lat": str(pedido.ubicacion_lat) if pedido.ubicacion_lat else None,
+                    "ubicacion_lng": str(pedido.ubicacion_lng) if pedido.ubicacion_lng else None,
+                    "ubicacion_plus_code": pedido.ubicacion_plus_code,
+                    "ubicacion_distrito": pedido.ubicacion_distrito,
                 }
-                if modalidad == "delivery"
+                if es_delivery
                 else None
             ),
-            "distancia_entrega_km": str(r.distancia_km) if r.distancia_km else None,
-            "costo_entrega": str(r.costo_delivery) if r.costo_delivery else None,
-            "medio_pago": medio_pago,
-            "numero_documento": numero_documento,
-            "nombre_o_razon_social": nombre_o_razon_social,
+            "distancia_entrega_km": (
+                str(pedido.distancia_km_estimada) if pedido.distancia_km_estimada else None
+            ),
+            "costo_entrega": (
+                str(pedido.costo_delivery_estimado) if pedido.costo_delivery_estimado else None
+            ),
+            "medio_pago": pedido.medio_pago,
+            # Solo con Izipay y ya aprobado: `sales` registra el pago con esta
+            # referencia. En efectivo va `None` y la venta queda por cobrar.
+            "pago_id_externo": (
+                pedido.pago_id_externo if pedido.pago_estado == "aprobado" else None
+            ),
+            "numero_documento": pedido.numero_documento,
+            "nombre_o_razon_social": pedido.nombre_o_razon_social,
         },
         session=session,
     )
-    session.commit()
-    session.refresh(pedido)
-    return pedido
 
 
 def obtener_por_token(

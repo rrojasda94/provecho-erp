@@ -50,12 +50,33 @@ papel. Por eso:
   a `registrar_pago` — se cobra al entregar/recoger, con el flujo normal de
   caja que ya existe (el repartidor o el mostrador lo cobran como cualquier
   delivery telefónico de hoy).
-- **Izipay**: se cobra de inmediato contra la pasarela activa y
+- **Izipay**: se cobra por adelantado contra la pasarela activa y
   `registrar_pago` se llama con `exigir_caja_abierta=False` — excepción
   explícita a ADR-025 §1, ya usada hasta ahora solo para el replay del hub
   (ADR-009). El dinero ya lo tiene la pasarela, no una caja física; exigir
   un turno abierto en el punto de venta `web` (que no tiene cajero delante)
   no protegería nada que Izipay no proteja ya.
+
+> **Enmienda (2026-09-19)**: dos cambios a lo de arriba.
+>
+> 1. **El efectivo exige cuenta** (RN-WEB-013). Un invitado paga solo con
+>    Izipay; si elige efectivo se le avisa y se le invita a registrarse (el
+>    carrito vive en el navegador y se conserva). Motivo: en la práctica
+>    aparecieron pedidos de prueba en efectivo sin nadie identificable a quien
+>    reclamar, y "sin cuenta" era justo lo que el negocio no quería para la
+>    plata contra entrega. Costo aceptado: un invitado sin tarjeta/billetera
+>    no puede pedir por la web hasta registrarse.
+> 2. **Izipay ya no aprueba en el acto.** `IzipayFake` dejaba el cobro
+>    aprobado dentro del propio checkout, sin pantalla de pago y sin webhook —
+>    el tramo más riesgoso del flujo real (esperar a la pasarela, un aviso que
+>    puede llegar dos veces o nunca) no se ejercitaba jamás. Ahora el pedido
+>    queda `pendiente` y la `Venta` nace cuando el webhook aprueba el pago
+>    (RN-WEB-016): así nada llega a cocina sin pagar, y la pantalla de pago
+>    (`/pedido/{id}/pago`), el webhook (`POST /storefront/webhooks/izipay`) y su
+>    idempotencia se prueban de verdad con la pasarela de prueba. Cuando Izipay
+>    entregue credenciales solo cambia `IzipayReal` (`crear_intento` con su
+>    formulario incrustado en esa misma pantalla, `verificar_webhook` con su
+>    firma). Sin credenciales, en producción, Izipay no se ofrece.
 
 `PuntoVenta(canal='web')` conserva `politica_pago='adelantado'` tal cual la
 exige `_validar_canal` — no se tocó esa validación. Lo que cambia es que
@@ -76,9 +97,11 @@ directamente. El flujo:
    mandó el navegador, RN-PRC-003) y crea `storefront_pedido` +
    `storefront_pedido_item` en estado `pendiente`.
 2. Publica `storefront.pedido_web_confirmado` **antes** del commit
-   (`core/events.py`). `sales.application.listeners::
-   on_pedido_web_confirmado` llama a `ventas.crear_venta(canal="web", ...)`
-   y, si el medio es Izipay, a `registrar_pago(...)`.
+   (`core/events.py`) — en efectivo, al confirmar; con Izipay, cuando el
+   webhook aprueba el pago (ver la enmienda del §2). `sales.application.
+   listeners::on_pedido_web_confirmado` llama a `ventas.crear_venta(
+   canal="web", ...)` y, si el evento trae `pago_id_externo`, a
+   `registrar_pago(...)`.
 3. Publica de vuelta `sales.pedido_web_procesado`
    (`{pedido_id, ok, venta_id?, numero_orden?, motivo?}`).
    `storefront.application.listeners::on_pedido_web_procesado` marca el

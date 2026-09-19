@@ -30,6 +30,8 @@ export type PedidoResultado = {
   modalidad: string;
   sucursal_id: string | null;
   medio_pago: string;
+  // Solo con Izipay: `pendiente` lleva a la pantalla de pago.
+  pago_estado: "pendiente" | "aprobado" | "rechazado" | null;
   total_estimado: string;
   costo_delivery_estimado: string | null;
   eta_min: number | null;
