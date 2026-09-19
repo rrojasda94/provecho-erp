@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { buscar, type Buscable } from "@/lib/busqueda";
 import { agregarFavoritoAction, quitarFavoritoAction } from "@/app/cuenta/actions";
@@ -110,12 +110,22 @@ export function CartaCliente({
   sesionActiva?: boolean;
   favoritosIds?: string[];
 }) {
-  const [consulta, setConsulta] = useState("");
-  const [categoria, setCategoria] = useState<string | null>(null);
-  const [tamano, setTamano] = useState<string>("");
-  const [precioMax, setPrecioMax] = useState<string>("");
-  const [soloDisponibles, setSoloDisponibles] = useState(false);
+  // Los filtros viven en la URL (`?q=&cat=&tam=`): el "atrás" del celular
+  // al volver de un producto no los pierde, y una búsqueda se puede compartir.
+  const params = useSearchParams();
+  const [consulta, setConsulta] = useState(params.get("q") ?? "");
+  const [categoria, setCategoria] = useState<string | null>(params.get("cat"));
+  const [tamano, setTamano] = useState(params.get("tam") ?? "");
   const [favoritos, setFavoritos] = useState(() => new Set(favoritosIds));
+
+  useEffect(() => {
+    const url = new URLSearchParams();
+    if (consulta) url.set("q", consulta);
+    if (categoria) url.set("cat", categoria);
+    if (tamano) url.set("tam", tamano);
+    const texto = url.toString();
+    window.history.replaceState(null, "", texto ? `?${texto}` : window.location.pathname);
+  }, [consulta, categoria, tamano]);
 
   function alCambiarFavorito(id: string, favorito: boolean) {
     setFavoritos((actual) => {
@@ -126,11 +136,20 @@ export function CartaCliente({
     });
   }
 
+  const enCategoria = useMemo(
+    () => carta.productos.filter((p) => !categoria || p.categoria_id === categoria),
+    [carta.productos, categoria],
+  );
+
+  // Los tamaños que ofrece lo que hay en la categoría elegida, en el orden de
+  // la carta (Personal, Mediana, Familiar): sin categoría con variantes, no
+  // hay filtro de tamaño que mostrar.
   const tamanos = useMemo(() => {
     const set = new Set<string>();
-    for (const p of carta.productos) for (const v of p.variantes) set.add(v.nombre);
-    return [...set].sort();
-  }, [carta.productos]);
+    for (const p of enCategoria) for (const v of p.variantes) set.add(v.nombre);
+    return [...set];
+  }, [enCategoria]);
+  const tamanoActivo = tamanos.includes(tamano) ? tamano : "";
 
   const buscables: Buscable[] = useMemo(
     () => carta.productos.map((p) => ({ id: p.id, terminos: terminosDe(p) })),
@@ -140,17 +159,14 @@ export function CartaCliente({
   const idsPorBusqueda = useMemo(() => new Set(buscar(consulta, buscables)), [consulta, buscables]);
 
   const filtrados = useMemo(() => {
-    return carta.productos.filter((p) => {
-      if (!idsPorBusqueda.has(p.id)) return false;
-      if (categoria && p.categoria_id !== categoria) return false;
-      if (tamano && !(p.variantes.length === 0 || p.variantes.some((v) => v.nombre === tamano))) {
-        return false;
-      }
-      if (precioMax && Number(p.precio_desde) > Number(precioMax)) return false;
-      if (soloDisponibles && !p.disponible) return false;
-      return true;
-    });
-  }, [carta.productos, idsPorBusqueda, categoria, tamano, precioMax, soloDisponibles]);
+    return enCategoria
+      .filter((p) => {
+        if (!idsPorBusqueda.has(p.id)) return false;
+        return !tamanoActivo || p.variantes.some((v) => v.nombre === tamanoActivo);
+      })
+      // Lo agotado se ve (con su etiqueta) pero al final: no estorba al pedir.
+      .sort((a, b) => Number(b.disponible) - Number(a.disponible));
+  }, [enCategoria, idsPorBusqueda, tamanoActivo]);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
@@ -189,41 +205,22 @@ export function CartaCliente({
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           {tamanos.length > 0 && (
-            <label className="flex items-center gap-1">
-              Tamaño
-              <select
-                value={tamano}
-                onChange={(e) => setTamano(e.target.value)}
-                className="rounded border border-negro/40 px-2 py-1"
-              >
-                <option value="">Todos</option>
-                {tamanos.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Tamaño">
+              <span className="font-bold">Tamaño</span>
+              {["", ...tamanos].map((t) => (
+                <button
+                  key={t || "todos"}
+                  type="button"
+                  onClick={() => setTamano(t)}
+                  className={`rounded-full border-2 border-negro px-3 py-1 text-xs font-bold uppercase ${
+                    tamanoActivo === t ? "bg-verde text-negro" : "bg-white"
+                  }`}
+                >
+                  {t || "Todos"}
+                </button>
+              ))}
+            </div>
           )}
-          <label className="flex items-center gap-1">
-            Precio hasta
-            <input
-              type="number"
-              min={0}
-              value={precioMax}
-              onChange={(e) => setPrecioMax(e.target.value)}
-              placeholder="S/"
-              className="w-20 rounded border border-negro/40 px-2 py-1"
-            />
-          </label>
-          <label className="flex items-center gap-1">
-            <input
-              type="checkbox"
-              checked={soloDisponibles}
-              onChange={(e) => setSoloDisponibles(e.target.checked)}
-            />
-            Solo disponibles
-          </label>
         </div>
       </div>
 

@@ -5,7 +5,14 @@ import { cookies } from "next/headers";
 import { ApiError, apiAuth } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
 
-export type ItemCheckout = { producto_comercial_id: string; cantidad: number };
+export type ItemCheckout = {
+  producto_comercial_id: string;
+  cantidad: number;
+  /** Cantidad por unidad del producto. */
+  extras?: { producto_comercial_id: string; cantidad: number }[];
+  /** Los sabores elegidos (Mitad x Mitad). */
+  valores_variante_ids?: string[];
+};
 
 export type DatosCheckout = {
   modalidad: "delivery" | "takeout";
@@ -30,6 +37,8 @@ export type PedidoResultado = {
   modalidad: string;
   sucursal_id: string | null;
   medio_pago: string;
+  // Solo con Izipay: `pendiente` lleva a la pantalla de pago.
+  pago_estado: "pendiente" | "aprobado" | "rechazado" | null;
   total_estimado: string;
   costo_delivery_estimado: string | null;
   eta_min: number | null;
@@ -75,6 +84,8 @@ export async function cotizarPedido(datos: {
   sucursal_id?: string;
   ubicacion_lat?: string;
   ubicacion_lng?: string;
+  // Lo que hay en el carrito: el estimado depende de qué se pide.
+  items?: { producto_comercial_id: string; cantidad: number }[];
 }): Promise<Cotizacion | null> {
   try {
     return await apiAuth<Cotizacion>("/api/v1/storefront/publico/pedidos/cotizar", {

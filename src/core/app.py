@@ -48,6 +48,7 @@ from src.modules.storefront.api import error_handlers as storefront_error_handle
 from src.modules.storefront.api.cuentas_routers import router as storefront_cuentas_router
 from src.modules.storefront.api.publico_routers import router as storefront_publico_router
 from src.modules.storefront.api.routers import router as storefront_router
+from src.modules.storefront.api.webhooks_routers import router as storefront_webhooks_router
 from src.modules.storefront.application import listeners as storefront_listeners
 from src.modules.supervision.api.routers import router as supervision_router
 from src.modules.users.api import error_handlers as users_error_handlers
@@ -388,6 +389,7 @@ def create_app() -> FastAPI:
     # restaurante loguea como personal del ERP (ADR-103). Rate limit por IP,
     # nunca escribe.
     app.include_router(storefront_publico_router, prefix="/api/v1")
+    app.include_router(storefront_webhooks_router, prefix="/api/v1")
     app.include_router(marketing_webhook_router, prefix="/api/v1")
     app.include_router(sync_router, prefix="/api/v1")
     app.include_router(reports_router, prefix="/api/v1")

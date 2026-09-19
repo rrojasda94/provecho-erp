@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -14,7 +15,12 @@ import {
 import { confirmarPedido, cotizarPedido, type Cotizacion } from "./actions";
 
 export type SucursalOpcion = { id: string; nombre: string; direccion: string | null };
-export type Perfil = { nombres: string; apellidos: string; telefono: string | null };
+export type Perfil = {
+  nombres: string;
+  apellidos: string;
+  telefono: string | null;
+  debe_cambiar_clave?: boolean;
+};
 export type Direccion = {
   id: string;
   etiqueta: string | null;
@@ -147,7 +153,10 @@ export function CheckoutCliente({
   const [direccionTexto, setDireccionTexto] = useState("");
   const [nombre, setNombre] = useState(perfil ? `${perfil.nombres} ${perfil.apellidos}` : "");
   const [telefono, setTelefono] = useState(perfil?.telefono ?? "");
-  const [medioPago, setMedioPago] = useState<MedioPago>("efectivo");
+  // El efectivo es para quien tiene cuenta (RN-WEB-013): un invitado arranca
+  // en Izipay y, si elige efectivo, se le invita a registrarse.
+  const [medioPago, setMedioPago] = useState<MedioPago>(perfil ? "efectivo" : "izipay");
+  const efectivoSinCuenta = medioPago === "efectivo" && !perfil;
   const [numeroDocumento, setNumeroDocumento] = useState("");
   const [razonSocial, setRazonSocial] = useState("");
   const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null);
@@ -157,19 +166,25 @@ export function CheckoutCliente({
 
   const total = useMemo(() => totalDelCarrito(lineas), [lineas]);
 
+  const itemsCotizar = useMemo(
+    () => lineas.map((l) => ({ producto_comercial_id: l.productoComercialId, cantidad: l.cantidad })),
+    [lineas],
+  );
+
   useEffect(() => {
     const promesa =
       modalidad === "takeout" && sucursalId
-        ? cotizarPedido({ modalidad: "takeout", sucursal_id: sucursalId })
+        ? cotizarPedido({ modalidad: "takeout", sucursal_id: sucursalId, items: itemsCotizar })
         : modalidad === "delivery" && ubicacion.coords
           ? cotizarPedido({
               modalidad: "delivery",
               ubicacion_lat: ubicacion.coords.lat,
               ubicacion_lng: ubicacion.coords.lng,
+              items: itemsCotizar,
             })
           : Promise.resolve(null);
     promesa.then(setCotizacion);
-  }, [modalidad, sucursalId, ubicacion.coords]);
+  }, [modalidad, sucursalId, ubicacion.coords, itemsCotizar]);
 
   function elegirDireccionGuardada(d: Direccion) {
     setDireccionTexto(d.direccion);
@@ -189,6 +204,8 @@ export function CheckoutCliente({
       items: lineas.map((l) => ({
         producto_comercial_id: l.productoComercialId,
         cantidad: l.cantidad,
+        extras: l.extras.map((e) => ({ producto_comercial_id: e.id, cantidad: e.cantidad })),
+        valores_variante_ids: l.valores.map((v) => v.id),
       })),
       nombre_contacto: nombre,
       telefono_contacto: telefono,
@@ -206,7 +223,9 @@ export function CheckoutCliente({
     }
     vaciarCarrito();
     const token = resultado.pedido.token_acceso ?? "";
-    router.push(`/pedido/${resultado.pedido.id}?token=${encodeURIComponent(token)}`);
+    // Con Izipay el pedido espera el pago: primero la pantalla de cobro.
+    const cobro = resultado.pedido.pago_estado === "pendiente" ? "/pago" : "";
+    router.push(`/pedido/${resultado.pedido.id}${cobro}?token=${encodeURIComponent(token)}`);
   }
 
   if (lineas.length === 0) {
@@ -331,6 +350,15 @@ export function CheckoutCliente({
             </button>
           ))}
         </div>
+        {efectivoSinCuenta && (
+          <p className="rounded border-2 border-rojo bg-crema-2 px-3 py-2 text-sm">
+            Para pagar en efectivo necesitas una cuenta: así podemos responder por tu pedido.{" "}
+            <Link href="/cuenta/registro" className="font-bold text-verde underline">
+              Regístrate (tu carrito se guarda)
+            </Link>{" "}
+            o paga con Izipay.
+          </p>
+        )}
       </section>
 
       <div className="flex items-center justify-between border-t-2 border-negro pt-4">
@@ -344,7 +372,7 @@ export function CheckoutCliente({
 
       <button
         type="button"
-        disabled={enviando || !nombre || !telefono}
+        disabled={enviando || !nombre || !telefono || efectivoSinCuenta}
         onClick={confirmar}
         className="sombra-dura rounded bg-verde px-4 py-3 font-bold uppercase text-negro hover:bg-verde-hover disabled:opacity-50"
       >

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 
 import { ESTADO_INICIAL } from "@/lib/estado-formulario";
@@ -25,6 +26,9 @@ export function LoginForm() {
         {pendiente ? "Ingresando..." : "Ingresar"}
       </button>
       {estado.error && <p className="text-sm text-rojo">{estado.error}</p>}
+      <Link href="/cuenta/recuperar" className="text-center text-xs text-humo underline">
+        ¿Olvidaste tu contraseña?
+      </Link>
     </form>
   );
 }

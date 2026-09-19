@@ -15,7 +15,7 @@ from src.core.rate_limit import rate_limit
 from src.modules.storefront.api import cuentas_schemas as schemas
 from src.modules.storefront.api.deps import get_cuenta_actual, get_db
 from src.modules.storefront.api.error_handlers import http_exception
-from src.modules.storefront.application import auth, direcciones, favoritos
+from src.modules.storefront.application import auth, direcciones, favoritos, recuperacion
 from src.modules.storefront.application.errors import (
     CredencialesInvalidas,
     CuentaBloqueada,
@@ -30,6 +30,9 @@ router = APIRouter(prefix="/storefront/cuentas", tags=["storefront"])
 _limite_registro = rate_limit("storefront_cuenta_registro", 10, 3600)
 _limite_login = rate_limit("storefront_cuenta_login", 10, 60)
 _limite_lectura = rate_limit("storefront_cuenta_lectura", 120, 3600)
+# Recuperar clave manda un correo: tope chico por IP para que no sirva de
+# ametralladora de correos a un tercero.
+_limite_recuperar = rate_limit("storefront_cuenta_recuperar", 5, 3600)
 
 
 def _ubicacion(body) -> dict:
@@ -44,6 +47,7 @@ def _cuenta_out(cuenta: StorefrontCuenta) -> dict:
         "fecha_nacimiento": cuenta.fecha_nacimiento,
         "tiene_password": cuenta.password_hash is not None,
         "tiene_google": cuenta.google_sub is not None,
+        "debe_cambiar_clave": cuenta.debe_cambiar_clave,
     }
 
 
@@ -116,6 +120,44 @@ def refresh(
         raise http_exception(e) from e
     session.commit()
     return tokens
+
+
+@router.post("/recuperar", status_code=202)
+def recuperar_clave(
+    body: schemas.RecuperarIn,
+    _=Depends(_limite_recuperar),
+    session=Depends(get_db),
+):
+    """Manda el enlace si el correo tiene cuenta. Siempre responde igual."""
+    recuperacion.solicitar_recuperacion(session, email=body.email)
+    session.commit()
+    return {"ok": True}
+
+
+@router.post("/restablecer", status_code=204)
+def restablecer_clave(
+    body: schemas.RestablecerIn,
+    _=Depends(_limite_login),
+    session=Depends(get_db),
+):
+    try:
+        recuperacion.restablecer_clave(session, token=body.token, password=body.password)
+    except TokenInvalido as e:
+        raise http_exception(e) from e
+    session.commit()
+
+
+@router.patch("/me/clave", status_code=204)
+def cambiar_clave(
+    body: schemas.CambiarClaveIn,
+    cuenta: StorefrontCuenta = Depends(get_cuenta_actual),
+    _=Depends(_limite_login),
+    session=Depends(get_db),
+):
+    recuperacion.cambiar_clave(
+        session, cuenta=cuenta, clave_actual=body.clave_actual, clave_nueva=body.clave_nueva
+    )
+    session.commit()
 
 
 @router.post("/logout", status_code=204)

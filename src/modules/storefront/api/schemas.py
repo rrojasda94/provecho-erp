@@ -58,6 +58,30 @@ class FotoOut(BaseModel):
 EntidadFoto = Literal["producto", "ingrediente"]
 
 
+# --- Atención al cliente (ERP: `/web/clientes`) ---
+class ClienteWebOut(BaseModel):
+    """Una cuenta del sitio vista por el personal: datos de contacto, nunca la
+    clave ni su hash."""
+
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    email: str
+    nombres: str
+    apellidos: str
+    telefono: str | None = None
+    numero_documento: str | None = None
+    tiene_password: bool = False
+    tiene_google: bool = False
+    debe_cambiar_clave: bool = False
+    created_at: datetime
+
+
+class ClaveTemporalOut(BaseModel):
+    """Se muestra una sola vez a quien atiende: no queda guardada en claro."""
+
+    clave_temporal: str
+
+
 # --- Horario estructurado (ver data-model.md) ---
 class HorarioAtencion(RootModel[dict[str, list[tuple[str, str]]]]):
     """`{"lun": [["11:00","23:00"]], ...}`. No se valida a nivel de tipo si
@@ -83,12 +107,47 @@ class IngredienteResumenOut(BaseModel):
     nombre: str
 
 
+class ExtraPublicoOut(BaseModel):
+    """Un extra que se puede sumar a la línea. `precio` es por unidad del
+    extra; `maximo` el tope por unidad del producto; si pertenece a un grupo,
+    `grupo_minimo`/`grupo_maximo` dicen cuántos hay que elegir (un sabor
+    obligatorio es un grupo con mínimo 1)."""
+
+    id: uuid.UUID
+    nombre: str
+    precio: Decimal
+    maximo: int | None = None
+    grupo_id: uuid.UUID | None = None
+    grupo_nombre: str | None = None
+    grupo_minimo: int = 0
+    grupo_maximo: int | None = None
+
+
+class ValorAtributoPublicoOut(BaseModel):
+    id: uuid.UUID
+    nombre: str
+    precio_extra: Decimal
+
+
+class AtributoPublicoOut(BaseModel):
+    """Algo que hay que elegir una vez (una mitad de la Mitad x Mitad)."""
+
+    id: uuid.UUID
+    nombre: str
+    display: str | None = None
+    valores: list[ValorAtributoPublicoOut] = []
+
+
 class VarianteCartaPublicaOut(BaseModel):
     id: uuid.UUID
     nombre: str
     precio: Decimal
     disponible: bool
     ingredientes: list[IngredienteResumenOut] = []
+    # Solo en el detalle del producto (`/productos/{id}`), no en `/carta`.
+    extras: list[ExtraPublicoOut] = []
+    atributos: list[AtributoPublicoOut] = []
+    exclusiones: list[tuple[uuid.UUID, uuid.UUID]] = []
 
 
 class ProductoCartaPublicaOut(BaseModel):
@@ -101,6 +160,11 @@ class ProductoCartaPublicaOut(BaseModel):
     disponible: bool
     ingredientes: list[IngredienteResumenOut] = []
     variantes: list[VarianteCartaPublicaOut] = []
+    # Las de un producto sin presentaciones (con presentaciones van en cada
+    # una). Solo en el detalle.
+    extras: list[ExtraPublicoOut] = []
+    atributos: list[AtributoPublicoOut] = []
+    exclusiones: list[tuple[uuid.UUID, uuid.UUID]] = []
 
 
 class CategoriaCartaOut(BaseModel):

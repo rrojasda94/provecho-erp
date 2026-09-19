@@ -16,6 +16,7 @@ export type Perfil = {
   apellidos: string;
   email: string;
   telefono: string | null;
+  debe_cambiar_clave?: boolean;
 };
 
 export type Direccion = {

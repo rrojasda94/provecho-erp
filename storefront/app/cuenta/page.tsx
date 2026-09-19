@@ -21,6 +21,9 @@ export default async function CuentaPage() {
     }),
   ]);
 
+  // Una clave temporal de atención al cliente se cambia antes de seguir.
+  if (perfil.debe_cambiar_clave) redirect("/cuenta/cambiar-clave");
+
   return (
     <CuentaCliente
       perfil={perfil}

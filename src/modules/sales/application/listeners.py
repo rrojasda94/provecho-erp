@@ -156,6 +156,27 @@ def _medio_pago_izipay(session, sucursal_id: uuid.UUID) -> uuid.UUID:
     return creado.id
 
 
+def _item_de_pedido_web(i: dict) -> dict:
+    """Una línea del pedido web como la espera `crear_venta`: sabores como
+    `valores_variante_ids` y cada extra con su id como UUID, igual que las manda
+    el PDV. Sin opciones, la línea es la de siempre (producto + cantidad)."""
+    item: dict = {
+        "producto_comercial_id": uuid.UUID(i["producto_comercial_id"]),
+        "cantidad": i["cantidad"],
+    }
+    if i.get("valores_variante_ids"):
+        item["valores_variante_ids"] = i["valores_variante_ids"]
+    if i.get("extras"):
+        item["extras"] = [
+            {
+                "producto_comercial_id": uuid.UUID(e["producto_comercial_id"]),
+                "cantidad": e["cantidad"],
+            }
+            for e in i["extras"]
+        ]
+    return item
+
+
 def _cliente_del_pedido_web(session, payload: dict) -> uuid.UUID | None:
     """El cliente de la venta: el de la cuenta si el comprador iba logueado; si
     no, el que sale de su teléfono (un invitado). Sin esto el repartidor no ve
@@ -204,8 +225,8 @@ def on_pedido_web_confirmado(payload: dict) -> None:
     Efectivo: la venta queda `orden` y se cobra al entregar/recoger, como
     cualquier delivery telefónico — no hay pago que registrar acá.
 
-    Izipay: se cobra de inmediato contra la pasarela activa (`IzipayFake`
-    hoy, aprueba siempre) y se registra el pago **sin exigir caja abierta**
+    Izipay: este evento llega recién cuando el webhook de la pasarela aprobó
+    el pago (RN-WEB-016) y acá solo se registra el cobro **sin exigir caja abierta**
     — excepción explícita a RN-POS-005/ADR-025 documentada en ADR-105: en
     delivery/recojo web alguien SÍ cobra en el momento de la entrega (el
     repartidor o el mostrador), la misma garantía que un cajero, así que la
@@ -238,13 +259,7 @@ def on_pedido_web_confirmado(payload: dict) -> None:
                     modalidad=payload["modalidad"],
                     usuario_id=usuario_id,
                     idempotency_key=payload["idempotency_key"],
-                    items=[
-                        {
-                            "producto_comercial_id": uuid.UUID(i["producto_comercial_id"]),
-                            "cantidad": i["cantidad"],
-                        }
-                        for i in payload["items"]
-                    ],
+                    items=[_item_de_pedido_web(i) for i in payload["items"]],
                     cliente_id=_cliente_del_pedido_web(session, payload),
                     # `referencia_atencion` es String(50); el nombre del
                     # formulario admite 150.
@@ -283,39 +298,31 @@ def on_pedido_web_confirmado(payload: dict) -> None:
                 session.commit()
                 return
 
-            if payload.get("medio_pago") == "izipay":
-                from src.shared.integrations.izipay import pasarela_activa
-
-                intento = pasarela_activa().crear_intento(
-                    monto=venta.total,
-                    moneda="PEN",
-                    referencia=str(venta.id),
-                    medio="izipay",
-                )
-                if intento.estado == "aprobado":
-                    try:
-                        ventas.registrar_pago(
-                            session,
-                            venta_id=venta.id,
-                            medio_pago_id=_medio_pago_izipay(session, venta.sucursal_id),
-                            monto=venta.total,
-                            idempotency_key=f"{payload['idempotency_key']}:pago",
-                            referencia_externa=intento.id_externo,
-                            receptor_num_doc=payload.get("numero_documento"),
-                            receptor_nombre=payload.get("nombre_o_razon_social"),
-                            exigir_caja_abierta=False,
-                        )
-                    except AppError:
-                        # La venta ya existe y sale a cocina igual; el cobro
-                        # se revisa a mano. No se le informa "fallido" al
-                        # sitio por esto — el pedido SÍ se va a preparar.
-                        log.exception(
-                            "No se pudo registrar el pago Izipay de un pedido web",
-                            extra={"venta_id": str(venta.id)},
-                        )
-                # `intento.estado == "pendiente"` (redirección real, no
-                # implementada todavía): la venta queda `orden` y el cobro
-                # se completa cuando exista el webhook de IzipayReal.
+            # Con Izipay la venta se crea DESPUÉS de que la pasarela aprobó el
+            # pago (el webhook dispara este evento), así que acá solo se
+            # registra lo ya cobrado. Sin `pago_id_externo` (efectivo) la
+            # venta queda por cobrar al entregar/recoger.
+            if payload.get("pago_id_externo"):
+                try:
+                    ventas.registrar_pago(
+                        session,
+                        venta_id=venta.id,
+                        medio_pago_id=_medio_pago_izipay(session, venta.sucursal_id),
+                        monto=venta.total,
+                        idempotency_key=f"{payload['idempotency_key']}:pago",
+                        referencia_externa=payload["pago_id_externo"],
+                        receptor_num_doc=payload.get("numero_documento"),
+                        receptor_nombre=payload.get("nombre_o_razon_social"),
+                        exigir_caja_abierta=False,
+                    )
+                except AppError:
+                    # La venta ya existe y sale a cocina igual; el cobro se
+                    # revisa a mano. No se le informa "fallido" al sitio por
+                    # esto — el pedido SÍ se va a preparar.
+                    log.exception(
+                        "No se pudo registrar el pago Izipay de un pedido web",
+                        extra={"venta_id": str(venta.id)},
+                    )
 
             event_bus.publish(
                 "sales.pedido_web_procesado",

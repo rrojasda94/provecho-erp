@@ -189,6 +189,11 @@ export type Producto = {
   es_extra: boolean;
   empaque_id: string | null;
   modalidades_empaque: string[] | null;
+  /** En qué canales se vende; `null` = en todos. */
+  canales: string[] | null;
+  /** Minutos que tarda en salir de cocina; `null` = no se sabe (el sitio usa
+   * su base estándar), `0` = sale al instante. */
+  tiempo_preparacion_min: number | null;
 };
 
 export type ExtraDeProducto = {
@@ -342,6 +347,11 @@ export const catalogoApi = {
       /** Artículo de empaque y en qué modalidades se descuenta (RN-EMP-003). */
       empaque_id: string | null;
       modalidades_empaque: string[] | null;
+      /** `[]` = "todos los canales": `null` no se distingue de "no lo mandé". */
+      canales: string[];
+      tiempo_preparacion_min: number;
+      /** Único modo de volver a "no se sabe" (mismo motivo que `quitar_receta`). */
+      quitar_tiempo_preparacion: boolean;
     }>,
   ) => pedir<Producto>(`/sales/productos/${id}`, { metodo: "PATCH", cuerpo }),
 

@@ -174,6 +174,9 @@ services:
       GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
       GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
       STOREFRONT_IMAGENES_HOST: ${STOREFRONT_IMAGENES_HOST:-}
+      # Client ID de "Ingresar con Google" (no es un secreto). Sin él el botón
+      # no se dibuja: faltaba acá y el `.env` del servidor no llegaba al sitio.
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
     mem_limit: 384m
     depends_on:
       - api

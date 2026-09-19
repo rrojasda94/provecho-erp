@@ -50,12 +50,33 @@ papel. Por eso:
   a `registrar_pago` — se cobra al entregar/recoger, con el flujo normal de
   caja que ya existe (el repartidor o el mostrador lo cobran como cualquier
   delivery telefónico de hoy).
-- **Izipay**: se cobra de inmediato contra la pasarela activa y
+- **Izipay**: se cobra por adelantado contra la pasarela activa y
   `registrar_pago` se llama con `exigir_caja_abierta=False` — excepción
   explícita a ADR-025 §1, ya usada hasta ahora solo para el replay del hub
   (ADR-009). El dinero ya lo tiene la pasarela, no una caja física; exigir
   un turno abierto en el punto de venta `web` (que no tiene cajero delante)
   no protegería nada que Izipay no proteja ya.
+
+> **Enmienda (2026-09-19)**: dos cambios a lo de arriba.
+>
+> 1. **El efectivo exige cuenta** (RN-WEB-013). Un invitado paga solo con
+>    Izipay; si elige efectivo se le avisa y se le invita a registrarse (el
+>    carrito vive en el navegador y se conserva). Motivo: en la práctica
+>    aparecieron pedidos de prueba en efectivo sin nadie identificable a quien
+>    reclamar, y "sin cuenta" era justo lo que el negocio no quería para la
+>    plata contra entrega. Costo aceptado: un invitado sin tarjeta/billetera
+>    no puede pedir por la web hasta registrarse.
+> 2. **Izipay ya no aprueba en el acto.** `IzipayFake` dejaba el cobro
+>    aprobado dentro del propio checkout, sin pantalla de pago y sin webhook —
+>    el tramo más riesgoso del flujo real (esperar a la pasarela, un aviso que
+>    puede llegar dos veces o nunca) no se ejercitaba jamás. Ahora el pedido
+>    queda `pendiente` y la `Venta` nace cuando el webhook aprueba el pago
+>    (RN-WEB-016): así nada llega a cocina sin pagar, y la pantalla de pago
+>    (`/pedido/{id}/pago`), el webhook (`POST /storefront/webhooks/izipay`) y su
+>    idempotencia se prueban de verdad con la pasarela de prueba. Cuando Izipay
+>    entregue credenciales solo cambia `IzipayReal` (`crear_intento` con su
+>    formulario incrustado en esa misma pantalla, `verificar_webhook` con su
+>    firma). Sin credenciales, en producción, Izipay no se ofrece.
 
 `PuntoVenta(canal='web')` conserva `politica_pago='adelantado'` tal cual la
 exige `_validar_canal` — no se tocó esa validación. Lo que cambia es que
@@ -76,9 +97,11 @@ directamente. El flujo:
    mandó el navegador, RN-PRC-003) y crea `storefront_pedido` +
    `storefront_pedido_item` en estado `pendiente`.
 2. Publica `storefront.pedido_web_confirmado` **antes** del commit
-   (`core/events.py`). `sales.application.listeners::
-   on_pedido_web_confirmado` llama a `ventas.crear_venta(canal="web", ...)`
-   y, si el medio es Izipay, a `registrar_pago(...)`.
+   (`core/events.py`) — en efectivo, al confirmar; con Izipay, cuando el
+   webhook aprueba el pago (ver la enmienda del §2). `sales.application.
+   listeners::on_pedido_web_confirmado` llama a `ventas.crear_venta(
+   canal="web", ...)` y, si el evento trae `pago_id_externo`, a
+   `registrar_pago(...)`.
 3. Publica de vuelta `sales.pedido_web_procesado`
    (`{pedido_id, ok, venta_id?, numero_orden?, motivo?}`).
    `storefront.application.listeners::on_pedido_web_procesado` marca el
@@ -114,6 +137,19 @@ ETA es `base + carga × minutos_por_pedido` (`STOREFRONT_ETA_*`), con 15
 minutos de colchón en el máximo del rango — mismo orden de magnitud que los
 30-45/45-55 min que Charlie's ya cotiza por teléfono.
 
+> **Enmienda (2026-09-19)**: esa fórmula daba el mismo estimado para una
+> botella de agua que para seis pizzas, y contaba como cola toda orden
+> abierta sin límite de tiempo —en staging, pedidos de prueba nunca cerrados
+> dejaron el estimado en 70-80 minutos—. Ahora el ETA sale de lo que se
+> pide: `preparación + cola + viaje` (RN-WEB-011), con el tiempo de
+> preparación cargado por producto en el ERP (`tiempo_preparacion_min`,
+> RN-COM-045), la cola limitada a las últimas 3 horas y solo cuando hay algo
+> que cocinar, y el viaje por km en delivery. `STOREFRONT_ETA_BASE_MINUTOS`
+> pasa a ser el tiempo de un producto sin tiempo cargado. La cotización
+> recibe el carrito (`items`) para poder calcularlo. Costo aceptado: el
+> negocio tiene que cargar el tiempo de cada producto; mientras no lo haga,
+> el estimado se comporta como antes (base estándar).
+
 Recojo: el cliente elige el local (`majambo.md` §3.1: "recojo = el cliente
 decide"), y solo se calcula el ETA, no la distancia ni el costo.
 
@@ -141,14 +177,23 @@ explícita, no como "ya funciona".
 
 ### 6. Extras y Mitad x Mitad quedan fuera de este slice
 
-El carrito de PR3 es "un producto/tamaño (ya un `producto_comercial_id`
+> **Corregido (2026-09-19)**: este apartado estaba mal diagnosticado y está
+> superado. `sales` **sí** tenía el concepto —extras como productos
+> (`producto_comercial_extra` + `producto_opcion_grupo`, ADR-018) y sabores como
+> atributos (`atributo` → `producto_atributo_valor`, ADR-055/056/063), los
+> mismos que usa el PDV—: lo que faltaba era enchufarlo al sitio, y `carta_publica`
+> lo recortaba a propósito. Consecuencia real, peor que "queda fuera": un
+> producto con sabores obligatorios **no se podía pedir por la web** (`crear_venta`
+> lo rechazaba con "falta elegir…"). Ahora la línea del carrito lleva extras y
+> sabores (RN-WEB-017); se ofrecen desde el detalle del producto, se validan antes
+> de cobrar y viajan por el evento hasta `crear_venta` como lo hace el PDV. No se
+> inventó ningún modelo de datos: solo dos columnas JSON en
+> `storefront_pedido_item` para mostrar lo elegido en `/pedido/{id}`.
+
+El carrito de PR3 era "un producto/tamaño (ya un `producto_comercial_id`
 propio, por variante) + una cantidad". Extras (máx. 3) y Mitad x Mitad de
-la carta de Charlie's (`brand-voice-guidelines.md`, `majambo.md` §3.1.8)
-necesitarían un concepto de extra/combo que hoy no existe en `sales` —
-construirlo a ciegas dentro de este PR, sin que el negocio lo valide,
-habría sido inventar un modelo de datos nuevo sin encargo. Se documenta
-como deuda con la forma del hueco (qué falta en `sales`, no cómo se
-resuelve).
+la carta de Charlie's (`brand-voice-guidelines.md`, `majambo.md` §3.1.8) se
+habían dejado afuera creyendo que exigían un concepto nuevo en `sales`.
 
 ## Consecuencias
 

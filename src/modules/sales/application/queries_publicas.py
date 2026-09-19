@@ -823,9 +823,14 @@ def carta_publica(
 ) -> list[dict]:
     """La carta que ve un cliente del sitio público: mismo motor de precio
     que el PDV (`precios.carta`), recortada a lo que RN-WEB-001 permite
-    mostrar —sin extras, atributos ni exclusiones, que son detalle de
-    configuración del PDV— y enriquecida con `descripcion`/`receta_id` por
-    nodo, que `precios.carta` no trae porque el PDV nunca los necesitó.
+    mostrar y enriquecida con `descripcion`/`receta_id` por nodo, que
+    `precios.carta` no trae porque el PDV nunca los necesitó.
+
+    Trae también lo que hace falta para **vender** un producto con opciones:
+    los extras (con su precio, tope y grupo), los atributos con sus valores —los
+    sabores de la Mitad x Mitad— y los pares excluidos. Antes se recortaban por
+    ser "configuración del PDV", y un producto con sabores obligatorios no se
+    podía pedir por la web: `crear_venta` lo rechazaba por "falta elegir".
     """
     # Import diferido: `precios` importa (transitivamente, vía
     # `inventory.application.recetas`) este mismo módulo — un import al
@@ -861,6 +866,9 @@ def carta_publica(
             "receta_id": producto.receta_id if producto else None,
             "precio_unitario": item["precio_unitario"],
             "stock_bajo": item["stock_bajo"],
+            "extras": item.get("extras", []),
+            "atributos": item.get("atributos", []),
+            "exclusiones": item.get("exclusiones", []),
         }
 
     return [
@@ -983,6 +991,45 @@ def carga_activa_por_sucursal(
         .group_by(Venta.sucursal_id)
     )
     return dict(filas.all())
+
+
+def tiempos_preparacion(
+    session: Session, producto_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, int | None]:
+    """Minutos de preparación de cada producto (`tiempo_preparacion_min`).
+    Una variante sin tiempo propio hereda el de su padre. `None` = no se sabe
+    (distinto de `0`, que es "sale al instante"). Lo usa el sitio de marca
+    para estimar la espera de un pedido según lo que lleva."""
+    if not producto_ids:
+        return {}
+    productos = {
+        p.id: p
+        for p in session.scalars(
+            select(ProductoComercial).where(ProductoComercial.id.in_(list(producto_ids)))
+        )
+    }
+    padres_ids = {
+        p.producto_padre_id
+        for p in productos.values()
+        if p.tiempo_preparacion_min is None and p.producto_padre_id is not None
+    }
+    padres = (
+        {
+            p.id: p
+            for p in session.scalars(
+                select(ProductoComercial).where(ProductoComercial.id.in_(padres_ids))
+            )
+        }
+        if padres_ids
+        else {}
+    )
+    resultado: dict[uuid.UUID, int | None] = {}
+    for producto_id, p in productos.items():
+        tiempo = p.tiempo_preparacion_min
+        if tiempo is None and p.producto_padre_id in padres:
+            tiempo = padres[p.producto_padre_id].tiempo_preparacion_min
+        resultado[producto_id] = tiempo
+    return resultado
 
 
 def puntos_venta_web_de_sucursales(

@@ -1,4 +1,4 @@
-import { Anton, Archivo } from "next/font/google";
+import localFont from "next/font/local";
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -11,16 +11,19 @@ import { RevelarObservador } from "@/components/revelar-observador";
 
 import "./globals.css";
 
-const anton = Anton({
-  subsets: ["latin"],
-  weight: "400",
-  variable: "--fuente-display-google",
+// Tusker Grotesk, la tipografía principal del brandbook (p. 47-49): el corte 4500
+// Medium para el texto y el 5800 Super para el énfasis y los títulos. Se sirven
+// desde el propio sitio (`next/font/local`): sin pedirle nada a Google, con
+// precarga y sin salto de diseño. Isidora Black —la otra fuente de la marca, para
+// titulares— todavía no llegó: los títulos usan la Super de Tusker hasta entonces.
+const tusker = localFont({
+  src: [
+    { path: "./fonts/TuskerGrotesk-4500Medium.woff2", weight: "400 500", style: "normal" },
+    { path: "./fonts/TuskerGrotesk-5800Super.woff2", weight: "600 900", style: "normal" },
+  ],
+  variable: "--fuente-tusker",
   display: "swap",
-});
-const archivo = Archivo({
-  subsets: ["latin"],
-  variable: "--fuente-cuerpo-google",
-  display: "swap",
+  fallback: ["Arial Narrow", "system-ui", "sans-serif"],
 });
 
 const TITULO = "Charlie's Pizzas — Pizza de barrio en Tarapoto";
@@ -38,13 +41,11 @@ export const metadata: Metadata = {
     title: TITULO,
     description: DESCRIPCION,
     url: URL_SITIO,
-    images: ["/marcas/logo.png"],
   },
   twitter: {
     card: "summary_large_image",
     title: TITULO,
     description: DESCRIPCION,
-    images: ["/marcas/logo.png"],
   },
 };
 
@@ -80,7 +81,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     "@type": "Restaurant",
     name: "Charlie's Pizzas",
     url: URL_SITIO,
-    image: `${URL_SITIO}/marcas/logo.png`,
+    image: `${URL_SITIO}/marcas/logo-vertical.png`,
     servesCuisine: "Pizza",
     priceRange: "S/",
     ...(contacto?.whatsapp ? { telephone: contacto.whatsapp } : {}),
@@ -96,7 +97,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   };
 
   return (
-    <html lang="es" className={`${anton.variable} ${archivo.variable}`}>
+    <html lang="es" className={tusker.variable}>
       <body>
         {/* Restaurant, no LocalBusiness por sucursal: cada local con su
             dirección y horario vive en el JSON-LD de `/locales`, no acá —
@@ -109,7 +110,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <RevelarObservador />
         <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b-4 border-negro bg-crema px-4 py-3 sm:px-8">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/marcas/logo.png" alt="Charlie's Pizzas" width={140} height={47} priority />
+            <Image
+              src="/marcas/logo-horizontal.png"
+              alt="Charlie's Pizzas"
+              width={545}
+              height={47}
+              priority
+              className="h-5 w-auto sm:h-6"
+            />
           </Link>
           <nav className="flex flex-wrap items-center gap-4 text-sm font-bold uppercase">
             {NAV.map((n) => (

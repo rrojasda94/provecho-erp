@@ -93,6 +93,41 @@ export async function loginGoogleAction(datos: {
   redirect("/cuenta");
 }
 
+/** Pide el enlace para elegir una clave nueva. La API contesta lo mismo
+ * exista o no el correo, y acá también: nunca se dice si tiene cuenta. */
+export async function recuperarClaveAction(_previo: Estado, formData: FormData): Promise<Estado> {
+  try {
+    await apiAuth("/api/v1/storefront/cuentas/recuperar", {
+      metodo: "POST",
+      cuerpo: { email: texto(formData, "email") },
+    });
+  } catch (e) {
+    return { error: mensajeDeError(e, "No se pudo enviar el enlace."), ok: false };
+  }
+  return { error: "", ok: true };
+}
+
+/** Elige la clave nueva con el enlace del correo (el `token` viaja oculto en
+ * el formulario). Al terminar, a ingresar: no se abre sesión sola. */
+export async function restablecerClaveAction(
+  _previo: Estado,
+  formData: FormData,
+): Promise<Estado> {
+  const password = texto(formData, "password");
+  if (password !== texto(formData, "confirmar")) {
+    return { error: "Las dos claves no coinciden.", ok: false };
+  }
+  try {
+    await apiAuth("/api/v1/storefront/cuentas/restablecer", {
+      metodo: "POST",
+      cuerpo: { token: texto(formData, "token"), password },
+    });
+  } catch (e) {
+    return { error: mensajeDeError(e, "No se pudo cambiar la clave."), ok: false };
+  }
+  redirect("/cuenta/ingresar?clave=ok");
+}
+
 export async function logoutAction(): Promise<void> {
   const store = await cookies();
   const refresh = store.get(COOKIE_REFRESH)?.value;
@@ -117,6 +152,25 @@ async function token(): Promise<string> {
   const valor = store.get(COOKIE_TOKEN)?.value;
   if (!valor) redirect("/cuenta/ingresar");
   return valor;
+}
+
+/** Cambio de clave de quien ya está adentro — o forzado, tras un restablecimiento
+ * de atención al cliente. */
+export async function cambiarClaveAction(_previo: Estado, formData: FormData): Promise<Estado> {
+  const nueva = texto(formData, "clave_nueva");
+  if (nueva !== texto(formData, "confirmar")) {
+    return { error: "Las dos claves no coinciden.", ok: false };
+  }
+  try {
+    await apiAuth("/api/v1/storefront/cuentas/me/clave", {
+      token: await token(),
+      metodo: "PATCH",
+      cuerpo: { clave_actual: texto(formData, "clave_actual") || undefined, clave_nueva: nueva },
+    });
+  } catch (e) {
+    return { error: mensajeDeError(e, "No se pudo cambiar la clave."), ok: false };
+  }
+  redirect("/cuenta");
 }
 
 export async function agregarDireccionAction(_previo: Estado, formData: FormData): Promise<Estado> {

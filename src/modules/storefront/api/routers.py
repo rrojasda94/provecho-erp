@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from src.modules.storefront.api import schemas
-from src.modules.storefront.application import contenido, fotos
+from src.modules.storefront.application import atencion, contenido, fotos
 from src.modules.users.api.deps import get_db, require_permission
 from src.modules.users.infrastructure.models import Usuario
 
@@ -54,6 +54,41 @@ def guardar_contenido(
         "updated_by": fila.updated_by,
         "updated_at": fila.updated_at,
     }
+
+
+# --- Atención al cliente: cuentas del sitio ------------------------------------
+@router.get("/clientes", response_model=list[schemas.ClienteWebOut])
+def listar_clientes_web(
+    q: str | None = Query(default=None, max_length=100),
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    return [
+        {
+            **{c: getattr(cuenta, c) for c in schemas.ClienteWebOut.model_fields
+               if hasattr(cuenta, c)},
+            "tiene_password": cuenta.password_hash is not None,
+            "tiene_google": cuenta.google_sub is not None,
+        }
+        for cuenta in atencion.listar(session, q=q)
+    ]
+
+
+@router.post(
+    "/clientes/{cuenta_id}/restablecer-clave", response_model=schemas.ClaveTemporalOut
+)
+def restablecer_clave_de_cliente(
+    cuenta_id: uuid.UUID,
+    actor: Usuario = Depends(require_permission(EDITAR)),
+    session: Session = Depends(get_db),
+):
+    """Para quien no tiene un correo al que llegue el enlace. Devuelve la clave
+    temporal **una sola vez**; la cuenta queda obligada a cambiarla."""
+    clave = atencion.restablecer_por_atencion(
+        session, cuenta_id=cuenta_id, actor_id=actor.id
+    )
+    session.commit()
+    return {"clave_temporal": clave}
 
 
 # --- Fotos de catálogo --------------------------------------------------------

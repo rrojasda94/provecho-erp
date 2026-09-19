@@ -345,6 +345,8 @@ class Settings(BaseSettings):
     # lista de precios general (`canal=None`) sigue aplicando igual
     # (`especificidad_lista`), así que cambiar esto no rompe nada mientras
     # no se cree una lista específica para otro canal.
+    # De dónde cuelgan los enlaces que se mandan por correo (recuperar clave).
+    storefront_sitio_url: str = "http://localhost:3000"
     storefront_canal: str = "web"
     storefront_modalidad: str = "delivery"
     # Base del enlace de postulación pública (ADR-087) que arma
@@ -357,8 +359,11 @@ class Settings(BaseSettings):
     # por `.env`, no `parametro_empresa` todavía — a diferencia de la tarifa
     # de delivery, es una primera versión y se prefirió no sumarle el paso de
     # aprobación de Gerencia antes de tener un solo pedido real que mirar.
+    # Base para un producto sin `tiempo_preparacion_min` cargado (RN-WEB-011).
     storefront_eta_base_minutos: int = 30
     storefront_eta_minutos_por_pedido: int = 5
+    # Trayecto de un delivery, por km de distancia al local.
+    storefront_eta_minutos_por_km: int = 3
     # A partir de cuántos pedidos `orden` una sucursal se considera saturada:
     # la asignación automática de local prueba otra candidata dentro del
     # radio de delivery antes de insistir en la más cercana (RN-WEB-010).

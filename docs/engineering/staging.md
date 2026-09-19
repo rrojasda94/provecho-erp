@@ -204,6 +204,15 @@ durante una hora. `dig +short <dominio>` antes de tocar nada.
       `STOREFRONT_MARCA_ID` (y el resto de `STOREFRONT_*`) en el `.env` del
       servidor, agregar el dominio a la lista de referrers de
       `GOOGLE_MAPS_BROWSER_KEY` (`integraciones-google.md`)
+- [ ] **«Ingresar con Google» y recuperar clave en el sitio de marca**:
+      crear el Client ID de OAuth (`integraciones-google.md` §6) y ponerlo en el
+      `.env` del servidor como `GOOGLE_OAUTH_CLIENT_ID`; poner
+      `STOREFRONT_SITIO_URL=https://charlies.majambo.com.pe` (de ahí salen los
+      enlaces de los correos: sin él apuntarían a `localhost`); y, para que el
+      correo de recuperación salga, los `SMTP_*`. Sin SMTP la recuperación por
+      correo no envía nada —el log lo dice— y se atiende desde el ERP
+      (`/web/clientes`). Reiniciar con `docker compose up -d` (sin filtro de
+      servicio).
 
 ## Comandos de referencia
 

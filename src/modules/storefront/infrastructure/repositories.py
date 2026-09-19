@@ -97,6 +97,16 @@ class RefreshTokenRepo:
         ):
             tok.revocado = True
 
+    def revocar_cuenta(self, cuenta_id: uuid.UUID) -> None:
+        """Cierra todas las sesiones de la cuenta (cambio de clave)."""
+        for tok in self.s.scalars(
+            select(StorefrontRefreshToken).where(
+                StorefrontRefreshToken.cuenta_id == cuenta_id,
+                StorefrontRefreshToken.revocado.is_(False),
+            )
+        ):
+            tok.revocado = True
+
 
 class DireccionRepo:
     def __init__(self, session: Session):
@@ -164,6 +174,11 @@ class PedidoRepo:
     def get_by_idempotency(self, key: str) -> StorefrontPedido | None:
         return self.s.scalar(
             select(StorefrontPedido).where(StorefrontPedido.idempotency_key == key)
+        )
+
+    def get_by_pago_externo(self, id_externo: str) -> StorefrontPedido | None:
+        return self.s.scalar(
+            select(StorefrontPedido).where(StorefrontPedido.pago_id_externo == id_externo)
         )
 
     def get_by_venta(self, venta_id: uuid.UUID) -> StorefrontPedido | None:

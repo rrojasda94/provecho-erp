@@ -1746,6 +1746,25 @@ producción se hace en cocinas de sucursal. Ver
   inventario** (ADR-071): el insumo ya salió del almacén y el plato sigue
   existiendo, solo cambia de cuenta.
 
+- **RN-COM-044** Un producto declara en qué **canales** se vende
+  (`producto_comercial.canales`: `pdv`, `web`, `delivery`, `agente_ia`);
+  **sin valor, en todos**. Una presentación sin canales propios hereda los de
+  su producto. La carta de un canal (`precios.carta`) omite lo que no se
+  vende ahí, y como esa carta es también la lista blanca del checkout web
+  (RN-WEB-012), un producto fuera del canal ni aparece ni se puede pedir
+  armando la petición a mano. Es lo que deja sacar de la web una caja, una
+  propina o cualquier ítem que solo existe en el mostrador, sin tocar las
+  listas de precio. **El kiosko no es un canal de venta**: vende como `pdv`
+  (`punto_venta.canal=kiosko` describe el aparato, no el canal), así que una
+  carta de kiosko distinta de la del mostrador no se puede expresar todavía
+  — ver `docs/roadmap/deuda/modulo-sales.md`.
+- **RN-COM-045** Un producto puede declarar su **tiempo de preparación**
+  (`tiempo_preparacion_min`, 0 a 240): cuánto tarda en salir de cocina. **NULL
+  es "no se sabe"** (el sitio usa su base estándar), **0 es "sale al
+  instante"** (una bebida): no son lo mismo y la pantalla los distingue. Una
+  presentación sin tiempo propio hereda el de su producto. Lo consume el
+  estimado de espera del sitio de marca (RN-WEB-011).
+
 ## Cumplimiento de pedido
 
 Proceso `PROC-OPE-002` ([workflows.md](workflows.md#cumplimiento-de-pedido)),
@@ -2159,7 +2178,9 @@ específicas de la parte **sin JWT**.
   devuelve `empresa_id`/`grupo_id`, costos, datos de `persona` de terceros,
   remuneración, usuarios/proveedores ni cantidades de receta — solo los
   campos enumerados en cada `*PublicoOut`. Ningún endpoint público serializa
-  un modelo ORM directamente.
+  un modelo ORM directamente. Los **extras, sabores (atributos) y pares
+  excluidos** de un producto sí son carta —hacen falta para venderlo, RN-WEB-017—
+  y salen solo en el detalle de cada producto, no en la lista.
 - **RN-WEB-002** Solo se publican promociones (`sales.promocion`) cuya
   columna `canales` incluye `"web"`, vigentes por fecha/hora/día, y cuya
   `marca_id` (si tiene) coincide con `STOREFRONT_MARCA_ID`.
@@ -2186,35 +2207,86 @@ específicas de la parte **sin JWT**.
   con clave (o viceversa) se vincula a la cuenta existente en vez de
   duplicarla — el email verificado por Google es la misma identidad.
 
-- **RN-WEB-009** El checkout web nunca exige cuenta: un invitado (sin
-  `Authorization`) confirma un pedido igual que un cliente logueado, con
+- **RN-WEB-018** **Recuperar la clave por correo.** Quien olvidó su clave pide un
+  enlace con su email; **la respuesta es la misma exista o no la cuenta** (no se
+  le dice a nadie qué correos tienen cuenta). El enlace vale 30 minutos y **una
+  sola vez**: se vuelve inválido apenas cambia la clave, sin guardar nada en
+  una tabla. Al cambiarla se cierran todas las sesiones abiertas de la cuenta y
+  se limpia el bloqueo por intentos. Una cuenta creada solo con Google (sin
+  clave) puede ponerse una por este camino. Tope de 5 pedidos de enlace por
+  hora y por IP, para que no sirva de ametralladora de correos.
+- **RN-WEB-019** **Atención al cliente restablece la clave de quien no tiene un
+  correo al que llegue.** Desde el ERP (`/web/clientes`, `storefront.editar`) se
+  genera una **clave temporal de 8 caracteres**, que se muestra **una sola vez**
+  a quien atiende y no se guarda en claro; se cierran las sesiones de la cuenta
+  y esta queda con `debe_cambiar_clave`: hasta que el cliente elija una propia
+  (con la temporal como clave actual), el sitio no lo deja seguir. Cada
+  restablecimiento queda en la auditoría con quién lo hizo. Cambiar la clave
+  estando adentro exige la actual, salvo una cuenta solo-Google que nunca tuvo.
+- **RN-WEB-009** El checkout web no exige cuenta para comprar: un invitado
+  (sin `Authorization`) confirma un pedido igual que un cliente logueado, con
   nombre/teléfono tecleados en el formulario en vez de leídos del perfil
-  (ADR-105).
+  (ADR-105) — **pero solo puede pagar con Izipay**: el efectivo exige cuenta
+  (RN-WEB-013).
 - **RN-WEB-010** Un pedido de delivery se asigna a la sucursal más cercana
   dentro del radio de delivery (`DELIVERY_DISTANCIA_MAXIMA_KM`) que tenga un
   punto de venta `web` habilitado para esa modalidad, salvo que esté
   saturada (`STOREFRONT_SATURACION_PEDIDOS` pedidos `orden` en curso) y otra
   candidata dentro de radio no lo esté — ahí gana la no saturada. Un
   recojo lo elige el propio cliente, no la asignación automática.
-- **RN-WEB-011** El estimado de espera que ve el cliente es
-  `STOREFRONT_ETA_BASE_MINUTOS + carga × STOREFRONT_ETA_MINUTOS_POR_PEDIDO`,
-  con 15 minutos de colchón en el máximo del rango — nunca un número fijo
-  sin importar cuántos pedidos tenga la sucursal delante. La `carga` cuenta
-  solo las ventas `orden` de las últimas 3 horas: una comanda que nadie
-  cerró (pedido de prueba, olvido del cajero) no es cola de cocina, y
-  contarla dejaba el estimado en 70-80 minutos para siempre.
+- **RN-WEB-011** El estimado de espera que ve el cliente sale **de lo que
+  pide**: `preparación + cola + viaje`. La *preparación* es el mayor
+  `tiempo_preparacion_min` entre sus productos (RN-COM-045; un producto sin
+  tiempo cuenta como `STOREFRONT_ETA_BASE_MINUTOS`); la *cola* es
+  `carga × STOREFRONT_ETA_MINUTOS_POR_PEDIDO`, y **solo cuenta si hay algo
+  que cocinar** (una botella de agua no espera detrás de las pizzas); el
+  *viaje* es, en delivery, `distancia_km × STOREFRONT_ETA_MINUTOS_POR_KM`.
+  Piso de 5 minutos. El máximo del rango suma 15 minutos de colchón si la
+  preparación llega a 20 (pasa por horno) y 5 si no. La `carga` cuenta solo
+  las ventas `orden` de las últimas 3 horas: una comanda que nadie cerró
+  (pedido de prueba, olvido del cajero) no es cola de cocina, y contarla
+  dejaba el estimado en 70-80 minutos para siempre.
 - **RN-WEB-012** El precio del carrito se vuelve a fijar server-side contra
   la carta pública al confirmar (RN-PRC-003): un producto que ya no está
   disponible, o cuyo precio cambió desde que se agregó al carrito, rechaza
   el pedido en vez de cobrar lo que el navegador tenía guardado.
-- **RN-WEB-013** Un pedido pagado en efectivo nace `Venta.estado='orden'`
-  sin ningún pago registrado — se cobra al entregar/recoger, con el flujo de
-  caja normal. Un pedido pagado con Izipay se cobra de inmediato y su pago
-  se registra sin exigir caja abierta en el punto de venta `web` (ADR-105,
-  excepción explícita a ADR-025 §1).
+- **RN-WEB-013** **El efectivo es para quien tiene cuenta**: un pedido que se
+  paga contra entrega necesita alguien a quien reclamar si no se recoge o no
+  se paga, así que un invitado que elige efectivo recibe un aviso que lo invita
+  a registrarse (el carrito se conserva) y la API rechaza el pedido. Un pedido
+  en efectivo nace `Venta.estado='orden'` sin ningún pago registrado — se
+  cobra al entregar/recoger, con el flujo de caja normal. Un pedido con Izipay
+  se cobra por adelantado (RN-WEB-016) y su pago se registra sin exigir caja
+  abierta en el punto de venta `web` (ADR-105, excepción explícita a ADR-025
+  §1).
 - **RN-WEB-014** Todo pedido web es idempotente por `idempotency_key`
   (tecleada por el cliente, generada por el navegador): confirmar dos veces
   con la misma clave devuelve el mismo pedido, nunca lo duplica.
+- **RN-WEB-016** **Un pedido con Izipay no es venta hasta que se paga.** Al
+  confirmarlo queda `pendiente` con `pago_estado='pendiente'` y el cliente ve la
+  pantalla de pago; la `Venta` se crea —y llega a cocina— recién cuando la
+  pasarela avisa por webhook que el cobro se **aprobó**. Si se **rechaza**, el
+  pedido queda `fallido` sin venta. El webhook es idempotente por el id del
+  intento (`pago_id_externo`, único): la pasarela reintenta hasta recibir
+  respuesta y un segundo aviso, o un "aprobado" tardío sobre un pedido ya
+  resuelto, no crea otra venta ni reabre nada. Sin credenciales de Izipay se
+  usa la pasarela de prueba (el cliente aprueba o rechaza en la pantalla de
+  pago); esa vía no existe en producción y allí, sin credenciales, el checkout
+  no ofrece Izipay.
+- **RN-WEB-017** **Una línea del carrito puede llevar extras y sabores, con las
+  mismas reglas que el PDV.** Los extras son productos comerciales que el
+  producto admite (RN-COM-021), con tope por extra y mínimo/máximo por grupo
+  (RN-COM-023); los sabores son atributos de los que se elige **uno por
+  atributo** (las dos mitades de una Mitad x Mitad, RN-COM-040), sin combinar los
+  pares excluidos (RN-COM-038) y con el recargo que declare cada valor
+  (RN-COM-036). La API valida todo esto **antes de cobrar** contra la carta
+  pública —con Izipay el pago va primero y una línea que `sales` rechazara
+  después dejaría al cliente con el pago hecho y sin pedido— y el precio nunca
+  viene del navegador. Regla propia de la marca, no del ERP: **como mucho 3
+  extras de pago por producto**; el sabor de un grupo obligatorio forma parte de
+  la pizza y no cuenta. El total del pedido es `(precio + recargo de sabores +
+  extras) × cantidad` por línea, el mismo número que `sales` cobra al crear la
+  venta. La misma pizza con otros sabores o extras es otra línea del carrito.
 - **RN-WEB-015** Un invitado sin cuenta consulta su propio pedido con el
   `token_acceso` que recibió al confirmarlo (`GET /storefront/publico/
   pedidos/{id}?token=...`) — nunca con su número de pedido solo, que no es

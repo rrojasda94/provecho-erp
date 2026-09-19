@@ -457,7 +457,10 @@ erDiagram
   se elimina), margen_contribucion (calculado; revisado por comercial/
   contabilidad para pricing), empaque_id (FK articulo tipo=empaque,
   nullable), modalidades_empaque (array `mesa`|`takeout`|`delivery` — en
-  cuáles se descuenta stock del empaque, RN-EMP-003). Precios en
+  cuáles se descuenta stock del empaque, RN-EMP-003), **canales** (array de
+  `pdv`|`web`|`delivery`|`agente_ia`, NULL = todos, RN-COM-044),
+  **tiempo_preparacion_min** (entero 0-240, NULL = no se sabe, RN-COM-045).
+  Precios en
   **lista_precio** / **precio** (por sucursal/canal/modalidad de consumo,
   RN-MDC-003). Puede formar parte de uno o más **combo** (N:N).
 - ~~**modificador**~~ / ~~**variante_producto**~~: **reemplazados por
@@ -2185,7 +2188,7 @@ eventos y por qué el efectivo no llama a `registrar_pago` de inmediato.
 | Tabla | Columnas propias | Notas |
 |---|---|---|
 | `storefront_pedido` | `marca_id` (FK), `cuenta_id` (FK, nullable — invitado), `nombre_contacto`, `telefono_contacto`, `email_contacto`, `modalidad` (`takeout`\|`delivery`), `sucursal_id` (FK, nullable hasta asignarse), `direccion_entrega`, `medio_pago` (`efectivo`\|`izipay`), `numero_documento`, `nombre_o_razon_social`, `total_estimado`, `costo_delivery_estimado`, `distancia_km_estimada`, `eta_min`, `eta_max`, `estado` (`pendiente`\|`confirmado`\|`fallido`), `fallo_motivo`, `venta_id` (FK `venta`, único, nullable), `numero_orden`, `idempotency_key` (único), `token_acceso` (único) + `UbicacionMixin` (destino del delivery) | `token_acceso` deja que un invitado sin cuenta consulte su pedido sin login |
-| `storefront_pedido_item` | `pedido_id` (FK), `producto_comercial_id` (FK), `nombre_congelado`, `cantidad`, `precio_unitario_congelado` | Foto del checkout para mostrar; el precio real lo vuelve a fijar `sales` al confirmar (RN-PRC-003) |
+| `storefront_pedido_item` | `pedido_id` (FK), `producto_comercial_id` (FK), `nombre_congelado`, `cantidad`, `precio_unitario_congelado` (con el recargo de los sabores), `extras` (JSON: `producto_comercial_id`, `nombre`, `cantidad` por unidad, `precio`), `valores` (JSON: `id`, `nombre`, `precio_extra` de los sabores elegidos) | Foto del checkout para mostrar; el precio real lo vuelve a fijar `sales` al confirmar (RN-PRC-003). Con Izipay es también la fuente del evento que crea la venta (RN-WEB-016/017) |
 
 ### `venta.canal`/`lista_precio.canal` ganan `web` (ADR-105, PR3)
 

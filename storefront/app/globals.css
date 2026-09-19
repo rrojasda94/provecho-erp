@@ -14,15 +14,25 @@
   --chp-tinta: #505b52;
   --chp-humo: #6f6857;
 
-  /* `next/font/google` (Anton + Archivo) inyecta estas dos variables en
-     `<html>` (`app/layout.tsx`); el fallback cubre el caso —hoy, mientras
-     no lleguen los archivos de Isidora Black/Tusker Grotesk del brandbook—
-     de que el layout raíz no las haya montado (una página renderizada
-     fuera de él, o un test de componente aislado). */
-  --fuente-cuerpo: var(--fuente-cuerpo-google, system-ui, sans-serif);
-  --fuente-display: var(--fuente-display-google, system-ui, sans-serif);
+  /* Tusker Grotesk (brandbook p. 47-49): `next/font/local` inyecta
+     `--fuente-tusker` en `<html>` (`app/layout.tsx`); el fallback cubre el caso
+     de que el layout raíz no la haya montado (una página renderizada fuera de
+     él, o un test de componente aislado). El texto usa el corte 4500 Medium y
+     los títulos la 5800 Super. Cuando llegue Isidora Black (titulares), solo
+     cambia `--fuente-display`. */
+  --fuente-cuerpo: var(--fuente-tusker, "Arial Narrow", system-ui, sans-serif);
+  --fuente-display: var(--fuente-tusker, "Arial Narrow", system-ui, sans-serif);
 
   --transicion: 200ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Tusker Grotesk es una grotesca condensada: a igual tamaño se lee más chica que la
+   fuente de sistema, y los `text-xs`/`text-sm` de las pastillas y ayudas quedaban
+   justos en el celular. Se sube un escalón la escala de texto pequeño. */
+@theme {
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
+  --text-base: 1.0625rem;
 }
 
 @theme inline {
@@ -55,6 +65,8 @@ body {
 
 .font-display {
   font-family: var(--fuente-display);
+  /* El corte Super de Tusker: sin esto los títulos saldrían en Medium. */
+  font-weight: 800;
 }
 
 /* Sombra dura de marca (del prototipo Claude Design portado, ver
