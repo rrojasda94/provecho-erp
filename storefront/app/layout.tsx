@@ -111,10 +111,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b-4 border-negro bg-crema px-4 py-3 sm:px-8">
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/marcas/logo-horizontal.png"
+              src="/marcas/logo-horizontal.svg"
               alt="Charlie's Pizzas"
-              width={545}
-              height={47}
+              width={2265}
+              height={192}
               priority
               className="h-5 w-auto sm:h-6"
             />

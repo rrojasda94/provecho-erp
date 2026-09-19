@@ -14,5 +14,5 @@ Se cargan con `next/font/local` en `app/layout.tsx` (variable `--fuente-tusker`)
 - **Isidora Black** (7800), la fuente de titulares del brandbook, no vino en el
   paquete. Cuando llegue: agregarla acá, declararla en `app/layout.tsx` y apuntar
   `--fuente-display` (`app/globals.css`) a ella.
-- **Licencia web.** El paquete de fuentes (`font.zip`) no trae el texto de la
-  licencia: confirmar con quien lo entregó que cubre su uso en un sitio web.
+
+**Licencia:** Tusker Grotesk es de uso libre (confirmado por la marca, 2026-09-19); se puede servir en el sitio.
