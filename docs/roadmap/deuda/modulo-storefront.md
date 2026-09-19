@@ -93,6 +93,10 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     diferencia de la tarifa de delivery (`delivery_radio_km`), Gerencia no
     puede tunear `STOREFRONT_ETA_*`/`STOREFRONT_SATURACION_PEDIDOS` sin un
     despliegue — aceptado para la primera versión, ver ADR-105 §4.
+  - ⬜ **Tiempos de preparación sin cargar.** El estimado (RN-WEB-011) mejora
+    solo donde el negocio cargó `tiempo_preparacion_min` (ficha del producto →
+    "Dónde se vende y cuánto tarda"); un producto sin tiempo usa la base de
+    30 min. El seeder de demo deja las pizzas en 25.
   - ⬜ **La cotización de delivery evalúa cada sucursal candidata por
     separado.** Bien para las dos sucursales actuales de Charlie's; una
     marca con muchas más necesitaría una versión que cotice en lote en vez

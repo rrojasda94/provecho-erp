@@ -114,6 +114,19 @@ ETA es `base + carga × minutos_por_pedido` (`STOREFRONT_ETA_*`), con 15
 minutos de colchón en el máximo del rango — mismo orden de magnitud que los
 30-45/45-55 min que Charlie's ya cotiza por teléfono.
 
+> **Enmienda (2026-09-19)**: esa fórmula daba el mismo estimado para una
+> botella de agua que para seis pizzas, y contaba como cola toda orden
+> abierta sin límite de tiempo —en staging, pedidos de prueba nunca cerrados
+> dejaron el estimado en 70-80 minutos—. Ahora el ETA sale de lo que se
+> pide: `preparación + cola + viaje` (RN-WEB-011), con el tiempo de
+> preparación cargado por producto en el ERP (`tiempo_preparacion_min`,
+> RN-COM-045), la cola limitada a las últimas 3 horas y solo cuando hay algo
+> que cocinar, y el viaje por km en delivery. `STOREFRONT_ETA_BASE_MINUTOS`
+> pasa a ser el tiempo de un producto sin tiempo cargado. La cotización
+> recibe el carrito (`items`) para poder calcularlo. Costo aceptado: el
+> negocio tiene que cargar el tiempo de cada producto; mientras no lo haga,
+> el estimado se comporta como antes (base estándar).
+
 Recojo: el cliente elige el local (`majambo.md` §3.1: "recojo = el cliente
 decide"), y solo se calcula el ETA, no la distancia ni el costo.
 

@@ -121,6 +121,12 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   algo que la pantalla nunca ofreció. Cierra también el segundo bloqueo: los
   sabores del seeder se creaban **sin precio de lista** y la carta descarta
   todo extra sin precio vigente.
+- ⬜ **Kiosko no es un canal de venta.** La carta por canal (RN-COM-044)
+  distingue `pdv`, `web`, `delivery` y `agente_ia`; el kiosko vende como `pdv`
+  (`punto_venta.canal=kiosko` solo describe el aparato), así que hoy no se
+  puede tener una carta de kiosko distinta de la del mostrador. Si se pide,
+  hay que decidir si `kiosko` pasa a ser canal (dos CHECK, listas de precio,
+  `rules.CANALES`) o si la carta se filtra por punto de venta.
 - ⬜ **`GET /carta` consulta grupos y extras producto por producto** (N+1).
   Ya era así antes de ADR-038 —dos consultas por producto— pero ahora corre
   también por cada variante: una pizza de tres tamaños pasó de 2 a 8

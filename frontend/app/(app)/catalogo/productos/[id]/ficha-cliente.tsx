@@ -47,6 +47,83 @@ export type ListaPrecio = {
  *   completo (RN-COM-022). Cada fila de esa tabla es una tarjeta obligatoria
  *   en el PDV. El padre agrupa y no se vende.
  */
+const CANALES_DE_VENTA = [
+  { clave: "pdv", nombre: "PDV y kiosko" },
+  { clave: "web", nombre: "Sitio web" },
+  { clave: "delivery", nombre: "Delivery" },
+  { clave: "agente_ia", nombre: "Agente IA" },
+];
+
+/** Dónde se vende y cuánto tarda. Sacar un producto de "Sitio web" lo quita
+ * de la carta de la web y de lo que el checkout acepta; el tiempo de
+ * preparación alimenta el estimado de espera que ve el cliente. */
+function SeccionVenta({
+  producto,
+  onGuardar,
+  onError,
+}: {
+  producto: ProductoDetalle;
+  onGuardar: (cuerpo: Parameters<typeof catalogoApi.editarProducto>[1]) => void;
+  onError: (mensaje: string) => void;
+}) {
+  const vigentes = producto.canales?.length
+    ? producto.canales
+    : CANALES_DE_VENTA.map((c) => c.clave);
+
+  function alternar(clave: string, marcado: boolean) {
+    const nuevos = marcado ? [...vigentes, clave] : vigentes.filter((c) => c !== clave);
+    if (nuevos.length === 0) {
+      onError("Tiene que venderse en al menos un canal; para retirarlo de todos, desmarca «Activo».");
+      return;
+    }
+    // Todos marcados se guarda como "todos" (`[]`): un canal nuevo que se
+    // agregue después no deja el producto fuera sin que nadie lo decida.
+    onGuardar({ canales: nuevos.length === CANALES_DE_VENTA.length ? [] : nuevos });
+  }
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-border bg-white p-4">
+      <h2 className="font-heading text-base text-dark">Dónde se vende y cuánto tarda</h2>
+      <div className="flex flex-wrap gap-x-5 gap-y-2">
+        {CANALES_DE_VENTA.map((c) => (
+          <label key={c.clave} className="flex items-center gap-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              checked={vigentes.includes(c.clave)}
+              onChange={(e) => alternar(c.clave, e.target.checked)}
+            />
+            {c.nombre}
+          </label>
+        ))}
+      </div>
+      <label className="flex max-w-xs flex-col gap-1 text-sm font-semibold">
+        Tiempo de preparación (minutos)
+        <input
+          type="number"
+          min={0}
+          max={240}
+          defaultValue={producto.tiempo_preparacion_min ?? ""}
+          placeholder="Sin definir: usa la base del sitio"
+          onBlur={(e) => {
+            const valor = e.target.value.trim();
+            if (valor === "") {
+              if (producto.tiempo_preparacion_min !== null) {
+                onGuardar({ quitar_tiempo_preparacion: true });
+              }
+            } else if (Number(valor) !== producto.tiempo_preparacion_min) {
+              onGuardar({ tiempo_preparacion_min: Number(valor) });
+            }
+          }}
+        />
+      </label>
+      <p className="text-xs text-gray">
+        <strong>0</strong> = sale al instante (una bebida); vacío = el sitio asume su tiempo
+        estándar. Las presentaciones sin tiempo propio heredan el de este producto.
+      </p>
+    </section>
+  );
+}
+
 export function FichaProducto({
   inicial,
   recetas,
@@ -142,6 +219,12 @@ export function FichaProducto({
           {error}
         </p>
       )}
+
+      <SeccionVenta
+        producto={producto}
+        onGuardar={(cuerpo) => correr(() => catalogoApi.editarProducto(producto.id, cuerpo))}
+        onError={setError}
+      />
 
       {!conPresentaciones && (
         <SeccionSimple

@@ -286,3 +286,47 @@ def test_el_rate_limit_corta(env, monkeypatch):
     monkeypatch.setattr(rate_limit, "consumir", _contar)
     codigos = [client.get(f"{PUBLICO}/contenido").status_code for _ in range(125)]
     assert 429 in codigos
+
+
+def test_un_producto_fuera_del_canal_no_sale_en_la_carta(env):
+    """`canales` saca de la web lo que solo existe en el PDV (cajas, propinas)."""
+    client, ids, _ = env
+    headers = _token(client)
+    _crear_lista_y_precio(client, headers, ids)
+    url = f"/api/v1/sales/productos/{ids['producto_id']}"
+
+    def en_carta():
+        return len(client.get(f"{PUBLICO}/carta").json()["productos"])
+
+    assert en_carta() == 1  # sin `canales` = todos
+    r = client.patch(url, headers=headers, json={"canales": ["pdv"]})
+    assert r.status_code == 200 and r.json()["canales"] == ["pdv"]
+    assert en_carta() == 0  # el canal del sitio en este test es `delivery`
+    r = client.patch(url, headers=headers, json={"canales": ["pdv", "delivery"]})
+    assert r.status_code == 200
+    assert en_carta() == 1
+    r = client.patch(url, headers=headers, json={"canales": []})  # [] = todos otra vez
+    assert r.json()["canales"] is None
+    assert en_carta() == 1
+
+
+def test_canal_inexistente_es_rechazado(env):
+    client, ids, _ = env
+    r = client.patch(
+        f"/api/v1/sales/productos/{ids['producto_id']}",
+        headers=_token(client),
+        json={"canales": ["kiosko"]},
+    )
+    assert r.status_code == 422  # kiosko no es canal de venta: es `pdv`
+
+
+def test_tiempo_de_preparacion_se_edita_y_se_limpia(env):
+    client, ids, _ = env
+    headers = _token(client)
+    url = f"/api/v1/sales/productos/{ids['producto_id']}"
+    r = client.patch(url, headers=headers, json={"tiempo_preparacion_min": 0})
+    assert r.json()["tiempo_preparacion_min"] == 0  # 0 = sale al instante, no "vacío"
+    r = client.patch(url, headers=headers, json={"quitar_tiempo_preparacion": True})
+    assert r.json()["tiempo_preparacion_min"] is None
+    r = client.patch(url, headers=headers, json={"tiempo_preparacion_min": 500})
+    assert r.status_code == 422

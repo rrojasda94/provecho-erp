@@ -12,12 +12,20 @@ Modalidad = Literal["takeout", "delivery"]
 MedioPago = Literal["efectivo", "izipay"]
 
 
+class ItemPedidoIn(BaseModel):
+    producto_comercial_id: uuid.UUID
+    cantidad: int = Field(gt=0, le=20)
+
+
 class CotizarPedidoIn(UbicacionMixin):
     modalidad: Modalidad
     # Recojo: el cliente ya eligió el local. Delivery: se ignora, la
     # asignación automática decide (RN-WEB-010).
     sucursal_id: uuid.UUID | None = None
     ubicacion_distrito: str | None = Field(default=None, max_length=100)
+    # Lo que hay en el carrito: el estimado de espera depende de qué se pide
+    # (una botella de agua no tarda lo que seis pizzas, RN-WEB-011).
+    items: list[ItemPedidoIn] = Field(default=[], max_length=30)
 
 
 class CotizacionOut(BaseModel):
@@ -26,11 +34,6 @@ class CotizacionOut(BaseModel):
     eta_max: int
     costo_delivery: Decimal | None = None
     distancia_km: Decimal | None = None
-
-
-class ItemPedidoIn(BaseModel):
-    producto_comercial_id: uuid.UUID
-    cantidad: int = Field(gt=0, le=20)
 
 
 class ConfirmarPedidoIn(UbicacionMixin):

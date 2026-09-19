@@ -75,6 +75,8 @@ export async function cotizarPedido(datos: {
   sucursal_id?: string;
   ubicacion_lat?: string;
   ubicacion_lng?: string;
+  // Lo que hay en el carrito: el estimado depende de qué se pide.
+  items?: { producto_comercial_id: string; cantidad: number }[];
 }): Promise<Cotizacion | null> {
   try {
     return await apiAuth<Cotizacion>("/api/v1/storefront/publico/pedidos/cotizar", {

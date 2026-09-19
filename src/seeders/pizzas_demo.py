@@ -375,7 +375,11 @@ def sembrar(session: Session, limpiar: bool = False) -> dict:
     articulos = {n: _articulo(session, empresa, categoria, n, udms) for n in INSUMOS}
 
     # El padre agrupa y no se vende: sin receta ni precio (RN-COM-022).
-    padre = _producto(session, "PZZA", marca_id=marca.id, nombre=PADRE)
+    # Las presentaciones heredan el tiempo del padre; en el sitio web sube el
+    # estimado de espera (RN-WEB-011). Es un dato de partida, se ajusta en el ERP.
+    padre = _producto(
+        session, "PZZA", marca_id=marca.id, nombre=PADRE, tiempo_preparacion_min=25
+    )
     lista = session.scalar(select(ListaPrecio).where(ListaPrecio.activa.is_(True)))
 
     ctx = {

@@ -65,6 +65,8 @@ def crear_producto(
     empaque_id: uuid.UUID | None = None,
     modalidades_empaque: list | None = None,
     es_extra: bool = False,
+    canales: list | None = None,
+    tiempo_preparacion_min: int | None = None,
 ) -> ProductoComercial:
     repo = ProductoComercialRepo(session)
     if repo.get_by_id_interno(id_interno):
@@ -91,6 +93,8 @@ def crear_producto(
             empaque_id=empaque_id,
             modalidades_empaque=modalidades_empaque,
             es_extra=es_extra,
+            canales=canales or None,
+            tiempo_preparacion_min=tiempo_preparacion_min,
         )
     )
 
@@ -281,7 +285,20 @@ def editar_producto(session: Session, producto_id: uuid.UUID, **campos) -> Produ
     ):
         if campos.get(campo) is not None:
             setattr(prod, campo, campos[campo])
+    _aplicar_venta_y_tiempos(prod, campos)
     return prod
+
+
+def _aplicar_venta_y_tiempos(prod: ProductoComercial, campos: dict) -> None:
+    """Canales y tiempo de preparación. `canales=[]` vuelve a "todos" (NULL);
+    el tiempo se limpia con `quitar_tiempo_preparacion`, porque `None` no se
+    distingue de "no lo mandaron" (ADR-096)."""
+    if campos.get("canales") is not None:
+        prod.canales = campos["canales"] or None
+    if campos.get("quitar_tiempo_preparacion"):
+        prod.tiempo_preparacion_min = None
+    elif campos.get("tiempo_preparacion_min") is not None:
+        prod.tiempo_preparacion_min = campos["tiempo_preparacion_min"]
 
 
 def _quitar_receta(prod: ProductoComercial) -> None:

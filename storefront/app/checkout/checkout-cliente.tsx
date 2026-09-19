@@ -157,19 +157,25 @@ export function CheckoutCliente({
 
   const total = useMemo(() => totalDelCarrito(lineas), [lineas]);
 
+  const itemsCotizar = useMemo(
+    () => lineas.map((l) => ({ producto_comercial_id: l.productoComercialId, cantidad: l.cantidad })),
+    [lineas],
+  );
+
   useEffect(() => {
     const promesa =
       modalidad === "takeout" && sucursalId
-        ? cotizarPedido({ modalidad: "takeout", sucursal_id: sucursalId })
+        ? cotizarPedido({ modalidad: "takeout", sucursal_id: sucursalId, items: itemsCotizar })
         : modalidad === "delivery" && ubicacion.coords
           ? cotizarPedido({
               modalidad: "delivery",
               ubicacion_lat: ubicacion.coords.lat,
               ubicacion_lng: ubicacion.coords.lng,
+              items: itemsCotizar,
             })
           : Promise.resolve(null);
     promesa.then(setCotizacion);
-  }, [modalidad, sucursalId, ubicacion.coords]);
+  }, [modalidad, sucursalId, ubicacion.coords, itemsCotizar]);
 
   function elegirDireccionGuardada(d: Direccion) {
     setDireccionTexto(d.direccion);

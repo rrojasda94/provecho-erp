@@ -183,6 +183,15 @@ def _extras_de(repo, producto, por_id: dict, precio_de: dict) -> list[dict]:
     return extras
 
 
+def _canales_de(producto, por_id: dict) -> list | None:
+    """Los canales del producto; si no tiene propios, los de su padre (una
+    variante se vende donde se vende su producto)."""
+    if producto.canales or producto.producto_padre_id is None:
+        return producto.canales
+    padre = por_id.get(producto.producto_padre_id)
+    return padre.canales if padre is not None else None
+
+
 def carta(
     session: Session,
     *,
@@ -215,7 +224,12 @@ def carta(
     repo = ProductoComercialRepo(session)
     precio_de = {}
     productos = repo.list(marca_id)
+    por_id = {p.id: p for p in productos}
     for producto in productos:
+        # Lo que no se vende en este canal ni aparece ni tiene precio: la
+        # carta es también la lista blanca del checkout web (RN-WEB-012).
+        if not rules.vende_en_canal(_canales_de(producto, por_id), canal):
+            continue
         try:
             precio_de[producto.id] = resolver_precio(
                 session,
@@ -228,7 +242,6 @@ def carta(
         except PrecioNoDefinido:
             continue
 
-    por_id = {p.id: p for p in productos}
     categoria_ids = {p.categoria_id for p in productos if p.categoria_id}
     nombre_categoria = {
         c.id: c.nombre
