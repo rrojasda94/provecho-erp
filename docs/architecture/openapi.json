@@ -69830,6 +69830,82 @@
         ]
       }
     },
+    "/api/v1/storefront/fotos/{entidad}": {
+      "get": {
+        "description": "Las fotos de muchas entidades en una sola llamada (`?ids=a&ids=b`) —\nlas pantallas `/web` del ERP pedían una por producto y agotaban el pool\nde conexiones.",
+        "operationId": "listar_fotos_varias_api_v1_storefront_fotos__entidad__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entidad",
+            "required": true,
+            "schema": {
+              "enum": [
+                "producto",
+                "ingrediente"
+              ],
+              "title": "Entidad",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ids",
+            "required": true,
+            "schema": {
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "maxItems": 500,
+              "title": "Ids",
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "items": {
+                      "$ref": "#/components/schemas/FotoOut"
+                    },
+                    "type": "array"
+                  },
+                  "propertyNames": {
+                    "format": "uuid"
+                  },
+                  "title": "Response Listar Fotos Varias Api V1 Storefront Fotos  Entidad  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Fotos Varias",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
     "/api/v1/storefront/fotos/{entidad}/{entidad_id}": {
       "get": {
         "operationId": "listar_fotos_api_v1_storefront_fotos__entidad___entidad_id__get",

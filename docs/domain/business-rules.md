@@ -2199,7 +2199,10 @@ específicas de la parte **sin JWT**.
 - **RN-WEB-011** El estimado de espera que ve el cliente es
   `STOREFRONT_ETA_BASE_MINUTOS + carga × STOREFRONT_ETA_MINUTOS_POR_PEDIDO`,
   con 15 minutos de colchón en el máximo del rango — nunca un número fijo
-  sin importar cuántos pedidos tenga la sucursal delante.
+  sin importar cuántos pedidos tenga la sucursal delante. La `carga` cuenta
+  solo las ventas `orden` de las últimas 3 horas: una comanda que nadie
+  cerró (pedido de prueba, olvido del cajero) no es cola de cocina, y
+  contarla dejaba el estimado en 70-80 minutos para siempre.
 - **RN-WEB-012** El precio del carrito se vuelve a fijar server-side contra
   la carta pública al confirmar (RN-PRC-003): un producto que ya no está
   disponible, o cuyo precio cambió desde que se agregó al carrito, rechaza

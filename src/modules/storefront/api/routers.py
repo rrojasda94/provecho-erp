@@ -3,7 +3,7 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from src.modules.storefront.api import schemas
@@ -99,6 +99,19 @@ def registrar_foto(
     )
     session.commit()
     return archivo
+
+
+@router.get("/fotos/{entidad}", response_model=dict[uuid.UUID, list[schemas.FotoOut]])
+def listar_fotos_varias(
+    entidad: schemas.EntidadFoto,
+    ids: list[uuid.UUID] = Query(max_length=500),
+    _: Usuario = Depends(require_permission(LEER)),
+    session: Session = Depends(get_db),
+):
+    """Las fotos de muchas entidades en una sola llamada (`?ids=a&ids=b`) —
+    las pantallas `/web` del ERP pedían una por producto y agotaban el pool
+    de conexiones."""
+    return fotos.listar_varias(session, entidad=entidad, entidad_ids=ids)
 
 
 @router.get("/fotos/{entidad}/{entidad_id}", response_model=list[schemas.FotoOut])

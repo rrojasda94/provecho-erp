@@ -575,6 +575,12 @@ def venta_para_reparto(session: Session, venta_id: uuid.UUID) -> dict | None:
 # necesita un horizonte distinto.
 VENTANA_REPARTO_HORAS = 24
 
+#: Cuánto atrás mira `carga_activa_por_sucursal`. Una comanda de más de 3 horas
+#: sin cerrar ya no está en cocina: está olvidada.
+# ponytail: ventana fija; la señal fina sería `venta_item.estado_preparacion`
+# (cuándo la cocina terminó cada línea) cuando el KDS se use en todos los locales.
+VENTANA_CARGA_HORAS = 3
+
 
 def ventas_para_reparto(
     session: Session,
@@ -861,6 +867,7 @@ def carta_publica(
         {
             **_nodo(item),
             "categoria_id": item["categoria_id"],
+            "categoria_nombre": item.get("categoria_nombre"),
             "variantes": [
                 _nodo(v) | {"orden": v.get("orden", 0)} for v in item.get("variantes", [])
             ],
@@ -957,12 +964,22 @@ def carga_activa_por_sucursal(
     cada sucursal — la señal de "qué tan ocupada está" que usa la asignación
     automática de local del sitio de marca (ADR-104) y su estimado de tiempo
     de espera. Una sucursal sin ninguna venta abierta no aparece en el dict
-    (léase como 0, no como "sucursal desconocida")."""
+    (léase como 0, no como "sucursal desconocida").
+
+    Solo cuentan las de las últimas `VENTANA_CARGA_HORAS`: una orden que nadie
+    cerró (pedido de prueba, olvido del cajero) no es cola de cocina, y sin
+    este corte inflaba el estimado del sitio para siempre (70-80 min por una
+    botella de agua)."""
     if not sucursal_ids:
         return {}
+    desde = datetime.now(UTC) - timedelta(hours=VENTANA_CARGA_HORAS)
     filas = session.execute(
         select(Venta.sucursal_id, func.count(Venta.id))
-        .where(Venta.sucursal_id.in_(list(sucursal_ids)), Venta.estado == "orden")
+        .where(
+            Venta.sucursal_id.in_(list(sucursal_ids)),
+            Venta.estado == "orden",
+            Venta.created_at >= desde,
+        )
         .group_by(Venta.sucursal_id)
     )
     return dict(filas.all())

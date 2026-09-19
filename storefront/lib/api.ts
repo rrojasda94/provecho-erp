@@ -10,6 +10,9 @@
  */
 export const API_INTERNAL_URL = process.env.API_INTERNAL_URL ?? "http://localhost:8000";
 
+// Sin plazo, una API colgada deja la página del sitio esperando para siempre.
+const TIMEOUT_MS = 8000;
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, mensaje: string) {
@@ -46,6 +49,7 @@ export async function apiAuth<T>(
     },
     body: opciones.cuerpo !== undefined ? JSON.stringify(opciones.cuerpo) : undefined,
     cache: "no-store",
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   if (!respuesta.ok) {
     throw new ApiError(respuesta.status, await leerError(respuesta));
@@ -71,6 +75,7 @@ export async function apiFetch<T>(
   try {
     const respuesta = await fetch(`${API_INTERNAL_URL}${ruta}`, {
       next: { revalidate: opciones.revalidate ?? 60 },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!respuesta.ok) {
       if (respuesta.status === 404) return null;

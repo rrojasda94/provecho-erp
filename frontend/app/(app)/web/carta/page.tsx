@@ -24,14 +24,15 @@ export default async function WebCartaPage() {
     // extra suelto (`sales.application.precios.carta` filtra igual).
     const productos = todos.filter((p) => p.activo && !p.es_extra && !p.producto_padre_id);
 
-    const fotos = await Promise.all(
-      productos.map((p) =>
-        apiFetch<Foto[]>(`/api/v1/storefront/fotos/producto/${p.id}`, { token }),
-      ),
-    );
-    const fotosPorProducto = Object.fromEntries(
-      productos.map((p, i) => [p.id, fotos[i]]),
-    );
+    // Una sola llamada para todas las fotos: una por producto agotaba el
+    // pool de conexiones de la API (QueuePool limit).
+    const ids = productos.map((p) => `ids=${p.id}`).join("&");
+    const fotosPorProducto = productos.length
+      ? await apiFetch<Record<string, Foto[]>>(
+          `/api/v1/storefront/fotos/producto?${ids}`,
+          { token },
+        )
+      : {};
 
     return <CartaCliente productos={productos} fotosPorProducto={fotosPorProducto} />;
   } catch (e) {

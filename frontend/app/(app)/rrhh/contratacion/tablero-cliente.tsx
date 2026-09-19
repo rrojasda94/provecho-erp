@@ -410,9 +410,14 @@ function Convocatorias({
         </DialogoTablero>
       </div>
 
+      <p className="text-xs text-gray">
+        Solo las convocatorias en estado <strong>publicada</strong> y con fecha límite vigente
+        aparecen en la web (Trabaja con nosotros). Las que están en borrador o cerradas no.
+      </p>
+
       {convocatorias.length === 0 ? (
         <p className="rounded bg-cream px-3 py-2 text-sm text-gray">
-          Ninguna convocatoria abierta.
+          Todavía no hay convocatorias.
         </p>
       ) : (
         <div className="overflow-x-auto">

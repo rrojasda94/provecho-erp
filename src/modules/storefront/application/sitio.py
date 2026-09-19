@@ -98,6 +98,11 @@ def carta(session) -> dict:
             v["receta_id"] for v in item.get("variantes", []) if v.get("receta_id")
         )
     ingredientes_por_receta = insumos_de_recetas(session, list(receta_ids))
+    fotos_por_producto = fotos_uc.fotos_principales_urls(
+        session,
+        entidad="producto",
+        entidad_ids=[i["producto_comercial_id"] for i in items],
+    )
 
     categorias: dict[uuid.UUID, str] = {}
     productos = []
@@ -115,9 +120,7 @@ def carta(session) -> dict:
                 **base,
                 "categoria_id": item.get("categoria_id"),
                 "precio_desde": precio_desde,
-                "foto_url": fotos_uc.foto_principal_url(
-                    session, entidad="producto", entidad_id=item["producto_comercial_id"]
-                ),
+                "foto_url": fotos_por_producto.get(item["producto_comercial_id"]),
                 "variantes": variantes,
             }
         )
@@ -137,14 +140,15 @@ def producto(session, producto_id: uuid.UUID) -> dict:
         item["fotos"] = [f.url_storage for f in fotos]
         ids_ingrediente = [i["id"] for i in item["ingredientes"]]
         detalle = articulos_publicos(session, ids_ingrediente)
+        fotos_ingrediente = fotos_uc.fotos_principales_urls(
+            session, entidad="ingrediente", entidad_ids=list(detalle)
+        )
         item["ingredientes_detalle"] = [
             {
                 "id": ing_id,
                 "nombre": datos_ing["nombre"],
                 "descripcion": datos_ing["descripcion"],
-                "foto_url": fotos_uc.foto_principal_url(
-                    session, entidad="ingrediente", entidad_id=ing_id
-                ),
+                "foto_url": fotos_ingrediente.get(ing_id),
             }
             for ing_id, datos_ing in detalle.items()
         ]
