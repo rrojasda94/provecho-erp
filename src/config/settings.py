@@ -86,6 +86,14 @@ class Settings(BaseSettings):
     # matar reportes legítimos o dejar la caja colgada. 0 = sin límite.
     db_statement_timeout_segundos: int = 15
     db_statement_timeout_reportes_segundos: int = 120
+    # Tamaño del pool por PROCESO de la API (con `--workers 2` son el doble).
+    # El tope de conexiones a Postgres es (pool + overflow) × workers × engines:
+    # con estos valores 2 × (20 + 10) = 60 como máximo, bajo el `max_connections`
+    # de 100 de Postgres, con margen para Celery. Se abren de a una, no de golpe.
+    db_pool_size: int = 10
+    db_max_overflow: int = 10
+    db_pool_size_reportes: int = 2
+    db_max_overflow_reportes: int = 3
     # Zona del negocio, no la del servidor: de ella sale "qué día es hoy"
     # para el ERP (`src/shared/fechas.py`). En Docker el sistema corre en UTC,
     # y con eso un cierre de las 20:00 hora Perú caía al día siguiente.

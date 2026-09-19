@@ -359,6 +359,7 @@ def confirmar(
             "punto_venta_id": str(r.punto_venta_id),
             "cliente_id": str(cliente_id) if cliente_id else None,
             "nombre_contacto": nombre_contacto,
+            "telefono_contacto": telefono_contacto,
             "modalidad": modalidad,
             "items": items_payload,
             "direccion_entrega": direccion_entrega,

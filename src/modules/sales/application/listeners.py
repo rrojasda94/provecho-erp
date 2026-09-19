@@ -156,6 +156,45 @@ def _medio_pago_izipay(session, sucursal_id: uuid.UUID) -> uuid.UUID:
     return creado.id
 
 
+def _cliente_del_pedido_web(session, payload: dict) -> uuid.UUID | None:
+    """El cliente de la venta: el de la cuenta si el comprador iba logueado; si
+    no, el que sale de su teléfono (un invitado). Sin esto el repartidor no ve
+    ni nombre ni teléfono del invitado (delivery los lee del cliente).
+
+    Nunca hace fallar el pedido: si no se puede resolver un cliente, la venta
+    se crea igual —sin contacto en la ruta, pero la comida sale.
+    """
+    if payload.get("cliente_id"):
+        return uuid.UUID(payload["cliente_id"])
+    telefono = (payload.get("telefono_contacto") or "").strip()
+    if not telefono:
+        return None
+    from src.modules.sales.application import clientes
+    from src.modules.sales.application.errors import AppError
+    from src.modules.sales.infrastructure.repositories import PuntoVentaRepo
+
+    try:
+        empresa_id = PuntoVentaRepo(session).empresa_de_sucursal(
+            uuid.UUID(payload["sucursal_id"])
+        )
+        if empresa_id is None:
+            return None
+        grupo_id = clientes.grupo_de_empresa(session, empresa_id)
+        cliente = clientes.cliente_de_contacto(
+            session,
+            grupo_id=grupo_id,
+            nombre=payload.get("nombre_contacto") or "",
+            telefono=telefono,
+        )
+    except AppError:
+        log.warning(
+            "No se pudo registrar el cliente de un pedido web de invitado",
+            extra={"pedido_id": payload.get("pedido_id")},
+        )
+        return None
+    return cliente.id
+
+
 def on_pedido_web_confirmado(payload: dict) -> None:
     """Un pedido confirmado en el sitio de marca (ADR-105) se
     convierte en una `Venta` real de canal `web` — el sitio no importa
@@ -206,10 +245,10 @@ def on_pedido_web_confirmado(payload: dict) -> None:
                         }
                         for i in payload["items"]
                     ],
-                    cliente_id=(
-                        uuid.UUID(payload["cliente_id"]) if payload.get("cliente_id") else None
-                    ),
-                    referencia_atencion=payload.get("nombre_contacto"),
+                    cliente_id=_cliente_del_pedido_web(session, payload),
+                    # `referencia_atencion` es String(50); el nombre del
+                    # formulario admite 150.
+                    referencia_atencion=(payload.get("nombre_contacto") or "")[:50] or None,
                     direccion_entrega=payload.get("direccion_entrega"),
                     ubicacion_place_id=ubicacion.get("ubicacion_place_id"),
                     ubicacion_lat=(
