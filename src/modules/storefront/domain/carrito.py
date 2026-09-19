@@ -4,12 +4,10 @@ El precio nunca se calcula acá — lo fija `sales` server-side al confirmar
 (RN-PRC-003, `crear_venta`), igual que cualquier otro canal. Esto solo
 valida la FORMA del carrito antes de mandarlo.
 
-Simplificación deliberada de PR3 (ADR-105): una línea es "un producto
-comercial (ya sea la pizza o el tamaño/variante elegido) + una cantidad".
-Extras (máx. 3) y Mitad x Mitad de la carta de Charlie's (brand guideline
-§3.1.8) todavía no tienen un concepto en `sales` del que colgarse — ni
-catálogo de extras ni combos —, así que quedan fuera de este slice. Ver
-`docs/roadmap/deuda/modulo-storefront.md`.
+Una línea es "un producto comercial (la pizza o el tamaño/variante elegido) +
+una cantidad + lo que se le eligió": extras y sabores (Mitad x Mitad), los
+mismos que ya modela `sales` para el PDV. Validarlos contra lo que el producto
+ofrece es de `domain/opciones.py`.
 """
 
 import uuid
@@ -23,6 +21,10 @@ LINEAS_MAXIMAS_POR_PEDIDO = 30
 class LineaCarrito:
     producto_comercial_id: uuid.UUID
     cantidad: int
+    # `(extra_id, cantidad por unidad)`, en el orden en que se eligieron.
+    extras: tuple[tuple[uuid.UUID, int], ...] = ()
+    # `producto_atributo_valor.id` elegidos (los sabores de la Mitad x Mitad).
+    valores: tuple[uuid.UUID, ...] = ()
 
 
 def validar(lineas: list[LineaCarrito]) -> None:

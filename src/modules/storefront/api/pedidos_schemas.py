@@ -12,9 +12,18 @@ Modalidad = Literal["takeout", "delivery"]
 MedioPago = Literal["efectivo", "izipay"]
 
 
+class ExtraPedidoIn(BaseModel):
+    producto_comercial_id: uuid.UUID
+    # Por unidad del producto: 2 pizzas con "extra queso" x1 son 2 porciones.
+    cantidad: int = Field(gt=0, le=3)
+
+
 class ItemPedidoIn(BaseModel):
     producto_comercial_id: uuid.UUID
     cantidad: int = Field(gt=0, le=20)
+    extras: list[ExtraPedidoIn] = Field(default=[], max_length=10)
+    # `producto_atributo_valor.id` (los sabores de la Mitad x Mitad).
+    valores_variante_ids: list[uuid.UUID] = Field(default=[], max_length=6)
 
 
 class CotizarPedidoIn(UbicacionMixin):
@@ -53,10 +62,19 @@ class ConfirmarPedidoIn(UbicacionMixin):
     idempotency_key: str = Field(min_length=8, max_length=100)
 
 
+class ExtraPedidoOut(BaseModel):
+    nombre: str
+    cantidad: int
+    precio: Decimal
+
+
 class ItemPedidoOut(BaseModel):
     nombre_congelado: str
     cantidad: int
     precio_unitario_congelado: Decimal
+    extras: list[ExtraPedidoOut] = []
+    # Nombres de los sabores/valores elegidos, para mostrar.
+    valores: list[str] = []
 
 
 class PedidoOut(BaseModel):

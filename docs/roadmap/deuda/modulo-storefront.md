@@ -86,10 +86,21 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   - ⬜ **Tras registrarse, el cliente vuelve a `/cuenta`, no al checkout.** El
     carrito se conserva en el navegador, pero quien se registra para pagar en
     efectivo tiene que volver a entrar al checkout a mano.
-  - ⬜ **Sin extras ni Mitad x Mitad.** El carrito es "producto/tamaño +
-    cantidad"; `sales` no tiene todavía un concepto de extra/combo del que
-    colgarse (ver ADR-105 §6). Necesita diseño conjunto con el negocio
-    antes de construirse.
+  - ✅ 2026-09-19 **Extras y Mitad x Mitad** (RN-WEB-017, ADR-105 §6 corregido):
+    la línea del carrito lleva extras y sabores, con las reglas del PDV. Lo que
+    deja abierto:
+    - ⬜ **Sin "sin cebolla" (restas).** El PDV deja quitar insumos de la receta
+      (`sin_articulo_ids`); el sitio no lo ofrece todavía.
+    - ⬜ **El tope de 3 extras vive en el sitio, no en el ERP.** Es una regla de la
+      marca (`majambo.md` §3.1.8); el PDV no la aplica. Si el negocio quiere que
+      valga en todos los canales, hay que llevarla a `sales`.
+    - ⬜ **Un grupo obligatorio cuyos extras no tienen precio vigente** no se
+      puede verificar antes de cobrar (el grupo llega a la carta solo a través
+      de sus extras con precio): `crear_venta` lo rechazaría. Es un producto que
+      tampoco se puede vender en el PDV; se arregla cargando el precio.
+    - ⬜ **Sin e2e de un producto con grupo de extras obligatorio** (como el sabor
+      de la carta demo): la lógica se prueba en unitarias y en `pytest`, y el
+      e2e cubre la Mitad x Mitad por atributos.
   - ⬜ **Boleta/factura del checkout no llega al cajero en efectivo.** La
     preferencia de comprobante que el cliente tecleó vive en
     `storefront_pedido`, pero ninguna pantalla del ERP se la muestra a

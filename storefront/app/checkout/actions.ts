@@ -5,7 +5,14 @@ import { cookies } from "next/headers";
 import { ApiError, apiAuth } from "@/lib/api";
 import { COOKIE_TOKEN } from "@/lib/auth";
 
-export type ItemCheckout = { producto_comercial_id: string; cantidad: number };
+export type ItemCheckout = {
+  producto_comercial_id: string;
+  cantidad: number;
+  /** Cantidad por unidad del producto. */
+  extras?: { producto_comercial_id: string; cantidad: number }[];
+  /** Los sabores elegidos (Mitad x Mitad). */
+  valores_variante_ids?: string[];
+};
 
 export type DatosCheckout = {
   modalidad: "delivery" | "takeout";

@@ -156,6 +156,27 @@ def _medio_pago_izipay(session, sucursal_id: uuid.UUID) -> uuid.UUID:
     return creado.id
 
 
+def _item_de_pedido_web(i: dict) -> dict:
+    """Una línea del pedido web como la espera `crear_venta`: sabores como
+    `valores_variante_ids` y cada extra con su id como UUID, igual que las manda
+    el PDV. Sin opciones, la línea es la de siempre (producto + cantidad)."""
+    item: dict = {
+        "producto_comercial_id": uuid.UUID(i["producto_comercial_id"]),
+        "cantidad": i["cantidad"],
+    }
+    if i.get("valores_variante_ids"):
+        item["valores_variante_ids"] = i["valores_variante_ids"]
+    if i.get("extras"):
+        item["extras"] = [
+            {
+                "producto_comercial_id": uuid.UUID(e["producto_comercial_id"]),
+                "cantidad": e["cantidad"],
+            }
+            for e in i["extras"]
+        ]
+    return item
+
+
 def on_pedido_web_confirmado(payload: dict) -> None:
     """Un pedido confirmado en el sitio de marca (ADR-105) se
     convierte en una `Venta` real de canal `web` — el sitio no importa
@@ -199,13 +220,7 @@ def on_pedido_web_confirmado(payload: dict) -> None:
                     modalidad=payload["modalidad"],
                     usuario_id=usuario_id,
                     idempotency_key=payload["idempotency_key"],
-                    items=[
-                        {
-                            "producto_comercial_id": uuid.UUID(i["producto_comercial_id"]),
-                            "cantidad": i["cantidad"],
-                        }
-                        for i in payload["items"]
-                    ],
+                    items=[_item_de_pedido_web(i) for i in payload["items"]],
                     cliente_id=(
                         uuid.UUID(payload["cliente_id"]) if payload.get("cliente_id") else None
                     ),
