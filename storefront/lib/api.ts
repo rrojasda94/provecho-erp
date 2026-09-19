@@ -49,7 +49,10 @@ export async function apiAuth<T>(
     },
     body: opciones.cuerpo !== undefined ? JSON.stringify(opciones.cuerpo) : undefined,
     cache: "no-store",
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    // Solo las lecturas tienen plazo: cortar un POST que igual llega al
+    // servidor (crear un pedido) haría reintentar con otra clave de
+    // idempotencia y duplicaría el pedido.
+    signal: (opciones.metodo ?? "GET") === "GET" ? AbortSignal.timeout(TIMEOUT_MS) : undefined,
   });
   if (!respuesta.ok) {
     throw new ApiError(respuesta.status, await leerError(respuesta));

@@ -29,7 +29,7 @@ export default async function WebCartaPage() {
     const ids = productos.map((p) => `ids=${p.id}`).join("&");
     const fotosPorProducto = productos.length
       ? await apiFetch<Record<string, Foto[]>>(
-          `/api/v1/storefront/fotos/producto?${ids}`,
+          `/api/v1/storefront/fotos?entidad=producto&${ids}`,
           { token },
         )
       : {};

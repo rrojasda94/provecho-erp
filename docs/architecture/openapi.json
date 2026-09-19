@@ -69789,54 +69789,13 @@
         ]
       }
     },
-    "/api/v1/storefront/fotos/{archivo_id}": {
-      "delete": {
-        "operationId": "borrar_foto_api_v1_storefront_fotos__archivo_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "archivo_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Archivo Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorValidacion"
-                }
-              }
-            },
-            "description": "Entrada inválida"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Borrar Foto",
-        "tags": [
-          "storefront"
-        ]
-      }
-    },
-    "/api/v1/storefront/fotos/{entidad}": {
+    "/api/v1/storefront/fotos": {
       "get": {
-        "description": "Las fotos de muchas entidades en una sola llamada (`?ids=a&ids=b`) —\nlas pantallas `/web` del ERP pedían una por producto y agotaban el pool\nde conexiones.",
-        "operationId": "listar_fotos_varias_api_v1_storefront_fotos__entidad__get",
+        "description": "Las fotos de muchas entidades en una sola llamada\n(`?entidad=producto&ids=a&ids=b`) —\nlas pantallas `/web` del ERP pedían una por producto y agotaban el pool\nde conexiones.",
+        "operationId": "listar_fotos_varias_api_v1_storefront_fotos_get",
         "parameters": [
           {
-            "in": "path",
+            "in": "query",
             "name": "entidad",
             "required": true,
             "schema": {
@@ -69877,7 +69836,7 @@
                   "propertyNames": {
                     "format": "uuid"
                   },
-                  "title": "Response Listar Fotos Varias Api V1 Storefront Fotos  Entidad  Get",
+                  "title": "Response Listar Fotos Varias Api V1 Storefront Fotos Get",
                   "type": "object"
                 }
               }
@@ -69901,6 +69860,47 @@
           }
         ],
         "summary": "Listar Fotos Varias",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/fotos/{archivo_id}": {
+      "delete": {
+        "operationId": "borrar_foto_api_v1_storefront_fotos__archivo_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "archivo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Archivo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Borrar Foto",
         "tags": [
           "storefront"
         ]

@@ -16,7 +16,7 @@ export default async function WebIngredientesPage() {
     const ids = insumos.items.map((a) => `ids=${a.id}`).join("&");
     const fotosPorInsumo = insumos.items.length
       ? await apiFetch<Record<string, Foto[]>>(
-          `/api/v1/storefront/fotos/ingrediente?${ids}`,
+          `/api/v1/storefront/fotos?entidad=ingrediente&${ids}`,
           { token },
         )
       : {};

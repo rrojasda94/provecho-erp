@@ -144,7 +144,9 @@ def test_presign_registro_listado_y_borrado_completo(env, monkeypatch):
     # del ERP pedían una por producto). Toda id pedida aparece, con o sin fotos.
     otro = str(uuid.uuid4())
     lote = client.get(
-        FOTOS + "/producto", headers=h, params=[("ids", ids["producto_id"]), ("ids", otro)]
+        FOTOS,
+        headers=h,
+        params=[("entidad", "producto"), ("ids", ids["producto_id"]), ("ids", otro)],
     )
     assert lote.status_code == 200, lote.text
     assert [f["id"] for f in lote.json()[ids["producto_id"]]] == [archivo_id]
