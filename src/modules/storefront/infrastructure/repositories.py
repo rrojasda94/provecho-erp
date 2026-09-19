@@ -166,6 +166,11 @@ class PedidoRepo:
             select(StorefrontPedido).where(StorefrontPedido.idempotency_key == key)
         )
 
+    def get_by_pago_externo(self, id_externo: str) -> StorefrontPedido | None:
+        return self.s.scalar(
+            select(StorefrontPedido).where(StorefrontPedido.pago_id_externo == id_externo)
+        )
+
     def get_by_venta(self, venta_id: uuid.UUID) -> StorefrontPedido | None:
         return self.s.scalar(
             select(StorefrontPedido).where(StorefrontPedido.venta_id == venta_id)

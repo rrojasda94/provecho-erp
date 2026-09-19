@@ -23436,6 +23436,38 @@
             ],
             "title": "Numero Orden"
           },
+          "pago_estado": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pendiente",
+                  "aprobado",
+                  "rechazado"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pago Estado"
+          },
+          "pago_id_externo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pago Id Externo"
+          },
+          "pago_simulado": {
+            "default": false,
+            "title": "Pago Simulado",
+            "type": "boolean"
+          },
           "sucursal_id": {
             "anyOf": [
               {
@@ -70577,6 +70609,36 @@
           }
         },
         "summary": "Ver Sucursales",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/webhooks/izipay": {
+      "post": {
+        "description": "Recibe el resultado de un cobro. La firma viaja en `X-Izipay-Signature`\n(real) o `X-Izipay-Fake` (pasarela de prueba, solo fuera de producción). El\ncuerpo se lee crudo: la firma se calcula sobre los bytes exactos.",
+        "operationId": "webhook_izipay_api_v1_storefront_webhooks_izipay_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Webhook Izipay",
         "tags": [
           "storefront"
         ]

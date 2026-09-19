@@ -71,6 +71,12 @@ class PedidoOut(BaseModel):
     costo_delivery_estimado: Decimal | None
     eta_min: int | None
     eta_max: int | None
+    # Solo con Izipay (`None` en efectivo).
+    pago_estado: Literal["pendiente", "aprobado", "rechazado"] | None = None
+    # Pasarela de prueba (sin `IZIPAY_API_KEY`): la pantalla de pago ofrece
+    # aprobar/rechazar a mano y necesita el id del intento para hacerlo.
+    pago_simulado: bool = False
+    pago_id_externo: str | None = None
     # Solo va en la respuesta de confirmación: es la credencial para que un
     # invitado sin cuenta vuelva a consultar su pedido.
     token_acceso: str | None = None

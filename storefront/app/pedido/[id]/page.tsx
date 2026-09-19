@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import { apiFetch } from "@/lib/api";
@@ -14,6 +14,7 @@ type Pedido = {
   fallo_motivo: string | null;
   modalidad: string;
   medio_pago: string;
+  pago_estado: "pendiente" | "aprobado" | "rechazado" | null;
   total_estimado: string;
   costo_delivery_estimado: string | null;
   eta_min: number | null;
@@ -37,6 +38,10 @@ export default async function PedidoPage({
     { revalidate: 0 },
   );
   if (!pedido) notFound();
+  // Con Izipay el pedido no está confirmado hasta que se paga.
+  if (pedido.estado === "pendiente" && pedido.pago_estado === "pendiente") {
+    redirect(`/pedido/${id}/pago?token=${encodeURIComponent(token)}`);
+  }
 
   return (
     <div className="mx-auto max-w-lg px-4 py-16">
@@ -63,8 +68,11 @@ export default async function PedidoPage({
         <div className="text-center">
           <h1 className="font-display text-2xl uppercase text-rojo">No pudimos confirmar tu pedido</h1>
           <p className="mt-2 text-humo">{pedido.fallo_motivo ?? "Intenta de nuevo."}</p>
-          <Link href="/carrito" className="mt-4 inline-block font-bold text-verde underline">
-            Volver al carrito
+          <Link
+            href={pedido.pago_estado === "rechazado" ? "/checkout" : "/carrito"}
+            className="mt-4 inline-block font-bold text-verde underline"
+          >
+            {pedido.pago_estado === "rechazado" ? "Intentar de nuevo" : "Volver al carrito"}
           </Link>
         </div>
       )}

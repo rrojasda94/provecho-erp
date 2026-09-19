@@ -62,6 +62,15 @@ class StorefrontPedido(Base, UuidPkMixin, TimestampMixin, UbicacionMixin):
     direccion_entrega: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     medio_pago: Mapped[str] = mapped_column(String(10))  # 'efectivo' | 'izipay'
+    # Solo con Izipay (NULL en efectivo): `pendiente` hasta que la pasarela
+    # avisa por webhook, luego `aprobado` | `rechazado`. La venta se crea
+    # recién al aprobarse — un pedido sin pagar no debe llegar a cocina.
+    pago_estado: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # Id del intento en la pasarela: único, es lo que hace idempotente el
+    # webhook (la pasarela reintenta hasta que se le contesta).
+    pago_id_externo: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, unique=True
+    )
     # Lo que el cliente tecleó para su comprobante — DNI (boleta) o RUC
     # (factura, 11 dígitos, `rules.tipo_comprobante_por_documento`). Igual
     # que el resto del ERP, decide el tipo el largo del documento.

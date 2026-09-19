@@ -159,7 +159,24 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
 
     app.dependency_overrides[get_db] = _override_get_db
     with TestClient(app) as c:
+        # El efectivo exige cuenta (RN-WEB-013): los pedidos de estas pruebas
+        # salen con una; los del invitado piden `headers={}` a propósito.
+        r = c.post(
+            "/api/v1/storefront/cuentas/registro",
+            json={
+                "email": "cliente@example.com", "password": "clave-larga-123",
+                "nombres": "Carlos", "apellidos": "Pérez", "tipo_documento": "dni",
+                "numero_documento": "45678912", "telefono": "987654321",
+                "fecha_nacimiento": "1995-05-20", "direccion": "Jr. Los Pinos 123",
+            },
+        )
+        assert r.status_code == 201, r.text
+        ids["auth"] = {"Authorization": "Bearer " + r.json()["access_token"]}
         yield c, ids, TestSession
+
+
+def _auth(ids):
+    return ids["auth"]
 
 
 def _items(ids, cantidad=2):
@@ -193,9 +210,9 @@ def _body_delivery(ids, idem: str, lat: Decimal, lng: Decimal, medio_pago="efect
     }
 
 
-def test_confirmar_pedido_recojo_efectivo_invitado(env):
+def test_confirmar_pedido_recojo_efectivo_con_cuenta(env):
     client, ids, TestSession = env
-    r = client.post(PEDIDOS, json=_body_takeout(ids, "recojo-001"))
+    r = client.post(PEDIDOS, headers=_auth(ids), json=_body_takeout(ids, "recojo-001"))
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["estado"] == "confirmado"
@@ -209,13 +226,15 @@ def test_confirmar_pedido_recojo_efectivo_invitado(env):
         assert venta is not None
         assert venta.canal == "web"
         assert venta.modalidad == "takeout"
-        assert venta.cliente_id is None
+        assert venta.cliente_id is not None  # el de la cuenta
         assert venta.estado == "orden"  # efectivo: se cobra al recoger, no ahora
 
 
 def test_confirmar_pedido_delivery_asigna_la_sucursal_mas_cercana(env):
     client, ids, _ = env
-    r = client.post(PEDIDOS, json=_body_delivery(ids, "deliv-001", CH2_LAT, CH2_LNG))
+    r = client.post(
+        PEDIDOS, headers=_auth(ids), json=_body_delivery(ids, "deliv-001", CH2_LAT, CH2_LNG)
+    )
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["estado"] == "confirmado"
@@ -245,7 +264,9 @@ def test_confirmar_pedido_delivery_evita_sucursal_saturada(env):
             )
         s.commit()
 
-    r = client.post(PEDIDOS, json=_body_delivery(ids, "deliv-002", CH1_LAT, CH1_LNG))
+    r = client.post(
+        PEDIDOS, headers=_auth(ids), json=_body_delivery(ids, "deliv-002", CH1_LAT, CH1_LNG)
+    )
     assert r.status_code == 201, r.text
     body = r.json()
     # CH1 está saturada: se prefiere CH2 aunque CH1 sea la más cercana.
@@ -258,28 +279,68 @@ def test_confirmar_pedido_fuera_de_cobertura(env, monkeypatch):
 
     monkeypatch.setattr(settings, "delivery_distancia_maxima_km", Decimal("0.001"))
     lejos_lat, lejos_lng = Decimal("-6.700000"), Decimal("-76.600000")
-    r = client.post(PEDIDOS, json=_body_delivery(ids, "deliv-003", lejos_lat, lejos_lng))
+    r = client.post(
+        PEDIDOS, headers=_auth(ids), json=_body_delivery(ids, "deliv-003", lejos_lat, lejos_lng)
+    )
     assert r.status_code == 409, r.text
 
 
 def test_idempotencia_del_pedido(env):
     client, ids, _ = env
-    r1 = client.post(PEDIDOS, json=_body_takeout(ids, "idem-001"))
-    r2 = client.post(PEDIDOS, json=_body_takeout(ids, "idem-001"))
+    r1 = client.post(PEDIDOS, headers=_auth(ids), json=_body_takeout(ids, "idem-001"))
+    r2 = client.post(PEDIDOS, headers=_auth(ids), json=_body_takeout(ids, "idem-001"))
     assert r1.status_code == 201
     assert r2.status_code == 201
     assert r1.json()["id"] == r2.json()["id"]
 
 
-def test_pago_izipay_registra_pago_sin_exigir_caja(env):
-    client, ids, TestSession = env
-    r = client.post(PEDIDOS, json=_body_takeout(ids, "izipay-001", medio_pago="izipay"))
+WEBHOOK = "/api/v1/storefront/webhooks/izipay"
+
+
+def _webhook(client, id_externo, resultado="aprobado"):
+    return client.post(
+        WEBHOOK, json={"id_externo": id_externo}, headers={"X-Izipay-Fake": resultado}
+    )
+
+
+def _pedido_izipay(client, ids, clave):
+    """Un invitado paga por adelantado: queda pendiente hasta el webhook."""
+    r = client.post(PEDIDOS, json=_body_takeout(ids, clave, medio_pago="izipay"))
     assert r.status_code == 201, r.text
-    body = r.json()
-    assert body["estado"] == "confirmado"
+    return r.json()
+
+
+def test_invitado_no_puede_pagar_en_efectivo(env):
+    client, ids, _ = env
+    r = client.post(PEDIDOS, json=_body_takeout(ids, "sin-cuenta-001"))
+    assert r.status_code == 409, r.text
+    assert "cuenta" in r.json()["detail"]
+
+
+def test_pago_izipay_deja_el_pedido_pendiente_hasta_el_webhook(env):
+    client, ids, TestSession = env
+    pedido = _pedido_izipay(client, ids, "izipay-001")
+    assert pedido["estado"] == "pendiente"
+    assert pedido["pago_estado"] == "pendiente"
+    assert pedido["pago_simulado"] is True
+    assert pedido["pago_id_externo"].startswith("fake-")
 
     with TestSession() as s:
-        venta = s.scalar(select(Venta).where(Venta.numero_orden == body["numero_orden"]))
+        # Sin pagar no hay venta: nada llega a cocina.
+        assert s.scalar(select(Venta).where(Venta.canal == "web")) is None
+
+    r = _webhook(client, pedido["pago_id_externo"])
+    assert r.status_code == 200, r.text
+
+    visto = client.get(
+        f"{PEDIDOS}/{pedido['id']}", params={"token": pedido["token_acceso"]}
+    ).json()
+    assert visto["estado"] == "confirmado"
+    assert visto["pago_estado"] == "aprobado"
+    assert visto["numero_orden"] is not None
+
+    with TestSession() as s:
+        venta = s.scalar(select(Venta).where(Venta.numero_orden == visto["numero_orden"]))
         assert venta is not None
         pago = s.scalar(select(Pago).where(Pago.venta_id == venta.id))
         assert pago is not None
@@ -288,9 +349,59 @@ def test_pago_izipay_registra_pago_sin_exigir_caja(env):
         assert medio.nombre.lower() == "izipay"
 
 
+def test_el_webhook_es_idempotente(env):
+    client, ids, TestSession = env
+    pedido = _pedido_izipay(client, ids, "izipay-002")
+    for _ in range(3):  # la pasarela reintenta hasta que se le contesta
+        assert _webhook(client, pedido["pago_id_externo"]).status_code == 200
+
+    with TestSession() as s:
+        assert len(s.scalars(select(Venta).where(Venta.canal == "web")).all()) == 1
+        assert len(s.scalars(select(Pago)).all()) == 1
+
+
+def test_pago_rechazado_cierra_el_pedido_sin_venta(env):
+    client, ids, TestSession = env
+    pedido = _pedido_izipay(client, ids, "izipay-003")
+    assert _webhook(client, pedido["pago_id_externo"], "rechazado").status_code == 200
+
+    visto = client.get(
+        f"{PEDIDOS}/{pedido['id']}", params={"token": pedido["token_acceso"]}
+    ).json()
+    assert visto["estado"] == "fallido"
+    assert visto["pago_estado"] == "rechazado"
+    with TestSession() as s:
+        assert s.scalar(select(Venta).where(Venta.canal == "web")) is None
+    # Un aviso tardío de "aprobado" no resucita un pedido ya rechazado.
+    assert _webhook(client, pedido["pago_id_externo"]).status_code == 200
+    with TestSession() as s:
+        assert s.scalar(select(Venta).where(Venta.canal == "web")) is None
+
+
+def test_webhook_con_pago_desconocido_o_firma_invalida(env):
+    client, ids, _ = env
+    assert _webhook(client, "fake-que-no-existe").status_code == 404
+    r = client.post(WEBHOOK, json={"id_externo": "x"}, headers={"X-Izipay-Fake": "quizas"})
+    assert r.status_code == 400
+    assert client.post(WEBHOOK, content=b"no es json").status_code == 400
+
+
+def test_en_produccion_sin_credenciales_izipay_no_se_puede_usar(env, monkeypatch):
+    from src.config.settings import settings
+
+    client, ids, _ = env
+    pedido = _pedido_izipay(client, ids, "izipay-004")
+    monkeypatch.setattr(settings, "environment", "production")
+    # El webhook de mentira no existe en producción: nadie aprueba sin pagar.
+    assert _webhook(client, pedido["pago_id_externo"]).status_code == 400
+    # Y el checkout ya no ofrece cobrar con una pasarela que no cobra.
+    r = client.post(PEDIDOS, json=_body_takeout(ids, "izipay-005", medio_pago="izipay"))
+    assert r.status_code == 409
+
+
 def test_token_de_invitado_permite_consultar_su_pedido(env):
     client, ids, _ = env
-    r = client.post(PEDIDOS, json=_body_takeout(ids, "token-001"))
+    r = client.post(PEDIDOS, json=_body_takeout(ids, "token-001", medio_pago="izipay"))
     pedido_id = r.json()["id"]
     token = r.json()["token_acceso"]
 
