@@ -345,6 +345,8 @@ class Settings(BaseSettings):
     # lista de precios general (`canal=None`) sigue aplicando igual
     # (`especificidad_lista`), así que cambiar esto no rompe nada mientras
     # no se cree una lista específica para otro canal.
+    # De dónde cuelgan los enlaces que se mandan por correo (recuperar clave).
+    storefront_sitio_url: str = "http://localhost:3000"
     storefront_canal: str = "web"
     storefront_modalidad: str = "delivery"
     # Base del enlace de postulación pública (ADR-087) que arma

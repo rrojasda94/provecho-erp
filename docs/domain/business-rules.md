@@ -2207,6 +2207,22 @@ específicas de la parte **sin JWT**.
   con clave (o viceversa) se vincula a la cuenta existente en vez de
   duplicarla — el email verificado por Google es la misma identidad.
 
+- **RN-WEB-018** **Recuperar la clave por correo.** Quien olvidó su clave pide un
+  enlace con su email; **la respuesta es la misma exista o no la cuenta** (no se
+  le dice a nadie qué correos tienen cuenta). El enlace vale 30 minutos y **una
+  sola vez**: se vuelve inválido apenas cambia la clave, sin guardar nada en
+  una tabla. Al cambiarla se cierran todas las sesiones abiertas de la cuenta y
+  se limpia el bloqueo por intentos. Una cuenta creada solo con Google (sin
+  clave) puede ponerse una por este camino. Tope de 5 pedidos de enlace por
+  hora y por IP, para que no sirva de ametralladora de correos.
+- **RN-WEB-019** **Atención al cliente restablece la clave de quien no tiene un
+  correo al que llegue.** Desde el ERP (`/web/clientes`, `storefront.editar`) se
+  genera una **clave temporal de 8 caracteres**, que se muestra **una sola vez**
+  a quien atiende y no se guarda en claro; se cierran las sesiones de la cuenta
+  y esta queda con `debe_cambiar_clave`: hasta que el cliente elija una propia
+  (con la temporal como clave actual), el sitio no lo deja seguir. Cada
+  restablecimiento queda en la auditoría con quién lo hizo. Cambiar la clave
+  estando adentro exige la actual, salvo una cuenta solo-Google que nunca tuvo.
 - **RN-WEB-009** El checkout web no exige cuenta para comprar: un invitado
   (sin `Authorization`) confirma un pedido igual que un cliente logueado, con
   nombre/teléfono tecleados en el formulario en vez de leídos del perfil

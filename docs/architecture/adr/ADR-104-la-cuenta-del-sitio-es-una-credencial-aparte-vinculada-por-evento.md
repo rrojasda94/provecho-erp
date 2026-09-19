@@ -112,6 +112,27 @@ se llevaría puesto el lockout.
   entrega cuenta, direcciones, favoritos y "tu último pedido" (de cualquier
   canal, ya que `web` como canal de venta todavía no existe).
 
+## Enmienda (2026-09-19): recuperar la clave
+
+Una credencial propia trae una obligación propia: cuando alguien olvida su clave
+no hay a quién llamar salvo que se construya. Se agregan tres caminos
+(RN-WEB-018/019), todos dentro de la misma frontera de aislamiento:
+
+1. **Enlace por correo**, sin tabla nueva: un JWT firmado con
+   `STOREFRONT_JWT_SECRET` y **audiencia propia** (`storefront-reset`), así que
+   no sirve como token de sesión ni al revés. Lleva una **huella de la clave
+   vigente**: al cambiarse, deja de valer solo (un solo uso). Se descartó una
+   tabla de tokens de un solo uso: más estado que limpiar para el mismo efecto.
+2. **Cambio de clave** estando adentro, que exige la actual.
+3. **Restablecimiento por atención al cliente**, para quien no llega a su correo
+   (el caso que el negocio pidió explícitamente): clave temporal mostrada una vez y
+   `debe_cambiar_clave` (migración `cec53f7b2f6e`). Es una acción del ERP con su
+   permiso y su auditoría; la cuenta del sitio sigue sin poder tocar nada del ERP.
+
+Costo aceptado: el enlace depende de que el correo esté configurado (`SMTP_*`);
+sin él el sitio lo dice en el log y quien atiende usa el camino 3. Sigue sin
+existir verificación de email al registrarse.
+
 ## Alternativas descartadas
 
 - **Reusar `usuario` con un rol "cliente" sin permisos.** Es lo que

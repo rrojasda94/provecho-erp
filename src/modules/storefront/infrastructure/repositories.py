@@ -97,6 +97,16 @@ class RefreshTokenRepo:
         ):
             tok.revocado = True
 
+    def revocar_cuenta(self, cuenta_id: uuid.UUID) -> None:
+        """Cierra todas las sesiones de la cuenta (cambio de clave)."""
+        for tok in self.s.scalars(
+            select(StorefrontRefreshToken).where(
+                StorefrontRefreshToken.cuenta_id == cuenta_id,
+                StorefrontRefreshToken.revocado.is_(False),
+            )
+        ):
+            tok.revocado = True
+
 
 class DireccionRepo:
     def __init__(self, session: Session):

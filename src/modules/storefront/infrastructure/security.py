@@ -26,6 +26,11 @@ from src.config.settings import settings
 #: por casualidad tuviera el mismo secreto).
 AUDIENCIA = "storefront"
 
+#: El enlace de recuperar clave no es una sesión: otra audiencia, para que ni
+#: un token de acceso valga como enlace ni el enlace como token de acceso.
+AUDIENCIA_RESET = "storefront-reset"
+RESET_MINUTOS = 30
+
 _hasher = PasswordHasher()
 
 
@@ -64,6 +69,34 @@ def decode_access_token(token: str) -> dict[str, Any]:
         settings.storefront_jwt_secret,
         algorithms=[settings.jwt_algorithm],
         audience=AUDIENCIA,
+    )
+
+
+def huella_de_clave(password_hash: str | None) -> str:
+    """Resumen corto de la clave vigente. Va dentro del enlace de recuperación:
+    al cambiarse la clave la huella cambia y el enlace deja de valer (un solo
+    uso, sin guardar nada). Es un hash del hash: no revela la clave."""
+    return hashlib.sha256((password_hash or "").encode()).hexdigest()[:16]
+
+
+def create_reset_token(cuenta_id: uuid.UUID, password_hash: str | None) -> str:
+    now = datetime.now(UTC)
+    payload = {
+        "sub": str(cuenta_id),
+        "ph": huella_de_clave(password_hash),
+        "aud": AUDIENCIA_RESET,
+        "iat": now,
+        "exp": now + timedelta(minutes=RESET_MINUTOS),
+    }
+    return jwt.encode(payload, settings.storefront_jwt_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_reset_token(token: str) -> dict[str, Any]:
+    return jwt.decode(
+        token,
+        settings.storefront_jwt_secret,
+        algorithms=[settings.jwt_algorithm],
+        audience=AUDIENCIA_RESET,
     )
 
 

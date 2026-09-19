@@ -16,7 +16,7 @@ identidades — `cliente.usuario_id` queda sin usar para este caso.
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, false
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -44,6 +44,12 @@ class StorefrontCuenta(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     # una tarea de reconciliación cubre el caso en que el evento se pierda.
     cliente_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("cliente.id"), nullable=True, unique=True
+    )
+
+    # Atención al cliente le puso una clave temporal: hasta que la cambie, el
+    # sitio no la deja seguir (`/cuenta/cambiar-clave`).
+    debe_cambiar_clave: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
     )
 
     intentos_fallidos: Mapped[int] = mapped_column(Integer, default=0)

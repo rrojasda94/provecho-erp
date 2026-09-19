@@ -15,7 +15,12 @@ import {
 import { confirmarPedido, cotizarPedido, type Cotizacion } from "./actions";
 
 export type SucursalOpcion = { id: string; nombre: string; direccion: string | null };
-export type Perfil = { nombres: string; apellidos: string; telefono: string | null };
+export type Perfil = {
+  nombres: string;
+  apellidos: string;
+  telefono: string | null;
+  debe_cambiar_clave?: boolean;
+};
 export type Direccion = {
   id: string;
   etiqueta: string | null;

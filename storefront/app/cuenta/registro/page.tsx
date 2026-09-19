@@ -16,7 +16,7 @@ export default function RegistroPage() {
         Con tu cuenta guardas direcciones, favoritos y ves tu último pedido.
       </p>
       <GoogleBoton clientId={clientId} />
-      <div className="text-center text-xs text-humo">o con tu email</div>
+      {clientId && <div className="text-center text-xs text-humo">o con tu email</div>}
       <RegistroForm />
       <p className="text-center text-sm text-humo">
         ¿Ya tienes cuenta?{" "}

@@ -4687,6 +4687,33 @@
         "title": "CalendarioOut",
         "type": "object"
       },
+      "CambiarClaveIn": {
+        "properties": {
+          "clave_actual": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clave Actual"
+          },
+          "clave_nueva": {
+            "maxLength": 255,
+            "minLength": 8,
+            "title": "Clave Nueva",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave_nueva"
+        ],
+        "title": "CambiarClaveIn",
+        "type": "object"
+      },
       "CampanaCreate": {
         "properties": {
           "canal": {
@@ -5947,6 +5974,20 @@
         "title": "CierreCajaOut",
         "type": "object"
       },
+      "ClaveTemporalOut": {
+        "description": "Se muestra una sola vez a quien atiende: no queda guardada en claro.",
+        "properties": {
+          "clave_temporal": {
+            "title": "Clave Temporal",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clave_temporal"
+        ],
+        "title": "ClaveTemporalOut",
+        "type": "object"
+      },
       "ClienteBuscadoOut": {
         "description": "Lo que el PDV necesita para pintar un resultado de búsqueda.",
         "properties": {
@@ -6679,6 +6720,79 @@
           }
         },
         "title": "ClienteUpdate",
+        "type": "object"
+      },
+      "ClienteWebOut": {
+        "description": "Una cuenta del sitio vista por el personal: datos de contacto, nunca la\nclave ni su hash.",
+        "properties": {
+          "apellidos": {
+            "title": "Apellidos",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "debe_cambiar_clave": {
+            "default": false,
+            "title": "Debe Cambiar Clave",
+            "type": "boolean"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombres": {
+            "title": "Nombres",
+            "type": "string"
+          },
+          "numero_documento": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Numero Documento"
+          },
+          "telefono": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono"
+          },
+          "tiene_google": {
+            "default": false,
+            "title": "Tiene Google",
+            "type": "boolean"
+          },
+          "tiene_password": {
+            "default": false,
+            "title": "Tiene Password",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "nombres",
+          "apellidos",
+          "created_at"
+        ],
+        "title": "ClienteWebOut",
         "type": "object"
       },
       "CodigoIn": {
@@ -9854,6 +9968,11 @@
           "apellidos": {
             "title": "Apellidos",
             "type": "string"
+          },
+          "debe_cambiar_clave": {
+            "default": false,
+            "title": "Debe Cambiar Clave",
+            "type": "boolean"
           },
           "email": {
             "title": "Email",
@@ -30476,6 +30595,19 @@
         "title": "RecetaUpdate",
         "type": "object"
       },
+      "RecuperarIn": {
+        "properties": {
+          "email": {
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "title": "RecuperarIn",
+        "type": "object"
+      },
       "RecursoOut": {
         "properties": {
           "campo_marca": {
@@ -32161,6 +32293,28 @@
           "valor"
         ],
         "title": "RespuestaPublicaIn",
+        "type": "object"
+      },
+      "RestablecerIn": {
+        "properties": {
+          "password": {
+            "maxLength": 255,
+            "minLength": 8,
+            "title": "Password",
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 2000,
+            "minLength": 10,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "password"
+        ],
+        "title": "RestablecerIn",
         "type": "object"
       },
       "ResultadoCeldaOut": {
@@ -69550,6 +69704,114 @@
         ]
       }
     },
+    "/api/v1/storefront/clientes": {
+      "get": {
+        "operationId": "listar_clientes_web_api_v1_storefront_clientes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ClienteWebOut"
+                  },
+                  "title": "Response Listar Clientes Web Api V1 Storefront Clientes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Listar Clientes Web",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/clientes/{cuenta_id}/restablecer-clave": {
+      "post": {
+        "description": "Para quien no tiene un correo al que llegue el enlace. Devuelve la clave\ntemporal **una sola vez**; la cuenta queda obligada a cambiarla.",
+        "operationId": "restablecer_clave_de_cliente_api_v1_storefront_clientes__cuenta_id__restablecer_clave_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "cuenta_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Cuenta Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaveTemporalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Restablecer Clave De Cliente",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
     "/api/v1/storefront/contenido": {
       "get": {
         "operationId": "listar_contenido_api_v1_storefront_contenido_get",
@@ -69868,6 +70130,45 @@
           }
         ],
         "summary": "Editar Perfil",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/me/clave": {
+      "patch": {
+        "operationId": "cambiar_clave_api_v1_storefront_cuentas_me_clave_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CambiarClaveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Cambiar Clave",
         "tags": [
           "storefront"
         ]
@@ -70222,6 +70523,46 @@
         ]
       }
     },
+    "/api/v1/storefront/cuentas/recuperar": {
+      "post": {
+        "description": "Manda el enlace si el correo tiene cuenta. Siempre responde igual.",
+        "operationId": "recuperar_clave_api_v1_storefront_cuentas_recuperar_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecuperarIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Recuperar Clave",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
     "/api/v1/storefront/cuentas/refresh": {
       "post": {
         "operationId": "refresh_api_v1_storefront_cuentas_refresh_post",
@@ -70299,6 +70640,40 @@
           }
         },
         "summary": "Registrar",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/cuentas/restablecer": {
+      "post": {
+        "operationId": "restablecer_clave_api_v1_storefront_cuentas_restablecer_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestablecerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Restablecer Clave",
         "tags": [
           "storefront"
         ]

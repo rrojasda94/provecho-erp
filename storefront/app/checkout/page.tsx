@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import { apiAuth, apiFetch } from "@/lib/api";
@@ -20,6 +21,8 @@ export default async function CheckoutPage() {
         }).catch(() => [])
       : Promise.resolve([]),
   ]);
+
+  if (perfil?.debe_cambiar_clave) redirect("/cuenta/cambiar-clave");
 
   return (
     <CheckoutCliente

@@ -102,6 +102,34 @@ export async function guardarContenidoAction(
   return { error: "", ok: true };
 }
 
+// --- Atención al cliente: clave de una cuenta del sitio -----------------------
+
+export type ResultadoClaveTemporal = { ok: true; clave: string } | { ok: false; error: string };
+
+/** Restablece la clave de un cliente del sitio que no puede recibir el correo
+ * de recuperación. La clave temporal viaja **una sola vez** hasta la pantalla
+ * de quien atiende; el cliente queda obligado a cambiarla al ingresar. */
+export async function restablecerClaveClienteAction(
+  cuentaId: string,
+): Promise<ResultadoClaveTemporal> {
+  try {
+    const r = await apiFetch<{ clave_temporal: string }>(
+      `/api/v1/storefront/clientes/${cuentaId}/restablecer-clave`,
+      { token: await token(), metodo: "POST" },
+    );
+    revalidatePath("/web/clientes");
+    return { ok: true, clave: r.clave_temporal };
+  } catch (e) {
+    const mensaje =
+      e instanceof ApiError && e.status === 403
+        ? "Tu usuario no tiene permiso para restablecer claves."
+        : e instanceof ApiError
+          ? e.message
+          : "No se pudo restablecer la clave.";
+    return { ok: false, error: mensaje };
+  }
+}
+
 // --- Fotos de catálogo (producto/ingrediente) --------------------------------
 
 type Entidad = "producto" | "ingrediente";

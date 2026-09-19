@@ -49,9 +49,18 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   registro con email/clave o Google, vínculo a `cliente` de `sales` por
   evento (`storefront.cuenta_registrada` → `sales.cliente_vinculado`).
   Lo que deja abierto:
-  - ⬜ **Sin "olvidé mi contraseña".** La cuenta web no tiene flujo de
-    recuperación — a diferencia del PIN del ERP (`tests/test_reset_pin.py`),
-    quien pierde su clave hoy no puede recuperarla sola.
+  - ✅ 2026-09-19 **"Olvidé mi contraseña"** (RN-WEB-018/019, ADR-104
+    enmendado): enlace por correo de un solo uso, cambio de clave, y
+    restablecimiento por atención al cliente desde el ERP (`/web/clientes`).
+    Lo que deja abierto:
+    - ⬜ **El correo depende de `SMTP_*` en el servidor.** Hasta que estén, la
+      recuperación por correo no envía nada (el log lo dice) y se atiende por el
+      camino de atención al cliente.
+    - ⬜ **`STOREFRONT_SITIO_URL` sin configurar** deja los enlaces apuntando a
+      `localhost`: es parte del checklist de `staging.md`.
+    - ⬜ **Sin límite de intentos por cuenta al pedir el enlace** (solo por IP):
+      alguien podría llenarle el correo a una persona desde muchas IP. Aceptado
+      mientras el volumen sea el de un solo local.
   - ⬜ **Sin verificación de email.** El registro por email/clave deja la
     cuenta operativa de inmediato; no hay envío de correo de confirmación
     ni columna `verificada_at`.

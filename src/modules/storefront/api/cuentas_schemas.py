@@ -60,6 +60,21 @@ class RefreshIn(BaseModel):
     refresh_token: str
 
 
+class RecuperarIn(BaseModel):
+    email: Email
+
+
+class RestablecerIn(BaseModel):
+    token: str = Field(min_length=10, max_length=2000)
+    password: str = Field(min_length=8, max_length=255)
+
+
+class CambiarClaveIn(BaseModel):
+    # Obligatoria si la cuenta ya tiene clave; una cuenta solo-Google no la tiene.
+    clave_actual: str | None = Field(default=None, max_length=255)
+    clave_nueva: str = Field(min_length=8, max_length=255)
+
+
 class TokensOut(BaseModel):
     access_token: str
     refresh_token: str
@@ -78,6 +93,7 @@ class CuentaOut(BaseModel):
     fecha_nacimiento: date | None
     tiene_password: bool = False
     tiene_google: bool = False
+    debe_cambiar_clave: bool = False
 
 
 class ActualizarPerfilIn(BaseModel):

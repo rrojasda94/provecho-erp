@@ -174,6 +174,15 @@ y [ADR-105](../architecture/adr/ADR-105-el-pedido-web-es-canal-propio-y-el-efect
   credenciales `izipay_disponible()` corta el checkout antes de crear un
   pedido que nadie podría cobrar. Probado en `tests/test_storefront_pedidos.py`
   (`test_en_produccion_sin_credenciales_izipay_no_se_puede_usar`).
+- **Recuperar la clave** (RN-WEB-018/019): el enlace es un JWT de otra audiencia
+  (`storefront-reset`) con la huella de la clave vigente —vale 30 minutos y una
+  sola vez—; `POST /storefront/cuentas/recuperar` responde igual exista o no el
+  correo y tiene rate limit propio (5/hora por IP). Cambiar la clave cierra todas
+  las sesiones. El restablecimiento por atención al cliente es una acción del ERP
+  (`storefront.editar`, auditada con el usuario): la clave temporal se muestra
+  una vez, no se guarda en claro y obliga a cambiarla. Probado en
+  `tests/test_storefront_recuperacion.py`, incluido que el enlace no sirve como
+  token de sesión y que un token de sesión no sirve como enlace.
 - **CSP propia** (`storefront/middleware.ts`, nonce por request,
   `'strict-dynamic'`), separada de la del ERP — el sitio no debe poder cargar
   ni ejecutar nada del back office ni viceversa.
