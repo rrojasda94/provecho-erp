@@ -66,11 +66,52 @@ def contenido(session) -> dict:
     }
 
 
-def _ficha(nodo: dict, ingredientes_por_receta: dict[uuid.UUID, list[dict]]) -> dict:
-    """Un producto o una variante, recortados a lo que RN-WEB-001 permite
-    mostrar: nunca `id_interno`, `margen_contribucion` ni `empaque_id`."""
-    ingredientes = ingredientes_por_receta.get(nodo.get("receta_id"), [])
+def _opciones(nodo: dict) -> dict:
+    """Extras, sabores y pares excluidos de un nodo, con los campos que el
+    cliente necesita para armar su línea (RN-WEB-001: enumerados, no el dict de
+    `sales` tal cual)."""
     return {
+        "extras": [
+            {
+                "id": e["producto_comercial_id"],
+                "nombre": e["nombre"],
+                "precio": e["precio_unitario"],
+                "maximo": e["maximo"],
+                "grupo_id": e["grupo_id"],
+                "grupo_nombre": e["grupo_nombre"],
+                "grupo_minimo": e["grupo_minimo"],
+                "grupo_maximo": e["grupo_maximo"],
+            }
+            for e in nodo.get("extras", [])
+        ],
+        "atributos": [
+            {
+                "id": a["atributo_id"],
+                "nombre": a["nombre"],
+                "display": a["display"],
+                "valores": [
+                    {"id": v["id"], "nombre": v["nombre"], "precio_extra": v["precio_extra"]}
+                    for v in a["valores"]
+                ],
+            }
+            for a in nodo.get("atributos", [])
+        ],
+        "exclusiones": [list(par) for par in nodo.get("exclusiones", [])],
+    }
+
+
+def _ficha(
+    nodo: dict,
+    ingredientes_por_receta: dict[uuid.UUID, list[dict]],
+    *,
+    con_opciones: bool = False,
+) -> dict:
+    """Un producto o una variante, recortados a lo que RN-WEB-001 permite
+    mostrar: nunca `id_interno`, `margen_contribucion` ni `empaque_id`. Las
+    opciones (extras/sabores) solo van en el detalle de un producto: la carta
+    completa las repetiría por cada tamaño de cada pizza."""
+    ingredientes = ingredientes_por_receta.get(nodo.get("receta_id"), [])
+    ficha = {
         "id": nodo["producto_comercial_id"],
         "nombre": nodo["nombre"],
         "descripcion": nodo.get("descripcion"),
@@ -80,9 +121,12 @@ def _ficha(nodo: dict, ingredientes_por_receta: dict[uuid.UUID, list[dict]]) -> 
             {"id": ins["articulo_id"], "nombre": ins["nombre"]} for ins in ingredientes
         ],
     }
+    if con_opciones:
+        ficha.update(_opciones(nodo))
+    return ficha
 
 
-def carta(session) -> dict:
+def carta(session, *, con_opciones: bool = False) -> dict:
     marca_id = _marca_id()
     sucursal_id = _sucursal_id(session)
     items = carta_publica(
@@ -104,11 +148,14 @@ def carta(session) -> dict:
     for item in items:
         if item.get("categoria_id"):
             categorias.setdefault(item["categoria_id"], item.get("categoria_nombre") or "")
-        variantes = [_ficha(v, ingredientes_por_receta) for v in item.get("variantes", [])]
+        variantes = [
+            _ficha(v, ingredientes_por_receta, con_opciones=con_opciones)
+            for v in item.get("variantes", [])
+        ]
         precios_variantes = [v["precio"] for v in variantes]
         precio_desde = min(precios_variantes) if precios_variantes else item["precio_unitario"]
 
-        base = _ficha(item, ingredientes_por_receta)
+        base = _ficha(item, ingredientes_por_receta, con_opciones=con_opciones)
         base.pop("precio")
         productos.append(
             {
@@ -129,7 +176,7 @@ def carta(session) -> dict:
 
 
 def producto(session, producto_id: uuid.UUID) -> dict:
-    datos = carta(session)
+    datos = carta(session, con_opciones=True)
     for item in datos["productos"]:
         if item["id"] != producto_id:
             continue

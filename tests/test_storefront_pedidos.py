@@ -3,6 +3,7 @@ ADR-105): invitado y logueado, asignación de local, ETA, efectivo e
 Izipay, idempotencia y el token de consulta para un invitado sin cuenta.
 """
 
+import json
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -32,6 +33,7 @@ from src.modules.sales.infrastructure.models import (
     ProductoComercial,
     PuntoVenta,
     Venta,
+    VentaItem,
 )
 from src.modules.storefront.application import listeners as storefront_listeners
 from src.modules.users.api.deps import get_db
@@ -159,7 +161,24 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
 
     app.dependency_overrides[get_db] = _override_get_db
     with TestClient(app) as c:
+        # El efectivo exige cuenta (RN-WEB-013): los pedidos de estas pruebas
+        # salen con una; los del invitado piden `headers={}` a propósito.
+        r = c.post(
+            "/api/v1/storefront/cuentas/registro",
+            json={
+                "email": "cliente@example.com", "password": "clave-larga-123",
+                "nombres": "Carlos", "apellidos": "Pérez", "tipo_documento": "dni",
+                "numero_documento": "45678912", "telefono": "987654321",
+                "fecha_nacimiento": "1995-05-20", "direccion": "Jr. Los Pinos 123",
+            },
+        )
+        assert r.status_code == 201, r.text
+        ids["auth"] = {"Authorization": "Bearer " + r.json()["access_token"]}
         yield c, ids, TestSession
+
+
+def _auth(ids):
+    return ids["auth"]
 
 
 def _items(ids, cantidad=2):
@@ -193,9 +212,9 @@ def _body_delivery(ids, idem: str, lat: Decimal, lng: Decimal, medio_pago="efect
     }
 
 
-def test_confirmar_pedido_recojo_efectivo_invitado(env):
+def test_confirmar_pedido_recojo_efectivo_con_cuenta(env):
     client, ids, TestSession = env
-    r = client.post(PEDIDOS, json=_body_takeout(ids, "recojo-001"))
+    r = client.post(PEDIDOS, headers=_auth(ids), json=_body_takeout(ids, "recojo-001"))
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["estado"] == "confirmado"
@@ -209,13 +228,15 @@ def test_confirmar_pedido_recojo_efectivo_invitado(env):
         assert venta is not None
         assert venta.canal == "web"
         assert venta.modalidad == "takeout"
-        assert venta.cliente_id is None
+        assert venta.cliente_id is not None  # el de la cuenta
         assert venta.estado == "orden"  # efectivo: se cobra al recoger, no ahora
 
 
 def test_confirmar_pedido_delivery_asigna_la_sucursal_mas_cercana(env):
     client, ids, _ = env
-    r = client.post(PEDIDOS, json=_body_delivery(ids, "deliv-001", CH2_LAT, CH2_LNG))
+    r = client.post(
+        PEDIDOS, headers=_auth(ids), json=_body_delivery(ids, "deliv-001", CH2_LAT, CH2_LNG)
+    )
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["estado"] == "confirmado"
@@ -245,7 +266,9 @@ def test_confirmar_pedido_delivery_evita_sucursal_saturada(env):
             )
         s.commit()
 
-    r = client.post(PEDIDOS, json=_body_delivery(ids, "deliv-002", CH1_LAT, CH1_LNG))
+    r = client.post(
+        PEDIDOS, headers=_auth(ids), json=_body_delivery(ids, "deliv-002", CH1_LAT, CH1_LNG)
+    )
     assert r.status_code == 201, r.text
     body = r.json()
     # CH1 está saturada: se prefiere CH2 aunque CH1 sea la más cercana.
@@ -258,28 +281,68 @@ def test_confirmar_pedido_fuera_de_cobertura(env, monkeypatch):
 
     monkeypatch.setattr(settings, "delivery_distancia_maxima_km", Decimal("0.001"))
     lejos_lat, lejos_lng = Decimal("-6.700000"), Decimal("-76.600000")
-    r = client.post(PEDIDOS, json=_body_delivery(ids, "deliv-003", lejos_lat, lejos_lng))
+    r = client.post(
+        PEDIDOS, headers=_auth(ids), json=_body_delivery(ids, "deliv-003", lejos_lat, lejos_lng)
+    )
     assert r.status_code == 409, r.text
 
 
 def test_idempotencia_del_pedido(env):
     client, ids, _ = env
-    r1 = client.post(PEDIDOS, json=_body_takeout(ids, "idem-001"))
-    r2 = client.post(PEDIDOS, json=_body_takeout(ids, "idem-001"))
+    r1 = client.post(PEDIDOS, headers=_auth(ids), json=_body_takeout(ids, "idem-001"))
+    r2 = client.post(PEDIDOS, headers=_auth(ids), json=_body_takeout(ids, "idem-001"))
     assert r1.status_code == 201
     assert r2.status_code == 201
     assert r1.json()["id"] == r2.json()["id"]
 
 
-def test_pago_izipay_registra_pago_sin_exigir_caja(env):
-    client, ids, TestSession = env
-    r = client.post(PEDIDOS, json=_body_takeout(ids, "izipay-001", medio_pago="izipay"))
+WEBHOOK = "/api/v1/storefront/webhooks/izipay"
+
+
+def _webhook(client, id_externo, resultado="aprobado"):
+    return client.post(
+        WEBHOOK, json={"id_externo": id_externo}, headers={"X-Izipay-Fake": resultado}
+    )
+
+
+def _pedido_izipay(client, ids, clave):
+    """Un invitado paga por adelantado: queda pendiente hasta el webhook."""
+    r = client.post(PEDIDOS, json=_body_takeout(ids, clave, medio_pago="izipay"))
     assert r.status_code == 201, r.text
-    body = r.json()
-    assert body["estado"] == "confirmado"
+    return r.json()
+
+
+def test_invitado_no_puede_pagar_en_efectivo(env):
+    client, ids, _ = env
+    r = client.post(PEDIDOS, json=_body_takeout(ids, "sin-cuenta-001"))
+    assert r.status_code == 409, r.text
+    assert "cuenta" in r.json()["detail"]
+
+
+def test_pago_izipay_deja_el_pedido_pendiente_hasta_el_webhook(env):
+    client, ids, TestSession = env
+    pedido = _pedido_izipay(client, ids, "izipay-001")
+    assert pedido["estado"] == "pendiente"
+    assert pedido["pago_estado"] == "pendiente"
+    assert pedido["pago_simulado"] is True
+    assert pedido["pago_id_externo"].startswith("fake-")
 
     with TestSession() as s:
-        venta = s.scalar(select(Venta).where(Venta.numero_orden == body["numero_orden"]))
+        # Sin pagar no hay venta: nada llega a cocina.
+        assert s.scalar(select(Venta).where(Venta.canal == "web")) is None
+
+    r = _webhook(client, pedido["pago_id_externo"])
+    assert r.status_code == 200, r.text
+
+    visto = client.get(
+        f"{PEDIDOS}/{pedido['id']}", params={"token": pedido["token_acceso"]}
+    ).json()
+    assert visto["estado"] == "confirmado"
+    assert visto["pago_estado"] == "aprobado"
+    assert visto["numero_orden"] is not None
+
+    with TestSession() as s:
+        venta = s.scalar(select(Venta).where(Venta.numero_orden == visto["numero_orden"]))
         assert venta is not None
         pago = s.scalar(select(Pago).where(Pago.venta_id == venta.id))
         assert pago is not None
@@ -288,9 +351,59 @@ def test_pago_izipay_registra_pago_sin_exigir_caja(env):
         assert medio.nombre.lower() == "izipay"
 
 
+def test_el_webhook_es_idempotente(env):
+    client, ids, TestSession = env
+    pedido = _pedido_izipay(client, ids, "izipay-002")
+    for _ in range(3):  # la pasarela reintenta hasta que se le contesta
+        assert _webhook(client, pedido["pago_id_externo"]).status_code == 200
+
+    with TestSession() as s:
+        assert len(s.scalars(select(Venta).where(Venta.canal == "web")).all()) == 1
+        assert len(s.scalars(select(Pago)).all()) == 1
+
+
+def test_pago_rechazado_cierra_el_pedido_sin_venta(env):
+    client, ids, TestSession = env
+    pedido = _pedido_izipay(client, ids, "izipay-003")
+    assert _webhook(client, pedido["pago_id_externo"], "rechazado").status_code == 200
+
+    visto = client.get(
+        f"{PEDIDOS}/{pedido['id']}", params={"token": pedido["token_acceso"]}
+    ).json()
+    assert visto["estado"] == "fallido"
+    assert visto["pago_estado"] == "rechazado"
+    with TestSession() as s:
+        assert s.scalar(select(Venta).where(Venta.canal == "web")) is None
+    # Un aviso tardío de "aprobado" no resucita un pedido ya rechazado.
+    assert _webhook(client, pedido["pago_id_externo"]).status_code == 200
+    with TestSession() as s:
+        assert s.scalar(select(Venta).where(Venta.canal == "web")) is None
+
+
+def test_webhook_con_pago_desconocido_o_firma_invalida(env):
+    client, ids, _ = env
+    assert _webhook(client, "fake-que-no-existe").status_code == 404
+    r = client.post(WEBHOOK, json={"id_externo": "x"}, headers={"X-Izipay-Fake": "quizas"})
+    assert r.status_code == 400
+    assert client.post(WEBHOOK, content=b"no es json").status_code == 400
+
+
+def test_en_produccion_sin_credenciales_izipay_no_se_puede_usar(env, monkeypatch):
+    from src.config.settings import settings
+
+    client, ids, _ = env
+    pedido = _pedido_izipay(client, ids, "izipay-004")
+    monkeypatch.setattr(settings, "environment", "production")
+    # El webhook de mentira no existe en producción: nadie aprueba sin pagar.
+    assert _webhook(client, pedido["pago_id_externo"]).status_code == 400
+    # Y el checkout ya no ofrece cobrar con una pasarela que no cobra.
+    r = client.post(PEDIDOS, json=_body_takeout(ids, "izipay-005", medio_pago="izipay"))
+    assert r.status_code == 409
+
+
 def test_token_de_invitado_permite_consultar_su_pedido(env):
     client, ids, _ = env
-    r = client.post(PEDIDOS, json=_body_takeout(ids, "token-001"))
+    r = client.post(PEDIDOS, json=_body_takeout(ids, "token-001", medio_pago="izipay"))
     pedido_id = r.json()["id"]
     token = r.json()["token_acceso"]
 
@@ -366,3 +479,191 @@ def test_variante_sin_tiempo_propio_hereda_el_de_su_padre(env):
         s.commit()
         tiempos = tiempos_preparacion(s, [hija.id, propia.id, padre.id])
         assert tiempos == {hija.id: 25, propia.id: 15, padre.id: 25}
+
+
+# --- extras y Mitad x Mitad (RN-WEB-017) --------------------------------------
+
+
+def _pizza_mitad_y_mitad(TestSession, ids):
+    """Una pizza de 40 con extras (queso hasta 2, tocino, champiñones) y dos
+    mitades (Hawaiana suma 3 en la primera). Hawaiana con Hawaiana y Peperoni con
+    Peperoni están excluidas: no es una mitad y mitad, es una entera."""
+    from src.modules.sales.application import atributos, catalogo
+    from src.modules.sales.infrastructure.models import ListaPrecio
+
+    with TestSession() as s:
+        base = s.get(ProductoComercial, uuid.UUID(ids["producto_id"]))
+        empresa = s.scalar(select(Empresa))
+        lista = s.scalar(select(ListaPrecio).where(ListaPrecio.nombre == "General"))
+
+        def producto(codigo, nombre, monto, **campos):
+            p = ProductoComercial(
+                id_interno=codigo, marca_id=base.marca_id, nombre=nombre,
+                receta_id=base.receta_id, **campos,
+            )
+            s.add(p)
+            s.flush()
+            precios.fijar_precio(
+                s, lista_precio_id=lista.id, producto_comercial_id=p.id,
+                monto=Decimal(monto),
+            )
+            return p
+
+        pizza = producto("P0000090", "Pizza Mitad", "40.00")
+        queso = producto("P0000091", "Extra Queso", "6.00", es_extra=True)
+        tocino = producto("P0000092", "Extra Tocino", "8.00", es_extra=True)
+        champi = producto("P0000093", "Extra Champinon", "5.00", es_extra=True)
+        ajeno = producto("P0000094", "Extra Ajeno", "4.00", es_extra=True)  # sin vincular
+        catalogo.vincular_extra(s, producto_id=pizza.id, extra_id=queso.id, maximo=2)
+        catalogo.vincular_extra(s, producto_id=pizza.id, extra_id=tocino.id)
+        catalogo.vincular_extra(s, producto_id=pizza.id, extra_id=champi.id)
+
+        valores = {}
+        for nombre_atributo in ("Mitad 1", "Mitad 2"):
+            atributo = atributos.crear_atributo(
+                s, empresa_id=empresa.id, nombre=nombre_atributo
+            )
+            for sabor in ("Hawaiana", "Peperoni"):
+                atributos.agregar_valor(s, atributo.id, nombre=sabor)
+            linea = atributos.ofrecer_atributo(
+                s, producto_id=pizza.id, atributo_id=atributo.id
+            )
+            nombres = {v.id: v.nombre for v in atributos.valores_de(s, atributo.id)}
+            for ptav in atributos.ptav_de_linea(s, linea.id):
+                valores[(nombre_atributo, nombres[ptav.atributo_valor_id])] = str(ptav.id)
+        atributos.fijar_precio_extra(
+            s, uuid.UUID(valores[("Mitad 1", "Hawaiana")]), precio_extra=Decimal("3.00")
+        )
+        for sabor in ("Hawaiana", "Peperoni"):
+            atributos.excluir(
+                s,
+                valor_id=uuid.UUID(valores[("Mitad 1", sabor)]),
+                excluye_id=uuid.UUID(valores[("Mitad 2", sabor)]),
+            )
+        s.commit()
+        return {
+            "pizza": str(pizza.id), "queso": str(queso.id), "tocino": str(tocino.id),
+            "champi": str(champi.id), "ajeno": str(ajeno.id),
+            "h1": valores[("Mitad 1", "Hawaiana")], "p1": valores[("Mitad 1", "Peperoni")],
+            "h2": valores[("Mitad 2", "Hawaiana")], "p2": valores[("Mitad 2", "Peperoni")],
+        }
+
+
+def _linea(o, cantidad, valores, extras=()):
+    return {
+        "producto_comercial_id": o["pizza"],
+        "cantidad": cantidad,
+        "valores_variante_ids": valores,
+        "extras": [{"producto_comercial_id": e, "cantidad": c} for e, c in extras],
+    }
+
+
+def _pedir(client, ids, linea, clave, **kw):
+    body = {**_body_takeout(ids, clave, **kw), "items": [linea]}
+    return client.post(PEDIDOS, headers=_auth(ids), json=body)
+
+
+def test_el_detalle_publico_trae_las_opciones_y_la_carta_no_las_repite(env):
+    client, ids, TestSession = env
+    o = _pizza_mitad_y_mitad(TestSession, ids)
+
+    det = client.get(f"/api/v1/storefront/publico/productos/{o['pizza']}")
+    assert det.status_code == 200, det.text
+    det = det.json()
+    assert {a["nombre"] for a in det["atributos"]} == {"Mitad 1", "Mitad 2"}
+    assert {e["nombre"] for e in det["extras"]} == {
+        "Extra Queso", "Extra Tocino", "Extra Champinon",
+    }
+    hawaiana = next(
+        v for a in det["atributos"] if a["nombre"] == "Mitad 1"
+        for v in a["valores"] if v["nombre"] == "Hawaiana"
+    )
+    assert Decimal(hawaiana["precio_extra"]) == Decimal("3.00")
+    assert len(det["exclusiones"]) == 2
+    assert "id_interno" not in json.dumps(det) and "empresa_id" not in json.dumps(det)
+
+    carta = client.get("/api/v1/storefront/publico/carta").json()
+    ficha = next(p for p in carta["productos"] if p["id"] == o["pizza"])
+    assert ficha["extras"] == [] and ficha["atributos"] == []  # liviana
+
+
+def test_mitad_y_mitad_con_extras_cobra_lo_mismo_que_el_pdv(env):
+    client, ids, TestSession = env
+    o = _pizza_mitad_y_mitad(TestSession, ids)
+    linea = _linea(o, 2, [o["h1"], o["p2"]], [(o["queso"], 2), (o["tocino"], 1)])
+    r = _pedir(client, ids, linea, "mitad-001")
+    assert r.status_code == 201, r.text
+    body = r.json()
+    # (40 + 3 de la Hawaiana + 2x6 + 8) x 2 pizzas
+    assert Decimal(body["total_estimado"]) == Decimal("126.00")
+    assert body["estado"] == "confirmado"
+    assert body["items"][0]["valores"] == ["Hawaiana", "Peperoni"]
+    assert {(e["nombre"], e["cantidad"]) for e in body["items"][0]["extras"]} == {
+        ("Extra Queso", 2), ("Extra Tocino", 1),
+    }
+
+    with TestSession() as s:
+        venta = s.scalar(select(Venta).where(Venta.numero_orden == body["numero_orden"]))
+        assert venta.total == Decimal("126.00")  # el mismo número que mostró la web
+        lineas = s.scalars(select(VentaItem).where(VentaItem.venta_id == venta.id)).all()
+        padre = next(i for i in lineas if i.padre_venta_item_id is None)
+        assert padre.precio_unitario == Decimal("43.00")  # con el recargo de la Hawaiana
+        assert sorted(padre.valores_variante_ids) == sorted([o["h1"], o["p2"]])
+        hijos = {
+            str(i.producto_comercial_id): i for i in lineas
+            if i.padre_venta_item_id == padre.id
+        }
+        # La cantidad del extra es por pizza: 2 pizzas x 2 quesos = 4 porciones.
+        assert hijos[o["queso"]].cantidad == 4 and hijos[o["queso"]].precio_unitario == 6
+        assert hijos[o["tocino"]].cantidad == 2
+
+
+@pytest.mark.parametrize(
+    ("armar", "mensaje"),
+    [
+        (lambda o: ([o["h1"]], []), "falta elegir Mitad 2"),
+        (lambda o: ([o["h1"], o["h2"]], []), "esa combinación no se puede pedir"),
+        (lambda o: ([o["h1"], o["p2"]], [("tocino", 2), ("queso", 2)]), "máximo 3 extras"),
+        (lambda o: ([o["h1"], o["p2"]], [("queso", 3)]), "admite hasta 2"),
+        (lambda o: ([o["h1"], o["p2"]], [("ajeno", 1)]), "ya no se ofrece"),
+    ],
+)
+def test_una_linea_que_sales_rechazaria_se_rechaza_antes_de_crear_nada(env, armar, mensaje):
+    client, ids, TestSession = env
+    o = _pizza_mitad_y_mitad(TestSession, ids)
+    valores, extras = armar(o)
+    linea = _linea(o, 1, valores, [(o[nombre], c) for nombre, c in extras])
+    r = _pedir(client, ids, linea, "rechazo-001")
+    assert r.status_code == 409, r.text
+    assert mensaje in r.json()["detail"]
+    with TestSession() as s:
+        assert s.scalar(select(Venta).where(Venta.canal == "web")) is None
+
+
+def test_izipay_con_opciones_cobra_el_total_y_arma_la_venta_al_aprobarse(env):
+    """Con Izipay la venta nace después, desde lo guardado: las opciones tienen
+    que sobrevivir ese viaje (pedido guardado → evento → `crear_venta`)."""
+    client, ids, TestSession = env
+    o = _pizza_mitad_y_mitad(TestSession, ids)
+    linea = _linea(o, 1, [o["p1"], o["h2"]], [(o["champi"], 1)])
+    body = {**_body_takeout(ids, "mitad-izipay", medio_pago="izipay"), "items": [linea]}
+    r = client.post(PEDIDOS, json=body)  # invitado
+    assert r.status_code == 201, r.text
+    pedido = r.json()
+    assert pedido["estado"] == "pendiente"
+    assert Decimal(pedido["total_estimado"]) == Decimal("45.00")  # 40 + 5, sin recargo
+
+    assert _webhook(client, pedido["pago_id_externo"]).status_code == 200
+    visto = client.get(
+        f"{PEDIDOS}/{pedido['id']}", params={"token": pedido["token_acceso"]}
+    ).json()
+    assert visto["estado"] == "confirmado"
+
+    with TestSession() as s:
+        venta = s.scalar(select(Venta).where(Venta.numero_orden == visto["numero_orden"]))
+        pago = s.scalar(select(Pago).where(Pago.venta_id == venta.id))
+        assert venta.total == Decimal("45.00") == pago.monto
+        lineas = s.scalars(select(VentaItem).where(VentaItem.venta_id == venta.id)).all()
+        padre = next(i for i in lineas if i.padre_venta_item_id is None)
+        assert sorted(padre.valores_variante_ids) == sorted([o["p1"], o["h2"]])
+        assert any(str(i.producto_comercial_id) == o["champi"] for i in lineas)

@@ -2178,7 +2178,9 @@ específicas de la parte **sin JWT**.
   devuelve `empresa_id`/`grupo_id`, costos, datos de `persona` de terceros,
   remuneración, usuarios/proveedores ni cantidades de receta — solo los
   campos enumerados en cada `*PublicoOut`. Ningún endpoint público serializa
-  un modelo ORM directamente.
+  un modelo ORM directamente. Los **extras, sabores (atributos) y pares
+  excluidos** de un producto sí son carta —hacen falta para venderlo, RN-WEB-017—
+  y salen solo en el detalle de cada producto, no en la lista.
 - **RN-WEB-002** Solo se publican promociones (`sales.promocion`) cuya
   columna `canales` incluye `"web"`, vigentes por fecha/hora/día, y cuya
   `marca_id` (si tiene) coincide con `STOREFRONT_MARCA_ID`.
@@ -2205,10 +2207,11 @@ específicas de la parte **sin JWT**.
   con clave (o viceversa) se vincula a la cuenta existente en vez de
   duplicarla — el email verificado por Google es la misma identidad.
 
-- **RN-WEB-009** El checkout web nunca exige cuenta: un invitado (sin
-  `Authorization`) confirma un pedido igual que un cliente logueado, con
+- **RN-WEB-009** El checkout web no exige cuenta para comprar: un invitado
+  (sin `Authorization`) confirma un pedido igual que un cliente logueado, con
   nombre/teléfono tecleados en el formulario en vez de leídos del perfil
-  (ADR-105).
+  (ADR-105) — **pero solo puede pagar con Izipay**: el efectivo exige cuenta
+  (RN-WEB-013).
 - **RN-WEB-010** Un pedido de delivery se asigna a la sucursal más cercana
   dentro del radio de delivery (`DELIVERY_DISTANCIA_MAXIMA_KM`) que tenga un
   punto de venta `web` habilitado para esa modalidad, salvo que esté
@@ -2228,14 +2231,43 @@ específicas de la parte **sin JWT**.
   la carta pública al confirmar (RN-PRC-003): un producto que ya no está
   disponible, o cuyo precio cambió desde que se agregó al carrito, rechaza
   el pedido en vez de cobrar lo que el navegador tenía guardado.
-- **RN-WEB-013** Un pedido pagado en efectivo nace `Venta.estado='orden'`
-  sin ningún pago registrado — se cobra al entregar/recoger, con el flujo de
-  caja normal. Un pedido pagado con Izipay se cobra de inmediato y su pago
-  se registra sin exigir caja abierta en el punto de venta `web` (ADR-105,
-  excepción explícita a ADR-025 §1).
+- **RN-WEB-013** **El efectivo es para quien tiene cuenta**: un pedido que se
+  paga contra entrega necesita alguien a quien reclamar si no se recoge o no
+  se paga, así que un invitado que elige efectivo recibe un aviso que lo invita
+  a registrarse (el carrito se conserva) y la API rechaza el pedido. Un pedido
+  en efectivo nace `Venta.estado='orden'` sin ningún pago registrado — se
+  cobra al entregar/recoger, con el flujo de caja normal. Un pedido con Izipay
+  se cobra por adelantado (RN-WEB-016) y su pago se registra sin exigir caja
+  abierta en el punto de venta `web` (ADR-105, excepción explícita a ADR-025
+  §1).
 - **RN-WEB-014** Todo pedido web es idempotente por `idempotency_key`
   (tecleada por el cliente, generada por el navegador): confirmar dos veces
   con la misma clave devuelve el mismo pedido, nunca lo duplica.
+- **RN-WEB-016** **Un pedido con Izipay no es venta hasta que se paga.** Al
+  confirmarlo queda `pendiente` con `pago_estado='pendiente'` y el cliente ve la
+  pantalla de pago; la `Venta` se crea —y llega a cocina— recién cuando la
+  pasarela avisa por webhook que el cobro se **aprobó**. Si se **rechaza**, el
+  pedido queda `fallido` sin venta. El webhook es idempotente por el id del
+  intento (`pago_id_externo`, único): la pasarela reintenta hasta recibir
+  respuesta y un segundo aviso, o un "aprobado" tardío sobre un pedido ya
+  resuelto, no crea otra venta ni reabre nada. Sin credenciales de Izipay se
+  usa la pasarela de prueba (el cliente aprueba o rechaza en la pantalla de
+  pago); esa vía no existe en producción y allí, sin credenciales, el checkout
+  no ofrece Izipay.
+- **RN-WEB-017** **Una línea del carrito puede llevar extras y sabores, con las
+  mismas reglas que el PDV.** Los extras son productos comerciales que el
+  producto admite (RN-COM-021), con tope por extra y mínimo/máximo por grupo
+  (RN-COM-023); los sabores son atributos de los que se elige **uno por
+  atributo** (las dos mitades de una Mitad x Mitad, RN-COM-040), sin combinar los
+  pares excluidos (RN-COM-038) y con el recargo que declare cada valor
+  (RN-COM-036). La API valida todo esto **antes de cobrar** contra la carta
+  pública —con Izipay el pago va primero y una línea que `sales` rechazara
+  después dejaría al cliente con el pago hecho y sin pedido— y el precio nunca
+  viene del navegador. Regla propia de la marca, no del ERP: **como mucho 3
+  extras de pago por producto**; el sabor de un grupo obligatorio forma parte de
+  la pizza y no cuenta. El total del pedido es `(precio + recargo de sabores +
+  extras) × cantidad` por línea, el mismo número que `sales` cobra al crear la
+  venta. La misma pizza con otros sabores o extras es otra línea del carrito.
 - **RN-WEB-015** Un invitado sin cuenta consulta su propio pedido con el
   `token_acceso` que recibió al confirmarlo (`GET /storefront/publico/
   pedidos/{id}?token=...`) — nunca con su número de pedido solo, que no es

@@ -71,14 +71,36 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   logueado, asignación automática de local, ETA, boleta/factura, efectivo
   e Izipay, canal `web` en `venta`. Lo que deja abierto:
   - ⬜ **`IzipayReal` es un esqueleto.** `src/shared/integrations/izipay/`
-    define el `Protocol` y `IzipayFake` (aprueba siempre); `IzipayReal`
-    lanza `NotImplementedError` en sus dos métodos. Sin una cuenta de
-    comercio real no hay contra qué probar el intercambio (redirección,
-    firma del webhook) — completar antes de aceptar un pago real.
-  - ⬜ **Sin extras ni Mitad x Mitad.** El carrito es "producto/tamaño +
-    cantidad"; `sales` no tiene todavía un concepto de extra/combo del que
-    colgarse (ver ADR-105 §6). Necesita diseño conjunto con el negocio
-    antes de construirse.
+    define el `Protocol`; `IzipayFake` deja el cobro pendiente y espera el
+    webhook (desde 2026-09-19, RN-WEB-016) y `IzipayReal` lanza
+    `NotImplementedError` en sus dos métodos. Lo que falta es solo lo que
+    depende de la cuenta de comercio: `crear_intento` real (formulario
+    incrustado en `/pedido/{id}/pago`) y `verificar_webhook` con la firma de
+    Izipay. La pantalla de pago, el webhook, la idempotencia y el paso
+    "pedido pendiente → venta" ya están construidos y probados.
+  - ⬜ **Un pedido con Izipay que nunca se paga queda `pendiente`.** Si el
+    cliente cierra la pantalla de pago y la pasarela nunca avisa, el pedido
+    no se vence solo (no llega a cocina, así que no cuesta comida; queda como
+    fila pendiente). Falta una tarea que cierre como `fallido` los pendientes
+    con más de N minutos.
+  - ⬜ **Tras registrarse, el cliente vuelve a `/cuenta`, no al checkout.** El
+    carrito se conserva en el navegador, pero quien se registra para pagar en
+    efectivo tiene que volver a entrar al checkout a mano.
+  - ✅ 2026-09-19 **Extras y Mitad x Mitad** (RN-WEB-017, ADR-105 §6 corregido):
+    la línea del carrito lleva extras y sabores, con las reglas del PDV. Lo que
+    deja abierto:
+    - ⬜ **Sin "sin cebolla" (restas).** El PDV deja quitar insumos de la receta
+      (`sin_articulo_ids`); el sitio no lo ofrece todavía.
+    - ⬜ **El tope de 3 extras vive en el sitio, no en el ERP.** Es una regla de la
+      marca (`majambo.md` §3.1.8); el PDV no la aplica. Si el negocio quiere que
+      valga en todos los canales, hay que llevarla a `sales`.
+    - ⬜ **Un grupo obligatorio cuyos extras no tienen precio vigente** no se
+      puede verificar antes de cobrar (el grupo llega a la carta solo a través
+      de sus extras con precio): `crear_venta` lo rechazaría. Es un producto que
+      tampoco se puede vender en el PDV; se arregla cargando el precio.
+    - ⬜ **Sin e2e de un producto con grupo de extras obligatorio** (como el sabor
+      de la carta demo): la lógica se prueba en unitarias y en `pytest`, y el
+      e2e cubre la Mitad x Mitad por atributos.
   - ⬜ **Boleta/factura del checkout no llega al cajero en efectivo.** La
     preferencia de comprobante que el cliente tecleó vive en
     `storefront_pedido`, pero ninguna pantalla del ERP se la muestra a

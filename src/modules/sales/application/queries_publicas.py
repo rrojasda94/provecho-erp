@@ -817,9 +817,14 @@ def carta_publica(
 ) -> list[dict]:
     """La carta que ve un cliente del sitio público: mismo motor de precio
     que el PDV (`precios.carta`), recortada a lo que RN-WEB-001 permite
-    mostrar —sin extras, atributos ni exclusiones, que son detalle de
-    configuración del PDV— y enriquecida con `descripcion`/`receta_id` por
-    nodo, que `precios.carta` no trae porque el PDV nunca los necesitó.
+    mostrar y enriquecida con `descripcion`/`receta_id` por nodo, que
+    `precios.carta` no trae porque el PDV nunca los necesitó.
+
+    Trae también lo que hace falta para **vender** un producto con opciones:
+    los extras (con su precio, tope y grupo), los atributos con sus valores —los
+    sabores de la Mitad x Mitad— y los pares excluidos. Antes se recortaban por
+    ser "configuración del PDV", y un producto con sabores obligatorios no se
+    podía pedir por la web: `crear_venta` lo rechazaba por "falta elegir".
     """
     # Import diferido: `precios` importa (transitivamente, vía
     # `inventory.application.recetas`) este mismo módulo — un import al
@@ -855,6 +860,9 @@ def carta_publica(
             "receta_id": producto.receta_id if producto else None,
             "precio_unitario": item["precio_unitario"],
             "stock_bajo": item["stock_bajo"],
+            "extras": item.get("extras", []),
+            "atributos": item.get("atributos", []),
+            "exclusiones": item.get("exclusiones", []),
         }
 
     return [

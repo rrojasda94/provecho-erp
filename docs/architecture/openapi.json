@@ -3673,6 +3673,45 @@
         "title": "AtributoOut",
         "type": "object"
       },
+      "AtributoPublicoOut": {
+        "description": "Algo que hay que elegir una vez (una mitad de la Mitad x Mitad).",
+        "properties": {
+          "display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "valores": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ValorAtributoPublicoOut"
+            },
+            "title": "Valores",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "AtributoPublicoOut",
+        "type": "object"
+      },
       "AtributoUpdate": {
         "properties": {
           "display": {
@@ -14037,6 +14076,127 @@
         "title": "ExtraIn",
         "type": "object"
       },
+      "ExtraPedidoIn": {
+        "properties": {
+          "cantidad": {
+            "exclusiveMinimum": 0.0,
+            "maximum": 3.0,
+            "title": "Cantidad",
+            "type": "integer"
+          },
+          "producto_comercial_id": {
+            "format": "uuid",
+            "title": "Producto Comercial Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "producto_comercial_id",
+          "cantidad"
+        ],
+        "title": "ExtraPedidoIn",
+        "type": "object"
+      },
+      "ExtraPedidoOut": {
+        "properties": {
+          "cantidad": {
+            "title": "Cantidad",
+            "type": "integer"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio",
+            "type": "string"
+          }
+        },
+        "required": [
+          "nombre",
+          "cantidad",
+          "precio"
+        ],
+        "title": "ExtraPedidoOut",
+        "type": "object"
+      },
+      "ExtraPublicoOut": {
+        "description": "Un extra que se puede sumar a la línea. `precio` es por unidad del\nextra; `maximo` el tope por unidad del producto; si pertenece a un grupo,\n`grupo_minimo`/`grupo_maximo` dicen cuántos hay que elegir (un sabor\nobligatorio es un grupo con mínimo 1).",
+        "properties": {
+          "grupo_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Id"
+          },
+          "grupo_maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Maximo"
+          },
+          "grupo_minimo": {
+            "default": 0,
+            "title": "Grupo Minimo",
+            "type": "integer"
+          },
+          "grupo_nombre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grupo Nombre"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "maximo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximo"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "precio"
+        ],
+        "title": "ExtraPublicoOut",
+        "type": "object"
+      },
       "FallarIn": {
         "properties": {
           "detalle": {
@@ -15739,10 +15899,29 @@
             "title": "Cantidad",
             "type": "integer"
           },
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraPedidoIn"
+            },
+            "maxItems": 10,
+            "title": "Extras",
+            "type": "array"
+          },
           "producto_comercial_id": {
             "format": "uuid",
             "title": "Producto Comercial Id",
             "type": "string"
+          },
+          "valores_variante_ids": {
+            "default": [],
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 6,
+            "title": "Valores Variante Ids",
+            "type": "array"
           }
         },
         "required": [
@@ -15758,6 +15937,14 @@
             "title": "Cantidad",
             "type": "integer"
           },
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraPedidoOut"
+            },
+            "title": "Extras",
+            "type": "array"
+          },
           "nombre_congelado": {
             "title": "Nombre Congelado",
             "type": "string"
@@ -15766,6 +15953,14 @@
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
             "title": "Precio Unitario Congelado",
             "type": "string"
+          },
+          "valores": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Valores",
+            "type": "array"
           }
         },
         "required": [
@@ -23436,6 +23631,38 @@
             ],
             "title": "Numero Orden"
           },
+          "pago_estado": {
+            "anyOf": [
+              {
+                "enum": [
+                  "pendiente",
+                  "aprobado",
+                  "rechazado"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pago Estado"
+          },
+          "pago_id_externo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pago Id Externo"
+          },
+          "pago_simulado": {
+            "default": false,
+            "title": "Pago Simulado",
+            "type": "boolean"
+          },
           "sucursal_id": {
             "anyOf": [
               {
@@ -26480,6 +26707,14 @@
       },
       "ProductoCartaPublicaOut": {
         "properties": {
+          "atributos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AtributoPublicoOut"
+            },
+            "title": "Atributos",
+            "type": "array"
+          },
           "categoria_id": {
             "anyOf": [
               {
@@ -26506,6 +26741,34 @@
           "disponible": {
             "title": "Disponible",
             "type": "boolean"
+          },
+          "exclusiones": {
+            "default": [],
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Exclusiones",
+            "type": "array"
+          },
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraPublicoOut"
+            },
+            "title": "Extras",
+            "type": "array"
           },
           "foto_url": {
             "anyOf": [
@@ -27015,6 +27278,14 @@
       },
       "ProductoPublicoDetalleOut": {
         "properties": {
+          "atributos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AtributoPublicoOut"
+            },
+            "title": "Atributos",
+            "type": "array"
+          },
           "categoria_id": {
             "anyOf": [
               {
@@ -27041,6 +27312,34 @@
           "disponible": {
             "title": "Disponible",
             "type": "boolean"
+          },
+          "exclusiones": {
+            "default": [],
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Exclusiones",
+            "type": "array"
+          },
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraPublicoOut"
+            },
+            "title": "Extras",
+            "type": "array"
           },
           "foto_url": {
             "anyOf": [
@@ -37250,6 +37549,31 @@
         "title": "UsuarioUpdate",
         "type": "object"
       },
+      "ValorAtributoPublicoOut": {
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "nombre": {
+            "title": "Nombre",
+            "type": "string"
+          },
+          "precio_extra": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Precio Extra",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "nombre",
+          "precio_extra"
+        ],
+        "title": "ValorAtributoPublicoOut",
+        "type": "object"
+      },
       "ValorDeCartaOut": {
         "description": "Un valor elegible de un atributo (ej. «Hawaiana» para «Mitad 1»).",
         "properties": {
@@ -37333,9 +37657,45 @@
       },
       "VarianteCartaPublicaOut": {
         "properties": {
+          "atributos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AtributoPublicoOut"
+            },
+            "title": "Atributos",
+            "type": "array"
+          },
           "disponible": {
             "title": "Disponible",
             "type": "boolean"
+          },
+          "exclusiones": {
+            "default": [],
+            "items": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Exclusiones",
+            "type": "array"
+          },
+          "extras": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExtraPublicoOut"
+            },
+            "title": "Extras",
+            "type": "array"
           },
           "id": {
             "format": "uuid",
@@ -70577,6 +70937,36 @@
           }
         },
         "summary": "Ver Sucursales",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/webhooks/izipay": {
+      "post": {
+        "description": "Recibe el resultado de un cobro. La firma viaja en `X-Izipay-Signature`\n(real) o `X-Izipay-Fake` (pasarela de prueba, solo fuera de producción). El\ncuerpo se lee crudo: la firma se calcula sobre los bytes exactos.",
+        "operationId": "webhook_izipay_api_v1_storefront_webhooks_izipay_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "summary": "Webhook Izipay",
         "tags": [
           "storefront"
         ]

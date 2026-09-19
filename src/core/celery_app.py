@@ -51,6 +51,21 @@ celery_app.conf.update(
         "socket_connect_timeout": 1,
         "socket_timeout": 1,
     },
+    # Lo mismo para el backend de resultados, que es OTRA conexión a Redis y
+    # tenía su propia política: `apply_async(retry=False)` solo apaga los
+    # reintentos del broker, y el backend igual reintentaba 20 veces con
+    # `Retry (n/20)` antes de rendirse. Con Redis caído, el request que
+    # confirmaba una venta se quedaba de 20 segundos a minutos colgado — justo
+    # lo que el comentario de arriba promete que no pasa.
+    redis_socket_connect_timeout=1,
+    result_backend_transport_options={
+        "retry_policy": {
+            "max_retries": 1,
+            "interval_start": 0,
+            "interval_step": 0,
+            "interval_max": 0,
+        },
+    },
 )
 
 # Barrido periódico de pedidos demorados (Celery beat).

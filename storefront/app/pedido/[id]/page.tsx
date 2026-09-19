@@ -1,12 +1,24 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 
 import { apiFetch } from "@/lib/api";
 
 export const metadata: Metadata = { title: "Tu pedido" };
 
-type ItemPedido = { nombre_congelado: string; cantidad: number; precio_unitario_congelado: string };
+type ItemPedido = {
+  nombre_congelado: string;
+  cantidad: number;
+  precio_unitario_congelado: string;
+  extras: { nombre: string; cantidad: number; precio: string }[];
+  valores: string[];
+};
+
+/** Lo que cuesta la línea: (producto con sabores + extras) x cantidad. */
+const totalDeItem = (it: ItemPedido): number =>
+  (Number(it.precio_unitario_congelado) +
+    it.extras.reduce((acc, e) => acc + Number(e.precio) * e.cantidad, 0)) *
+  it.cantidad;
 type Pedido = {
   id: string;
   estado: "pendiente" | "confirmado" | "fallido";
@@ -14,6 +26,7 @@ type Pedido = {
   fallo_motivo: string | null;
   modalidad: string;
   medio_pago: string;
+  pago_estado: "pendiente" | "aprobado" | "rechazado" | null;
   total_estimado: string;
   costo_delivery_estimado: string | null;
   eta_min: number | null;
@@ -37,6 +50,10 @@ export default async function PedidoPage({
     { revalidate: 0 },
   );
   if (!pedido) notFound();
+  // Con Izipay el pedido no está confirmado hasta que se paga.
+  if (pedido.estado === "pendiente" && pedido.pago_estado === "pendiente") {
+    redirect(`/pedido/${id}/pago?token=${encodeURIComponent(token)}`);
+  }
 
   return (
     <div className="mx-auto max-w-lg px-4 py-16">
@@ -63,19 +80,30 @@ export default async function PedidoPage({
         <div className="text-center">
           <h1 className="font-display text-2xl uppercase text-rojo">No pudimos confirmar tu pedido</h1>
           <p className="mt-2 text-humo">{pedido.fallo_motivo ?? "Intenta de nuevo."}</p>
-          <Link href="/carrito" className="mt-4 inline-block font-bold text-verde underline">
-            Volver al carrito
+          <Link
+            href={pedido.pago_estado === "rechazado" ? "/checkout" : "/carrito"}
+            className="mt-4 inline-block font-bold text-verde underline"
+          >
+            {pedido.pago_estado === "rechazado" ? "Intentar de nuevo" : "Volver al carrito"}
           </Link>
         </div>
       )}
 
       <ul className="mt-6 flex flex-col gap-2 rounded-lg border-2 border-negro bg-white p-4 text-sm">
         {pedido.items.map((it, i) => (
-          <li key={i} className="flex justify-between">
+          <li key={i} className="flex justify-between gap-3">
             <span>
               {it.cantidad}x {it.nombre_congelado}
+              {it.valores.length > 0 && (
+                <span className="block text-xs text-humo">{it.valores.join(" + ")}</span>
+              )}
+              {it.extras.length > 0 && (
+                <span className="block text-xs text-humo">
+                  {it.extras.map((e) => `${e.cantidad}× ${e.nombre}`).join(" · ")}
+                </span>
+              )}
             </span>
-            <span>S/ {(Number(it.precio_unitario_congelado) * it.cantidad).toFixed(2)}</span>
+            <span>S/ {totalDeItem(it).toFixed(2)}</span>
           </li>
         ))}
         {pedido.costo_delivery_estimado && (
