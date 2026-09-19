@@ -154,6 +154,10 @@ def cotizar_pedido(
         destino_lat=datos.ubicacion_lat,
         destino_lng=datos.ubicacion_lng,
         destino_distrito=datos.ubicacion_distrito,
+        lineas=[
+            LineaCarrito(producto_comercial_id=i.producto_comercial_id, cantidad=i.cantidad)
+            for i in datos.items
+        ],
     )
     return resultado
 

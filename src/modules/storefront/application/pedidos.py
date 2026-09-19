@@ -12,6 +12,7 @@ para cuando `confirmar()` retorna, el pedido ya salió `confirmado` o
 `fallido` — no hace falta que quien llama haga polling.
 """
 
+import math
 import secrets
 import uuid
 from dataclasses import dataclass
@@ -27,6 +28,7 @@ from src.modules.sales.application.queries_publicas import (
     carta_publica,
     cotizar_delivery_publico,
     puntos_venta_web_de_sucursales,
+    tiempos_preparacion,
 )
 from src.modules.storefront.application.errors import NoEncontrado, ReglaNegocio
 from src.modules.storefront.domain import asignacion, carrito
@@ -65,6 +67,19 @@ def _candidatas_activas(session: Session, marca_id: uuid.UUID) -> list[Sucursal]
     )
 
 
+def _preparacion_min(session: Session, lineas: list[carrito.LineaCarrito]) -> int:
+    """Lo que tarda el pedido en salir de cocina: el mayor tiempo entre sus
+    productos. Un producto sin tiempo cargado cuenta como la base estándar
+    (`STOREFRONT_ETA_BASE_MINUTOS`); uno con `0` sale al instante. Sin líneas
+    —cotizar antes de tener carrito— es la base."""
+    base = settings.storefront_eta_base_minutos
+    if not lineas:
+        return base
+    tiempos = tiempos_preparacion(session, [linea.producto_comercial_id for linea in lineas])
+    de_cada_linea = [tiempos.get(linea.producto_comercial_id) for linea in lineas]
+    return max(base if t is None else t for t in de_cada_linea)
+
+
 def _resolver_sucursal(
     session: Session,
     *,
@@ -74,6 +89,7 @@ def _resolver_sucursal(
     destino_lat: Decimal | None,
     destino_lng: Decimal | None,
     destino_distrito: str | None,
+    lineas: list[carrito.LineaCarrito] | None = None,
 ) -> Resolucion:
     """Recojo: el cliente ya eligió el local (`sucursal_id`), solo se valida
     y se calcula el ETA. Delivery: se elige el local automáticamente entre
@@ -94,6 +110,7 @@ def _resolver_sucursal(
         )
 
     cargas = carga_activa_por_sucursal(session, [s.id for s in elegibles])
+    preparacion_min = _preparacion_min(session, lineas or [])
 
     if modalidad == "takeout":
         if sucursal_id is None:
@@ -104,7 +121,7 @@ def _resolver_sucursal(
         carga = cargas.get(elegida.id, 0)
         eta_min, eta_max = asignacion.estimar_eta(
             carga,
-            base_minutos=settings.storefront_eta_base_minutos,
+            preparacion_min=preparacion_min,
             minutos_por_pedido=settings.storefront_eta_minutos_por_pedido,
         )
         return Resolucion(
@@ -145,12 +162,16 @@ def _resolver_sucursal(
     )
     if elegida is None:
         raise ReglaNegocio("fuera de cobertura de delivery")
+    cotizacion = cotizaciones[elegida.sucursal_id]
+    viaje_min = math.ceil(
+        (cotizacion["distancia_km"] or Decimal(0)) * settings.storefront_eta_minutos_por_km
+    )
     eta_min, eta_max = asignacion.estimar_eta(
         elegida.carga,
-        base_minutos=settings.storefront_eta_base_minutos,
+        preparacion_min=preparacion_min,
         minutos_por_pedido=settings.storefront_eta_minutos_por_pedido,
+        viaje_min=viaje_min,
     )
-    cotizacion = cotizaciones[elegida.sucursal_id]
     return Resolucion(
         sucursal_id=elegida.sucursal_id,
         punto_venta_id=elegida.punto_venta_id,
@@ -170,10 +191,11 @@ def cotizar(
     destino_lat: Decimal | None = None,
     destino_lng: Decimal | None = None,
     destino_distrito: str | None = None,
+    lineas: list[carrito.LineaCarrito] | None = None,
 ) -> dict:
     """Vista previa antes de confirmar: a qué sucursal iría el pedido, con
     qué ETA y (delivery) a qué costo — para mostrarlo en el checkout antes
-    de que el cliente decida."""
+    de que el cliente decida. Con `lineas` el ETA sale de lo que se pide."""
     r = _resolver_sucursal(
         session,
         marca_id=marca_id,
@@ -182,6 +204,7 @@ def cotizar(
         destino_lat=destino_lat,
         destino_lng=destino_lng,
         destino_distrito=destino_distrito,
+        lineas=lineas,
     )
     return {
         "sucursal_id": r.sucursal_id,
@@ -264,6 +287,7 @@ def confirmar(
         destino_lat=ubicacion_lat,
         destino_lng=ubicacion_lng,
         destino_distrito=ubicacion_distrito,
+        lineas=lineas,
     )
 
     precios = _precios_de_carta(

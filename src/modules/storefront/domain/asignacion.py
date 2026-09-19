@@ -40,13 +40,30 @@ def elegir(candidatas: list[Candidata], *, saturacion: int) -> Candidata | None:
     return no_saturadas[0] if no_saturadas else ordenadas[0]
 
 
+#: Piso del estimado: por más que salga al instante, alguien tiene que
+#: armarlo y entregarlo.
+MINUTOS_MINIMOS = 5
+
+#: Desde cuántos minutos de preparación el pedido pasa por horno y el
+#: colchón es el de cocina (15) y no el de mostrador (5).
+PREPARACION_DE_COCINA_MIN = 20
+
+
 def estimar_eta(
-    carga: int, *, base_minutos: int, minutos_por_pedido: int
+    carga: int, *, preparacion_min: int, minutos_por_pedido: int, viaje_min: int = 0
 ) -> tuple[int, int]:
-    """Rango de espera en minutos: `base` sin cola, `+minutos_por_pedido`
-    por cada pedido `orden` que la sucursal ya tiene delante del suyo
-    (RN-WEB-011). El rango alto agrega 15 minutos de colchón — mismo
-    criterio que los 30-45/45-55 min que Charlie's ya cotiza por teléfono
-    (`majambo.md` §3.1.6)."""
-    minimo = base_minutos + carga * minutos_por_pedido
-    return minimo, minimo + 15
+    """Rango de espera en minutos (RN-WEB-011).
+
+    `preparacion_min` es lo que tarda **este** pedido en salir de cocina: el
+    mayor tiempo entre sus productos. La cola (`carga × minutos_por_pedido`)
+    solo cuenta si hay algo que cocinar: una botella de agua no espera detrás
+    de las pizzas. `viaje_min` es el trayecto de un delivery.
+
+    El rango alto agrega un colchón: 15 minutos si pasa por cocina —mismo
+    criterio que los 30-45 min que Charlie's cotiza por teléfono
+    (`majambo.md` §3.1.6)— y 5 si sale del mostrador.
+    """
+    cola = carga * minutos_por_pedido if preparacion_min > 0 else 0
+    minimo = max(preparacion_min + cola + viaje_min, MINUTOS_MINIMOS)
+    colchon = 15 if preparacion_min >= PREPARACION_DE_COCINA_MIN else 5
+    return minimo, minimo + colchon

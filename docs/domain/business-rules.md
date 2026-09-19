@@ -1746,6 +1746,25 @@ producción se hace en cocinas de sucursal. Ver
   inventario** (ADR-071): el insumo ya salió del almacén y el plato sigue
   existiendo, solo cambia de cuenta.
 
+- **RN-COM-044** Un producto declara en qué **canales** se vende
+  (`producto_comercial.canales`: `pdv`, `web`, `delivery`, `agente_ia`);
+  **sin valor, en todos**. Una presentación sin canales propios hereda los de
+  su producto. La carta de un canal (`precios.carta`) omite lo que no se
+  vende ahí, y como esa carta es también la lista blanca del checkout web
+  (RN-WEB-012), un producto fuera del canal ni aparece ni se puede pedir
+  armando la petición a mano. Es lo que deja sacar de la web una caja, una
+  propina o cualquier ítem que solo existe en el mostrador, sin tocar las
+  listas de precio. **El kiosko no es un canal de venta**: vende como `pdv`
+  (`punto_venta.canal=kiosko` describe el aparato, no el canal), así que una
+  carta de kiosko distinta de la del mostrador no se puede expresar todavía
+  — ver `docs/roadmap/deuda/modulo-sales.md`.
+- **RN-COM-045** Un producto puede declarar su **tiempo de preparación**
+  (`tiempo_preparacion_min`, 0 a 240): cuánto tarda en salir de cocina. **NULL
+  es "no se sabe"** (el sitio usa su base estándar), **0 es "sale al
+  instante"** (una bebida): no son lo mismo y la pantalla los distingue. Una
+  presentación sin tiempo propio hereda el de su producto. Lo consume el
+  estimado de espera del sitio de marca (RN-WEB-011).
+
 ## Cumplimiento de pedido
 
 Proceso `PROC-OPE-002` ([workflows.md](workflows.md#cumplimiento-de-pedido)),
@@ -2196,10 +2215,15 @@ específicas de la parte **sin JWT**.
   saturada (`STOREFRONT_SATURACION_PEDIDOS` pedidos `orden` en curso) y otra
   candidata dentro de radio no lo esté — ahí gana la no saturada. Un
   recojo lo elige el propio cliente, no la asignación automática.
-- **RN-WEB-011** El estimado de espera que ve el cliente es
-  `STOREFRONT_ETA_BASE_MINUTOS + carga × STOREFRONT_ETA_MINUTOS_POR_PEDIDO`,
-  con 15 minutos de colchón en el máximo del rango — nunca un número fijo
-  sin importar cuántos pedidos tenga la sucursal delante.
+- **RN-WEB-011** El estimado de espera que ve el cliente sale **de lo que
+  pide**: `preparación + cola + viaje`. La *preparación* es el mayor
+  `tiempo_preparacion_min` entre sus productos (RN-COM-045; un producto sin
+  tiempo cuenta como `STOREFRONT_ETA_BASE_MINUTOS`); la *cola* es
+  `carga × STOREFRONT_ETA_MINUTOS_POR_PEDIDO`, y **solo cuenta si hay algo
+  que cocinar** (una botella de agua no espera detrás de las pizzas); el
+  *viaje* es, en delivery, `distancia_km × STOREFRONT_ETA_MINUTOS_POR_KM`.
+  Piso de 5 minutos. El máximo del rango suma 15 minutos de colchón si la
+  preparación llega a 20 (pasa por horno) y 5 si no.
 - **RN-WEB-012** El precio del carrito se vuelve a fijar server-side contra
   la carta pública al confirmar (RN-PRC-003): un producto que ya no está
   disponible, o cuyo precio cambió desde que se agregó al carrito, rechaza

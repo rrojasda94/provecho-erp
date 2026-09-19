@@ -968,6 +968,45 @@ def carga_activa_por_sucursal(
     return dict(filas.all())
 
 
+def tiempos_preparacion(
+    session: Session, producto_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, int | None]:
+    """Minutos de preparación de cada producto (`tiempo_preparacion_min`).
+    Una variante sin tiempo propio hereda el de su padre. `None` = no se sabe
+    (distinto de `0`, que es "sale al instante"). Lo usa el sitio de marca
+    para estimar la espera de un pedido según lo que lleva."""
+    if not producto_ids:
+        return {}
+    productos = {
+        p.id: p
+        for p in session.scalars(
+            select(ProductoComercial).where(ProductoComercial.id.in_(list(producto_ids)))
+        )
+    }
+    padres_ids = {
+        p.producto_padre_id
+        for p in productos.values()
+        if p.tiempo_preparacion_min is None and p.producto_padre_id is not None
+    }
+    padres = (
+        {
+            p.id: p
+            for p in session.scalars(
+                select(ProductoComercial).where(ProductoComercial.id.in_(padres_ids))
+            )
+        }
+        if padres_ids
+        else {}
+    )
+    resultado: dict[uuid.UUID, int | None] = {}
+    for producto_id, p in productos.items():
+        tiempo = p.tiempo_preparacion_min
+        if tiempo is None and p.producto_padre_id in padres:
+            tiempo = padres[p.producto_padre_id].tiempo_preparacion_min
+        resultado[producto_id] = tiempo
+    return resultado
+
+
 def puntos_venta_web_de_sucursales(
     session: Session, sucursal_ids: Sequence[uuid.UUID]
 ) -> dict[uuid.UUID, dict]:

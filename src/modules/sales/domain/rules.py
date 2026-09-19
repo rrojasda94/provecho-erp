@@ -5,6 +5,13 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, get_args
 
 CANALES = {"pdv", "agente_ia", "delivery", "web"}
+
+
+def vende_en_canal(canales: list | None, canal: str) -> bool:
+    """`canales` NULL/vacío = se vende en todos. Lo que se filtra por canal es
+    la carta: un producto que no se vende en el canal ni aparece ni se puede
+    pedir desde él (la carta es también la lista blanca del checkout web)."""
+    return not canales or canal in canales
 MODALIDADES = {"mesa", "takeout", "delivery"}
 
 # --- Estado de la venta -------------------------------------------------------

@@ -704,6 +704,11 @@ class LoteSyncIn(BaseModel):
     pagos: list[PagoSyncIn] = []
 
 
+#: El vocabulario, escrito una vez (`rules.CANALES`) y traído como `Literal`
+#: para que el 422 lo diga en el borde.
+CanalVenta = Literal["pdv", "agente_ia", "delivery", "web"]
+
+
 class ProductoCreate(BaseModel):
     id_interno: str = Field(min_length=1, max_length=8)
     # En una variante se ignora: hereda la marca del padre.
@@ -726,6 +731,9 @@ class ProductoCreate(BaseModel):
     # a la del producto al que se agrega (RN-COM-021). No sale suelto en la
     # carta.
     es_extra: bool = False
+    # NULL o vacío = se vende en todos los canales.
+    canales: list[CanalVenta] | None = None
+    tiempo_preparacion_min: int | None = Field(default=None, ge=0, le=240)
 
 
 class GrupoOpcionCreate(BaseModel):
@@ -791,6 +799,12 @@ class ProductoUpdate(BaseModel):
     orden: int | None = None
     empaque_id: uuid.UUID | None = None
     modalidades_empaque: list[str] | None = None
+    # `[]` = "todos los canales" (`None` es "no lo mandaron", ADR-096).
+    canales: list[CanalVenta] | None = None
+    tiempo_preparacion_min: int | None = Field(default=None, ge=0, le=240)
+    # Único modo de volver a "no se sabe": `None` es indistinguible de "no lo
+    # mandaron" (mismo criterio que `quitar_receta`).
+    quitar_tiempo_preparacion: bool = False
 
 
 class ProductoOut(BaseModel):
@@ -808,6 +822,8 @@ class ProductoOut(BaseModel):
     es_extra: bool = False
     empaque_id: uuid.UUID | None = None
     modalidades_empaque: list[str] | None = None
+    canales: list[str] | None = None
+    tiempo_preparacion_min: int | None = None
 
 
 class ProductoDetalleOut(ProductoOut):

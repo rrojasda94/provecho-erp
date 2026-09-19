@@ -316,3 +316,53 @@ def test_cotizar_delivery_devuelve_sucursal_y_eta(env):
     body = r.json()
     assert body["sucursal_id"] == ids["ch1_id"]
     assert body["eta_min"] > 0
+
+
+def test_cotizar_usa_el_tiempo_de_preparacion_de_lo_que_se_pide(env):
+    client, ids, TestSession = env
+    with TestSession() as s:
+        pizza = s.get(ProductoComercial, uuid.UUID(ids["producto_id"]))
+        pizza.tiempo_preparacion_min = 25
+        agua = ProductoComercial(
+            id_interno="P0000098", marca_id=pizza.marca_id, nombre="Agua",
+            tiempo_preparacion_min=0,
+        )
+        s.add(agua)
+        s.commit()
+        agua_id = str(agua.id)
+
+    def cotizar(items):
+        r = client.post(
+            COTIZAR,
+            json={"modalidad": "takeout", "sucursal_id": ids["ch1_id"], "items": items},
+        )
+        assert r.status_code == 200, r.text
+        return (r.json()["eta_min"], r.json()["eta_max"])
+
+    pizza = {"producto_comercial_id": ids["producto_id"], "cantidad": 2}
+    agua = {"producto_comercial_id": agua_id, "cantidad": 1}
+    assert cotizar([agua]) == (5, 10)  # la botella de agua ya no espera 70 min
+    assert cotizar([pizza]) == (25, 40)
+    assert cotizar([pizza, agua]) == (25, 40)  # manda lo que más tarda
+    assert cotizar([]) == (30, 45)  # sin carrito: la base estándar
+
+
+def test_variante_sin_tiempo_propio_hereda_el_de_su_padre(env):
+    from src.modules.sales.application.queries_publicas import tiempos_preparacion
+
+    _, ids, TestSession = env
+    with TestSession() as s:
+        padre = s.get(ProductoComercial, uuid.UUID(ids["producto_id"]))
+        padre.tiempo_preparacion_min = 25
+        hija = ProductoComercial(
+            id_interno="P0000097", marca_id=padre.marca_id, nombre="Familiar",
+            producto_padre_id=padre.id,
+        )
+        propia = ProductoComercial(
+            id_interno="P0000096", marca_id=padre.marca_id, nombre="Personal",
+            producto_padre_id=padre.id, tiempo_preparacion_min=15,
+        )
+        s.add_all([hija, propia])
+        s.commit()
+        tiempos = tiempos_preparacion(s, [hija.id, propia.id, padre.id])
+        assert tiempos == {hija.id: 25, propia.id: 15, padre.id: 25}

@@ -1984,6 +1984,20 @@
             "title": "Atributos",
             "type": "array"
           },
+          "canales": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canales"
+          },
           "categoria_id": {
             "anyOf": [
               {
@@ -2117,6 +2131,17 @@
               }
             ],
             "title": "Receta Id"
+          },
+          "tiempo_preparacion_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tiempo Preparacion Min"
           },
           "variantes": {
             "default": [],
@@ -9351,6 +9376,15 @@
       },
       "CotizarPedidoIn": {
         "properties": {
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ItemPedidoIn"
+            },
+            "maxItems": 30,
+            "title": "Items",
+            "type": "array"
+          },
           "modalidad": {
             "enum": [
               "takeout",
@@ -26526,6 +26560,26 @@
       },
       "ProductoCreate": {
         "properties": {
+          "canales": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "pdv",
+                    "agente_ia",
+                    "delivery",
+                    "web"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canales"
+          },
           "categoria_id": {
             "anyOf": [
               {
@@ -26625,6 +26679,19 @@
               }
             ],
             "title": "Receta Id"
+          },
+          "tiempo_preparacion_min": {
+            "anyOf": [
+              {
+                "maximum": 240.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tiempo Preparacion Min"
           }
         },
         "required": [
@@ -26641,6 +26708,20 @@
           "activo": {
             "title": "Activo",
             "type": "boolean"
+          },
+          "canales": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canales"
           },
           "categoria_id": {
             "anyOf": [
@@ -26759,6 +26840,17 @@
             ],
             "title": "Receta Id"
           },
+          "tiempo_preparacion_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tiempo Preparacion Min"
+          },
           "variantes": {
             "default": [],
             "items": {
@@ -26783,6 +26875,20 @@
           "activo": {
             "title": "Activo",
             "type": "boolean"
+          },
+          "canales": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canales"
           },
           "categoria_id": {
             "anyOf": [
@@ -26884,6 +26990,17 @@
               }
             ],
             "title": "Receta Id"
+          },
+          "tiempo_preparacion_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tiempo Preparacion Min"
           }
         },
         "required": [
@@ -27005,6 +27122,26 @@
             ],
             "title": "Activo"
           },
+          "canales": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "pdv",
+                    "agente_ia",
+                    "delivery",
+                    "web"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canales"
+          },
           "categoria_id": {
             "anyOf": [
               {
@@ -27081,6 +27218,11 @@
             "title": "Quitar Receta",
             "type": "boolean"
           },
+          "quitar_tiempo_preparacion": {
+            "default": false,
+            "title": "Quitar Tiempo Preparacion",
+            "type": "boolean"
+          },
           "receta_id": {
             "anyOf": [
               {
@@ -27092,6 +27234,19 @@
               }
             ],
             "title": "Receta Id"
+          },
+          "tiempo_preparacion_min": {
+            "anyOf": [
+              {
+                "maximum": 240.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tiempo Preparacion Min"
           }
         },
         "title": "ProductoUpdate",

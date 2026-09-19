@@ -457,7 +457,10 @@ erDiagram
   se elimina), margen_contribucion (calculado; revisado por comercial/
   contabilidad para pricing), empaque_id (FK articulo tipo=empaque,
   nullable), modalidades_empaque (array `mesa`|`takeout`|`delivery` — en
-  cuáles se descuenta stock del empaque, RN-EMP-003). Precios en
+  cuáles se descuenta stock del empaque, RN-EMP-003), **canales** (array de
+  `pdv`|`web`|`delivery`|`agente_ia`, NULL = todos, RN-COM-044),
+  **tiempo_preparacion_min** (entero 0-240, NULL = no se sabe, RN-COM-045).
+  Precios en
   **lista_precio** / **precio** (por sucursal/canal/modalidad de consumo,
   RN-MDC-003). Puede formar parte de uno o más **combo** (N:N).
 - ~~**modificador**~~ / ~~**variante_producto**~~: **reemplazados por
