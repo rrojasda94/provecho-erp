@@ -13,7 +13,12 @@ import {
 } from "@/lib/carrito";
 
 import { Girador } from "@/components/boton";
+import { direccionDePunto } from "@/components/direccion/buscador-lugares";
+import { CampoDireccion, UBICACION_VACIA, type Ubicacion } from "@/components/direccion/campo-direccion";
+import { coordenadasDe } from "@/components/direccion/ubicacion";
+import { cargarMaps } from "@/lib/google-maps";
 import { vibrar } from "@/lib/haptica";
+import { configMapas } from "@/lib/mapas";
 
 import { confirmarPedido, cotizarPedido, type Cotizacion } from "./actions";
 
@@ -28,9 +33,19 @@ export type Direccion = {
   id: string;
   etiqueta: string | null;
   direccion: string;
-  ubicacion_lat?: string | null;
-  ubicacion_lng?: string | null;
-};
+  predeterminada?: boolean;
+} & Partial<Ubicacion>;
+
+/** El ancla guardada de una dirección, en la forma que espera el campo. */
+function anclaDe(d: Direccion): Ubicacion {
+  return {
+    ubicacion_place_id: d.ubicacion_place_id ?? null,
+    ubicacion_lat: d.ubicacion_lat ?? null,
+    ubicacion_lng: d.ubicacion_lng ?? null,
+    ubicacion_plus_code: d.ubicacion_plus_code ?? null,
+    ubicacion_distrito: d.ubicacion_distrito ?? null,
+  };
+}
 
 type Modalidad = "delivery" | "takeout";
 type MedioPago = "efectivo" | "izipay";
@@ -104,9 +119,37 @@ function CamposComprobante({
   );
 }
 
-function useUbicacionActual() {
+/** El GPS del navegador, y después la calle que hay en ese punto.
+ *
+ * Antes devolvía solo el par de coordenadas y dejaba el campo de texto vacío:
+ * el repartidor recibía un pedido con un punto y sin dirección escrita. Ahora
+ * el punto se traduce a una dirección (geocodificación inversa, la misma que
+ * usa el pin arrastrable) y se escribe en el campo. Si Google no contesta, al
+ * menos queda el punto y el cliente escribe la referencia.
+ */
+function useUbicacionActual(alUbicar: (texto: string, ancla: Ubicacion) => void) {
   const [estado, setEstado] = useState<"inicial" | "buscando" | "lista" | "error">("inicial");
-  const [coords, setCoords] = useState<{ lat: string; lng: string } | null>(null);
+  const { apiKey } = configMapas();
+
+  async function resolver(lat: number, lng: number) {
+    try {
+      const maps = await cargarMaps(apiKey);
+      const hallado = await direccionDePunto(maps, lat, lng);
+      if (hallado) {
+        alUbicar(hallado.texto, hallado.ancla);
+        setEstado("lista");
+        return;
+      }
+    } catch {
+      // Sin clave, sin internet o sin cuota: se sigue con el punto pelado.
+    }
+    alUbicar("", {
+      ...UBICACION_VACIA,
+      ubicacion_lat: String(lat),
+      ubicacion_lng: String(lng),
+    });
+    setEstado("lista");
+  }
 
   function pedir() {
     if (!("geolocation" in navigator)) {
@@ -115,16 +158,13 @@ function useUbicacionActual() {
     }
     setEstado("buscando");
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCoords({ lat: String(pos.coords.latitude), lng: String(pos.coords.longitude) });
-        setEstado("lista");
-      },
+      (pos) => void resolver(pos.coords.latitude, pos.coords.longitude),
       () => setEstado("error"),
       { timeout: 8000 },
     );
   }
 
-  return { estado, coords, pedir };
+  return { estado, pedir };
 }
 
 export function CheckoutCliente({
@@ -153,7 +193,31 @@ export function CheckoutCliente({
   }, []);
   const [modalidad, setModalidad] = useState<Modalidad>("delivery");
   const [sucursalId, setSucursalId] = useState(sucursales[0]?.id ?? "");
-  const [direccionTexto, setDireccionTexto] = useState("");
+
+  // La dirección predeterminada de la cuenta entra puesta, **con su punto en
+  // el mapa**. Antes las direcciones guardadas se ofrecían como pastillas que
+  // solo copiaban el texto y tiraban las coordenadas, así que a quien ya
+  // tenía su casa cargada el sitio igual le exigía prender el GPS.
+  const predeterminada =
+    direcciones.find((d) => d.predeterminada) ?? direcciones[0] ?? null;
+  // `semilla.version` es la `key` del campo: cambiarla lo remonta con otro
+  // texto y otro pin. Es el mismo recurso que usa el PDV cuando el DNI del
+  // cliente trae su dirección (`app/pdv/dialogos.tsx`).
+  const [semilla, setSemilla] = useState({
+    version: 0,
+    texto: predeterminada?.direccion ?? "",
+    ancla: predeterminada ? anclaDe(predeterminada) : UBICACION_VACIA,
+  });
+  const [direccionTexto, setDireccionTexto] = useState(predeterminada?.direccion ?? "");
+  const [ancla, setAncla] = useState<Ubicacion>(
+    predeterminada ? anclaDe(predeterminada) : UBICACION_VACIA,
+  );
+
+  function sembrarDireccion(texto: string, nueva: Ubicacion) {
+    setSemilla((s) => ({ version: s.version + 1, texto, ancla: nueva }));
+    setDireccionTexto(texto);
+    setAncla(nueva);
+  }
   const [nombre, setNombre] = useState(perfil ? `${perfil.nombres} ${perfil.apellidos}` : "");
   const [telefono, setTelefono] = useState(perfil?.telefono ?? "");
   // El efectivo es para quien tiene cuenta (RN-WEB-013): un invitado arranca
@@ -168,7 +232,10 @@ export function CheckoutCliente({
   } | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
-  const ubicacion = useUbicacionActual();
+  const ubicacion = useUbicacionActual(sembrarDireccion);
+  // De dónde salgan las coordenadas da igual: elegir una sugerencia de
+  // Google, arrastrar el pin, usar una dirección guardada o prender el GPS.
+  const punto = coordenadasDe(ancla);
 
   const total = useMemo(() => totalDelCarrito(lineas), [lineas]);
 
@@ -184,11 +251,11 @@ export function CheckoutCliente({
   // nueva — antes cambiar de local dos veces seguidas podía dejar el precio
   // del primero.
   const puedeCotizar = Boolean(
-    (modalidad === "takeout" && sucursalId) || (modalidad === "delivery" && ubicacion.coords),
+    (modalidad === "takeout" && sucursalId) || (modalidad === "delivery" && punto),
   );
   const claveCotizacion = JSON.stringify([
     modalidad,
-    modalidad === "takeout" ? sucursalId : ubicacion.coords,
+    modalidad === "takeout" ? sucursalId : punto,
     itemsCotizar,
   ]);
   const cotizacion = respuesta?.clave === claveCotizacion ? respuesta.cotizacion : null;
@@ -199,7 +266,7 @@ export function CheckoutCliente({
     let vigente = true;
     const [modalidadActual, origen, items] = JSON.parse(claveCotizacion) as [
       Modalidad,
-      string | { lat: string; lng: string },
+      string | { lat: number; lng: number },
       { producto_comercial_id: string; cantidad: number }[],
     ];
     const promesa =
@@ -211,8 +278,8 @@ export function CheckoutCliente({
           })
         : cotizarPedido({
             modalidad: "delivery",
-            ubicacion_lat: (origen as { lat: string; lng: string }).lat,
-            ubicacion_lng: (origen as { lat: string; lng: string }).lng,
+            ubicacion_lat: String((origen as { lat: number; lng: number }).lat),
+            ubicacion_lng: String((origen as { lat: number; lng: number }).lng),
             items,
           });
     promesa.then((c) => {
@@ -224,14 +291,17 @@ export function CheckoutCliente({
   }, [claveCotizacion, puedeCotizar]);
 
   function elegirDireccionGuardada(d: Direccion) {
-    setDireccionTexto(d.direccion);
+    sembrarDireccion(d.direccion, anclaDe(d));
   }
 
   async function confirmar() {
     setError("");
     if (lineas.length === 0) return;
-    if (modalidad === "delivery" && !ubicacion.coords) {
-      setError("Comparte tu ubicación para cotizar el delivery.");
+    if (modalidad === "delivery" && !punto) {
+      setError(
+        "Elige tu dirección de la lista que aparece al escribirla, o toca " +
+          "“Usar mi ubicación actual”: necesitamos el punto en el mapa para cotizar el delivery.",
+      );
       return;
     }
     setEnviando(true);
@@ -247,8 +317,18 @@ export function CheckoutCliente({
       nombre_contacto: nombre,
       telefono_contacto: telefono,
       direccion_entrega: modalidad === "delivery" ? direccionTexto : undefined,
-      ubicacion_lat: modalidad === "delivery" ? ubicacion.coords?.lat : undefined,
-      ubicacion_lng: modalidad === "delivery" ? ubicacion.coords?.lng : undefined,
+      // El ancla completa y no solo el par de coordenadas: el `place_id`
+      // identifica la puerta sin ambigüedad y el distrito puede cambiar la
+      // tarifa. El backend ya los aceptaba; el sitio nunca se los mandaba.
+      ...(modalidad === "delivery"
+        ? {
+            ubicacion_lat: punto ? String(punto.lat) : undefined,
+            ubicacion_lng: punto ? String(punto.lng) : undefined,
+            ubicacion_place_id: ancla.ubicacion_place_id ?? undefined,
+            ubicacion_plus_code: ancla.ubicacion_plus_code ?? undefined,
+            ubicacion_distrito: ancla.ubicacion_distrito ?? undefined,
+          }
+        : {}),
       medio_pago: medioPago,
       numero_documento: numeroDocumento || undefined,
       nombre_o_razon_social: numeroDocumento.length === 11 ? razonSocial : undefined,
@@ -305,19 +385,28 @@ export function CheckoutCliente({
                   key={d.id}
                   type="button"
                   onClick={() => elegirDireccionGuardada(d)}
-                  className="rounded-full border-2 border-negro px-3 py-1 text-xs font-bold"
+                  className={`rounded-full border-2 border-negro px-3 py-1 text-xs font-bold transition-transform active:scale-95 ${
+                    direccionTexto === d.direccion ? "bg-verde" : "bg-white"
+                  }`}
                 >
                   {d.etiqueta ?? "Dirección"}
                 </button>
               ))}
             </div>
           )}
-          <input
-            value={direccionTexto}
-            onChange={(e) => setDireccionTexto(e.target.value)}
-            placeholder="Jr./Av. y número, referencia"
-            required
-            className="rounded border-2 border-negro px-3 py-2"
+          {/* El mismo campo del PDV: autocompletado de Google y pin arrastrable
+              para corregir la puerta. La `key` lo remonta cuando la dirección
+              llega de afuera (una guardada, o el GPS). */}
+          <CampoDireccion
+            key={semilla.version}
+            etiqueta=""
+            requerido
+            defaultValue={semilla.texto}
+            ubicacion={semilla.ancla}
+            onCambio={(texto, nueva) => {
+              setDireccionTexto(texto);
+              setAncla(nueva);
+            }}
           />
           <button
             type="button"

@@ -64,7 +64,10 @@ sea correcta y el crédito gratuito esté disponible.
    - `https://staging.majambo.com.pe/*`
    - `https://clientes.majambo.com.pe/*` — la landing del QR (ADR-080)
    - `https://charlies.majambo.com.pe/*` — el sitio de marca (ADR-103),
-     mapa de locales (`storefront/app/locales/`)
+     mapa de locales (`storefront/app/locales/`) y el campo de dirección del
+     checkout (`storefront/components/direccion/`, que usa Places y Geocoding
+     igual que el del ERP — la misma clave del navegador, las mismas APIs
+     habilitadas)
 
    El puerto cuenta. Levantar el front en otro (`npm run dev` cuando 3000 está
    ocupado, que es lo normal con varios worktrees) da

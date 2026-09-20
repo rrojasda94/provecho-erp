@@ -1,9 +1,11 @@
 /// <reference types="google.maps" />
 /**
- * Carga del SDK de Google Maps, una sola vez por pestaña. Copia recortada
- * de `frontend/lib/google-maps.ts` — solo la librería `marker`, sin
- * `places` ni `geocoding` porque este sitio no tiene campo de dirección
- * (ADR-103, el mapa de locales solo dibuja marcadores fijos).
+ * Carga del SDK de Google Maps, una sola vez por pestaña. Copia de
+ * `frontend/lib/google-maps.ts`.
+ *
+ * Trae `marker` (el mapa de locales), y además `places` y `geocoding` desde
+ * que el checkout tiene campo de dirección con autocompletado y pin
+ * arrastrable: son las mismas tres que carga el ERP.
  *
  * El fix del race de `importLibrary` (ADR-080 §"Lo que apareció construyendo
  * esto") aplica igual acá: `window.google.maps` puede existir antes de que
@@ -42,7 +44,7 @@ export function cargarMaps(apiKey: string): Promise<typeof google.maps> {
       script.id = ID;
       script.src =
         `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}` +
-        "&libraries=marker&v=weekly&loading=async";
+        "&libraries=places,marker,geocoding&v=weekly&loading=async";
       script.async = true;
       script.onerror = () => rechazar(new Error("no se pudo cargar el SDK de Maps"));
       document.head.appendChild(script);

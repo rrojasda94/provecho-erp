@@ -2223,6 +2223,14 @@ específicas de la parte **sin JWT**.
   (con la temporal como clave actual), el sitio no lo deja seguir. Cada
   restablecimiento queda en la auditoría con quién lo hizo. Cambiar la clave
   estando adentro exige la actual, salvo una cuenta solo-Google que nunca tuvo.
+- **RN-WEB-020** Un pedido web con modalidad `delivery` necesita **dirección
+  escrita y punto en el mapa**. El punto puede venir de una sugerencia de Google,
+  del pin arrastrado a mano, de una dirección guardada de la cuenta o del GPS del
+  navegador; de dónde salga da igual, pero sin él no se cotiza ni se confirma: la
+  tarifa se cobra por kilómetro (ADR-054) y el repartidor necesita a dónde ir.
+  Editar el texto a mano suelta el punto (`shared/ubicacion.py` lo vuelve a
+  aplicar en el servidor): un texto que dice una calle y unas coordenadas que
+  dicen otra mandan el reparto al lugar equivocado.
 - **RN-WEB-009** El checkout web no exige cuenta para comprar: un invitado
   (sin `Authorization`) confirma un pedido igual que un cliente logueado, con
   nombre/teléfono tecleados en el formulario en vez de leídos del perfil

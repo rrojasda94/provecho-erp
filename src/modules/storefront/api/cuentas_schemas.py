@@ -123,8 +123,15 @@ class DireccionOut(BaseModel):
     direccion: str
     referencia: str | None
     predeterminada: bool
+    # El ancla completa, no solo el par de coordenadas: el checkout vuelve a
+    # montar el campo de dirección con ella y necesita el `place_id` para que
+    # Google no vuelva a cobrar una búsqueda por algo ya elegido, y el
+    # distrito porque la tarifa de delivery puede depender de él.
+    ubicacion_place_id: str | None = None
     ubicacion_lat: Decimal | None = None
     ubicacion_lng: Decimal | None = None
+    ubicacion_plus_code: str | None = None
+    ubicacion_distrito: str | None = None
 
 
 class FavoritoIn(BaseModel):
