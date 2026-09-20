@@ -386,7 +386,8 @@ erDiagram
 - **articulo** (inventariable): empresa_id (tenant directo — `categoria_id`
   es opcional, no sirve de puente de tenant por sí solo), id_interno (hasta
   8 alfanuméricos, autogenerado, único en todo el grupo, corregible por
-  pantalla — RN-GEN-005), nombre,
+  pantalla — RN-GEN-005), nombre, **nombre_publico** (opcional — cómo lo ve
+  el cliente en el sitio de marca; vacío = `nombre`, RN-WEB-001),
   categoria_id (opcional), unidad_medida_id, tipo (`insumo` | `subreceta` | `mercaderia` | `empaque`
   | `repuesto` | `suministro` — **enum extensible**: se agregan tipos
   nuevos cuando el negocio lo requiera, sin migración destructiva),
@@ -529,12 +530,13 @@ revertirla: la variante **sigue siendo** una fila de `producto_comercial`
 con `producto_padre_id`, y por eso precio, margen, KDS, carta y réplica no
 cambian. Lo que se agrega es de dónde salen esas filas y qué las identifica.
 
-- **atributo**: empresa_id, nombre, `modo_variante`
+- **atributo**: empresa_id, nombre, **nombre_publico** (opcional, RN-WEB-001),
+  `modo_variante`
   (`siempre` | `dinamica` | `nunca` — el `create_variant` de Odoo),
   `display` (`radio` | `pildoras` | `select` | `color`), orden,
   ref_externa. UNIQUE(empresa_id, nombre).
-- **atributo_valor**: atributo_id, nombre, orden, activo.
-  UNIQUE(atributo_id, nombre).
+- **atributo_valor**: atributo_id, nombre, **nombre_publico** (opcional,
+  RN-WEB-001), orden, activo. UNIQUE(atributo_id, nombre).
 - **producto_atributo_linea**: producto_comercial_id, atributo_id, orden —
   qué atributo ofrece un producto. UNIQUE(producto_comercial_id, atributo_id).
 - **producto_atributo_valor** (**PTAV**): linea_id, atributo_valor_id,
@@ -2174,7 +2176,7 @@ Credencial separada del ERP — ver ADR-104 para el detalle del aislamiento.
 
 | Tabla | Columnas propias | Notas |
 |---|---|---|
-| `storefront_cuenta` | `email` (único), `password_hash` (nullable), `google_sub` (único, nullable), `nombres`, `apellidos`, `tipo_documento`, `numero_documento`, `telefono`, `fecha_nacimiento`, `cliente_id` (FK `cliente`, único, nullable), `intentos_fallidos`, `bloqueado_hasta` | `cliente_id` se completa por evento, puede quedar `NULL` |
+| `storefront_cuenta` | `email` (único), `password_hash` (nullable), `google_sub` (único, nullable), `nombres`, `apellidos`, `tipo_documento`, `numero_documento` (único entre vivas), `telefono` (único entre vivas), `fecha_nacimiento`, `cliente_id` (FK `cliente`, único, nullable), `intentos_fallidos`, `bloqueado_hasta` | `cliente_id` se completa por evento, puede quedar `NULL`. Documento y teléfono con índice único **parcial** (`WHERE deleted_at IS NULL`): una cuenta de baja no reserva el DNI de nadie (RN-WEB-021) |
 | `storefront_direccion` | `cuenta_id` (FK), `etiqueta`, `direccion`, `referencia`, `predeterminada` + `UbicacionMixin` | Varias por cuenta; una sola `predeterminada` a la vez |
 | `storefront_favorito` | `cuenta_id` (FK), `producto_comercial_id` (FK) | `UNIQUE(cuenta_id, producto_comercial_id)`, sin soft delete |
 | `storefront_refresh_token` | `cuenta_id` (FK), `token_hash` (único), `sesion_id`, `expira_en`, `revocado` | Mismo mecanismo de rotación que `refresh_token` del ERP, tabla propia |

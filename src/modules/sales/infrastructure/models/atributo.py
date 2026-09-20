@@ -46,6 +46,11 @@ class Atributo(Base, UuidPkMixin, TimestampMixin):
     # dos filas para el mismo hecho.
     empresa_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("empresa.id"), index=True)
     nombre: Mapped[str] = mapped_column(String(80))
+    # Cómo lo ve el cliente en el sitio de marca. Vacío = `nombre`.
+    # El interno está escrito para quien arma el catálogo ("Mitad 1 F", con
+    # la F de Familiar) y salía así en la web. Mismo criterio que
+    # `articulo.nombre_publico`.
+    nombre_publico: Mapped[str | None] = mapped_column(String(80), nullable=True)
     modo_variante: Mapped[str] = mapped_column(
         String(10), default="nunca", server_default=text("'nunca'"), nullable=False
     )

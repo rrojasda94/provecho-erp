@@ -2795,6 +2795,17 @@
             "title": "Nombre",
             "type": "string"
           },
+          "nombre_publico": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre Publico"
+          },
           "tipo": {
             "title": "Tipo",
             "type": "string"
@@ -3055,6 +3066,18 @@
               }
             ],
             "title": "Nombre"
+          },
+          "nombre_publico": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nombre Publico"
           },
           "tipo": {
             "anyOf": [
@@ -9343,6 +9366,20 @@
           "fecha_publicacion"
         ],
         "title": "ConvocatoriaPublicar",
+        "type": "object"
+      },
+      "CorreoSalienteOut": {
+        "description": "`False` = el servidor no tiene SMTP y ningún correo sale.",
+        "properties": {
+          "configurado": {
+            "title": "Configurado",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "configurado"
+        ],
+        "title": "CorreoSalienteOut",
         "type": "object"
       },
       "CotizacionDeliveryIn": {
@@ -69791,6 +69828,43 @@
           }
         ],
         "summary": "Listar Clientes Web",
+        "tags": [
+          "storefront"
+        ]
+      }
+    },
+    "/api/v1/storefront/clientes/correo": {
+      "get": {
+        "description": "Si el servidor puede mandar correos.\n\nSin `SMTP_HOST` el enlace de \"olvidé mi contraseña\" se genera y no sale a\nningún lado: el sitio responde lo mismo de siempre (no puede delatar qué\ncorreos tienen cuenta, RN-WEB-018) y desde afuera es indistinguible de un\nenvío real. Quien atiende tiene que poder saberlo para ofrecer el\nrestablecimiento asistido en vez de mandar a esperar un correo que no\nexiste.",
+        "operationId": "estado_del_correo_api_v1_storefront_clientes_correo_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CorreoSalienteOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Estado Del Correo",
         "tags": [
           "storefront"
         ]

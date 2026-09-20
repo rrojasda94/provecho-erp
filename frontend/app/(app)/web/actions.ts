@@ -204,10 +204,15 @@ export async function guardarDescripcionProductoAction(
     await apiFetch(`/api/v1/sales/productos/${productoId}`, {
       token: await token(),
       metodo: "PATCH",
-      cuerpo: { descripcion: texto(formData, "descripcion") || null },
+      // Cadena vacía y no `null`: vacío significa "bórralo", y `null` para la
+      // API significa "no lo toques" (ver `editar_articulo`).
+      cuerpo: {
+        descripcion: texto(formData, "descripcion"),
+        nombre_publico: texto(formData, "nombre_publico"),
+      },
     });
   } catch (e) {
-    return estadoDeError(e, "No se pudo guardar la descripción.");
+    return estadoDeError(e, "No se pudo guardar el ingrediente.");
   }
   revalidatePath("/web/carta");
   return { error: "", ok: true };

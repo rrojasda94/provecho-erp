@@ -2181,6 +2181,13 @@ específicas de la parte **sin JWT**.
   un modelo ORM directamente. Los **extras, sabores (atributos) y pares
   excluidos** de un producto sí son carta —hacen falta para venderlo, RN-WEB-017—
   y salen solo en el detalle de cada producto, no en la lista.
+  Los **nombres** que ve el cliente salen de `nombre_publico` cuando está
+  cargado (`articulo`, `atributo`, `atributo_valor`) y del nombre interno
+  cuando no. El interno está escrito para el almacén y para quien arma el
+  catálogo ("QUESO EDAM BLOQUE 3KG", "Mitad 1 F"): renombrarlo no es opción
+  —el almacén necesita distinguir dos quesos que al comensal le dan igual—,
+  así que son dos nombres para dos públicos. El ERP y el PDV siguen viendo
+  siempre el interno.
 - **RN-WEB-002** Solo se publican promociones (`sales.promocion`) cuya
   columna `canales` incluye `"web"`, vigentes por fecha/hora/día, y cuya
   `marca_id` (si tiene) coincide con `STOREFRONT_MARCA_ID`.
@@ -2231,6 +2238,12 @@ específicas de la parte **sin JWT**.
   Editar el texto a mano suelta el punto (`shared/ubicacion.py` lo vuelve a
   aplicar en el servidor): un texto que dice una calle y unas coordenadas que
   dicen otra mandan el reparto al lugar equivocado.
+- **RN-WEB-021** Una cuenta del sitio por persona: `email`, `numero_documento`
+  y `telefono` son únicos entre las cuentas vivas (índices parciales
+  `WHERE deleted_at IS NULL`). El registro rechaza cada uno con su propio
+  mensaje — "ya existe una cuenta" a secas obliga a adivinar cuál repitió— e
+  invita a entrar o a recuperar la clave. Una cuenta dada de baja no reserva
+  ninguno de los tres.
 - **RN-WEB-009** El checkout web no exige cuenta para comprar: un invitado
   (sin `Authorization`) confirma un pedido igual que un cliente logueado, con
   nombre/teléfono tecleados en el formulario en vez de leídos del perfil

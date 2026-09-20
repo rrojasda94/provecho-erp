@@ -679,6 +679,11 @@ def atributos_ofrecidos(
             {
                 "atributo_id": atributo.id,
                 "nombre": atributo.nombre,
+                # El nombre para el cliente viaja **al lado** del interno, no
+                # en su lugar: el PDV consume esta misma función y el cajero
+                # necesita el interno ("Mitad 1 F" le dice el tamaño). Quien
+                # elige es la frontera pública (`storefront/.../sitio.py`).
+                "nombre_publico": atributo.nombre_publico,
                 "display": atributo.display,
                 "orden": linea.orden,
                 "valores": [],
@@ -688,6 +693,7 @@ def atributos_ofrecidos(
             {
                 "id": ptav.id,
                 "nombre": valor.nombre,
+                "nombre_publico": valor.nombre_publico,
                 "precio_extra": ptav.precio_extra or Decimal(0),
             }
         )

@@ -312,10 +312,16 @@ def editar_articulo(session: Session, articulo_id: uuid.UUID, **campos) -> Artic
         _existe(session, Categoria, campos["categoria_id"], "categoría")
     for campo in (
         "categoria_id", "tipo", "costo_promedio", "archivado", "controla_lote",
-        "dias_alerta_vencimiento", "descripcion",
+        "dias_alerta_vencimiento",
     ):
         if campo in campos and campos[campo] is not None:
             setattr(articulo, campo, campos[campo])
+    # Estos dos se pueden **vaciar**: mandar "" borra lo que había. Con la
+    # regla de arriba ("None = no tocar") no habría forma de quitar un nombre
+    # público puesto por error, y ese texto es el que ve el cliente.
+    for campo in ("descripcion", "nombre_publico"):
+        if campos.get(campo) is not None:
+            setattr(articulo, campo, campos[campo].strip() or None)
     return articulo
 
 

@@ -113,10 +113,25 @@ def _crear_cuenta(
     ubicacion: dict | None,
 ) -> StorefrontCuenta:
     email = email.strip().lower()
-    if CuentaRepo(session).get_by_email(email) is not None:
+    repo = CuentaRepo(session)
+    # Tres identidades, tres mensajes distintos: "ya existe una cuenta" a
+    # secas obliga a adivinar cuál de los tres campos repitió. La unicidad de
+    # verdad la garantizan los índices de la base (migración b3c81d4e9a17);
+    # esto es para poder explicarlo, no para sustituirlos.
+    if repo.get_by_email(email) is not None:
         raise Conflicto("ya existe una cuenta con ese email")
+    if numero_documento and repo.get_by_documento(numero_documento) is not None:
+        raise Conflicto(
+            "ya existe una cuenta con ese documento. Si es tuya, entra con tu correo "
+            "o usa '¿olvidaste tu contraseña?'"
+        )
+    if telefono and repo.get_by_telefono(telefono) is not None:
+        raise Conflicto(
+            "ya existe una cuenta con ese teléfono. Si es tuya, entra con tu correo "
+            "o usa '¿olvidaste tu contraseña?'"
+        )
 
-    cuenta = CuentaRepo(session).add(
+    cuenta = repo.add(
         StorefrontCuenta(
             email=email, password_hash=password_hash, google_sub=google_sub,
             nombres=nombres.strip(), apellidos=apellidos.strip() or "-",

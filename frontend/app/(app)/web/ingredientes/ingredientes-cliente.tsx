@@ -13,6 +13,7 @@ import {
 export type Insumo = {
   id: string;
   nombre: string;
+  nombre_publico: string | null;
   descripcion: string | null;
   archivado: boolean;
 };
@@ -32,6 +33,20 @@ function FormDescripcion({ insumo }: { insumo: Insumo }) {
   return (
     <form action={formAction} className="flex flex-1 flex-col gap-1">
       <input type="hidden" name="articulo_id" value={insumo.id} />
+      {/* El nombre del artículo está escrito para el almacén ("QUESO EDAM
+          BLOQUE 3KG") y el sitio lo mostraba tal cual bajo cada pizza.
+          Renombrarlo no es opción: el almacén necesita distinguir dos quesos
+          que al cliente le dan igual. */}
+      <label className="flex flex-col gap-1 text-xs font-semibold text-gray">
+        Nombre para el cliente
+        <input
+          name="nombre_publico"
+          maxLength={80}
+          placeholder={`Vacío = se muestra "${insumo.nombre}"`}
+          defaultValue={insumo.nombre_publico ?? ""}
+          className="text-sm font-normal text-dark"
+        />
+      </label>
       <textarea
         name="descripcion"
         rows={2}
@@ -46,7 +61,7 @@ function FormDescripcion({ insumo }: { insumo: Insumo }) {
           disabled={pendiente}
           className="self-start rounded bg-primary px-3 py-1 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-60"
         >
-          {pendiente ? "Guardando..." : "Guardar descripción"}
+          {pendiente ? "Guardando..." : "Guardar"}
         </button>
         {estado.error && <span className="text-xs text-secondary">{estado.error}</span>}
         {estado.ok && <span className="text-xs text-accent">Guardado.</span>}
@@ -118,8 +133,8 @@ export function IngredientesCliente({
           Ingredientes del sitio web
         </h1>
         <p className="text-sm text-gray">
-          Descripción y foto que ve el cliente al hacer clic en un
-          ingrediente dentro de una pizza.
+          Nombre, descripción y foto que ve el cliente cuando toca un
+          ingrediente dentro de una pizza. El nombre del almacén no cambia.
         </p>
       </div>
       <div className="flex flex-col gap-3">
@@ -130,6 +145,9 @@ export function IngredientesCliente({
           >
             <div className="w-full sm:w-40 sm:shrink-0">
               <h3 className="font-semibold text-dark">{i.nombre}</h3>
+              {i.nombre_publico && (
+                <p className="text-xs text-gray">En la web: {i.nombre_publico}</p>
+              )}
               <Fotos insumoId={i.id} fotos={fotosPorInsumo[i.id] ?? []} />
             </div>
             <FormDescripcion insumo={i} />

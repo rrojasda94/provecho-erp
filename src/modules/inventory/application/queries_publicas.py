@@ -743,12 +743,15 @@ def insumos_de_recetas(
     """
     if not receta_ids:
         return {}
+    # `nombre_publico` primero: el nombre interno está escrito para el
+    # almacén ("QUESO EDAM BLOQUE 3KG") y el sitio lo mostraba tal cual.
+    nombre_visible = func.coalesce(Articulo.nombre_publico, Articulo.nombre)
     stmt = (
-        select(RecetaItem.receta_id, Articulo.id, Articulo.nombre)
+        select(RecetaItem.receta_id, Articulo.id, nombre_visible)
         .join(Articulo, Articulo.id == RecetaItem.articulo_id)
         .where(RecetaItem.receta_id.in_(list(receta_ids)))
         .distinct()
-        .order_by(Articulo.nombre)
+        .order_by(nombre_visible)
     )
     if solo_incondicionales:
         stmt = stmt.where(RecetaItem.aplica_valores.is_(None))
@@ -769,9 +772,11 @@ def articulos_publicos(
     if not ids:
         return {}
     filas = session.execute(
-        select(Articulo.id, Articulo.nombre, Articulo.descripcion).where(
-            Articulo.id.in_(ids)
-        )
+        select(
+            Articulo.id,
+            func.coalesce(Articulo.nombre_publico, Articulo.nombre).label("nombre"),
+            Articulo.descripcion,
+        ).where(Articulo.id.in_(ids))
     )
     return {
         fila.id: {"nombre": fila.nombre, "descripcion": fila.descripcion}

@@ -162,6 +162,8 @@ class ArticuloUpdate(BaseModel):
     # era inmutable.
     id_interno: str | None = Field(default=None, min_length=1, max_length=8)
     nombre: str | None = Field(default=None, min_length=1, max_length=150)
+    # Cómo lo ve el cliente en el sitio de marca. Vacío = el de siempre.
+    nombre_publico: str | None = Field(default=None, max_length=80)
     descripcion: str | None = None
     categoria_id: uuid.UUID | None = None
     tipo: str | None = Field(default=None, max_length=30)
@@ -177,6 +179,7 @@ class ArticuloOut(BaseModel):
     empresa_id: uuid.UUID
     id_interno: str
     nombre: str
+    nombre_publico: str | None = None
     descripcion: str | None = None
     unidad_medida_id: uuid.UUID
     tipo: str

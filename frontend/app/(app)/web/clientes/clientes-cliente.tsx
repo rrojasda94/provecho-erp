@@ -143,9 +143,12 @@ function Fila({
 export function ClientesCliente({
   clientes,
   busqueda,
+  correoConfigurado = true,
 }: {
   clientes: ClienteWeb[];
   busqueda: string;
+  /** `false` = el servidor no tiene SMTP y ningún correo sale. */
+  correoConfigurado?: boolean;
 }) {
   const [resultado, setResultado] = useState<Resultado | null>(null);
 
@@ -158,6 +161,14 @@ export function ClientesCliente({
           correo, restablécesela aquí y díctasela por teléfono.
         </p>
       </div>
+
+      {!correoConfigurado && (
+        <p className="rounded border border-secondary bg-cream px-3 py-2 text-sm text-dark">
+          <strong>El servidor no está enviando correos.</strong> Falta configurar el correo
+          saliente (<code>SMTP_*</code>), así que el enlace de &quot;olvidé mi contraseña&quot; no
+          le llega a nadie. Mientras tanto, restablece la clave desde acá y díctala por teléfono.
+        </p>
+      )}
 
       <form method="get" className="flex gap-2">
         <input
