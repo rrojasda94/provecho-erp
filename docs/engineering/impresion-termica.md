@@ -44,7 +44,8 @@ El logo y las líneas de cortesía del pie viven en `marca.skins["ticket"]`:
 
 - `logo` es una **ruta servida por el frontend**, no un archivo en la base.
   Los archivos viven en `frontend/public/marcas/`; cambiar el logo es
-  reemplazar el archivo con el mismo nombre.
+  reemplazar el archivo con el mismo nombre. `charlies.svg` es el logo vertical
+  oficial en **negro puro** (la térmica es de una sola tinta).
 - Sin `logo`, el ticket sale con el nombre de la marca en texto, que es lo que
   importa.
 - Sin `pie`, sale la línea legal por defecto.

@@ -11,6 +11,13 @@ test("tipografía, logo, favicon e imagen para compartir", async ({ page, reques
 
   await page.goto("/");
   await expect(page.getByRole("img", { name: "Charlie's Pizzas" }).first()).toBeVisible();
+  // Los SVG oficiales (cabecera y pie) cargaron de verdad: un <img> roto también es "visible".
+  const logos = page.getByRole("img", { name: "Charlie's Pizzas" });
+  expect(await logos.count()).toBeGreaterThanOrEqual(2);
+  const cargaron = await logos.evaluateAll((imgs) =>
+    (imgs as HTMLImageElement[]).map((i) => i.complete && i.naturalWidth > 0),
+  );
+  expect(cargaron.every(Boolean)).toBe(true);
 
   const cargadas = await page.evaluate(async () => {
     await document.fonts.ready;

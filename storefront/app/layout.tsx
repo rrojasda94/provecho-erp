@@ -111,10 +111,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b-4 border-negro bg-crema px-4 py-3 sm:px-8">
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/marcas/logo-horizontal.png"
+              src="/marcas/logo-horizontal.svg"
               alt="Charlie's Pizzas"
-              width={545}
-              height={47}
+              width={2265}
+              height={192}
               priority
               className="h-5 w-auto sm:h-6"
             />
@@ -137,7 +137,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <footer className="mt-12 border-t-4 border-negro bg-negro px-4 py-8 text-sm text-crema sm:px-8">
           <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="font-display text-lg uppercase">Charlie&apos;s Pizzas</p>
+              <Image
+                src="/marcas/logo-horizontal-crema.svg"
+                alt="Charlie's Pizzas"
+                width={2265}
+                height={192}
+                className="h-5 w-auto"
+              />
               <p className="mt-1 max-w-md text-crema/80">
                 {datos?.contenido?.pie?.texto ??
                   "Una marca de Grupo Majambo. Pizza de barrio en Tarapoto."}

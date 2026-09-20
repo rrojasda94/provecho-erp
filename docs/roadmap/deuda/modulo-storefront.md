@@ -18,13 +18,14 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     e imagen para compartir el enlace. Lo que deja abierto:
     - ⬜ **Isidora Black** (titulares) no vino en el paquete: los títulos usan la
       Super de Tusker hasta entonces (`storefront/app/fonts/README.md`).
-    - ⬜ **Logos en SVG y en negativo.** Solo hay PNG (el horizontal mide 47 px de
-      alto) y ninguna versión para fondo oscuro; por eso el pie negro no lleva
-      logo (`storefront/public/marcas/README.md`).
-    - ⬜ **Licencia web de Tusker Grotesk** sin confirmar: el paquete no la trae.
-    - ⬜ **`frontend/public/marcas/charlies.svg`** (texto provisional) sigue siendo el
-      logo de los tickets térmicos (ADR-067): necesita una versión monocroma
-      real, no este PNG.
+    - ✅ 2026-09-19 **Logos en SVG y licencia de Tusker**: la marca entregó los tres
+      logotipos en SVG (`storefront/public/marcas/`) y confirmó que Tusker Grotesk es
+      de uso libre. Íconos e imágenes para compartir se regeneraron desde el vector.
+    - ✅ 2026-09-19 **Logo por fondo**: cada logo tiene tres tintas (aceituna negra para
+      fondo claro, crema para fondo oscuro, verde original); el pie negro ya lleva logo.
+      El ticket térmico del ERP usa el logo vertical oficial en negro puro
+      (`frontend/public/marcas/charlies.svg`). Queda sin probar en la impresora real:
+      confirmar el contraste en la primera tanda de tickets.
   - ⬜ **`storefront_marca_id` sin resolver `articulo`/`producto_comercial`
     por otra marca.** El sitio sirve una sola marca a la vez
     (`STOREFRONT_MARCA_ID`); si el grupo abre un segundo sitio de marca,

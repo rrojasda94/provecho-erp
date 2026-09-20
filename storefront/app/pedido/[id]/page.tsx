@@ -60,10 +60,10 @@ export default async function PedidoPage({
     <div className="relative mx-auto max-w-lg px-4 py-16">
       {/* Marca de agua: el logo corto (brandbook p. 37), a baja opacidad. */}
       <Image
-        src="/marcas/logo-corto.png"
+        src="/marcas/logo-corto.svg"
         alt=""
-        width={800}
-        height={619}
+        width={1617}
+        height={1251}
         aria-hidden
         className="pointer-events-none absolute -bottom-6 right-2 -z-10 w-40 opacity-10"
       />
