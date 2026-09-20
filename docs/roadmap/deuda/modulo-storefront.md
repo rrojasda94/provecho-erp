@@ -32,6 +32,13 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
       El ticket térmico del ERP usa el logo vertical oficial en negro puro
       (`frontend/public/marcas/charlies.svg`). Queda sin probar en la impresora real:
       confirmar el contraste en la primera tanda de tickets.
+  - ⬜ **`components/direccion/` está copiado del ERP.** Los siete archivos del
+    campo de dirección (y `lib/direcciones.ts`, `lib/google-maps.ts`,
+    `lib/mapas.ts`) son copias de `frontend/`, con las clases de la marca
+    cambiadas. Es deliberado: son dos apps de Next separadas, cada una con su
+    `package.json` y su imagen, y compartirlas pide montar workspaces de npm
+    para siete archivos. El costo real es que un arreglo hay que hacerlo dos
+    veces — si aparece un tercer consumidor, ahí conviene el paquete compartido.
   - ⬜ **`storefront_marca_id` sin resolver `articulo`/`producto_comercial`
     por otra marca.** El sitio sirve una sola marca a la vez
     (`STOREFRONT_MARCA_ID`); si el grupo abre un segundo sitio de marca,

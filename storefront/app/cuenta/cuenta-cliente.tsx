@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useTransition } from "react";
 
 import { Boton } from "@/components/boton";
+import { CampoDireccion } from "@/components/direccion/campo-direccion";
 import { ESTADO_INICIAL } from "@/lib/estado-formulario";
 
 import {
@@ -107,7 +108,10 @@ function FormNuevaDireccion() {
           <input type="checkbox" name="predeterminada" /> Predeterminada
         </label>
       </div>
-      <input name="direccion" placeholder="Dirección" required className="rounded border px-2 py-1 text-sm" />
+      {/* El mismo campo del checkout: deja sus cinco campos ocultos con el
+          punto del mapa dentro de este `<form>`, así la dirección se guarda
+          anclada y el checkout no tiene que volver a pedir el GPS. */}
+      <CampoDireccion etiqueta="" requerido claseCampo="rounded border px-2 py-1 text-sm" />
       <input name="referencia" placeholder="Referencia (opcional)" className="rounded border px-2 py-1 text-sm" />
       <Boton className="self-start px-3 py-1 text-xs" esperando="Guardando...">
         Agregar dirección

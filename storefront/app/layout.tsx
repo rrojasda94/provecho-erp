@@ -5,8 +5,10 @@ import type { Metadata } from "next";
 
 import { apiFetch } from "@/lib/api";
 import { obtenerSesion } from "@/lib/auth";
+import { configMapas } from "@/lib/mapas";
 import { URL_SITIO } from "@/lib/sitio";
 import { CarritoBadge } from "@/components/carrito-badge";
+import { ProveedorConfigMapas } from "@/components/direccion/config-mapas";
 import { RevelarObservador } from "@/components/revelar-observador";
 
 import "./globals.css";
@@ -154,7 +156,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </nav>
         </header>
 
-        <main className="flex-1">{children}</main>
+        {/* La clave de Maps la lee el proceso de Next y baja por contexto: un
+            componente cliente no puede tocar `process.env`, y así el campo de
+            dirección del checkout la encuentra sin que cada página se la pase. */}
+        <main className="flex-1">
+          <ProveedorConfigMapas config={configMapas()}>{children}</ProveedorConfigMapas>
+        </main>
 
         <footer className="mt-12 border-t-4 border-negro bg-negro px-4 py-8 text-sm text-crema sm:px-8">
           <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

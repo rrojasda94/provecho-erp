@@ -173,6 +173,8 @@ services:
       API_INTERNAL_URL: http://api:8000
       GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
       GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
+      # Sesga el autocompletado de direcciones del checkout a Perú.
+      GOOGLE_MAPS_PAIS: ${GOOGLE_MAPS_PAIS:-pe}
       STOREFRONT_IMAGENES_HOST: ${STOREFRONT_IMAGENES_HOST:-}
       # Client ID de "Ingresar con Google" (no es un secreto). Sin él el botón
       # no se dibuja: faltaba acá y el `.env` del servidor no llegaba al sitio.

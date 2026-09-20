@@ -26,7 +26,7 @@ test("agregar al carrito y pagar con Izipay (de prueba) un pedido de recojo, com
   await page.getByRole("link", { name: new RegExp(PRODUCTO) }).click();
   await expect(page.getByRole("heading", { name: PRODUCTO })).toBeVisible();
   await page.getByRole("button", { name: /Agregar/ }).click();
-  await expect(page.getByRole("button", { name: "¡Agregado!" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /¡Agregado!/ })).toBeVisible();
 
   await page.goto("/checkout");
   await expect(page.getByRole("heading", { name: "Checkout" })).toBeVisible();

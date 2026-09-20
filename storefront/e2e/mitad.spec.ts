@@ -34,7 +34,7 @@ test("armar una Mitad x Mitad con extra y pagarla con Izipay (de prueba)", async
     .click();
   await expect(agregar).toContainText("49.00"); // + 6 del extra queso
   await agregar.click();
-  await expect(page.getByRole("button", { name: "¡Agregado!" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /¡Agregado!/ })).toBeVisible();
 
   await page.goto("/carrito");
   await expect(page.getByText("Mitad 1: Hawaiana")).toBeVisible();

@@ -11326,6 +11326,17 @@
             ],
             "title": "Referencia"
           },
+          "ubicacion_distrito": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Distrito"
+          },
           "ubicacion_lat": {
             "anyOf": [
               {
@@ -11349,6 +11360,28 @@
               }
             ],
             "title": "Ubicacion Lng"
+          },
+          "ubicacion_place_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Place Id"
+          },
+          "ubicacion_plus_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ubicacion Plus Code"
           }
         },
         "required": [

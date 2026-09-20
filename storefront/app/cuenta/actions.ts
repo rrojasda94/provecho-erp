@@ -206,6 +206,22 @@ export async function marcarDireccionPredeterminadaAction(direccionId: string): 
   revalidatePath("/cuenta");
 }
 
+/** Los cinco campos del ancla que `CampoDireccion` deja como `<input hidden>`.
+ * Un `FormData` no sabe decir `null`: el vacío se convierte acá. */
+const CAMPOS_UBICACION = [
+  "ubicacion_place_id",
+  "ubicacion_lat",
+  "ubicacion_lng",
+  "ubicacion_plus_code",
+  "ubicacion_distrito",
+] as const;
+
+function ubicacionDe(formData: FormData): Record<string, string | undefined> {
+  return Object.fromEntries(
+    CAMPOS_UBICACION.map((c) => [c, texto(formData, c) || undefined]),
+  );
+}
+
 export async function agregarDireccionAction(_previo: Estado, formData: FormData): Promise<Estado> {
   try {
     await apiAuth("/api/v1/storefront/cuentas/me/direcciones", {
@@ -216,11 +232,16 @@ export async function agregarDireccionAction(_previo: Estado, formData: FormData
         direccion: texto(formData, "direccion"),
         referencia: texto(formData, "referencia") || undefined,
         predeterminada: formData.get("predeterminada") === "on",
+        // Sin esto, toda dirección guardada desde "Mi cuenta" nacía sin punto
+        // en el mapa y el checkout volvía a pedir el GPS aunque el cliente ya
+        // la tuviera cargada.
+        ...ubicacionDe(formData),
       },
     });
   } catch (e) {
     return { error: mensajeDeError(e, "No se pudo guardar la dirección."), ok: false };
   }
+  revalidatePath("/cuenta");
   return { error: "", ok: true };
 }
 
