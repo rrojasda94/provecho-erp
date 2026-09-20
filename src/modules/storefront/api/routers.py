@@ -10,6 +10,7 @@ from src.modules.storefront.api import schemas
 from src.modules.storefront.application import atencion, contenido, fotos
 from src.modules.users.api.deps import get_db, require_permission
 from src.modules.users.infrastructure.models import Usuario
+from src.shared.integrations.email import smtp
 
 router = APIRouter(prefix="/storefront", tags=["storefront"])
 
@@ -57,6 +58,22 @@ def guardar_contenido(
 
 
 # --- Atención al cliente: cuentas del sitio ------------------------------------
+@router.get("/clientes/correo", response_model=schemas.CorreoSalienteOut)
+def estado_del_correo(
+    _: Usuario = Depends(require_permission(LEER)),
+):
+    """Si el servidor puede mandar correos.
+
+    Sin `SMTP_HOST` el enlace de "olvidé mi contraseña" se genera y no sale a
+    ningún lado: el sitio responde lo mismo de siempre (no puede delatar qué
+    correos tienen cuenta, RN-WEB-018) y desde afuera es indistinguible de un
+    envío real. Quien atiende tiene que poder saberlo para ofrecer el
+    restablecimiento asistido en vez de mandar a esperar un correo que no
+    existe.
+    """
+    return {"configurado": smtp.configurado()}
+
+
 @router.get("/clientes", response_model=list[schemas.ClienteWebOut])
 def listar_clientes_web(
     q: str | None = Query(default=None, max_length=100),

@@ -62,11 +62,11 @@ def env(monkeypatch, _app_compartida, _engine_de_prueba):
         yield c, ids, TestSession
 
 
-def _registro_body(email="ana@example.com", numero_documento="45678912"):
+def _registro_body(email="ana@example.com", numero_documento="45678912", telefono="987654321"):
     return {
         "email": email, "password": "clave-larga-123", "nombres": "Ana",
         "apellidos": "Torres", "tipo_documento": "dni",
-        "numero_documento": numero_documento, "telefono": "987654321",
+        "numero_documento": numero_documento, "telefono": telefono,
         "fecha_nacimiento": "1995-05-20", "direccion": "Jr. Los Pinos 123",
     }
 
@@ -85,6 +85,41 @@ def test_registro_email_duplicado_es_409(env):
     client.post(f"{CUENTAS}/registro", json=_registro_body())
     r = client.post(f"{CUENTAS}/registro", json=_registro_body(numero_documento="11223344"))
     assert r.status_code == 409
+
+
+def test_registro_con_documento_o_telefono_ya_usados_es_409(env):
+    """Una persona, una cuenta.
+
+    Solo el email era único, así que la misma persona podía abrir varias
+    cuentas con su mismo DNI y terminar con los pedidos repartidos entre
+    ellas. El mensaje distingue cuál de los dos repitió: "ya existe una
+    cuenta" a secas obliga a adivinar.
+    """
+    client, _, _ = env
+    assert client.post(f"{CUENTAS}/registro", json=_registro_body()).status_code == 201
+
+    mismo_dni = client.post(
+        f"{CUENTAS}/registro",
+        json=_registro_body(email="otra@example.com", telefono="900000001"),
+    )
+    assert mismo_dni.status_code == 409
+    assert "documento" in mismo_dni.json()["detail"]
+
+    mismo_telefono = client.post(
+        f"{CUENTAS}/registro",
+        json=_registro_body(email="tercera@example.com", numero_documento="11223344"),
+    )
+    assert mismo_telefono.status_code == 409
+    assert "teléfono" in mismo_telefono.json()["detail"]
+
+    # Con los tres distintos sí entra.
+    distinta = client.post(
+        f"{CUENTAS}/registro",
+        json=_registro_body(
+            email="cuarta@example.com", numero_documento="11223344", telefono="900000002",
+        ),
+    )
+    assert distinta.status_code == 201, distinta.text
 
 
 def test_registro_se_vincula_a_un_cliente_de_sales(env):

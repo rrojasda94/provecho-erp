@@ -22,6 +22,15 @@ class Articulo(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     # empresas; los códigos ya asignados de 4 caracteres siguen valiendo.
     id_interno: Mapped[str] = mapped_column(String(8))
     nombre: Mapped[str] = mapped_column(String(150))
+    # Cómo se llama este insumo **para el cliente**, en el sitio de marca.
+    # Vacío = se usa `nombre`.
+    #
+    # El nombre interno está escrito para el almacén y la cocina ("QUESO
+    # EDAM BLOQUE 3KG", "SALSA BASE PIZZA V2") y el sitio lo mostraba tal
+    # cual bajo cada pizza. No se puede renombrar el artículo para arreglarlo:
+    # el almacén necesita distinguir dos quesos que al comensal le dan igual.
+    # Son dos públicos, así que son dos nombres.
+    nombre_publico: Mapped[str | None] = mapped_column(String(80), nullable=True)
     # Copy para el diálogo de ingrediente del sitio de marca (storefront,
     # ADR-103). Nunca obligatoria.
     descripcion: Mapped[str | None] = mapped_column(Text, nullable=True)

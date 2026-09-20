@@ -67,6 +67,22 @@ class CuentaRepo:
             )
         )
 
+    def get_by_documento(self, numero_documento: str) -> StorefrontCuenta | None:
+        return self.s.scalar(
+            select(StorefrontCuenta).where(
+                StorefrontCuenta.numero_documento == numero_documento.strip(),
+                StorefrontCuenta.deleted_at.is_(None),
+            )
+        )
+
+    def get_by_telefono(self, telefono: str) -> StorefrontCuenta | None:
+        return self.s.scalar(
+            select(StorefrontCuenta).where(
+                StorefrontCuenta.telefono == telefono.strip(),
+                StorefrontCuenta.deleted_at.is_(None),
+            )
+        )
+
     def add(self, cuenta: StorefrontCuenta) -> StorefrontCuenta:
         self.s.add(cuenta)
         self.s.flush()

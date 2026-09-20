@@ -174,6 +174,88 @@ def test_carta_trae_producto_con_ingredientes_y_sin_campos_prohibidos(env):
         assert prohibido not in crudo, prohibido + " se filtro a la carta publica"
 
 
+
+def test_un_producto_con_tamanos_lista_los_ingredientes_de_sus_variantes(env):
+    """La receta vive en la variante, nunca en el padre.
+
+    `catalogo.crear_variante` **obliga** a que un producto con tamaños no
+    tenga receta propia, así que el nodo padre llegaba siempre con
+    `ingredientes: []` y en el sitio ninguna pizza con tamaños mostraba un
+    solo ingrediente. El fixture de las otras pruebas no tiene variantes, que
+    es por lo que esto pasó en verde hasta verlo en el sitio real.
+    """
+    from src.modules.inventory.infrastructure.models import Receta, RecetaItem, UnidadMedida
+
+    client, ids, TestSession = env
+    headers = _token(client)
+    with TestSession() as s:
+        padre = s.get(ProductoComercial, uuid.UUID(ids["producto_id"]))
+        udm_id = s.scalar(select(UnidadMedida.id))
+        albahaca = Articulo(
+            empresa_id=uuid.UUID(ids["empresa_id"]), id_interno="ART0002",
+            nombre="ALBAHACA FRESCA X 100G", nombre_publico="Albahaca",
+            unidad_medida_id=udm_id, tipo="insumo",
+        )
+        s.add(albahaca)
+        s.flush()
+        receta_grande = Receta(
+            empresa_id=uuid.UUID(ids["empresa_id"]), nombre="Pizza clasica familiar",
+            rendimiento_cantidad=Decimal(1), rendimiento_unidad_medida_id=udm_id,
+        )
+        s.add(receta_grande)
+        s.flush()
+        s.add_all([
+            RecetaItem(
+                receta_id=receta_grande.id, articulo_id=uuid.UUID(ids["insumo_id"]),
+                cantidad=Decimal("0.4"),
+            ),
+            RecetaItem(
+                receta_id=receta_grande.id, articulo_id=albahaca.id, cantidad=Decimal("0.01"),
+            ),
+        ])
+        # El padre pierde su receta y gana una variante que sí la tiene, que es
+        # la forma en la que el ERP guarda una pizza con tamaños.
+        receta_del_padre = padre.receta_id
+        padre.receta_id = None
+        variante = ProductoComercial(
+            id_interno="P0000002", marca_id=uuid.UUID(ids["marca_id"]),
+            nombre="Pizza Clasica Familiar", producto_padre_id=padre.id,
+            receta_id=receta_grande.id,
+        )
+        s.add(variante)
+        s.flush()
+        assert receta_del_padre is not None
+        variante_id = str(variante.id)
+        s.commit()
+
+    # El precio va en la variante: un producto con variantes no se vende por
+    # sí mismo (RN-COM-022).
+    r = client.post(
+        "/api/v1/sales/listas-precio", headers=headers,
+        json={
+            "marca_id": ids["marca_id"], "nombre": "Lista delivery",
+            "vigente_desde": str(HOY - timedelta(days=1)),
+            "canal": "delivery", "modalidad": "delivery",
+        },
+    )
+    assert r.status_code == 201, r.text
+    r = client.post(
+        f"/api/v1/sales/listas-precio/{r.json()['id']}/precios", headers=headers,
+        json={"producto_comercial_id": variante_id, "monto": "60.00"},
+    )
+    assert r.status_code == 201, r.text
+
+    producto = client.get(f"{PUBLICO}/carta").json()["productos"][0]
+    nombres = [i["nombre"] for i in producto["ingredientes"]]
+    # Los de la variante, y el alias en vez del nombre de almacén.
+    assert nombres == ["Albahaca", "Queso mozzarella"]
+
+    detalle = client.get(f"{PUBLICO}/productos/{ids['producto_id']}").json()
+    assert [i["nombre"] for i in detalle["ingredientes_detalle"]] == [
+        "Albahaca", "Queso mozzarella",
+    ]
+
+
 def test_las_categorias_de_la_carta_traen_su_nombre(env):
     """Sin nombre, los chips de categoría del sitio salían como puntos vacíos."""
     from src.modules.inventory.infrastructure.models import Categoria

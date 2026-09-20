@@ -59,6 +59,12 @@ EntidadFoto = Literal["producto", "ingrediente"]
 
 
 # --- Atención al cliente (ERP: `/web/clientes`) ---
+class CorreoSalienteOut(BaseModel):
+    """`False` = el servidor no tiene SMTP y ningún correo sale."""
+
+    configurado: bool
+
+
 class ClienteWebOut(BaseModel):
     """Una cuenta del sitio vista por el personal: datos de contacto, nunca la
     clave ni su hash."""

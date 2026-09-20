@@ -87,10 +87,17 @@ def _opciones(nodo: dict) -> dict:
         "atributos": [
             {
                 "id": a["atributo_id"],
-                "nombre": a["nombre"],
+                # El nombre para el cliente si lo cargaron en el ERP, y si no
+                # el interno. Sin esto los sabores salían como "Mitad 1 F" o
+                # "Americana F": el nombre con el que se arma el catálogo.
+                "nombre": a.get("nombre_publico") or a["nombre"],
                 "display": a["display"],
                 "valores": [
-                    {"id": v["id"], "nombre": v["nombre"], "precio_extra": v["precio_extra"]}
+                    {
+                        "id": v["id"],
+                        "nombre": v.get("nombre_publico") or v["nombre"],
+                        "precio_extra": v["precio_extra"],
+                    }
                     for v in a["valores"]
                 ],
             }
@@ -124,6 +131,15 @@ def _ficha(
     if con_opciones:
         ficha.update(_opciones(nodo))
     return ficha
+
+
+def _unir_ingredientes(variantes: list[dict]) -> list[dict]:
+    """Los ingredientes de todas las variantes, sin repetir y por nombre."""
+    por_id: dict[uuid.UUID, dict] = {}
+    for v in variantes:
+        for ing in v["ingredientes"]:
+            por_id.setdefault(ing["id"], ing)
+    return sorted(por_id.values(), key=lambda i: i["nombre"])
 
 
 def carta(session, *, con_opciones: bool = False) -> dict:
@@ -162,6 +178,14 @@ def carta(session, *, con_opciones: bool = False) -> dict:
 
         base = _ficha(item, ingredientes_por_receta, con_opciones=con_opciones)
         base.pop("precio")
+        # Un producto con tamaños **nunca** tiene receta propia: el ERP la
+        # obliga a vivir en cada variante (`catalogo.crear_variante`), así que
+        # el nodo padre venía siempre con `ingredientes: []` y en el sitio no
+        # se veía un solo ingrediente. Se arma la unión de las de sus
+        # variantes: los ingredientes de "Pizza Americana" son los mismos sea
+        # personal o familiar, cambia la cantidad, que acá no se muestra.
+        if not base["ingredientes"] and variantes:
+            base["ingredientes"] = _unir_ingredientes(variantes)
         productos.append(
             {
                 **base,
@@ -190,15 +214,21 @@ def producto(session, producto_id: uuid.UUID) -> dict:
         fotos_ingrediente = fotos_uc.fotos_principales_urls(
             session, entidad="ingrediente", entidad_ids=list(detalle)
         )
-        item["ingredientes_detalle"] = [
-            {
-                "id": ing_id,
-                "nombre": datos_ing["nombre"],
-                "descripcion": datos_ing["descripcion"],
-                "foto_url": fotos_ingrediente.get(ing_id),
-            }
-            for ing_id, datos_ing in detalle.items()
-        ]
+        # Ordenados por nombre, como la lista de la carta: sin esto salían en
+        # el orden físico de la tabla y dos pantallas del mismo producto
+        # mostraban los mismos ingredientes en distinto orden.
+        item["ingredientes_detalle"] = sorted(
+            (
+                {
+                    "id": ing_id,
+                    "nombre": datos_ing["nombre"],
+                    "descripcion": datos_ing["descripcion"],
+                    "foto_url": fotos_ingrediente.get(ing_id),
+                }
+                for ing_id, datos_ing in detalle.items()
+            ),
+            key=lambda i: i["nombre"],
+        )
         return item
     raise NoEncontrado("producto no encontrado")
 

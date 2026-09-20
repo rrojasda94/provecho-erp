@@ -12,11 +12,24 @@ export default async function WebClientesPage({
   const { q } = await searchParams;
 
   try {
-    const clientes = await apiFetch<ClienteWeb[]>(
-      `/api/v1/storefront/clientes?q=${encodeURIComponent(q ?? "")}`,
-      { token },
+    // El estado del correo en paralelo y tolerante: que no se pueda leer no
+    // puede dejar sin pantalla a quien está atendiendo a un cliente.
+    const [clientes, correo] = await Promise.all([
+      apiFetch<ClienteWeb[]>(
+        `/api/v1/storefront/clientes?q=${encodeURIComponent(q ?? "")}`,
+        { token },
+      ),
+      apiFetch<{ configurado: boolean }>("/api/v1/storefront/clientes/correo", {
+        token,
+      }).catch(() => ({ configurado: true })),
+    ]);
+    return (
+      <ClientesCliente
+        clientes={clientes}
+        busqueda={q ?? ""}
+        correoConfigurado={correo.configurado}
+      />
     );
-    return <ClientesCliente clientes={clientes} busqueda={q ?? ""} />;
   } catch (e) {
     const mensaje =
       e instanceof ApiError && e.status === 403

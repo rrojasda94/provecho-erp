@@ -29,6 +29,10 @@ class AtributoValor(Base, UuidPkMixin, TimestampMixin):
         ForeignKey("atributo.id"), index=True
     )
     nombre: Mapped[str] = mapped_column(String(80))
+    # Cómo lo ve el cliente en el sitio de marca. Vacío = `nombre`.
+    # Los sabores salían como "Americana F" o "Hawaiana F" en la web, que es
+    # el nombre con el que se cargaron en el ERP.
+    nombre_publico: Mapped[str | None] = mapped_column(String(80), nullable=True)
     orden: Mapped[int] = mapped_column(
         Integer, default=0, server_default=text("0"), nullable=False
     )
