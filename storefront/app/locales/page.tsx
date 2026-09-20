@@ -39,7 +39,7 @@ export default async function LocalesPage() {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }}
         />
       ))}
-      <h1 className="font-display text-3xl uppercase text-negro">Nuestros locales</h1>
+      <h1 className="font-titular text-3xl uppercase text-negro">Nuestros locales</h1>
       <MapaLocales sucursales={sucursales} apiKey={config.apiKey} mapId={config.mapId} />
     </div>
   );

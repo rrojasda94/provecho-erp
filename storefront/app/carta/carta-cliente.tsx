@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { buscar, type Buscable } from "@/lib/busqueda";
+import { vibrar } from "@/lib/haptica";
+import { Girador } from "@/components/boton";
 import { agregarFavoritoAction, quitarFavoritoAction } from "@/app/cuenta/actions";
 
 export type Ingrediente = { id: string; nombre: string };
@@ -39,16 +41,18 @@ function terminosDe(p: Producto): string[] {
   ];
 }
 
-function BotonFavorito({
+export function BotonFavorito({
   productoId,
   esFavorito,
   sesionActiva,
   onCambio,
+  onError,
 }: {
   productoId: string;
   esFavorito: boolean;
   sesionActiva: boolean;
   onCambio: (id: string, favorito: boolean) => void;
+  onError?: (mensaje: string) => void;
 }) {
   const [pendiente, startTransition] = useTransition();
   const router = useRouter();
@@ -79,24 +83,30 @@ function BotonFavorito({
     <button
       type="button"
       disabled={pendiente}
+      aria-pressed={esFavorito}
+      aria-busy={pendiente}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
         const nuevoValor = !esFavorito;
         onCambio(productoId, nuevoValor);
+        vibrar();
         startTransition(async () => {
           try {
             if (nuevoValor) await agregarFavoritoAction(productoId);
             else await quitarFavoritoAction(productoId);
           } catch {
+            // Se revierte Y se avisa: el rollback mudo hacía que un fallo se
+            // viera igual que "el corazón no responde".
             onCambio(productoId, esFavorito);
+            onError?.("No pudimos guardar tu favorito. Intenta de nuevo.");
           }
         });
       }}
-      className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-sm"
+      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-base text-rojo transition-transform active:scale-90 disabled:opacity-70"
       title={esFavorito ? "Quitar de favoritos" : "Agregar a favoritos"}
     >
-      {esFavorito ? "♥" : "♡"}
+      {pendiente ? <Girador className="h-3.5 w-3.5 text-humo" /> : esFavorito ? "♥" : "♡"}
     </button>
   );
 }
@@ -117,6 +127,21 @@ export function CartaCliente({
   const [categoria, setCategoria] = useState<string | null>(params.get("cat"));
   const [tamano, setTamano] = useState(params.get("tam") ?? "");
   const [favoritos, setFavoritos] = useState(() => new Set(favoritosIds));
+  const [errorFavorito, setErrorFavorito] = useState("");
+
+  // El `useState` de arriba solo corre en el primer render: sin esto, un
+  // `router.refresh()` o una vuelta atrás traían la lista nueva del servidor y
+  // los corazones seguían mostrando la vieja. Desincronizado, el siguiente
+  // click mandaba el verbo contrario al que el servidor esperaba y quedaba
+  // trabado — el "marco pero no desmarco" del reporte. Se ajusta durante el
+  // render (y no en un efecto) porque es exactamente el caso que React
+  // documenta para eso: estado local que deriva de una prop que cambió.
+  const claveServidor = favoritosIds.join(",");
+  const [claveVista, setClaveVista] = useState(claveServidor);
+  if (claveServidor !== claveVista) {
+    setClaveVista(claveServidor);
+    setFavoritos(new Set(favoritosIds));
+  }
 
   useEffect(() => {
     const url = new URLSearchParams();
@@ -170,7 +195,7 @@ export function CartaCliente({
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
-      <h1 className="font-display text-3xl uppercase text-negro">Carta</h1>
+      <h1 className="font-titular text-3xl uppercase text-negro">Carta</h1>
 
       <div className="flex flex-col gap-3">
         <input
@@ -224,12 +249,20 @@ export function CartaCliente({
         </div>
       </div>
 
+      {errorFavorito && (
+        <p role="alert" className="text-sm text-rojo">
+          {errorFavorito}
+        </p>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtrados.map((p) => (
           <Link
             key={p.id}
             href={`/carta/${p.id}`}
-            className="sombra-dura flex flex-col overflow-hidden rounded-lg border-2 border-negro bg-white"
+            prefetch
+            onClick={() => vibrar()}
+            className="sombra-dura revelar flex flex-col overflow-hidden rounded-lg border-2 border-negro bg-white"
           >
             <div className="relative h-40 w-full bg-crema-2">
               {p.foto_url && <Image src={p.foto_url} alt={p.nombre} fill className="object-cover" />}
@@ -243,6 +276,7 @@ export function CartaCliente({
                 esFavorito={favoritos.has(p.id)}
                 sesionActiva={sesionActiva}
                 onCambio={alCambiarFavorito}
+                onError={setErrorFavorito}
               />
             </div>
             <div className="flex flex-1 flex-col gap-1 p-3">

@@ -87,8 +87,13 @@ def editar(
     if predeterminada:
         _quitar_predeterminada_actual(session, cuenta_id)
         d.predeterminada = True
+    # `None` es "no lo toques", igual que los campos de arriba: el router arma
+    # el dict de ubicación siempre con las cinco claves, así que un PATCH que
+    # solo marca la dirección como predeterminada llegaba con los cinco en
+    # `None` y borraba el pin que el cliente había puesto en el mapa.
     for campo, valor in (ubicacion or {}).items():
-        setattr(d, campo, valor)
+        if valor is not None:
+            setattr(d, campo, valor)
     return d
 
 

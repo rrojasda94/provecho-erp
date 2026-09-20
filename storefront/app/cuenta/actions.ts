@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -171,6 +172,38 @@ export async function cambiarClaveAction(_previo: Estado, formData: FormData): P
     return { error: mensajeDeError(e, "No se pudo cambiar la clave."), ok: false };
   }
   redirect("/cuenta");
+}
+
+export async function actualizarPerfilAction(
+  _previo: Estado,
+  formData: FormData,
+): Promise<Estado> {
+  try {
+    await apiAuth("/api/v1/storefront/cuentas/me", {
+      token: await token(),
+      metodo: "PATCH",
+      cuerpo: {
+        nombres: texto(formData, "nombres"),
+        apellidos: texto(formData, "apellidos"),
+        telefono: texto(formData, "telefono") || undefined,
+      },
+    });
+  } catch (e) {
+    return { error: mensajeDeError(e, "No se pudieron guardar tus datos."), ok: false };
+  }
+  // El saludo del encabezado sale de estos datos: sin revalidar, el nombre
+  // nuevo no aparece hasta recargar a mano.
+  revalidatePath("/cuenta");
+  return { error: "", ok: true };
+}
+
+export async function marcarDireccionPredeterminadaAction(direccionId: string): Promise<void> {
+  await apiAuth(`/api/v1/storefront/cuentas/me/direcciones/${direccionId}`, {
+    token: await token(),
+    metodo: "PATCH",
+    cuerpo: { predeterminada: true },
+  });
+  revalidatePath("/cuenta");
 }
 
 export async function agregarDireccionAction(_previo: Estado, formData: FormData): Promise<Estado> {

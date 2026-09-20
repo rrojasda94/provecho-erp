@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
+import { Girador } from "@/components/boton";
+
 import { simularPago } from "./actions";
 
 /**
@@ -78,23 +80,30 @@ export function PagoCliente({
               type="button"
               disabled={enviando}
               onClick={() => responder("aprobado")}
-              className="sombra-dura flex-1 rounded bg-verde px-4 py-3 font-bold uppercase text-negro disabled:opacity-50"
+              aria-busy={enviando}
+              className="sombra-dura flex flex-1 items-center justify-center gap-2 rounded bg-verde px-4 py-3 font-bold uppercase text-negro disabled:opacity-50"
             >
-              Aprobar pago
+              {enviando && <Girador />}
+              {enviando ? "Procesando..." : "Aprobar pago"}
             </button>
             <button
               type="button"
               disabled={enviando}
               onClick={() => responder("rechazado")}
-              className="flex-1 rounded border-2 border-negro px-4 py-3 font-bold uppercase disabled:opacity-50"
+              className="flex-1 rounded border-2 border-negro px-4 py-3 font-bold uppercase transition-transform active:scale-95 disabled:opacity-50"
             >
               Rechazar pago
             </button>
           </div>
-          {error && <p className="text-sm text-rojo">{error}</p>}
+          {error && (
+            <p role="alert" className="text-sm text-rojo">
+              {error}
+            </p>
+          )}
         </div>
       ) : (
-        <p className="text-humo">
+        <p className="flex items-center justify-center gap-2 text-humo" aria-live="polite">
+          <Girador />
           Estamos esperando la confirmación de tu pago con Izipay. No cierres esta página.
         </p>
       )}

@@ -12,6 +12,9 @@ import {
   type LineaCarrito,
 } from "@/lib/carrito";
 
+import { Girador } from "@/components/boton";
+import { vibrar } from "@/lib/haptica";
+
 import { confirmarPedido, cotizarPedido, type Cotizacion } from "./actions";
 
 export type SucursalOpcion = { id: string; nombre: string; direccion: string | null };
@@ -159,7 +162,10 @@ export function CheckoutCliente({
   const efectivoSinCuenta = medioPago === "efectivo" && !perfil;
   const [numeroDocumento, setNumeroDocumento] = useState("");
   const [razonSocial, setRazonSocial] = useState("");
-  const [cotizacion, setCotizacion] = useState<Cotizacion | null>(null);
+  const [respuesta, setRespuesta] = useState<{
+    clave: string;
+    cotizacion: Cotizacion | null;
+  } | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const ubicacion = useUbicacionActual();
@@ -171,20 +177,51 @@ export function CheckoutCliente({
     [lineas],
   );
 
+  // Una cotización se identifica por lo que la determina. Guardar el
+  // resultado junto a su clave resuelve dos cosas de una: se sabe si lo que
+  // está en pantalla corresponde a lo que el cliente eligió recién (si no,
+  // está cotizando) y una respuesta lenta de una consulta vieja no pisa a la
+  // nueva — antes cambiar de local dos veces seguidas podía dejar el precio
+  // del primero.
+  const puedeCotizar = Boolean(
+    (modalidad === "takeout" && sucursalId) || (modalidad === "delivery" && ubicacion.coords),
+  );
+  const claveCotizacion = JSON.stringify([
+    modalidad,
+    modalidad === "takeout" ? sucursalId : ubicacion.coords,
+    itemsCotizar,
+  ]);
+  const cotizacion = respuesta?.clave === claveCotizacion ? respuesta.cotizacion : null;
+  const cotizando = puedeCotizar && respuesta?.clave !== claveCotizacion;
+
   useEffect(() => {
+    if (!puedeCotizar) return;
+    let vigente = true;
+    const [modalidadActual, origen, items] = JSON.parse(claveCotizacion) as [
+      Modalidad,
+      string | { lat: string; lng: string },
+      { producto_comercial_id: string; cantidad: number }[],
+    ];
     const promesa =
-      modalidad === "takeout" && sucursalId
-        ? cotizarPedido({ modalidad: "takeout", sucursal_id: sucursalId, items: itemsCotizar })
-        : modalidad === "delivery" && ubicacion.coords
-          ? cotizarPedido({
-              modalidad: "delivery",
-              ubicacion_lat: ubicacion.coords.lat,
-              ubicacion_lng: ubicacion.coords.lng,
-              items: itemsCotizar,
-            })
-          : Promise.resolve(null);
-    promesa.then(setCotizacion);
-  }, [modalidad, sucursalId, ubicacion.coords, itemsCotizar]);
+      modalidadActual === "takeout"
+        ? cotizarPedido({
+            modalidad: "takeout",
+            sucursal_id: origen as string,
+            items,
+          })
+        : cotizarPedido({
+            modalidad: "delivery",
+            ubicacion_lat: (origen as { lat: string; lng: string }).lat,
+            ubicacion_lng: (origen as { lat: string; lng: string }).lng,
+            items,
+          });
+    promesa.then((c) => {
+      if (vigente) setRespuesta({ clave: claveCotizacion, cotizacion: c });
+    });
+    return () => {
+      vigente = false;
+    };
+  }, [claveCotizacion, puedeCotizar]);
 
   function elegirDireccionGuardada(d: Direccion) {
     setDireccionTexto(d.direccion);
@@ -285,9 +322,18 @@ export function CheckoutCliente({
           <button
             type="button"
             onClick={ubicacion.pedir}
-            className="self-start rounded border-2 border-negro px-3 py-1 text-xs font-bold uppercase hover:bg-crema-2"
+            disabled={ubicacion.estado === "buscando"}
+            aria-busy={ubicacion.estado === "buscando"}
+            className="flex items-center gap-2 self-start rounded border-2 border-negro px-3 py-1 text-xs font-bold uppercase transition-transform hover:bg-crema-2 active:scale-95 disabled:opacity-60"
           >
-            {ubicacion.estado === "lista" ? "Ubicación lista ✓" : "Usar mi ubicación actual"}
+            {/* El estado "buscando" se calculaba y no se mostraba: el GPS puede
+                tardar ocho segundos y el botón se veía muerto todo ese rato. */}
+            {ubicacion.estado === "buscando" && <Girador className="h-3 w-3" />}
+            {ubicacion.estado === "buscando"
+              ? "Buscando tu ubicación..."
+              : ubicacion.estado === "lista"
+                ? "Ubicación lista ✓"
+                : "Usar mi ubicación actual"}
           </button>
           {ubicacion.estado === "error" && (
             <p className="text-xs text-rojo">
@@ -363,19 +409,34 @@ export function CheckoutCliente({
 
       <div className="flex items-center justify-between border-t-2 border-negro pt-4">
         <span className="font-bold uppercase">Total</span>
-        <span className="font-display text-2xl text-verde">
+        <span
+          className="flex items-center gap-2 font-display text-2xl text-verde"
+          aria-busy={cotizando}
+        >
+          {/* Mientras se recalcula el delivery el número cambia solo: el giro
+              avisa que todavía no es el definitivo. */}
+          {cotizando && <Girador className="h-4 w-4 text-humo" />}
           S/ {(total + Number(cotizacion?.costo_delivery ?? 0)).toFixed(2)}
         </span>
       </div>
 
-      {error && <p className="text-sm text-rojo">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-rojo">
+          {error}
+        </p>
+      )}
 
       <button
         type="button"
         disabled={enviando || !nombre || !telefono || efectivoSinCuenta}
-        onClick={confirmar}
-        className="sombra-dura rounded bg-verde px-4 py-3 font-bold uppercase text-negro hover:bg-verde-hover disabled:opacity-50"
+        aria-busy={enviando}
+        onClick={() => {
+          vibrar(15);
+          void confirmar();
+        }}
+        className="sombra-dura flex items-center justify-center gap-2 rounded bg-verde px-4 py-3 font-bold uppercase text-negro hover:bg-verde-hover disabled:opacity-50"
       >
+        {enviando && <Girador />}
         {enviando ? "Confirmando..." : "Confirmar pedido"}
       </button>
     </div>

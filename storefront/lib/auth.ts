@@ -38,5 +38,10 @@ export async function obtenerSesion(): Promise<Sesion> {
   if (!token) return null;
   const claims = decodificarClaims(token);
   if (!claims) return null;
+  // Vencido es lo mismo que sin sesión. Sin esta línea la página se dibujaba
+  // "con sesión" (corazones activos, saludo con el email) mientras cada
+  // llamada a la API devolvía 401 y las listas llegaban vacías: el sitio se
+  // contradecía a sí mismo y los favoritos quedaban trabados.
+  if (typeof claims.exp === "number" && claims.exp * 1000 <= Date.now()) return null;
   return { token, email: claims.email };
 }

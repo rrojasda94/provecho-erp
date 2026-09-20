@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { vibrar } from "@/lib/haptica";
 import { agregarAlCarrito } from "@/lib/carrito";
 import {
   esDePago,
@@ -256,6 +257,7 @@ export function AgregarCarrito({
       },
       cantidad,
     );
+    vibrar(15);
     setAgregado(true);
     setTimeout(() => setAgregado(false), 1500);
   }
@@ -317,7 +319,7 @@ export function AgregarCarrito({
           <button
             type="button"
             onClick={() => setCantidad((c) => Math.max(1, c - 1))}
-            className="px-3 py-1 font-bold"
+            className="px-3 py-1 font-bold transition-transform active:scale-90"
             aria-label="Menos"
           >
             −
@@ -326,7 +328,7 @@ export function AgregarCarrito({
           <button
             type="button"
             onClick={() => setCantidad((c) => Math.min(20, c + 1))}
-            className="px-3 py-1 font-bold"
+            className="px-3 py-1 font-bold transition-transform active:scale-90"
             aria-label="Más"
           >
             +
@@ -336,9 +338,11 @@ export function AgregarCarrito({
           type="button"
           disabled={!elegida.disponible || falta !== null}
           onClick={agregar}
-          className="sombra-dura flex-1 rounded bg-verde px-4 py-2 font-bold uppercase text-negro hover:bg-verde-hover disabled:opacity-50"
+          className={`sombra-dura flex-1 rounded px-4 py-2 font-bold uppercase text-negro transition-colors hover:bg-verde-hover disabled:opacity-50 ${
+            agregado ? "bg-oliva" : "bg-verde"
+          }`}
         >
-          {agregado ? "¡Agregado!" : `Agregar — S/ ${(unitario * cantidad).toFixed(2)}`}
+          {agregado ? "¡Agregado! ✓" : `Agregar — S/ ${(unitario * cantidad).toFixed(2)}`}
         </button>
       </div>
     </div>
