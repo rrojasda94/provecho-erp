@@ -24,6 +24,8 @@ test("tipografía, logo, favicon e imagen para compartir", async ({ page, reques
     return [...document.fonts].filter((f) => f.status === "loaded").map((f) => f.family);
   });
   expect(cargadas.some((f) => f.toLowerCase().includes("tusker"))).toBe(true);
+  // Isidora Black se carga para el titular de la portada.
+  expect(cargadas.some((f) => f.toLowerCase().includes("isidora"))).toBe(true);
   // Las fuentes salen del propio sitio: ni Anton ni Archivo desde Google.
   expect(pedidos.filter((u) => /fonts\.(googleapis|gstatic)\.com/.test(u))).toEqual([]);
 
@@ -38,4 +40,21 @@ test("tipografía, logo, favicon e imagen para compartir", async ({ page, reques
     expect(respuesta.ok(), `${selector} → ${destino}`).toBe(true);
     expect(respuesta.headers()["content-type"]).toContain("image/");
   }
+});
+
+test("el pie queda abajo y dice quién hizo el sitio", async ({ page }) => {
+  // Una página corta a propósito: acá es donde el pie flotaba a media pantalla.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/cuenta/ingresar");
+
+  const pie = page.locator("footer");
+  await expect(pie).toContainText("TAG Digitales");
+  await expect(pie).toContainText(/©\s*20\d\d/);
+
+  const abajo = await pie.evaluate((el) => {
+    const caja = el.getBoundingClientRect();
+    // Tolerancia de 1 px: el borde superior redondea distinto según el zoom.
+    return caja.bottom >= window.innerHeight - 1;
+  });
+  expect(abajo).toBe(true);
 });

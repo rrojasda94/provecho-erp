@@ -49,7 +49,7 @@ export function DetalleProducto({ producto }: { producto: ProductoDetalle }) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <h1 className="font-display text-3xl uppercase text-negro">{producto.nombre}</h1>
+        <h1 className="font-titular text-3xl uppercase text-negro">{producto.nombre}</h1>
         {producto.descripcion && <p className="text-humo">{producto.descripcion}</p>}
 
         {producto.ingredientes_detalle.length > 0 && (

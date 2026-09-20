@@ -511,18 +511,39 @@ ERP, y su paleta sale del brandbook propio de Charlie's Pizzas
 | `--chp-oliva` | `#85B73E` | Acento secundario |
 | `--chp-negro` | `#1A1A1A` | Texto de cuerpo |
 
-Tipografía: **Tusker Grotesk** (brandbook p. 47-49: «encabezados y cuerpos de
-texto», tres pesos como máximo). El sitio usa el corte **4500 Medium** para el
-texto y el **5800 Super** para el énfasis y los títulos, servidos desde el propio
-sitio (`next/font/local`, `storefront/app/fonts/`): ya no se le pide nada a Google
-Fonts ni se depende de Anton/Archivo. **Isidora Black** (la fuente de titulares del
-brandbook) todavía no llegó: los títulos usan la Super de Tusker hasta entonces, y
-cuando llegue solo cambia `--fuente-display`. Logos (brandbook p. 28-41): el
-**horizontal** va en la cabecera, el **vertical** en la landing del QR y donde se
-necesite el logo completo, y el **CH'S** (logo responsive, p. 37) como favicon,
-ícono de la app y marca de agua; la imagen que se ve al compartir el enlace
-(`opengraph-image.png`) junta los tres con el eslogan. No hay versión en negativo
-(para fondo oscuro) ni SVG todavía: el logo no se coloca sobre el pie negro.
+Tipografía: tres papeles, tres fuentes (detalle y motivos en
+`storefront/app/fonts/README.md`). El **cuerpo de texto** usa la sans del
+sistema: el brandbook (p. 48) pone Tusker también ahí, pero es una grotesca
+condensada y leer párrafos seguidos en ella cansa — se comprobó usando el sitio.
+Los **títulos, precios y botones** usan Tusker **5800 Super** (`.font-display`),
+y el **`h1` de cada página** usa **Isidora Black 7800** (`.font-titular`), que es
+el papel que el brandbook le da (p. 49); del paquete de Isidora solo llegó ese
+corte. Todo se sirve desde el propio sitio (`next/font/local`,
+`storefront/app/fonts/`): no se le pide nada a Google Fonts.
+
+Logos (brandbook p. 28-41): el **horizontal** va en la cabecera y en el pie, el
+**vertical** en la landing del QR y en el ticket térmico, y el **CH'S** (logo
+responsive, p. 37) como favicon, ícono de la app y marca de agua; la imagen que
+se ve al compartir el enlace (`opengraph-image.png`) sale del CH'S. Cada uno
+tiene tres tintas según el fondo (aceituna, crema, verde original); falta la
+versión en negativo.
+
+Respuesta a la interacción (el sitio se usa en un celular, dentro o camino a un
+local, con la conexión que haya):
+
+- Toda ruta que cargue datos tiene su `loading.tsx` con esqueleto. Sin él, Next
+  deja la pantalla anterior congelada mientras el servidor contesta y el sitio
+  parece roto: es literalmente lo que se reportó como "no se puede hacer click
+  en los productos".
+- Todo botón que dispara algo asíncrono muestra que está trabajando
+  (`components/boton.tsx`, `aria-busy` + giro + texto). Deshabilitarlo y nada
+  más no alcanza.
+- Todo elemento tocable tiene estado `:active` visible (`.sombra-dura` se hunde,
+  los botones chicos se encogen). En un celular no hay `:hover`.
+- Los gestos que "confirman" algo (agregar al carrito, marcar un favorito)
+  vibran 10-15 ms (`lib/haptica.ts`). Es mejora progresiva: iOS la ignora.
+- Todo lo anterior se apaga o se frena con `prefers-reduced-motion`.
+
 Voz de
 marca: `docs/foundation/glossary.md` no la cubre — vive en
 `brand-voice-guidelines.md` del brandbook (cercano, natural, profesional;

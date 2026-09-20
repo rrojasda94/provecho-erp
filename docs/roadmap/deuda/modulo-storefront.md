@@ -16,8 +16,14 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
     Tusker Grotesk 4500/5800 servida desde `storefront/app/fonts/` y los tres
     logos del brandbook (horizontal, vertical, CH'S), con favicon, ícono de la app
     e imagen para compartir el enlace. Lo que deja abierto:
-    - ⬜ **Isidora Black** (titulares) no vino en el paquete: los títulos usan la
-      Super de Tusker hasta entonces (`storefront/app/fonts/README.md`).
+    - ✅ 2026-09-20 **Isidora Black y el cuerpo de texto**: llegó el corte Black
+      (el único del paquete) y se usa en el `h1` de cada página, que es el papel
+      que le da el brandbook. El cuerpo pasó a la sans del sistema: Tusker es
+      condensada y leer párrafos en ella cansa. Detalle en
+      `storefront/app/fonts/README.md`.
+    - ⬜ **Licencia web de Isidora**: el archivo vino de un agregador de fuentes
+      gratuitas y la familia es comercial (Latinotype). Confirmar con la marca
+      antes de salir de staging.
     - ✅ 2026-09-19 **Logos en SVG y licencia de Tusker**: la marca entregó los tres
       logotipos en SVG (`storefront/public/marcas/`) y confirmó que Tusker Grotesk es
       de uso libre. Íconos e imágenes para compartir se regeneraron desde el vector.

@@ -225,6 +225,53 @@ def test_direcciones_crud(env):
     assert nueva_id not in [d["id"] for d in listado3]
 
 
+def test_patch_parcial_no_borra_la_ubicacion_de_la_direccion(env):
+    """Marcar una dirección como predeterminada no puede perder su pin.
+
+    El router arma el dict de ubicación siempre con las cinco claves, así que
+    un PATCH que solo toca `predeterminada` llegaba con las cinco en `None` y
+    las escribía encima. Quien puso su casa en el mapa la perdía por tocar
+    "usar por defecto", y el delivery volvía a pedirle el GPS.
+    """
+    client, _, _ = env
+    token = client.post(f"{CUENTAS}/registro", json=_registro_body()).json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    creada = client.post(
+        f"{CUENTAS}/me/direcciones", headers=headers,
+        json={
+            "etiqueta": "Casa", "direccion": "Jr. Lima 100",
+            "ubicacion_lat": "-6.488000", "ubicacion_lng": "-76.365000",
+        },
+    )
+    assert creada.status_code == 201
+
+    editada = client.patch(
+        f"{CUENTAS}/me/direcciones/{creada.json()['id']}", headers=headers,
+        json={"predeterminada": True},
+    )
+    assert editada.status_code == 200
+    assert editada.json()["ubicacion_lat"] is not None
+    assert editada.json()["ubicacion_lng"] is not None
+
+
+def test_actualizar_perfil(env):
+    client, _, _ = env
+    token = client.post(f"{CUENTAS}/registro", json=_registro_body()).json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    editado = client.patch(
+        f"{CUENTAS}/me", headers=headers,
+        json={"nombres": "Renato", "apellidos": "Rojas", "telefono": "999888777"},
+    )
+    assert editado.status_code == 200
+
+    perfil = client.get(f"{CUENTAS}/me", headers=headers).json()
+    assert (perfil["nombres"], perfil["apellidos"], perfil["telefono"]) == (
+        "Renato", "Rojas", "999888777",
+    )
+
+
 def test_favoritos_crud(env):
     client, ids, _ = env
     token = client.post(f"{CUENTAS}/registro", json=_registro_body()).json()["access_token"]
@@ -236,11 +283,14 @@ def test_favoritos_crud(env):
     )
     assert agregar.status_code == 201
 
+    # Marcar dos veces no es un error: el corazón de la carta manda el verbo
+    # según lo que tenga dibujado, y si su lista quedó desincronizada (token
+    # vencido, respuesta perdida) un 409 dejaba el botón trabado para siempre.
     duplicado = client.post(
         f"{CUENTAS}/me/favoritos", headers=headers,
         json={"producto_comercial_id": ids["producto_id"]},
     )
-    assert duplicado.status_code == 409
+    assert duplicado.status_code == 201
 
     listado = client.get(f"{CUENTAS}/me/favoritos", headers=headers)
     assert listado.json() == [ids["producto_id"]]
@@ -248,6 +298,10 @@ def test_favoritos_crud(env):
     quitar = client.delete(f"{CUENTAS}/me/favoritos/{ids['producto_id']}", headers=headers)
     assert quitar.status_code == 204
     assert client.get(f"{CUENTAS}/me/favoritos", headers=headers).json() == []
+
+    # Y quitar lo que ya no está tampoco: el estado final es el mismo.
+    repetido = client.delete(f"{CUENTAS}/me/favoritos/{ids['producto_id']}", headers=headers)
+    assert repetido.status_code == 204
 
 
 def test_favorito_de_producto_inexistente_404(env):

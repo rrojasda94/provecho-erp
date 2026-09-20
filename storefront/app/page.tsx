@@ -64,7 +64,7 @@ export default async function HomePage() {
               {promoActiva.nombre}
             </p>
           )}
-          <h1 className="font-display text-4xl uppercase leading-tight sm:text-6xl">
+          <h1 className="font-titular text-4xl uppercase leading-tight sm:text-6xl">
             {hero?.titulo ?? "A tu manera"}
           </h1>
           <p className="mt-4 text-base text-crema/90 sm:text-lg">
@@ -146,7 +146,7 @@ export default async function HomePage() {
       )}
 
       <section className="revelar bg-verde py-8 text-center">
-        <p className="font-display text-3xl uppercase text-white sm:text-5xl">A tu manera</p>
+        <p className="font-titular text-3xl uppercase text-white sm:text-5xl">A tu manera</p>
       </section>
     </div>
   );

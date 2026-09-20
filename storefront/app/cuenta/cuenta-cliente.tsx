@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useActionState, useTransition } from "react";
 
+import { Boton } from "@/components/boton";
 import { ESTADO_INICIAL } from "@/lib/estado-formulario";
 
 import {
+  actualizarPerfilAction,
   agregarDireccionAction,
   borrarDireccionAction,
   logoutAction,
+  marcarDireccionPredeterminadaAction,
 } from "./actions";
 
 export type Perfil = {
@@ -16,6 +19,7 @@ export type Perfil = {
   apellidos: string;
   email: string;
   telefono: string | null;
+  numero_documento?: string | null;
   debe_cambiar_clave?: boolean;
 };
 
@@ -35,8 +39,66 @@ export type UltimoPedido = {
   items: { nombre: string; cantidad: string }[];
 } | null;
 
+const CAMPO = "rounded border-2 border-negro/40 px-3 py-2 text-sm";
+
+/** "Mis datos": el endpoint `PATCH /cuentas/me` existía desde el primer día y
+ * ninguna pantalla lo usaba — de ahí el "no puedo actualizar mis datos". */
+function FormMisDatos({ perfil }: { perfil: Perfil }) {
+  const [estado, formAction] = useActionState(actualizarPerfilAction, ESTADO_INICIAL);
+  return (
+    <form action={formAction} className="mt-2 flex flex-col gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input
+          name="nombres"
+          defaultValue={perfil.nombres}
+          placeholder="Nombres"
+          required
+          className={CAMPO + " flex-1"}
+        />
+        <input
+          name="apellidos"
+          defaultValue={perfil.apellidos}
+          placeholder="Apellidos"
+          required
+          className={CAMPO + " flex-1"}
+        />
+      </div>
+      <input
+        name="telefono"
+        defaultValue={perfil.telefono ?? ""}
+        placeholder="Teléfono"
+        inputMode="tel"
+        autoComplete="tel"
+        maxLength={20}
+        className={CAMPO}
+      />
+      <div className="flex flex-col gap-1 text-xs text-humo">
+        <span>
+          Correo: <strong className="text-tinta">{perfil.email}</strong> — es tu usuario para
+          entrar, por eso no se cambia solo. Escríbenos si lo necesitas.
+        </span>
+        {perfil.numero_documento && (
+          <span>
+            DNI: <strong className="text-tinta">{perfil.numero_documento}</strong> — va impreso en
+            tu boleta.
+          </span>
+        )}
+      </div>
+      <Boton className="self-start text-sm" esperando="Guardando...">
+        Guardar mis datos
+      </Boton>
+      {estado.ok && <p className="text-xs text-verde">Listo, guardamos tus datos.</p>}
+      {estado.error && (
+        <p role="alert" className="text-xs text-rojo">
+          {estado.error}
+        </p>
+      )}
+    </form>
+  );
+}
+
 function FormNuevaDireccion() {
-  const [estado, formAction, pendiente] = useActionState(agregarDireccionAction, ESTADO_INICIAL);
+  const [estado, formAction] = useActionState(agregarDireccionAction, ESTADO_INICIAL);
   return (
     <form action={formAction} className="flex flex-col gap-2 rounded border-2 border-negro/30 p-3">
       <div className="flex gap-2">
@@ -47,14 +109,14 @@ function FormNuevaDireccion() {
       </div>
       <input name="direccion" placeholder="Dirección" required className="rounded border px-2 py-1 text-sm" />
       <input name="referencia" placeholder="Referencia (opcional)" className="rounded border px-2 py-1 text-sm" />
-      <button
-        type="submit"
-        disabled={pendiente}
-        className="self-start rounded bg-verde px-3 py-1 text-xs font-bold text-negro disabled:opacity-60"
-      >
-        {pendiente ? "Guardando..." : "Agregar dirección"}
-      </button>
-      {estado.error && <p className="text-xs text-rojo">{estado.error}</p>}
+      <Boton className="self-start px-3 py-1 text-xs" esperando="Guardando...">
+        Agregar dirección
+      </Boton>
+      {estado.error && (
+        <p role="alert" className="text-xs text-rojo">
+          {estado.error}
+        </p>
+      )}
     </form>
   );
 }
@@ -70,14 +132,28 @@ function FilaDireccion({ direccion }: { direccion: Direccion }) {
         )}
         <p className="text-xs text-humo">{direccion.direccion}</p>
       </div>
-      <button
-        type="button"
-        disabled={pendiente}
-        onClick={() => startTransition(() => void borrarDireccionAction(direccion.id))}
-        className="text-xs text-rojo hover:underline"
-      >
-        Quitar
-      </button>
+      <div className="flex shrink-0 items-center gap-3">
+        {!direccion.predeterminada && (
+          <button
+            type="button"
+            disabled={pendiente}
+            onClick={() =>
+              startTransition(() => void marcarDireccionPredeterminadaAction(direccion.id))
+            }
+            className="text-xs text-tinta underline disabled:opacity-60"
+          >
+            Usar por defecto
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={pendiente}
+          onClick={() => startTransition(() => void borrarDireccionAction(direccion.id))}
+          className="text-xs text-rojo hover:underline disabled:opacity-60"
+        >
+          Quitar
+        </button>
+      </div>
     </li>
   );
 }
@@ -108,6 +184,11 @@ export function CuentaCliente({
           </button>
         </form>
       </div>
+
+      <section>
+        <h2 className="font-display text-lg uppercase text-negro">Mis datos</h2>
+        <FormMisDatos perfil={perfil} />
+      </section>
 
       {ultimoPedido && (
         <section>

@@ -12,10 +12,9 @@ import { RevelarObservador } from "@/components/revelar-observador";
 import "./globals.css";
 
 // Tusker Grotesk, la tipografía principal del brandbook (p. 47-49): el corte 4500
-// Medium para el texto y el 5800 Super para el énfasis y los títulos. Se sirven
-// desde el propio sitio (`next/font/local`): sin pedirle nada a Google, con
-// precarga y sin salto de diseño. Isidora Black —la otra fuente de la marca, para
-// titulares— todavía no llegó: los títulos usan la Super de Tusker hasta entonces.
+// Medium y el 5800 Super. Se sirven desde el propio sitio (`next/font/local`):
+// sin pedirle nada a Google, con precarga y sin salto de diseño. Ya no lleva el
+// cuerpo de texto — ver el comentario de `--fuente-cuerpo` en `globals.css`.
 const tusker = localFont({
   src: [
     { path: "./fonts/TuskerGrotesk-4500Medium.woff2", weight: "400 500", style: "normal" },
@@ -25,6 +24,25 @@ const tusker = localFont({
   display: "swap",
   fallback: ["Arial Narrow", "system-ui", "sans-serif"],
 });
+
+// Isidora Black 7800, la de titulares del brandbook (p. 49). Solo llegó este
+// corte, así que se usa donde corresponde un peso así: el título grande de cada
+// página. No sirve para párrafos — un texto entero en negra 900 cansa más que
+// la condensada que veníamos usando.
+const isidora = localFont({
+  src: [{ path: "./fonts/isidora-black.woff2", weight: "900", style: "normal" }],
+  variable: "--fuente-isidora",
+  display: "swap",
+  fallback: ["system-ui", "sans-serif"],
+});
+
+/** Año de la última actualización del sitio. Lo inyecta el build (`FECHA_BUILD`,
+ * ver `Dockerfile` y `next.config.mjs`); en desarrollo, el año de hoy. */
+function anioDeActualizacion(): number {
+  const fecha = process.env.FECHA_BUILD;
+  const t = fecha ? Date.parse(fecha) : NaN;
+  return new Date(Number.isNaN(t) ? Date.now() : t).getFullYear();
+}
 
 const TITULO = "Charlie's Pizzas — Pizza de barrio en Tarapoto";
 const DESCRIPCION =
@@ -97,8 +115,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   };
 
   return (
-    <html lang="es" className={tusker.variable}>
-      <body>
+    <html lang="es" className={`${tusker.variable} ${isidora.variable}`}>
+      {/* Columna de alto mínimo con el `<main>` elástico: es lo que mantiene
+          el pie pegado abajo en una página corta (un carrito vacío, un 404)
+          en vez de dejarlo flotando a media pantalla. `dvh` y no `vh` por la
+          barra del navegador del celular, que cambia de alto al hacer scroll. */}
+      <body className="flex min-h-dvh flex-col">
         {/* Restaurant, no LocalBusiness por sucursal: cada local con su
             dirección y horario vive en el JSON-LD de `/locales`, no acá —
             este es el de la marca en general, en cada página. */}
@@ -132,7 +154,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </nav>
         </header>
 
-        <main>{children}</main>
+        <main className="flex-1">{children}</main>
 
         <footer className="mt-12 border-t-4 border-negro bg-negro px-4 py-8 text-sm text-crema sm:px-8">
           <div className="mx-auto flex max-w-5xl flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -181,6 +203,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </div>
               </div>
             )}
+          </div>
+          <div className="mx-auto mt-6 flex max-w-5xl flex-col gap-1 border-t border-crema/20 pt-4 text-xs text-crema/70 sm:flex-row sm:justify-between">
+            <span>© {anioDeActualizacion()} Charlie&apos;s Pizzas — Grupo Majambo</span>
+            <span>
+              Hecho por <strong className="text-crema">TAG Digitales</strong>
+            </span>
           </div>
         </footer>
       </body>
