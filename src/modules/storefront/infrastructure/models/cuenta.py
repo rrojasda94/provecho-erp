@@ -16,7 +16,17 @@ identidades — `cliente.usuario_id` queda sin usar para este caso.
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, false
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    false,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.database import Base
@@ -25,6 +35,28 @@ from src.core.model_base import SoftDeleteMixin, TimestampMixin, UuidPkMixin
 
 class StorefrontCuenta(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "storefront_cuenta"
+    __table_args__ = (
+        # Una cuenta por persona (RN-WEB-021). Únicos entre las **vivas**,
+        # no entre todas: una cuenta dada de baja no puede seguir reservando
+        # el DNI ni el teléfono de nadie (mismo patrón que
+        # `terminal_marcaje`). `email` y `google_sub` son únicos sin más:
+        # son la credencial misma, y liberarlos permitiría quedarse con la
+        # identidad de una cuenta borrada.
+        Index(
+            "uq_storefront_cuenta_documento",
+            "numero_documento",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        Index(
+            "uq_storefront_cuenta_telefono",
+            "telefono",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     # NULL si la cuenta se creó solo con Google (nunca tecleó una clave acá).
