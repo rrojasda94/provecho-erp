@@ -339,6 +339,8 @@ funcionalidad. Un PR por punto, cada uno mergeado antes del siguiente.
   rol semántico, tokens de estado ajustados, test de contraste AA.
 - **Asientos omitidos con nombre y apellido** (enmienda ADR-089): el aviso
   lista cada uno con su documento; los fallos de listener se anotan como `error`.
+- **Kardex por sede y por almacén** (enmienda ADR-108): selector de ámbito en
+  la ficha y tabla «Cómo está cada sede».
 
 ## Fuentes
 

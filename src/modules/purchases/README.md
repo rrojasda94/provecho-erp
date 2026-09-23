@@ -124,7 +124,8 @@ cada recepción del artículo, de la más vieja a la más nueva, con fecha, cost
 unitario **de la recepción** (lo que se pagó, no lo pactado en la OC),
 cantidad y proveedor. Alcance por la empresa del proveedor (ADR-004). La
 ficha del artículo lo grafica y calcula la frecuencia de compra; se llega
-desde cada línea de una OC (`/compras/articulos/[id]`).
+desde cada línea de una OC (`/compras/articulos/[id]`). Con `?almacen_id=`, solo las compras que
+entraron directo a ese almacén.
 
 ## Compra directa (2026-08-29, ADR-082)
 

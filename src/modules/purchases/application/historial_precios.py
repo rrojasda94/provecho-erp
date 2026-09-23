@@ -27,6 +27,7 @@ def historial_precios(
     *,
     empresa_id: uuid.UUID | None,
     desde: date | None = None,
+    almacen_id: uuid.UUID | None = None,
 ) -> list[dict]:
     """Cada recepción del artículo, de la más vieja a la más nueva.
 
@@ -53,6 +54,10 @@ def historial_precios(
         consulta = consulta.where(Proveedor.empresa_id == empresa_id)
     if desde is not None:
         consulta = consulta.where(RecepcionCompra.fecha >= desde)
+    # Las compras que entraron directo a ese almacén: el local que compra por
+    # su cuenta, no lo que le llega del central (eso es un traslado).
+    if almacen_id is not None:
+        consulta = consulta.where(OrdenCompra.almacen_destino_id == almacen_id)
     return [
         {
             "fecha": fecha,

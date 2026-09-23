@@ -399,15 +399,21 @@ def listar_comprobantes_recibidos(
 def historial_de_precios(
     articulo_id: uuid.UUID,
     desde: date | None = None,
+    almacen_id: uuid.UUID | None = None,
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     """A cuánto se compró el artículo en cada recepción (kardex gráfico).
+    Con `almacen_id`, solo las compras que entraron directo a ese almacén.
 
     Sin paginar: son las recepciones de **un** artículo, decenas por año.
     """
     return historial_precios.historial_precios(
-        session, articulo_id, empresa_id=tenant.filtro_empresa(), desde=desde
+        session,
+        articulo_id,
+        empresa_id=tenant.filtro_empresa(),
+        desde=desde,
+        almacen_id=almacen_id,
     )
 

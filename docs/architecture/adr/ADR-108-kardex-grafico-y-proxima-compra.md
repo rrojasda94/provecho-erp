@@ -54,3 +54,28 @@ seis datos y en Compras no existía.
   proveedor todavía (deuda en `docs/roadmap/deuda/modulo-inventory.md`).
 - Las semanas previas al primer movimiento del período se recortan: un
   artículo nuevo se grafica desde que empezó a moverse.
+
+## Enmienda 2026-09-23 — por almacén, por sede y como un todo
+
+El kardex de la empresa entera no decía cómo estaba cada local. Se agrega el
+**ámbito**:
+
+- `GET /inventory/articulos/{id}/kardex` acepta `almacen_id` **o**
+  `sucursal_id` (los dos juntos: 422). En la empresa los traslados internos
+  se siguen excluyendo; en una sede o un almacén **cuentan**: lo que llega del
+  central es su reposición y lo que manda, una salida. Con ámbito, la próxima
+  compra se lee como **próxima reposición**.
+- Una sede se valida contra la empresa del usuario, no contra sus sucursales
+  asignadas: comparar sedes es mirar las demás
+  (`exigir_sucursal_de_la_empresa`).
+- `GET /inventory/articulos/{id}/kardex/por-almacen`: una fila por almacén que
+  maneja el artículo con stock, mínimo, consumo diario, próxima reposición y
+  reposiciones en 90 días, lo que se agota primero arriba. En la ficha es la
+  tabla **«Cómo está cada sede»**, en rojo lo que está bajo el mínimo y en
+  ámbar lo que se repone en una semana o menos.
+- El precio sigue siendo de la empresa: un local abastecido por el central
+  no compra. `historial-precios?almacen_id=` filtra las compras que entraron
+  directo a un almacén, para la sede que sí compra por su cuenta.
+- El ámbito vive en la URL (`?ambito=almacen:<id>` / `sucursal:<id>`), así que
+  el enlace se comparte con quien maneja ese local.
+

@@ -166,19 +166,37 @@ function textoCompras(precios: PrecioHistorico[] | null) {
   };
 }
 
+/** En la empresa se mide cada cuánto se compra; en una sede, cuántas veces
+ * se repuso: a un local le llega del central, no de un proveedor. */
+function datoFrecuencia(
+  kardex: Kardex,
+  compras: ReturnType<typeof textoCompras>,
+  ambito: string | undefined,
+) {
+  if (!ambito) return { titulo: "Frecuencia de compra", ...compras.frecuencia };
+  return {
+    titulo: "Reposiciones",
+    valor: `${kardex.reposiciones_90_dias} en 90 días`,
+    detalle: "Días con alguna entrada",
+  };
+}
+
 function Resumen({
   kardex,
   precios,
   unidad,
   hoy,
+  ambito,
 }: {
   kardex: Kardex;
   precios: PrecioHistorico[] | null;
   unidad: string;
   hoy: string;
+  ambito?: string;
 }) {
   const proxima = textoProximaCompra(kardex, hoy);
   const compras = textoCompras(precios);
+  const frecuencia = datoFrecuencia(kardex, compras, ambito);
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <Dato
@@ -200,11 +218,11 @@ function Resumen({
         detalle="Promedio de los últimos 90 días"
       />
       <Dato
-        titulo="Próxima compra"
+        titulo={ambito ? "Próxima reposición" : "Próxima compra"}
         valor={proxima.valor}
         detalle={proxima.detalle}
       />
-      <Dato titulo="Frecuencia de compra" {...compras.frecuencia} />
+      <Dato {...frecuencia} />
       <Dato titulo="Último precio" {...compras.precio} />
     </div>
   );
@@ -403,6 +421,8 @@ export function KardexArticulo({
   precios,
   unidad,
   hoy,
+  ambito,
+  alcancePrecios,
 }: {
   kardex: Kardex;
   /** `null` si el usuario no puede leer compras: se dibuja el resto. */
@@ -410,20 +430,34 @@ export function KardexArticulo({
   unidad: string;
   /** Hoy en la zona del negocio (`YYYY-MM-DD`), del servidor. */
   hoy: string;
+  /** Nombre de la sede o el almacén; sin él, la empresa entera. */
+  ambito?: string;
+  /** De dónde son los precios: el precio es de la empresa salvo que se pidan
+   * solo las compras directas de un almacén. */
+  alcancePrecios?: string;
 }) {
+  const donde = ambito ? ` — ${ambito}` : "";
   return (
     <section className="flex flex-col gap-4" aria-label="Kardex del artículo">
-      <Resumen kardex={kardex} precios={precios} unidad={unidad} hoy={hoy} />
+      <Resumen
+        kardex={kardex}
+        precios={precios}
+        unidad={unidad}
+        hoy={hoy}
+        ambito={ambito}
+      />
       <div className="grid gap-4 lg:grid-cols-2">
         {precios && (
-          <Tarjeta titulo="Precio de compra">
+          <Tarjeta
+            titulo={`Precio de compra${alcancePrecios ? ` — ${alcancePrecios}` : ""}`}
+          >
             <GraficoPrecio precios={precios} />
           </Tarjeta>
         )}
-        <Tarjeta titulo={`Entradas y salidas por semana (${unidad})`}>
+        <Tarjeta titulo={`Entradas y salidas por semana (${unidad})${donde}`}>
           <GraficoMovimientos kardex={kardex} />
         </Tarjeta>
-        <Tarjeta titulo={`Saldo al cierre de cada semana (${unidad})`}>
+        <Tarjeta titulo={`Saldo al cierre de cada semana (${unidad})${donde}`}>
           <GraficoSaldo kardex={kardex} />
         </Tarjeta>
       </div>

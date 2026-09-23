@@ -1299,7 +1299,9 @@ producción se hace en cocinas de sucursal. Ver
   historia. Sin mínimo declarado se proyecta contra cero; en el mínimo o
   debajo, es hoy. Es el día en que hay que **haber comprado**: el plazo del
   proveedor lo resta quien arma la OC. Es una sugerencia visible en la
-  ficha del artículo, no dispara nada (ADR-108).
+  ficha del artículo, no dispara nada (ADR-108). Mirada en una sede o un almacén (y
+  no en la empresa), los traslados cuentan —lo que llega del central es su
+  reposición— y la fecha es la de la **próxima reposición** de ese local.
 - **RN-INV-025** El catálogo de artículos **se baja, se edita y se vuelve a
   subir** en el mismo formato, con revisión en el medio (ADR-051). La
   identidad de una fila es su `ID` o, si va vacío, su **código interno** — el
