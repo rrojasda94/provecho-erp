@@ -341,6 +341,9 @@ funcionalidad. Un PR por punto, cada uno mergeado antes del siguiente.
   lista cada uno con su documento; los fallos de listener se anotan como `error`.
 - **Kardex por sede y por almacén** (enmienda ADR-108): selector de ámbito en
   la ficha y tabla «Cómo está cada sede».
+- **KDS, PDV y Mi reparto como apps Android** (ADR-109): tres manifests con
+  `scope` propio, login dentro de cada app (`/<app>/ingresar`) que vuelve a
+  la misma pantalla, y el usuario recordado en la app instalada (solo PIN).
 
 ## Fuentes
 

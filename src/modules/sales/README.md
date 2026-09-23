@@ -11,6 +11,11 @@ Nubefact).
 el home, visible con `sales.crear`; la ficha de Ventas es solo el
 back-office (jornada, clientes, mesas, promociones). El backend no cambia.
 
+**Apps instalables (2026-09-23, ADR-109):** `/pdv` y `/kds` se instalan en
+Android como apps separadas (manifest en `frontend/public/{pdv,kds}/`), con
+login propio (`/pdv/ingresar`, `/kds/ingresar`) que vuelve a la misma
+pantalla —el KDS, a su `?pantalla=`— y el último usuario recordado.
+
 ## Entidades
 
 `producto_comercial`, `receta`, `receta_item`, `lista_precio`, `venta`,

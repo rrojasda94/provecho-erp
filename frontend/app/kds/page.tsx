@@ -16,6 +16,7 @@
  * contra sus sucursales** — la URL la escribe cualquiera.
  */
 
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { ApiError, apiFetch } from "@/lib/api";
@@ -27,6 +28,7 @@ import {
   type SucursalKds,
 } from "@/lib/kds";
 import { tieneAccesoModulo, tienePermiso } from "@/lib/permisos";
+import { urlIngreso } from "@/lib/ingreso";
 import { obtenerSesion } from "@/lib/sesion";
 
 import DespachoCliente from "./despacho-cliente";
@@ -34,6 +36,11 @@ import EstacionesCliente from "./estaciones-cliente";
 import HistorialCliente from "./historial-cliente";
 import KdsCliente from "./kds-cliente";
 import "./kds.css";
+
+export const metadata: Metadata = {
+  title: "Cocina | Provecho",
+  manifest: "/kds/manifest.webmanifest",
+};
 
 /**
  * La sucursal de la URL solo si de verdad es suya; si no, la primera. El gate
@@ -71,8 +78,9 @@ export default async function PaginaKds({
 }: {
   searchParams: Promise<{ pantalla?: string; sucursal?: string; vista?: string }>;
 }) {
-  const { token, usuario } = await obtenerSesion();
   const parametros = await searchParams;
+  const ingreso = urlIngreso("/kds", parametros);
+  const { token, usuario } = await obtenerSesion(ingreso);
 
   if (!tieneAccesoModulo(usuario.permisos, "kds.")) {
     return (
@@ -100,7 +108,7 @@ export default async function PaginaKds({
       { token },
     );
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401) redirect("/login");
+    if (e instanceof ApiError && e.status === 401) redirect(ingreso);
     return (
       <Bloqueo
         titulo="No se pudo cargar la cocina"
