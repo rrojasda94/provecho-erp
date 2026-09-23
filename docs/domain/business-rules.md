@@ -1291,6 +1291,15 @@ producción se hace en cocinas de sucursal. Ver
   sin abastecedor propio (el central, principio de la cadena) no arma
   borrador — el conteo se cierra igual, armar la lista es una consecuencia
   del cierre, no una condición.
+- **RN-INV-027** La **próxima compra sugerida** de un artículo es el día en
+  que su stock (toda la empresa) toca la suma de sus mínimos al ritmo de
+  consumo actual: `hoy + (stock − mínimo) ÷ consumo diario`. El consumo
+  diario es el promedio de las salidas de los últimos 90 días (sin
+  traslados internos, que no son consumo), y exige al menos 7 días de
+  historia. Sin mínimo declarado se proyecta contra cero; en el mínimo o
+  debajo, es hoy. Es el día en que hay que **haber comprado**: el plazo del
+  proveedor lo resta quien arma la OC. Es una sugerencia visible en la
+  ficha del artículo, no dispara nada (ADR-108).
 - **RN-INV-025** El catálogo de artículos **se baja, se edita y se vuelve a
   subir** en el mismo formato, con revisión en el medio (ADR-051). La
   identidad de una fila es su `ID` o, si va vacío, su **código interno** — el

@@ -26,7 +26,9 @@ export function useTablaServidor(servidor: PaginaServidor | undefined) {
   const params = useSearchParams();
   const [pendiente, startTransition] = useTransition();
   const [busqueda, setBusqueda] = useState(servidor?.q ?? "");
-  const temporizador = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const temporizador = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   useEffect(() => () => clearTimeout(temporizador.current), []);
 
@@ -36,14 +38,19 @@ export function useTablaServidor(servidor: PaginaServidor | undefined) {
       if (valor) nuevos.set(clave, valor);
       else nuevos.delete(clave);
     }
-    startTransition(() => router.replace(`${pathname}?${nuevos}`, { scroll: false }));
+    startTransition(() =>
+      router.replace(`${pathname}?${nuevos}`, { scroll: false }),
+    );
   };
 
   const buscar = (valor: string) => {
     setBusqueda(valor);
     clearTimeout(temporizador.current);
     // Buscar vuelve a la primera página: la 7 de otra búsqueda suele no existir.
-    temporizador.current = setTimeout(() => ir({ q: valor.trim() || null, page: null }), RETRASO_MS);
+    temporizador.current = setTimeout(
+      () => ir({ q: valor.trim() || null, page: null }),
+      RETRASO_MS,
+    );
   };
 
   const paginar = (pageIndex: number, pageSize: number) =>
@@ -59,7 +66,10 @@ export function useTablaServidor(servidor: PaginaServidor | undefined) {
  * Filtro y paginación de la tabla, locales o contra el servidor. Una sola
  * forma para que `TablaDatos` no ramifique en cada opción.
  */
-export function useFiltroTabla(servidor: PaginaServidor | undefined, cargando: boolean) {
+export function useFiltroTabla(
+  servidor: PaginaServidor | undefined,
+  cargando: boolean,
+) {
   const [local, setLocal] = useState("");
   const remota = useTablaServidor(servidor);
   if (!servidor) {
@@ -73,7 +83,10 @@ export function useFiltroTabla(servidor: PaginaServidor | undefined, cargando: b
       opciones: {},
     };
   }
-  const actual: PaginationState = { pageIndex: servidor.page - 1, pageSize: servidor.pageSize };
+  const actual: PaginationState = {
+    pageIndex: servidor.page - 1,
+    pageSize: servidor.pageSize,
+  };
   return {
     filtro: remota.busqueda,
     alFiltrar: remota.buscar,

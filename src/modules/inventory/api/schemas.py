@@ -300,6 +300,26 @@ class StockOut(BaseModel):
     bajo_minimo: bool
 
 
+class SemanaKardexOut(BaseModel):
+    semana: date
+    entradas: Decimal
+    salidas: Decimal
+    saldo: Decimal
+
+
+class KardexArticuloOut(BaseModel):
+    """El kardex de un artículo resumido por semana, para graficar."""
+
+    articulo_id: uuid.UUID
+    stock: Decimal
+    stock_minimo: Decimal | None
+    # `None` con menos de una semana de historia: no hay ritmo que medir.
+    consumo_diario: Decimal | None
+    # Cuándo el stock toca el mínimo al ritmo actual. `None` si no se consume.
+    proxima_compra: date | None
+    semanas: list[SemanaKardexOut]
+
+
 class MovimientoKardexOut(BaseModel):
     """Una línea del kardex. `MovimientoOut` es lo que devuelve el alta;
     esto es lo que se lee, y por eso trae rótulos y no solo ids."""

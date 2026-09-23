@@ -9,7 +9,13 @@ from sqlalchemy.orm import Session
 from src.config.settings import settings
 from src.core.tenant import Tenant
 from src.modules.purchases.api import schemas
-from src.modules.purchases.application import compra_directa, comprobantes, ordenes, proveedores
+from src.modules.purchases.application import (
+    compra_directa,
+    comprobantes,
+    historial_precios,
+    ordenes,
+    proveedores,
+)
 from src.modules.purchases.application.scope import (
     exigir_almacen,
     exigir_orden_compra,
@@ -384,3 +390,24 @@ def listar_comprobantes_recibidos(
         for c in pagina["items"]
     ]
     return pagina
+
+
+@router.get(
+    "/articulos/{articulo_id}/historial-precios",
+    response_model=list[schemas.PrecioHistoricoOut],
+)
+def historial_de_precios(
+    articulo_id: uuid.UUID,
+    desde: date | None = None,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """A cuánto se compró el artículo en cada recepción (kardex gráfico).
+
+    Sin paginar: son las recepciones de **un** artículo, decenas por año.
+    """
+    return historial_precios.historial_precios(
+        session, articulo_id, empresa_id=tenant.filtro_empresa(), desde=desde
+    )
+

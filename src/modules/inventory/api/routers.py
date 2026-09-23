@@ -22,6 +22,7 @@ from src.modules.inventory.application import (
 from src.modules.inventory.application import conteos as conteos_uc
 from src.modules.inventory.application import devoluciones as devoluciones_uc
 from src.modules.inventory.application import guias as guias_uc
+from src.modules.inventory.application import kardex as kardex_uc
 from src.modules.inventory.application import lotes as lotes_uc
 from src.modules.inventory.application import matriz as matriz_uc
 from src.modules.inventory.application import merma as merma_uc
@@ -324,6 +325,22 @@ def obtener_articulo(
     session: Session = Depends(get_db),
 ):
     return exigir_articulo(session, articulo_id, tenant)
+
+
+@router.get("/articulos/{articulo_id}/kardex", response_model=schemas.KardexArticuloOut)
+def kardex_de_articulo(
+    articulo_id: uuid.UUID,
+    dias: int = Query(180, ge=7, le=730, description="Cuántos días hacia atrás"),
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Entradas y salidas por semana, saldo y próxima compra sugerida del
+    artículo en toda la empresa (ficha del artículo, kardex gráfico)."""
+    exigir_articulo(session, articulo_id, tenant)
+    return kardex_uc.resumen_kardex(
+        session, articulo_id, empresa_id=tenant.filtro_empresa(), dias=dias
+    )
 
 
 @router.patch("/articulos/{articulo_id}", response_model=schemas.ArticuloOut)

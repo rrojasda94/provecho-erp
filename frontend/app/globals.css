@@ -148,6 +148,10 @@
     --chart-3: var(--marca-secondary);
     --chart-4: #3730a3;
     --chart-5: #15803d;
+    /* Entradas del kardex (azul) contra salidas en `--primary`: el par pasa
+       las pruebas de daltonismo en claro (#0284c7/#c6390f) y en oscuro
+       (#3b8fe8/#f4511e) con `validate_palette.js`. */
+    --kardex-entrada: #0284c7;
 
     --sidebar: #ffffff;
     --sidebar-foreground: var(--marca-dark);
@@ -205,6 +209,7 @@ html {
    No está en docs/product/ui-ux.md porque el brandboard nunca contempló
    pantallas oscuras fuera del PDV/KDS. Ver ADR-037. */
 .dark {
+    --kardex-entrada: #3b8fe8;
     --background: #101216;
     --foreground: #e6e9ee;
     --card: #191c22;
