@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetchCompleto } from "@/lib/api";
 import type { Escalamiento } from "@/lib/reports";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -21,7 +21,7 @@ export default async function EscalamientosPage({
   let escalamientos: Escalamiento[];
   try {
     escalamientos = (
-      await apiFetch<Pagina<Escalamiento>>(
+      await apiFetchCompleto<Escalamiento>(
         `/api/v1/reports/escalamientos?${query}`,
         { token },
       )

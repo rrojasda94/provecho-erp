@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { IngredientesCliente, type Foto, type Insumo } from "./ingredientes-cliente";
@@ -7,8 +7,8 @@ export default async function WebIngredientesPage() {
   const { token } = await obtenerSesion();
 
   try {
-    const insumos = await apiFetch<Pagina<Insumo>>(
-      "/api/v1/inventory/articulos?tipo=insumo&page_size=200",
+    const insumos = await apiFetchCompleto<Insumo>(
+      "/api/v1/inventory/articulos?tipo=insumo",
       { token },
     );
 

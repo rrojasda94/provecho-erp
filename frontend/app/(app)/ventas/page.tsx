@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { JornadaCliente, type Comprobante, type Sucursal, type Venta } from "./jornada-cliente";
@@ -43,7 +43,7 @@ async function jornadaDe(
     query.set("hasta", filtros.fecha);
   }
   if (filtros.estado) query.set("estado", filtros.estado);
-  const pagina = await apiFetch<Pagina<Venta>>(`/api/v1/sales/ventas?${query}`, { token });
+  const pagina = await apiFetchCompleto<Venta>(`/api/v1/sales/ventas?${query}`, { token });
   return pagina.items;
 }
 

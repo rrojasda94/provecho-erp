@@ -40797,6 +40797,25 @@
             }
           },
           {
+            "description": "Busca en la glosa",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 100,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Busca en la glosa",
+              "title": "Q"
+            }
+          },
+          {
             "description": "Página, empezando en 1",
             "in": "query",
             "name": "page",

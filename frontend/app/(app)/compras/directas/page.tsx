@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, type Pagina, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import type { Almacen, Articulo, Proveedor } from "../ordenes-compra/ordenes-compra-cliente";
@@ -21,7 +21,7 @@ export default async function ComprasDirectasPage() {
   let almacenes: Almacen[];
   try {
     [proveedores, almacenes] = await Promise.all([
-      apiFetch<Pagina<Proveedor>>("/api/v1/purchases/proveedores?page_size=200", {
+      apiFetchCompleto<Proveedor>("/api/v1/purchases/proveedores", {
         token,
       }),
       apiFetch<Almacen[]>("/api/v1/almacenes", { token }),
@@ -40,7 +40,7 @@ export default async function ComprasDirectasPage() {
   let avisoArticulos: string | null = null;
   try {
     articulos = (
-      await apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?page_size=200", {
+      await apiFetchCompleto<Articulo>("/api/v1/inventory/articulos", {
         token,
       })
     ).items;

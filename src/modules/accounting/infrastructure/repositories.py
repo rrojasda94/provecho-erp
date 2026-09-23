@@ -137,12 +137,14 @@ class AsientoRepo:
     def get(self, asiento_id: uuid.UUID) -> Asiento | None:
         return self.s.get(Asiento, asiento_id)
 
-    def q_list(self, empresa_id: uuid.UUID | None = None):
+    def q_list(self, empresa_id: uuid.UUID | None = None, busqueda: str | None = None):
         """La consulta, sin ejecutar: el router la pagina (ADR-026)."""
         q = select(Asiento)
         if empresa_id is not None:
             q = q.where(Asiento.empresa_id == empresa_id)
-        return q.order_by(Asiento.fecha.desc())
+        if busqueda and busqueda.strip():
+            q = q.where(Asiento.glosa.ilike(f"%{busqueda.strip()}%"))
+        return q.order_by(Asiento.fecha.desc(), Asiento.created_at.desc())
 
     def list(self, empresa_id: uuid.UUID | None = None) -> list[Asiento]:
         return list(self.s.scalars(self.q_list(empresa_id)))

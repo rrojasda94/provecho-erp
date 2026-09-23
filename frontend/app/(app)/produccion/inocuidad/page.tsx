@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import type { Almacen } from "../ordenes-cliente";
@@ -9,13 +9,12 @@ export default async function InocuidadProduccionPage() {
 
   try {
     const [checklists, almacenes] = await Promise.all([
-      apiFetch<Pagina<Checklist>>("/api/v1/production/checklists", { token }),
+      apiFetchCompleto<Checklist>("/api/v1/production/checklists", { token }),
       apiFetch<Almacen[]>("/api/v1/almacenes", { token }),
     ]);
     return (
       <InocuidadCliente
         checklists={checklists.items}
-        total={checklists.total}
         almacenes={almacenes}
       />
     );

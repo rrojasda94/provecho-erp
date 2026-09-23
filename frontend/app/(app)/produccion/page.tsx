@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, type Pagina, apiFetchCompleto } from "@/lib/api";
 import { primeroElDe } from "@/lib/destinos";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -41,7 +41,7 @@ export default async function ProduccionPage({
       ),
       // El artículo a producir y los insumos a consumir salen del mismo
       // catálogo: una subreceta es artículo como cualquier otro.
-      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?page_size=200", {
+      apiFetchCompleto<Articulo>("/api/v1/inventory/articulos", {
         token,
       }),
       apiFetch<Almacen[]>("/api/v1/almacenes", { token }),

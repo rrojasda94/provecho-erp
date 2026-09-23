@@ -16,6 +16,7 @@ import { TablaBusqueda } from "@/components/tabla/tabla-busqueda";
 import { TablaCuerpo } from "@/components/tabla/tabla-cuerpo";
 import { TablaEncabezado } from "@/components/tabla/tabla-encabezado";
 import { TablaPaginacion } from "@/components/tabla/tabla-paginacion";
+import { type PaginaServidor, useFiltroTabla } from "@/components/tabla/use-tabla-servidor";
 
 /**
  * Tabla genérica del ERP (F2.11): TanStack Table headless + Tailwind. La usan
@@ -53,6 +54,7 @@ export function TablaDatos<T>({
   cargando = false,
   denso = false,
   vacio,
+  servidor,
 }: {
   columnas: ColumnDef<T>[];
   datos: T[];
@@ -63,16 +65,27 @@ export function TablaDatos<T>({
   denso?: boolean;
   /** Qué decir cuando la consulta salió bien y no trajo filas. */
   vacio?: React.ReactNode;
+  /**
+   * La página ya la cortó el servidor: buscar y paginar cambian la URL en vez
+   * de filtrar lo recibido. Para los listados que no entran enteros en el
+   * navegador (el catálogo de artículos, el libro contable). Ordenar sigue
+   * siendo sobre la página visible.
+   */
+  servidor?: PaginaServidor;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [filtroGlobal, setFiltroGlobal] = useState("");
+  const { filtro, alFiltrar, ocupado, total, sinBuscador, estado, opciones } = useFiltroTabla(
+    servidor,
+    cargando,
+  );
 
   const tabla = useReactTable({
     data: datos,
     columns: columnas,
-    state: { sorting, globalFilter: filtroGlobal },
+    state: { sorting, globalFilter: filtro, ...estado },
     onSortingChange: setSorting,
-    onGlobalFilterChange: setFiltroGlobal,
+    onGlobalFilterChange: alFiltrar,
+    ...opciones,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -80,15 +93,13 @@ export function TablaDatos<T>({
     initialState: { pagination: { pageSize: 10 } },
   });
 
-  const sinFilas = !cargando && tabla.getRowModel().rows.length === 0;
+  const sinFilas = !ocupado && tabla.getRowModel().rows.length === 0;
 
   return (
     <div>
-      <TablaBusqueda
-        valor={filtroGlobal}
-        alCambiar={setFiltroGlobal}
-        placeholder={placeholderBusqueda}
-      />
+      {!sinBuscador && (
+        <TablaBusqueda valor={filtro} alCambiar={alFiltrar} placeholder={placeholderBusqueda} />
+      )}
 
       {/* `relative` junto a `overflow-x-auto` y no por estética: un
           descendiente `position:absolute` sin ancestro posicionado toma
@@ -103,17 +114,17 @@ export function TablaDatos<T>({
           {!sinFilas && (
             <TablaCuerpo
               tabla={tabla}
-              cargando={cargando}
+              cargando={ocupado}
               columnas={columnas.length}
               denso={denso}
             />
           )}
         </table>
 
-        {sinFilas && (vacio ?? <VacioPorDefecto busqueda={filtroGlobal} />)}
+        {sinFilas && (vacio ?? <VacioPorDefecto busqueda={filtro} />)}
       </div>
 
-      <TablaPaginacion tabla={tabla} />
+      <TablaPaginacion tabla={tabla} total={total} />
     </div>
   );
 }

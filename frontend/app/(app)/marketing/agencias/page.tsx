@@ -1,5 +1,5 @@
 import { Insignia } from "@/components/estado/insignia";
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, type Pagina, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 type Opcion = {
@@ -44,12 +44,12 @@ export default async function AgenciasPage({
   const { token } = await obtenerSesion();
   const { estado = "" } = await searchParams;
 
-  const query = new URLSearchParams({ page_size: "100" });
+  const query = new URLSearchParams();
   if (estado) query.set("estado", estado);
 
   let pagina: Pagina<Evaluacion>;
   try {
-    pagina = await apiFetch<Pagina<Evaluacion>>(
+    pagina = await apiFetchCompleto<Evaluacion>(
       `/api/v1/marketing/evaluaciones-agencia?${query}`,
       { token },
     );
@@ -63,8 +63,8 @@ export default async function AgenciasPage({
     );
   }
 
-  const campanas = await apiFetch<Pagina<Campana>>(
-    "/api/v1/marketing/campanas?page_size=100",
+  const campanas = await apiFetchCompleto<Campana>(
+    "/api/v1/marketing/campanas",
     { token },
   )
     .then((p) => p.items)

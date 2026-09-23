@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import type { Activo } from "../activos/activos-cliente";
@@ -12,7 +12,7 @@ export default async function DocumentosPage() {
   try {
     [documentos, activos] = await Promise.all([
       apiFetch<Documento[]>("/api/v1/assets/documentos", { token }),
-      apiFetch<Pagina<Activo>>("/api/v1/assets/activos?page_size=200", { token })
+      apiFetchCompleto<Activo>("/api/v1/assets/activos", { token })
         .then((p) => p.items)
         .catch(() => [] as Activo[]),
     ]);

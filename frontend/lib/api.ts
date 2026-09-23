@@ -85,3 +85,78 @@ export async function apiFetch<T>(
   if (respuesta.status === 204) return undefined as T;
   return respuesta.json() as Promise<T>;
 }
+
+/** El techo de `page_size` del contrato (`PAGE_SIZE_MAXIMO`, ADR-026). */
+export const PAGINA_MAXIMA = 200;
+
+/**
+ * Junta todas las páginas de un listado, de a una, hasta cubrir `total`.
+ *
+ * Aparte de `apiFetchTodas` para poder probarla sin red, y para que el cliente
+ * (que pide por el proxy, no con `apiFetch`) la use con su propio `pedir`.
+ */
+export async function recorrerPaginas<T>(
+  pedir: (page: number) => Promise<Pagina<T>>,
+): Promise<T[]> {
+  const items: T[] = [];
+  for (let page = 1; ; page++) {
+    const pagina = await pedir(page);
+    items.push(...pagina.items);
+    // Una página corta es la última, diga lo que diga `total`: si alguien
+    // borró filas mientras se recorría, seguir pidiendo sería un bucle.
+    if (pagina.items.length < pagina.page_size || items.length >= pagina.total) return items;
+  }
+}
+
+/** `ruta` con `page` y `page_size` al techo, conservando su query. */
+export function rutaPagina(ruta: string, page: number): string {
+  const [base, query = ""] = ruta.split("?");
+  const params = new URLSearchParams(query);
+  params.set("page", String(page));
+  params.set("page_size", String(PAGINA_MAXIMA));
+  return `${base}?${params}`;
+}
+
+/**
+ * Un listado paginado **completo**.
+ *
+ * Existe porque pedir `page_size=200` y usar `.items` cortaba en silencio en la
+ * fila 200 —o en la 50, donde ni se pasaba el tamaño—: lo que no llegó no
+ * aparecía en la tabla ni en los desplegables, y nada lo decía.
+ *
+ * ponytail: trae todo en serie de a 200. Sirve mientras un listado sean miles,
+ * no cientos de miles; el que crezca a eso pasa a paginar en el servidor como
+ * Artículos (`TablaDatos` con `servidor`).
+ */
+export function apiFetchTodas<T>(
+  ruta: string,
+  opciones: { token?: string } = {},
+): Promise<T[]> {
+  return recorrerPaginas((page) => apiFetch<Pagina<T>>(rutaPagina(ruta, page), opciones));
+}
+
+/** `apiFetchTodas` con el sobre de siempre, para las pantallas que ya leen
+ * `.items` y `.total`: cambiar la llamada alcanza, el resto queda igual. */
+export async function apiFetchCompleto<T>(
+  ruta: string,
+  opciones: { token?: string } = {},
+): Promise<Pagina<T>> {
+  const items = await apiFetchTodas<T>(ruta, opciones);
+  return { items, total: items.length, page: 1, page_size: items.length };
+}
+
+/** Lo que una tabla paginada en el servidor lleva en la URL. */
+export type ParamsPagina = { q?: string; page?: string; page_size?: string };
+
+/**
+ * `?q&page&page_size` de la URL, acotados a lo que el contrato acepta —la URL
+ * la escribe cualquiera—, y la query lista para la API.
+ */
+export function leerPagina({ q, page, page_size }: ParamsPagina, porDefecto = 50) {
+  const pagina = Math.max(1, Math.trunc(Number(page)) || 1);
+  const tamano = Math.min(PAGINA_MAXIMA, Math.max(1, Math.trunc(Number(page_size)) || porDefecto));
+  const busqueda = q?.trim() ?? "";
+  const query = new URLSearchParams({ page: String(pagina), page_size: String(tamano) });
+  if (busqueda) query.set("q", busqueda);
+  return { query, pagina, tamano, q: busqueda };
+}

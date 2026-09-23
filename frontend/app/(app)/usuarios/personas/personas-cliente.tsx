@@ -9,7 +9,6 @@ import {
   DialogoFormulario,
   valor,
 } from "@/components/formulario/dialogo-formulario";
-import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import {
   ETIQUETA_DOCUMENTO,
@@ -161,12 +160,9 @@ function DialogoEditarPersona({
 
 export function PersonasCliente({
   personas,
-  total,
   permisos,
 }: {
   personas: Persona[];
-  /** Cuántos hay en total: la página viene recortada. */
-  total: number;
   permisos: string[];
 }) {
   const columnas: ColumnDef<Persona>[] = useMemo(
@@ -215,11 +211,6 @@ export function PersonasCliente({
         domicilio acá lo corrige en todas. Es también donde se ejerce el derecho de
         <strong> rectificación</strong> de la Ley 29733.
       </p>
-      <AvisoRecortado
-        mostrados={personas.length}
-        total={total}
-        sugerencia="Buscá por nombre o documento para encontrar la que falta."
-      />
       <TablaDatos
         columnas={columnas}
         datos={personas}

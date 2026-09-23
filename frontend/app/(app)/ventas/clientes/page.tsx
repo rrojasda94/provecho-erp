@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, type Pagina, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { ClientesCliente, type Cliente } from "./clientes-cliente";
@@ -8,8 +8,8 @@ export default async function ClientesPage() {
 
   let pagina: Pagina<Cliente>;
   try {
-    pagina = await apiFetch<Pagina<Cliente>>(
-      "/api/v1/sales/clientes/listado?page_size=200",
+    pagina = await apiFetchCompleto<Cliente>(
+      "/api/v1/sales/clientes/listado",
       { token },
     );
   } catch (e) {
@@ -23,7 +23,6 @@ export default async function ClientesPage() {
   return (
     <ClientesCliente
       clientes={pagina.items}
-      total={pagina.total}
       permisos={usuario.permisos}
     />
   );

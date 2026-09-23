@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { PermisosCliente, type Solicitud, type TrabajadorRef } from "./permisos-cliente";
@@ -27,8 +27,8 @@ export default async function PermisosPage({
   try {
     const query = new URLSearchParams(soloPendientes ? { estado: "pendiente" } : {});
     const [solicitudes, trabajadores, personas] = await Promise.all([
-      apiFetch<Pagina<Solicitud>>(`/api/v1/rrhh/solicitudes-permiso?${query}`, { token }),
-      apiFetch<Pagina<Trabajador>>("/api/v1/rrhh/trabajadores", { token }),
+      apiFetchCompleto<Solicitud>(`/api/v1/rrhh/solicitudes-permiso?${query}`, { token }),
+      apiFetchCompleto<Trabajador>("/api/v1/rrhh/trabajadores", { token }),
       apiFetch<Persona[]>("/api/v1/personas/buscar", { token }),
     ]);
 

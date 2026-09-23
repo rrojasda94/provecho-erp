@@ -23,12 +23,19 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   consulta sin ejecutar) junto a su `list()`, así que solo el router cambia.
   Frontend migrado (5 fetchers) y `openapi.json` regenerado.
   `tests/test_paginacion.py` (9 casos).
-- ⬜ **Los controles de paginación de la tabla son del cliente, no del
-  servidor**: `tabla-datos.tsx` (TanStack) pagina de a 10 **sobre las filas
-  que ya recibió**, así que "página 1 de 1" habla de la página del servidor,
-  no del total. Con 50 filas por request no se nota; falta cablear
-  `page`/`page_size` a los controles antes de la primera sucursal con meses
-  de historia.
+- ✅ **Los controles de paginación de la tabla son del cliente, no del
+  servidor** (cerrado 2026-09-23, enmienda a ADR-026). `TablaDatos` acepta
+  `servidor={{ total, page, pageSize, q }}`: buscar y paginar cambian la URL
+  y el Server Component vuelve a pedir. Lo usan Artículos y el libro
+  contable (Asientos, que ganó `?q=` sobre la glosa). El resto de los
+  listados trae **todas** las páginas con `apiFetchCompleto`/`apiFetchTodas`
+  (`lib/api.ts`): ~45 llamadas cortaban en silencio en la fila 200 —o en la
+  50, donde ni se pasaba `page_size`—, incluidos proveedores, trabajadores y
+  usuarios. `AvisoRecortado` quedó solo en Producción, que pagina con enlaces.
+- ⬜ **Pasar a `servidor` los listados que crezcan a decenas de miles**
+  (traslados, ajustes, conteos, facturas de proveedor): hoy los trae enteros
+  de a 200, que alcanza para años de un grupo de este tamaño pero no escala
+  sin techo. Hace falta `?q=` en cada endpoint antes de migrar su pantalla.
 - ⬜ **Listados que quedaron fuera de la primera pasada** (misma regla, una
   línea cada uno cuando su pantalla exista): `stock-lote` (devuelve tuplas,
   no entidades), clientes del contrato público de `sales`, arqueos, conteos

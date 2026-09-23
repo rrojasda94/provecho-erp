@@ -1,5 +1,5 @@
 import { Insignia } from "@/components/estado/insignia";
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, type Pagina, apiFetchCompleto } from "@/lib/api";
 import { fecha } from "@/lib/fechas";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -33,13 +33,13 @@ export default async function LeadsPage({
   const { token } = await obtenerSesion();
   const { atribuido = "", campana = "" } = await searchParams;
 
-  const query = new URLSearchParams({ page_size: "100" });
+  const query = new URLSearchParams();
   if (atribuido) query.set("atribuido", atribuido);
   if (campana) query.set("campana_id", campana);
 
   let leads: Pagina<Lead>;
   try {
-    leads = await apiFetch<Pagina<Lead>>(`/api/v1/marketing/leads?${query}`, { token });
+    leads = await apiFetchCompleto<Lead>(`/api/v1/marketing/leads?${query}`, { token });
   } catch (e) {
     return (
       <p className="text-secondary">
@@ -50,8 +50,8 @@ export default async function LeadsPage({
     );
   }
 
-  const campanas = await apiFetch<Pagina<Campana>>(
-    "/api/v1/marketing/campanas?page_size=100",
+  const campanas = await apiFetchCompleto<Campana>(
+    "/api/v1/marketing/campanas",
     { token },
   )
     .then((p) => p.items)

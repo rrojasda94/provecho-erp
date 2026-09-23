@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import type { Almacen } from "../ordenes-cliente";
@@ -9,13 +9,12 @@ export default async function ReportesProduccionPage() {
 
   try {
     const [reportes, almacenes] = await Promise.all([
-      apiFetch<Pagina<ReporteJornada>>("/api/v1/production/reportes-jornada", { token }),
+      apiFetchCompleto<ReporteJornada>("/api/v1/production/reportes-jornada", { token }),
       apiFetch<Almacen[]>("/api/v1/almacenes", { token }),
     ]);
     return (
       <ReportesCliente
         reportes={reportes.items}
-        total={reportes.total}
         almacenes={almacenes}
       />
     );
