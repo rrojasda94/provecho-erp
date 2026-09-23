@@ -35,7 +35,7 @@ from src.shared import fechas, tributos
 log = logging.getLogger(__name__)
 
 
-def _omitir(
+def anotar_omision(
     session: Session,
     *,
     empresa_id: uuid.UUID,
@@ -233,7 +233,7 @@ def crear_asiento_automatico(
         return None
     periodo = periodos.periodo_para_registrar(session, empresa_id, fecha)
     if periodo is None:
-        _omitir(
+        anotar_omision(
             session, empresa_id=empresa_id, evento=evento,
             referencia_origen=referencia_origen, motivo="periodo_cerrado", fecha=fecha,
         )
@@ -296,7 +296,7 @@ def crear_asiento_automatico_multilinea(
         return None
     periodo = periodos.periodo_para_registrar(session, empresa_id, fecha)
     if periodo is None:
-        _omitir(
+        anotar_omision(
             session, empresa_id=empresa_id, evento=evento,
             referencia_origen=referencia_origen, motivo="periodo_cerrado", fecha=fecha,
         )
@@ -514,7 +514,7 @@ def crear_asiento_desde_plantilla(
         # Deuda del ERP, no de la empresa: alguien publicó un evento con
         # consecuencia contable y nadie escribió su asiento. Se anota para
         # que se vea, en vez de esperar a que lo note el cierre del mes.
-        _omitir(
+        anotar_omision(
             session, empresa_id=empresa_id, evento=evento,
             referencia_origen=referencia_origen, motivo="sin_plantilla", fecha=fecha,
         )
@@ -537,7 +537,7 @@ def crear_asiento_desde_plantilla(
         # La empresa no importó su plan de cuentas. Desde ADR-089 nace con
         # él, así que esto solo aparece en empresas anteriores al cambio —
         # y el detalle dice exactamente qué códigos faltan.
-        _omitir(
+        anotar_omision(
             session, empresa_id=empresa_id, evento=evento,
             referencia_origen=referencia_origen, motivo="sin_cuentas", fecha=fecha,
             detalle=f"faltan en el plan de cuentas: {', '.join(faltantes)}",
@@ -584,7 +584,7 @@ def crear_asiento_de_cobro(
     cuentas = CuentaContableRepo(session).get_by_codigos(empresa_id, codigos)
     faltantes = [codigo for codigo in codigos if codigo not in cuentas]
     if faltantes:
-        _omitir(
+        anotar_omision(
             session, empresa_id=empresa_id, evento=evento,
             referencia_origen=referencia_origen, motivo="sin_cuentas",
             fecha=fechas.hoy(),

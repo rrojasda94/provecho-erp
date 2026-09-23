@@ -3,6 +3,11 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **Reintentar un asiento omitido desde la pantalla** (ADR-089, enmienda
+  2026-09-23). El aviso ya dice cuál falta y a qué documento pertenece, pero
+  arreglar la causa (importar el plan de cuentas, reabrir el mes) no lo
+  regenera: se registra a mano. Reintentar exige guardar el payload del evento
+  en `asiento_omitido` (monto, glosa, desglose), que hoy no se guarda.
 - ✅ 2026-09-05 **El cobro entra al balance y la venta anulada sale de él**
   (sin migración): `sales.venta_pagada` y `sales.venta_anulada` no tenían
   suscriptor. El cobro cancela ahora la `1212` y mete la plata donde entró

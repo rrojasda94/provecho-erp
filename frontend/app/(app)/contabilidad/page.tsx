@@ -1,4 +1,11 @@
-import { ApiError, apiFetch, leerPagina, type Pagina, type ParamsPagina } from "@/lib/api";
+import {
+  ApiError,
+  apiFetch,
+  leerPagina,
+  type Pagina,
+  type ParamsPagina,
+} from "@/lib/api";
+import { hoyEnZonaDelNegocio } from "@/lib/fechas";
 import { obtenerSesion } from "@/lib/sesion";
 
 import {
@@ -7,6 +14,17 @@ import {
   type AsientoOmitido,
   type Cuenta,
 } from "./asientos-cliente";
+
+/** Ventana del aviso de asientos omitidos. Sin ella el aviso sumaba desde
+ * el primer día y un problema ya resuelto seguía gritando para siempre; una
+ * configuración que sigue rota vuelve a aparecer mañana, que es la señal. */
+const DIAS_OMITIDOS = 30;
+
+function haceDias(dias: number): string {
+  const hoy = new Date(`${hoyEnZonaDelNegocio()}T12:00:00Z`);
+  hoy.setUTCDate(hoy.getUTCDate() - dias);
+  return hoy.toISOString().slice(0, 10);
+}
 
 /** El libro crece con cada venta: se busca (por glosa) y pagina en el
  * servidor. Pedía la primera página y buscaba en el navegador, así que del
@@ -21,7 +39,9 @@ export default async function AsientosPage({
 
   try {
     const [asientos, cuentas] = await Promise.all([
-      apiFetch<Pagina<Asiento>>(`/api/v1/accounting/asientos?${query}`, { token }),
+      apiFetch<Pagina<Asiento>>(`/api/v1/accounting/asientos?${query}`, {
+        token,
+      }),
       apiFetch<Cuenta[]>("/api/v1/accounting/cuentas-contables", { token }),
     ]);
 
@@ -32,7 +52,7 @@ export default async function AsientosPage({
     let omitidos: AsientoOmitido[] = [];
     try {
       omitidos = await apiFetch<AsientoOmitido[]>(
-        "/api/v1/accounting/asientos-omitidos",
+        `/api/v1/accounting/asientos-omitidos?desde=${haceDias(DIAS_OMITIDOS)}`,
         { token },
       );
     } catch {
@@ -45,6 +65,7 @@ export default async function AsientosPage({
         pagina={{ total: asientos.total, page: pagina, pageSize: tamano, q }}
         cuentas={cuentas}
         omitidos={omitidos}
+        diasOmitidos={DIAS_OMITIDOS}
         permisos={usuario.permisos}
       />
     );
