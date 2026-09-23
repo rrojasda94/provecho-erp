@@ -82,7 +82,7 @@ function SeccionVenta({
   }
 
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border bg-white p-4">
+    <section className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
       <h2 className="font-heading text-base text-dark">Dónde se vende y cuánto tarda</h2>
       <div className="flex flex-wrap gap-x-5 gap-y-2">
         {CANALES_DE_VENTA.map((c) => (
@@ -352,7 +352,7 @@ function SeccionSimple({
   onError: (mensaje: string) => void;
 }) {
   return (
-    <section className="rounded-lg border border-gray/20 bg-white p-4">
+    <section className="rounded-lg border border-gray/20 bg-card p-4">
       <h2 className="mb-1 font-heading text-lg text-dark">Receta</h2>
       <p className="mb-3 text-xs text-gray">
         Se elige entre las que ya existen. Para armarla o corregirla, ve a{" "}
@@ -510,7 +510,7 @@ function SeccionPresentaciones({
   }
 
   return (
-    <section className="rounded-lg border border-gray/20 bg-white p-4">
+    <section className="rounded-lg border border-gray/20 bg-card p-4">
       <h2 className="mb-1 font-heading text-lg text-dark">
         Presentaciones
       </h2>
@@ -718,7 +718,7 @@ function NuevaPresentacion({
         type="button"
         onClick={crear}
         disabled={deshabilitado || guardando || !nombre.trim() || !idInterno}
-        className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+        className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
       >
         {guardando ? "Creando..." : "+ Presentación"}
       </button>
@@ -754,7 +754,7 @@ function SeccionExtras({
   onDesvincularExtra: (extraId: string) => void;
 }) {
   return (
-    <section className="rounded-lg border border-gray/20 bg-white p-4">
+    <section className="rounded-lg border border-gray/20 bg-card p-4">
       <h2 className="mb-1 font-heading text-lg text-dark">
         Extras y opciones
       </h2>
@@ -919,7 +919,7 @@ function NuevoGrupo({
           setMaximo("");
           setObligatorio(false);
         }}
-        className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+        className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
       >
         Crear grupo
       </button>
@@ -1039,7 +1039,7 @@ function SeccionAtributos({
   }
 
   return (
-    <section className="rounded-lg border border-gray/20 bg-white p-4">
+    <section className="rounded-lg border border-gray/20 bg-card p-4">
       <h2 className="mb-1 font-heading text-lg text-dark">Atributos</h2>
       <p className="mb-3 text-xs text-gray">
         Para crear un atributo nuevo o agregarle valores, ve a{" "}
@@ -1160,7 +1160,7 @@ function SeccionAtributos({
           type="button"
           onClick={generar}
           disabled={!generable || generando}
-          className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
+          className="rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary disabled:opacity-50"
           title={
             generable
               ? undefined

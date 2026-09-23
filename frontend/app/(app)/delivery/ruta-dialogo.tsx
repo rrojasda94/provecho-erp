@@ -131,7 +131,7 @@ function OpcionPedido({
         {venta.distanciaKm ? ` · ${venta.distanciaKm} km` : ""}
       </span>
       {!venta.lista ? (
-        <span className="ml-auto shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
+        <span className="ml-auto shrink-0 rounded bg-status-warning-surface px-1.5 py-0.5 text-xs text-status-warning-texto">
           En cocina
         </span>
       ) : null}

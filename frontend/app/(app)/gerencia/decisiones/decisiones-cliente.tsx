@@ -159,7 +159,7 @@ export function DecisionesCliente({
       ) : (
         <ul className="flex flex-col gap-3">
           {decisiones.map((d) => (
-            <li key={d.id} className="rounded border border-gray/20 bg-white p-4">
+            <li key={d.id} className="rounded border border-gray/20 bg-card p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-semibold text-dark">{d.tipo.replace(/_/g, " ")}</span>
                 <span

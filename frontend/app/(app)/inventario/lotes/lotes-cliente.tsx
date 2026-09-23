@@ -51,9 +51,9 @@ export function LotesCliente({
           <span
             className={
               row.original.vencido
-                ? "rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-900"
+                ? "rounded bg-status-danger-surface px-2 py-0.5 text-xs font-bold text-status-danger"
                 : row.original.por_vencer
-                  ? "rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900"
+                  ? "rounded bg-status-warning-surface px-2 py-0.5 text-xs font-bold text-status-warning-texto"
                   : "text-sm text-gray"
             }
           >
@@ -85,7 +85,7 @@ export function LotesCliente({
       {enElTope && (
         <p
           role="status"
-          className="rounded-lg bg-status-warning-surface px-3 py-2 text-sm text-status-warning"
+          className="rounded-lg bg-status-warning-surface px-3 py-2 text-sm text-status-warning-texto"
         >
           Se muestran los <span className="cifra">{saldos.length}</span> lotes que
           vencen primero. Hay más: filtrá por almacén o por SKU para verlos.

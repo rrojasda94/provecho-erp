@@ -26,20 +26,20 @@ function ListaResultados({
 }) {
   if (buscando) {
     return (
-      <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-gray/30 bg-white shadow-md">
+      <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-gray/30 bg-card shadow-md">
         <li className="px-3 py-2 text-sm text-gray">Buscando...</li>
       </ul>
     );
   }
   if (resultados.length === 0) {
     return (
-      <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-gray/30 bg-white shadow-md">
+      <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-gray/30 bg-card shadow-md">
         <li className="px-3 py-2 text-sm text-gray">Sin resultados.</li>
       </ul>
     );
   }
   return (
-    <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-gray/30 bg-white shadow-md">
+    <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded border border-gray/30 bg-card shadow-md">
       {resultados.map((p) => (
         <li key={p.id}>
           <button

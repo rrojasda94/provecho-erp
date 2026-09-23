@@ -24,7 +24,7 @@ const TONOS: Record<Tono, { Icono: LucideIcon; clase: string }> = {
   },
   alerta: {
     Icono: AlertTriangle,
-    clase: "bg-status-warning-surface text-status-warning",
+    clase: "bg-status-warning-surface text-status-warning-texto",
   },
   peligro: {
     Icono: XCircle,

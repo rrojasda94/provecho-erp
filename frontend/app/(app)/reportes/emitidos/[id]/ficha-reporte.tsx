@@ -174,7 +174,7 @@ function BotonDestino({
   return (
     <Link
       href={ruta}
-      className="w-fit rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
+      className="w-fit rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary"
     >
       {etiqueta} →
     </Link>
@@ -362,7 +362,7 @@ function CadenaAbierta({
           visible={puedeEscalar && !enGerencia}
           deshabilitada={enviando || !texto.trim()}
           onClick={() => onAccion("elevar", texto.trim())}
-          clase="rounded bg-secondary px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50"
+          clase="rounded bg-secondary px-3 py-1.5 text-sm font-bold text-secondary-foreground disabled:opacity-50"
         >
           Elevar al siguiente nivel
         </Accion>
@@ -370,7 +370,7 @@ function CadenaAbierta({
           visible={puedeResolver}
           deshabilitada={enviando || !texto.trim()}
           onClick={() => onAccion("resolver", texto.trim())}
-          clase="rounded bg-primary px-3 py-1.5 text-sm font-bold text-white disabled:opacity-50"
+          clase="rounded bg-primary px-3 py-1.5 text-sm font-bold text-primary-foreground disabled:opacity-50"
         >
           Dar por resuelto
         </Accion>
@@ -387,7 +387,7 @@ function CadenaAbierta({
 function Cabecera({ escalamiento }: { escalamiento: Escalamiento }) {
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">
+      <span className="rounded bg-status-warning-surface px-2 py-0.5 text-xs font-bold text-status-warning-texto">
         {ETIQUETA_NIVEL[escalamiento.nivel_actual] ?? escalamiento.nivel_actual}
       </span>
       <span className="font-semibold">
@@ -483,7 +483,7 @@ function FormularioApertura({
         type="button"
         disabled={enviando || !texto.trim()}
         onClick={() => onAbrir(motivo, texto.trim())}
-        className="w-fit rounded bg-secondary px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+        className="w-fit rounded bg-secondary px-4 py-2 text-sm font-bold text-secondary-foreground disabled:opacity-50"
       >
         Elevar este reporte
       </button>
