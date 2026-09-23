@@ -38,16 +38,14 @@ dentro de seis meses.
 
 ## Pendiente de corte
 
-Nada. **0.11.1 se cortó el 2026-09-17** y se lleva los 2 fragmentos
-acumulados desde el corte de 0.11.0: rutear un pedido delivery ya no exige
-que esté listo (se decide con qué sale recién al iniciar la ruta), despachar
-desde el KDS deja de cerrar la entrega de reparto (antes hacía desaparecer
-la ruta), una ruta se edita —paradas y repartidor— mientras no terminó, y
-avisos de sonido/toast más bandeja en KDS y caja cuando se registra una
-entrega o termina una ruta (ADR-101). Mismo criterio de numeración que
-siempre: **parche**, como el resto de los cortes de esta serie 0.x —no
-distingue `added` de `fixed`, se reserva `minor`/`major` para cuando el
-proyecto lo pida explícitamente.
+Nada. **0.13.0 se cortó el 2026-09-23** y se lleva los 26 fragmentos
+acumulados desde 0.12.0: PDV
+como módulo propio, inventario en cinco entradas con pestañas, listados sin
+tope, kardex gráfico por sede y almacén, KDS/PDV/reparto como apps
+instalables (ADR-109) y las rondas 2-3 del sitio de Charlie's. **Minor y no
+parche**: SemVer pide minor cuando entra funcionalidad nueva, y esta tanda
+es casi toda funcionalidad nueva — mismo criterio con que se cortó 0.12.0
+por el módulo `supervision`. El parche queda para cortes que solo corrigen.
 
 Nota histórica del corte anterior (0.11.0, 2026-09-10): se llevó 38
 fragmentos desde 0.10.0 — el módulo de delivery completo (PWA de repartidor,
