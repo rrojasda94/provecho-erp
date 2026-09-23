@@ -6,11 +6,14 @@ import { revalidatePath } from "next/cache";
 
 import { API_INTERNAL_URL, apiFetch } from "@/lib/api";
 import { COOKIE_REFRESH, COOKIE_TOKEN } from "@/lib/auth";
+import { esAppInstalable, urlIngreso } from "@/lib/ingreso";
 import type { Paleta, TamanoFuente, Tema } from "@/lib/sesion";
 
 /** Logout compartido por todo el shell — un solo botón, en la barra
  * superior, no uno por pantalla (antes vivía duplicado en cada página). */
-export async function logoutAction() {
+/** `app`: desde una app instalable (ADR-109) se vuelve a su propio ingreso.
+ * Llega del cliente, por eso pasa por `esAppInstalable` y no a `redirect`. */
+export async function logoutAction(app?: string) {
   const store = await cookies();
   const refresh = store.get(COOKIE_REFRESH)?.value;
   if (refresh) {
@@ -29,7 +32,7 @@ export async function logoutAction() {
   }
   store.delete(COOKIE_TOKEN);
   store.delete(COOKIE_REFRESH);
-  redirect("/login");
+  redirect(esAppInstalable(app) ? urlIngreso(app) : "/login");
 }
 
 /** Guarda tema, tamaño de letra o paleta en el perfil — no en el navegador

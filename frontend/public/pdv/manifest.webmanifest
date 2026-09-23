@@ -1,0 +1,18 @@
+{
+  "id": "/pdv",
+  "name": "Provecho — PDV",
+  "short_name": "PDV",
+  "description": "Punto de venta: pedidos, cobro y caja.",
+  "start_url": "/pdv",
+  "scope": "/pdv",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d0d0f",
+  "theme_color": "#2e7d32",
+  "icons": [
+    { "src": "/pdv/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pdv/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/pdv/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pdv/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

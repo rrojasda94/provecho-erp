@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import { COOKIE_REFRESH, COOKIE_TOKEN } from "@/lib/auth";
+import { SIGUIENTE_PERMITIDO } from "@/lib/ingreso";
 import {
   opcionesCookie,
 } from "@/lib/sesion-refresh";
@@ -48,15 +49,6 @@ const INTENTOS_ANTES_DEL_BLOQUEO = 5;
 const MINUTOS_DE_BLOQUEO = 15;
 
 const LARGO_PIN = 6;
-
-/**
- * Único destino post-login que no es el home (ADR-083 Fase B): la mitad del
- * SSO del BI que quedó cortada por no tener sesión de Provecho todavía. Se
- * valida por regex exacta —no basta con no ser absoluta— porque `next` sale
- * de la URL y un valor cualquiera ahí sería la puerta a un open redirect: el
- * login es la pantalla que menos puede darse ese lujo.
- */
-const SIGUIENTE_PERMITIDO = /^\/oauth\/authorize(\?[^\s]*)?$/;
 
 /** Cuánto falta, dicho como se dice en voz alta y no en segundos. */
 function espera(segundos: number | undefined): string {
@@ -139,6 +131,8 @@ export async function loginAction(
   store.set(COOKIE_TOKEN, tokens.access_token, opcionesCookie());
   store.set(COOKIE_REFRESH, tokens.refresh_token, opcionesCookie());
 
+  // De vuelta a la app instalada desde la que entró (ADR-109) o al SSO del
+  // BI (ADR-083 Fase B); cualquier otro `next` se ignora.
   const siguiente = String(formData.get("next") ?? "");
   if (SIGUIENTE_PERMITIDO.test(siguiente)) redirect(siguiente);
 

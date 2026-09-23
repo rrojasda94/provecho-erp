@@ -16,10 +16,12 @@
  * cualquiera. El gate real lo sigue haciendo la API en cada request.
  */
 
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { ApiError, apiFetch } from "@/lib/api";
 import { tienePermiso } from "@/lib/permisos";
+import { urlIngreso } from "@/lib/ingreso";
 import { obtenerSesion } from "@/lib/sesion";
 import { ProveedorConfigMapas } from "@/components/direccion/config-mapas";
 import { configMapas } from "@/lib/mapas";
@@ -27,6 +29,11 @@ import { configMapas } from "@/lib/mapas";
 import BloqueoPorInactividad from "./bloqueo";
 import PdvCliente from "./pdv-cliente";
 import "./pdv.css";
+
+export const metadata: Metadata = {
+  title: "PDV | Provecho",
+  manifest: "/pdv/manifest.webmanifest",
+};
 
 type PuntoVenta = {
   id: string;
@@ -102,6 +109,7 @@ type Contexto =
 async function resolverContexto(
   token: string,
   sucursalId: string,
+  ingreso: string,
 ): Promise<Contexto> {
   let puntos: PuntoVenta[];
   try {
@@ -110,7 +118,7 @@ async function resolverContexto(
       { token },
     );
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401) redirect("/login");
+    if (e instanceof ApiError && e.status === 401) redirect(ingreso);
     return {
       ok: false,
       titulo: "No se pudo cargar el punto de venta",
@@ -140,8 +148,9 @@ export default async function PaginaPdv({
   // `/users/me` y no el JWT: los claims del token se congelan al emitirlo y
   // una reasignación de sucursal recién valdría al renovar. Acá se recalcula
   // contra la base en cada render.
-  const { token, usuario } = await obtenerSesion();
   const parametros = await searchParams;
+  const ingreso = urlIngreso("/pdv", parametros);
+  const { token, usuario } = await obtenerSesion(ingreso);
 
   // Mismo permiso que abre la ficha del módulo (ADR-106). La API igual
   // rechaza la venta, pero el cajero tiene que leer a quién pedirle qué y no
@@ -166,7 +175,7 @@ export default async function PaginaPdv({
     );
   }
 
-  const ctx = await resolverContexto(token, sucursalId);
+  const ctx = await resolverContexto(token, sucursalId, ingreso);
   if (!ctx.ok) {
     return (
       <Bloqueo

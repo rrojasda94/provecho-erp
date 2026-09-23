@@ -110,3 +110,7 @@ mezclarlos enterraría la alerta que sí importa bajo el ruido de la rutina.
   cookie de acceso al vencer— ya no ocurre. Ese camino existía desde ADR-073
   para cubrir el desfase entre el reloj del navegador y el de la API, y pasa a
   ser el único.
+
+> Nota (2026-09-23, ADR-109): en las apps instaladas (KDS, PDV, reparto) la
+> sesión sigue muriendo igual; lo único que se recuerda es el usuario, para
+> que al volver a entrar solo falte el PIN.

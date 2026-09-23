@@ -83,7 +83,8 @@ Frontend: `app/reparto/` (pantalla completa fuera del shell, como el PDV
 y el KDS — ADR-013) con `use-gps.ts` (GPS en vivo mientras la ruta está
 en curso, con el mismo throttle 10 s/30 m que el backend acepta) y
 `use-wake-lock.ts` (pantalla encendida durante la ruta). Instalable
-(`public/reparto/manifest.webmanifest`), sin service worker: offline
+(`public/reparto/manifest.webmanifest`, `id` propio; su login es
+`/reparto/ingresar` y recuerda el usuario — ADR-109), sin service worker: offline
 queda declarado como deuda (ADR-013). `app/(app)/delivery/` es el
 tablero de despacho, dentro del shell (ADR-013 reserva la pantalla
 completa para lo que se opera de pie): tablero con sondeo cada 10 s

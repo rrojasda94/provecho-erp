@@ -335,6 +335,9 @@ funcionalidad. Un PR por punto, cada uno mergeado antes del siguiente.
 - **Kardex gráfico** (ADR-108, RN-INV-027): ficha del artículo en Inventario
   y Compras con precio histórico, entradas/salidas por semana, saldo contra
   mínimo y próxima compra sugerida.
+- **KDS, PDV y Mi reparto como apps Android** (ADR-109): tres manifests con
+  `scope` propio, login dentro de cada app (`/<app>/ingresar`) que vuelve a
+  la misma pantalla, y el usuario recordado en la app instalada (solo PIN).
 
 ## Fuentes
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { ingresoDesde } from "@/lib/ingreso";
 import { estaMuerta, suscribir } from "@/lib/sesion-muerta";
 
 /**
@@ -58,7 +59,8 @@ export function AvisoSesionExpirada() {
         <button
           type="button"
           onClick={() => {
-            window.location.href = "/login";
+            // Dentro de una app instalada, su propio ingreso (ADR-109).
+            window.location.href = ingresoDesde(location.pathname, location.search);
           }}
           className="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/85"
         >

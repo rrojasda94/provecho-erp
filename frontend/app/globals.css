@@ -1054,6 +1054,16 @@ dialog:modal {
         color: var(--muted-foreground);
     }
 
+    .login-no-soy-yo {
+        align-self: flex-end;
+        margin-top: -0.5rem;
+        background: none;
+        border: none;
+        font-size: 0.8125rem;
+        color: var(--muted-foreground);
+        text-decoration: underline;
+    }
+
     .login-nota {
         font-size: 0.8125rem;
         color: var(--muted-foreground);
