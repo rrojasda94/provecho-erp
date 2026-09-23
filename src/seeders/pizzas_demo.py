@@ -272,7 +272,7 @@ def _tamano(
         session,
         variante.id,
         empaque_id=articulos["Caja Pizza"].id,
-        # El empaque solo se consume fuera del salón (RN-EMP-003).
+        # El empaque solo se consume fuera del salón (RN-EMB-003).
         modalidades_empaque=["takeout", "delivery"],
     )
     _precio(session, lista, variante, precio)

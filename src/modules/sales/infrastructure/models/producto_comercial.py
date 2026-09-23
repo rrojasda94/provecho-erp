@@ -94,7 +94,7 @@ class ProductoComercial(Base, UuidPkMixin, TimestampMixin):
         ForeignKey("articulo.id"), nullable=True
     )
     # Array `mesa`|`takeout`|`delivery` — en cuáles se descuenta el
-    # empaque (RN-EMP-003).
+    # empaque (RN-EMB-003).
     modalidades_empaque: Mapped[list | None] = mapped_column(JsonB, nullable=True)
     # Identificador del sistema del que vino este producto
     # ("__export__.product_template_1307_c1b92172" en un export de Odoo).

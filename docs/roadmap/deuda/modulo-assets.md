@@ -9,7 +9,7 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   y detección de consumo anómalo RN-VEH-006/007), mantenimiento
   (`plan_mantenimiento` + `orden_mantenimiento`, aviso con anticipación
   configurable RN-MNT-005) y documentos con vencimiento
-  (`documento_vigencia`, RN-DOC-001..004). Cinco emisiones nuevas en
+  (`documento_vigencia`, RN-VIG-001..004). Cinco emisiones nuevas en
   `reports` (`assets.mantenimiento_proximo/vencido`,
   `assets.documento_por_vencer/vencido`, `assets.consumo_anomalo`), área
   `compras` nueva en `AREAS_BASE`. Migración `30270ac890b1`.

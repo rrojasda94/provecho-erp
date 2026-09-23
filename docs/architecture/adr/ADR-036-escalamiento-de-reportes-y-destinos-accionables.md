@@ -222,4 +222,4 @@ columna, el mozo como actor de `pedido_demorado`):
 - ADR-033 (módulo `reports`), ADR-024 (catálogo cerrado de consulta),
   ADR-031 (`audit_log`), ADR-016 (eventos post-commit), ADR-004 (tenant)
 - RN-CTP-004, RN-PRD-014/015, RN-REP-001..014
-- `docs/architecture/data-model.md` §6 y §16
+- `docs/architecture/data-model.md` §6 y §10

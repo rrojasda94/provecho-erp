@@ -136,8 +136,7 @@ cuadrar contra el mayor. `estado_resultados` devuelve el resultado por líneas
 ve en la pantalla en vez de haber que buscarlo.
 
 Límites conocidos, todos en el ROADMAP: una venta cuyo comprobante nunca se
-emite no reconoce IGV; la cuenta por cobrar de la venta
-(1212) queda abierta porque `sales.pago_registrado` no se publica; el costo
+emite no reconoce IGV; el costo
 de ventas (69) no se genera solo porque `inventory.stock_consumido` viaja sin
 monto; no hay asiento de cierre anual, así que el resultado del balance es
 acumulado desde el inicio del libro; y el corte corriente/no corriente se
@@ -209,7 +208,7 @@ Evento operativo → regla de mapeo contable → asiento generado → mayor/bala
 
 ## Relaciones
 
-- Escucha: `sales.venta_confirmada`, `sales.pago_registrado`,
+- Escucha: `sales.venta_confirmada`, `sales.venta_pagada` (cancela la 1212),
   `sales.comprobante_emitido`, `purchases.oc_emitida` (provisiona),
   `purchases.compra_recibida`, `purchases.comprobante_conforme` (decide y
   ejecuta el pago según condición del proveedor),

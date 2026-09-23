@@ -153,7 +153,7 @@ por eso son un proceso con tres variantes y no tres procesos.
   3. Con todos los ítems listos, el pedido aparece en la pantalla de
      despacho (`sales.pedido_listo`).
   4. Se emplata; se consume el empaque de mesa si el producto lo define
-     (RN-EMP-003).
+     (RN-EMB-003).
   5. Quien despacha verifica el pedido completo contra la comanda
      (RN-CUP-004).
   6. Se lleva a la mesa indicada en `referencia_atencion` y se entrega
@@ -168,7 +168,7 @@ por eso son un proceso con tres variantes y no tres procesos.
 - **Postcondición**: todos los ítems en `entregado`, `sales.venta_entregada`
   emitido; si el pago quedó para el final, la venta queda habilitada para
   cobro (RN-POS-005, RN-CUP-009).
-- **Relacionado**: RN-CUP-001..006/009/010, RN-POS-005, RN-EMP-003,
+- **Relacionado**: RN-CUP-001..006/009/010, RN-POS-005, RN-EMB-003,
   `sales.pedido_listo`, `sales.venta_entregada`.
 
 ### CU-OPE-002 — Takeout (recojo en sucursal)
@@ -178,7 +178,7 @@ por eso son un proceso con tres variantes y no tres procesos.
   y nombre de referencia del cliente (RN-COM-008).
 - **Flujo principal**:
   1. a 3. Igual que CU-OPE-001 (preparación por estación hasta pedido listo).
-  4. Se empaca para llevar, consumiendo el empaque de takeout (RN-EMP-003).
+  4. Se empaca para llevar, consumiendo el empaque de takeout (RN-EMB-003).
   5. Verificación contra comanda (RN-CUP-004).
   6. Se llama al cliente por número de orden en el mostrador.
   7. Se entrega y, si el pago quedó pendiente, se cobra antes de entregar
@@ -190,7 +190,7 @@ por eso son un proceso con tres variantes y no tres procesos.
   - Cliente llega antes de que el pedido esté listo → se le informa el
     tiempo restante desde el avance real del KDS.
 - **Postcondición**: ítems en `entregado`, `sales.venta_entregada` emitido.
-- **Relacionado**: RN-CUP-001..006/011, RN-COM-008, RN-EMP-003,
+- **Relacionado**: RN-CUP-001..006/011, RN-COM-008, RN-EMB-003,
   PROC-COM-002.
 
 ### CU-OPE-003 — Delivery
@@ -202,7 +202,7 @@ por eso son un proceso con tres variantes y no tres procesos.
 - **Flujo principal**:
   1. a 3. Igual que CU-OPE-001 (preparación por estación hasta pedido listo).
   4. Se empaca para transporte, consumiendo el empaque de delivery
-     (RN-EMP-003).
+     (RN-EMB-003).
   5. Verificación contra comanda (RN-CUP-004).
   6. Se asigna repartidor: propio, o de plataforma externa — en cuyo caso
      se registra la plataforma y no hay vínculo laboral ni gestión de
@@ -222,7 +222,7 @@ por eso son un proceso con tres variantes y no tres procesos.
 - **Postcondición**: ítems en `entregado`, `sales.venta_entregada` emitido
   con el repartidor registrado; o pedido no entregado, con motivo.
 - **Relacionado**: RN-CUP-001..008/010, RN-COM-008, RN-PER-003,
-  RN-MDP-005, RN-EMP-003, PROC-COM-002.
+  RN-MDP-005, RN-EMB-003, PROC-COM-002.
 
 ### Transversal a las 3 modalidades
 

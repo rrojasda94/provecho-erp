@@ -16,12 +16,18 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
   (nunca Radix). Podar el catálogo por defecto a lo que el ERP usa, nunca
   copiar el registro completo. Tarjetas/grillas simples sin comportamiento
   interactivo siguen siendo HTML + Tailwind sin componente.
-- **Shell estilo Odoo**: home de apps (grilla de módulos, `app/(app)/apps.config.ts`)
+- **Shell estilo Odoo**: home de apps (grilla de módulos, `MODULOS` en `frontend/lib/modulos.ts`)
   + navegación con sidebar dentro de cada módulo. Un módulo solo aparece en
   el grid, y solo es accesible por URL directa, si `permisos` (de
   `GET /users/me`) cubre su prefijo — el filtro del grid es UX, el guard real
   vive en el `layout.tsx` de cada módulo (server-side, deny por defecto,
   igual que el backend).
+- **`frontend/` es el back office del ERP, no el sitio público.** El sitio de
+  marca (`storefront/`, en la raíz del repo) es otra app Next.js con su propio
+  `package.json`, `Dockerfile` y `middleware.ts` (ADR-103): solo lee la
+  superficie pública `/api/v1/storefront/publico/*`, sin JWT. Lo que se edita
+  del sitio (textos, fotos, carta) vive acá, en el módulo `web`
+  (`prefijoPermiso: "storefront."`).
 - **Color con moderación** (2026-07-27, revisado 2026-08-07): superficies
   neutras por defecto — acero `--color-steel` en el back office, blanco en las
   tarjetas, crema **solo** en PDV/KDS/login. El color de marca

@@ -316,14 +316,20 @@ GitHub Actions. Ver ADR-008 para el porqué de separar entrega de despliegue.
 
 **`ci.yml`** — en cada push a `main` y en cada PR:
 
-| Job | Qué verifica |
-|-----|--------------|
-| `backend` | `ruff check`, `pytest`, que Alembic tenga **una sola cabeza** y que el contrato OpenAPI esté regenerado |
-| `migraciones` | contra un Postgres 16 real: `upgrade head` sobre base vacía, `downgrade base`, volver a subir, y `alembic check` |
-| `imagen` | que **las dos** imágenes construyan y que los contenedores arranquen: backend responde `/health`, frontend responde `/login` |
-| `seguridad` | `pip-audit` (informativo, no bloquea) |
-| `frontend` | `eslint` + `npm test` + `build` |
-| `e2e` | flujo del dinero de punta a punta (Playwright) contra la API real |
+Nueve jobs; el ruleset de `main` exige **seis** (columna "Obligatorio").
+Los otros tres corren en cada PR pero no bloquean el merge, a propósito.
+
+| Job | Qué verifica | Obligatorio |
+|-----|--------------|-------------|
+| `backend` | `ruff check`, `pytest` (sobre SQLite), que Alembic tenga **una sola cabeza** y que el contrato OpenAPI esté regenerado | Sí |
+| `migraciones` | contra un Postgres 16 real: `upgrade head` sobre base vacía, `downgrade base`, volver a subir, y `alembic check`; además `tests/test_bi_alcance.py` (vistas `vw_bi_*` de ADR-083, SQL que SQLite no crea) | Sí |
+| `backend-postgres` | la suite entera de `pytest` **otra vez**, contra Postgres real: largo de VARCHAR, CHECK y FKs que SQLite no hace cumplir | No — lento, y su valor es atrapar lo que SQLite no puede, no repetir `backend` |
+| `imagen` | que **las tres** imágenes construyan y que los contenedores arranquen: backend responde `/health`, frontend (`./frontend`) responde `/login` y sitio de marca (`./storefront`, ADR-103) responde `/salud` | Sí |
+| `seguridad` | `pip-audit` (informativo: el paso no falla aunque encuentre avisos) | Sí |
+| `frontend` | `eslint` + `npm test` + `build` | Sí |
+| `storefront` | `lint` + `typecheck` + `npm test` + `build` de la app `storefront/` | No |
+| `e2e` | flujo del dinero de punta a punta (Playwright) contra la API real | Sí |
+| `uso` | recorridos de uso con captura en cada hito (ADR-047); su salida es el artefacto, no el verde | No — además `continue-on-error: true`, así que nunca aparece rojo en el PR |
 
 El chequeo de cabeza única atrapa el caso en que dos ramas crean migraciones
 en paralelo: `alembic upgrade head` falla durante el despliegue, no en el
@@ -340,6 +346,13 @@ copiar, `standalone` mal armado) se descubría al desplegar.
 publica **tres** imágenes en GHCR, `ghcr.io/<repo>:latest`,
 `ghcr.io/<repo>-web:latest` y `ghcr.io/<repo>-charlies:latest`; los tags `v*`
 publican además la versión exacta (`:1.2.3`, `:1.2`).
+
+La versión que publica un tag la escribe `scripts/cortar_version.py` en
+`pyproject.toml` y `frontend/package.json`, y en ningún otro lado:
+`storefront/package.json` lleva **su propia versión** (`0.1.0` al 2026-09-18)
+y el script no la toca. La imagen `-charlies` sale igual con el tag del
+release; lo que queda desfasado es solo el número que declara su
+`package.json`.
 
 ### Despliegue
 

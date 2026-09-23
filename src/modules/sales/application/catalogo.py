@@ -101,7 +101,7 @@ def crear_producto(
 
 def _exigir_empaque(session: Session, empaque_id: uuid.UUID) -> None:
     """Lo que se guarda en `empaque_id` tiene que ser un artículo de tipo
-    empaque (RN-EMP-003).
+    empaque (RN-EMB-003).
 
     `data-model.md` lo declaraba desde siempre —«FK articulo tipo=empaque»—
     pero nada lo hacía cumplir: el `PATCH` metía el campo en un bucle

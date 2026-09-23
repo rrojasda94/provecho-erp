@@ -16,7 +16,7 @@ y soporta agentes de IA y humanos para toma de pedidos.
 | Auth | JWT + refresh token, PIN con Argon2id, RBAC |
 | Infra | Docker, GitHub Actions |
 | Observabilidad | Logs JSON correlacionados, Sentry/GlitchTip, chequeos de salud |
-| Integraciones | Factiliza (facturación electrónica PE) |
+| Integraciones | Factiliza (facturación electrónica PE), Google Maps (direcciones y reparto) |
 
 ## Arranque local
 
@@ -55,6 +55,8 @@ Docker Desktop. Detalle en
   (ventas del día, stock bajo mínimo, cajas abiertas; ADR-012). Primera
   pantalla real del frontend, corriendo servidor: el JWT vive en cookie
   httpOnly, nunca en el navegador vía JS.
+- Sitio de Charlie's Pizzas: http://localhost:3001 — servicio `charlies`,
+  app Next aparte (`storefront/`, ADR-103) que solo lee la API pública.
 
 ### Salud
 
@@ -87,6 +89,7 @@ uvicorn src.main:app --reload
 pytest
 ruff check .
 cd frontend && npm run lint && npm run typecheck
+cd storefront && npm run lint && npm run typecheck && npm test
 ```
 
 ## Documentación

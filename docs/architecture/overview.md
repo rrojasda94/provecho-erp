@@ -18,6 +18,27 @@ Regla de dependencias: `api → application → domain`. `infrastructure`
 implementa interfaces del dominio (Repository Pattern). El dominio no conoce
 FastAPI ni SQLAlchemy.
 
+## Módulos
+
+Trece módulos en `src/modules/`, todos con código (el detalle y lo pendiente
+de cada uno vive en su `README.md`):
+
+| Módulo | Responsabilidad |
+|--------|-----------------|
+| `users` | Autenticación (PIN Argon2id + JWT), RBAC, estructura organizacional (grupo, empresa, marca, sucursal) y bandeja de notificaciones |
+| `inventory` | Stock por almacén y lote (FEFO), solicitud → picking → transferencia → recepción, merma, conteo, devoluciones y guías de remisión |
+| `sales` | PDV y ventas en todos los canales, catálogo comercial y precios, promociones y cupones, clientes, pagos y comprobantes electrónicos (Factiliza) |
+| `purchases` | Proveedores, orden de compra → recepción → entrada al almacén, conformidad del comprobante y compra de activos |
+| `accounting` | Plan de cuentas (PCGE), asientos automáticos por evento, periodos, caja (apertura, cierre, arqueo, custodia) y tesorería |
+| `production` | Plan y orden de producción de subrecetas, consumo de insumos, control de calidad, checklist de inocuidad y costeo real |
+| `rrhh` | Ciclo de vida laboral: trabajador, contrato, asistencia, nómina y boletas, liquidación, permisos y disciplina |
+| `marketing` | Campañas, piezas de contenido, leads y atribución a la venta, encuestas por WhatsApp y evaluación de agencia |
+| `reports` | Qué reporta el ERP, a quién le llega y por qué: catálogo de emisiones, reglas de distribución y escalamientos |
+| `assets` | Activos, equipos y vehículos: kilometraje y combustible, mantenimiento y documentos con vencimiento |
+| `delivery` | Reparto propio: repartidores, rutas con paradas, registro de entrega o fallo y avisos al cliente (ADR-098) |
+| `supervision` | Tareas de apertura y cierre de sucursal con checklist, foto e informe diario (ADR-102) |
+| `storefront` | Sitio web público de marca: contenido editable y lectura del catálogo para la app pública (ADR-103) |
+
 ## Comunicación entre módulos
 
 **Event-driven interno** vía `src/core/events.py` (bus síncrono en proceso).

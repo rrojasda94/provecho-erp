@@ -32,7 +32,7 @@ decidió no hacerlo).
 | `inventory` (catálogo, stock, lotes/FEFO, conteo, abastecimiento, recetas) | 🔶 En curso | Catálogo, stock por almacén, lote/FEFO, conteo cíclico, abastecimiento interno, recetas/variantes, abastecedor de respaldo, devoluciones y planillas .xlsx operables de punta a punta; deuda menor pendiente. | [`modulo-inventory.md`](docs/roadmap/historial/modulo-inventory.md) |
 | `purchases` (proveedores, órdenes de compra) | 🔶 En curso | Ciclo de OC completo con idempotencia y umbral configurable, recepción a inventario, conformidad de comprobante y compra directa; pendiente caja chica para compra directa y reconciliación completa con contabilidad. | [`modulo-purchases.md`](docs/roadmap/historial/modulo-purchases.md) |
 | `assets` (activos, mantenimiento, combustible, documentos con vencimiento) | 🔶 En curso | Activo/vehículo, kilometraje y consumo de combustible con detección de anomalía, repuestos en la orden, cronograma de mantenimiento con aviso anticipado, documentos con vencimiento (SOAT, licencias, certificados) con adjunto real a S3, alta automática al recibir OC tipo `activo`, depreciación en `accounting` y alerta por email, todo operativo desde 2026-09-09; solo `flota` sigue pendiente. | [`modulo-assets.md`](docs/roadmap/historial/modulo-assets.md) |
-| `sales` (PDV, KDS, catálogo de venta) | 🔶 En curso | PDV/KDS/catálogo operativo con mesas, cupones, cocina por estaciones, variantes/restas y delivery; queda el motor de promociones condicionales completo, la entidad `entrega` y tarifa de delivery por sucursal. | [`modulo-sales.md`](docs/roadmap/historial/modulo-sales.md) |
+| `sales` (PDV, KDS, catálogo de venta) | 🔶 En curso | PDV/KDS/catálogo operativo con mesas, cupones, cocina por estaciones, variantes/restas y delivery; queda el motor de promociones condicionales completo. La entidad `entrega` vive en `delivery` (ADR-098); la tarifa de delivery es por empresa y editable por Gerencia (ADR-068) — por sucursal solo cuando haya caso. | [`modulo-sales.md`](docs/roadmap/historial/modulo-sales.md) |
 | `production` (orden de producción) | 🔶 En curso | Slice core implementado desde 2026-07-25 (consumo, calidad, costeo); la primera cocina de producción central real está planeada para 2027, hoy la producción ocurre en cocinas de sucursal. | [`modulo-production.md`](docs/roadmap/historial/modulo-production.md) |
 | `accounting` (libro contable + tesorería) | 🔶 En curso | PCGE, periodos, asientos automáticos/manuales, libro mayor, estados financieros, ciclo de caja/custodia y pago a proveedor en producción desde 2026-09-05; deuda declarada en fecha real del asiento y registro de préstamos/traspasos. | [`modulo-accounting.md`](docs/roadmap/historial/modulo-accounting.md) |
 | `rrhh` (contratación, legajo, asistencia, planilla) | 🔶 En curso | Ciclo laboral, contratación/convocatoria, ARCO de postulante, asistencia PAD, terminal de marcaje y legajo+permisos construidos y probados; boletas/liquidaciones (nómina) siguen por API a propósito. | [`modulo-rrhh.md`](docs/roadmap/historial/modulo-rrhh.md) |
@@ -210,7 +210,10 @@ contiene, buscando su `[[ COMPLETAR ]]`):
   `scripts/desplegar.sh` y `release.yml` publicando también la imagen del
   frontend (`ghcr.io/rrojasda94/provecho-erp-web`) — antes solo publicaba el
   backend, staging no habría tenido pantallas.
-- ⬜ **Falta para terminar el primer despliegue de staging:**
+- ✅ **Primer despliegue de staging terminado** (checklist cerrado en
+  [`staging.md`](docs/engineering/staging.md#pendiente); el cron de backup usa
+  `scripts/backup-staging.sh`, no `src.backups.backup`, porque la imagen de la
+  API no trae `postgresql-client`):
   1. `.env` real en el servidor (`JWT_SECRET`/`POSTGRES_PASSWORD` generados
      ahí, nunca en una conversación — un secreto que la pasó deja de serlo).
   2. `docker login ghcr.io` con el token de lectura ya generado.
@@ -257,22 +260,23 @@ nombre del archivo.
 | Área | Archivo | ⬜ abiertos | ✅ cerrados |
 | --- | --- | --- | --- |
 | Transversal | [`transversal.md`](docs/roadmap/deuda/transversal.md) | 1 | 35 |
-| Seguridad (tras el endurecimiento base de 2026-07-26) | [`seguridad.md`](docs/roadmap/deuda/seguridad.md) | 12 | 6 |
-| Dashboard y caja (tras la implementación de 2026-07-26 — ADR-012) | [`dashboard-y-caja.md`](docs/roadmap/deuda/dashboard-y-caja.md) | 6 | 17 |
-| Protección de datos personales (tras la implementación de 2026-07-26 — ADR-011) | [`proteccion-de-datos-personales.md`](docs/roadmap/deuda/proteccion-de-datos-personales.md) | 8 | 1 |
-| Contrato de API (tras la implementación de 2026-07-26 — ADR-010) | [`contrato-de-api.md`](docs/roadmap/deuda/contrato-de-api.md) | 6 | 1 |
-| Modo offline del PDV (tras la fase 2 de 2026-07-27 — ADR-009) | [`modo-offline-del-pdv.md`](docs/roadmap/deuda/modo-offline-del-pdv.md) | 10 | 3 |
-| CI/CD (tras la implementación de 2026-07-26) | [`ci-cd.md`](docs/roadmap/deuda/ci-cd.md) | 6 | 5 |
+| Seguridad (tras el endurecimiento base de 2026-07-26) | [`seguridad.md`](docs/roadmap/deuda/seguridad.md) | 15 | 8 |
+| Dashboard y caja (tras la implementación de 2026-07-26 — ADR-012) | [`dashboard-y-caja.md`](docs/roadmap/deuda/dashboard-y-caja.md) | 12 | 20 |
+| Protección de datos personales (tras la implementación de 2026-07-26 — ADR-011) | [`proteccion-de-datos-personales.md`](docs/roadmap/deuda/proteccion-de-datos-personales.md) | 9 | 1 |
+| Contrato de API (tras la implementación de 2026-07-26 — ADR-010) | [`contrato-de-api.md`](docs/roadmap/deuda/contrato-de-api.md) | 7 | 1 |
+| Modo offline del PDV (tras la fase 2 de 2026-07-27 — ADR-009) | [`modo-offline-del-pdv.md`](docs/roadmap/deuda/modo-offline-del-pdv.md) | 11 | 3 |
+| CI/CD (tras la implementación de 2026-07-26) | [`ci-cd.md`](docs/roadmap/deuda/ci-cd.md) | 8 | 5 |
 | Observabilidad y salud (tras las implementaciones de 2026-07-26) | [`observabilidad-y-salud.md`](docs/roadmap/deuda/observabilidad-y-salud.md) | 3 | 6 |
 | Backups (tras la implementación de 2026-07-26) | [`backups.md`](docs/roadmap/deuda/backups.md) | 4 | 1 |
 | Módulo inventory (slices siguientes) | [`modulo-inventory.md`](docs/roadmap/deuda/modulo-inventory.md) | 1 | 55 |
-| Módulo sales (slices siguientes) | [`modulo-sales.md`](docs/roadmap/deuda/modulo-sales.md) | 51 | 28 |
-| Módulo purchases (slices siguientes) | [`modulo-purchases.md`](docs/roadmap/deuda/modulo-purchases.md) | 7 | 3 |
+| Módulo sales (slices siguientes) | [`modulo-sales.md`](docs/roadmap/deuda/modulo-sales.md) | 58 | 30 |
+| Módulo purchases (slices siguientes) | [`modulo-purchases.md`](docs/roadmap/deuda/modulo-purchases.md) | 9 | 4 |
 | Módulo assets (slice core — deuda declarada) | [`modulo-assets.md`](docs/roadmap/deuda/modulo-assets.md) | 1 | 8 |
-| Módulo production (slices siguientes) | [`modulo-production.md`](docs/roadmap/deuda/modulo-production.md) | 6 | 16 |
-| Módulo accounting (slices siguientes) | [`modulo-accounting.md`](docs/roadmap/deuda/modulo-accounting.md) | 8 | 3 |
-| Módulo rrhh (slice completo — deuda declarada) | [`modulo-rrhh.md`](docs/roadmap/deuda/modulo-rrhh.md) | 11 | 4 |
-| Módulo marketing (slice core — deuda declarada) | [`modulo-marketing.md`](docs/roadmap/deuda/modulo-marketing.md) | 5 | 2 |
+| Módulo production (slices siguientes) | [`modulo-production.md`](docs/roadmap/deuda/modulo-production.md) | 2 | 20 |
+| Módulo accounting (slices siguientes) | [`modulo-accounting.md`](docs/roadmap/deuda/modulo-accounting.md) | 16 | 11 |
+| Módulo rrhh (slice completo — deuda declarada) | [`modulo-rrhh.md`](docs/roadmap/deuda/modulo-rrhh.md) | 15 | 10 |
+| Módulo marketing (slice core — deuda declarada) | [`modulo-marketing.md`](docs/roadmap/deuda/modulo-marketing.md) | 5 | 3 |
+| Módulo delivery (slices 1-6 — deuda declarada, ADR-098) | [`modulo-delivery.md`](docs/roadmap/deuda/modulo-delivery.md) | 16 | 2 |
 | Módulo supervision (slice core — deuda declarada) | [`modulo-supervision.md`](docs/roadmap/deuda/modulo-supervision.md) | 4 | 0 |
 | Frontend (F2 — arquitectura y UX, documento 2026-07-27, actualizado tras ADR-013) | [`frontend.md`](docs/roadmap/deuda/frontend.md) | 11 | 24 |
 | Módulo storefront (sitio de marca, PR1+PR2+PR3+PR4 — deuda declarada) | [`modulo-storefront.md`](docs/roadmap/deuda/modulo-storefront.md) | 16 | 3 |

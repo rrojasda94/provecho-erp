@@ -378,7 +378,7 @@ salida, último punto donde un error todavía es barato. Luego:
   el cajero (PROC-COM-002, RN-MDP-005).
 
 Emplatado (mesa) o empaquetado (takeout/delivery) consumen el `empaque`
-que corresponda según modalidad (RN-EMP-003).
+que corresponda según modalidad (RN-EMB-003).
 
 **Excepciones** (detalle en los CU): cliente ausente o dirección errada en
 delivery, pedido no recogido en takeout, producto rechazado en la entrega

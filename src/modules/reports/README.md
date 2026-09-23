@@ -27,7 +27,7 @@ guarda y se entrega. Ver ADR-033.
 (qué emisión se distribuye, en qué ámbito), `regla_destinatario` (a qué área,
 rol, usuario o resolutor dinámico), `reporte_emitido` (la instancia guardada,
 con su foto de datos) y `entrega_reporte` (a quién le tocó y **por qué**).
-Detalle en `docs/architecture/data-model.md` §16.
+Detalle en `docs/architecture/data-model.md` §10.
 
 El **catálogo de emisiones** (`domain/catalogo.py`) es una lista cerrada en
 código, no una tabla: la regla configura *a quién* llega un reporte, nunca
@@ -64,17 +64,25 @@ permitiría al reportado dictar lo que dice su reporte. Escalar sí es un acto
 del usuario y por eso sí tiene endpoint: no cambia lo que el reporte dice, dice
 qué se hizo con él.
 
-Emisiones cableadas (16): los cuatro avisos que existían
-migrados desde `users` (`sales.pedido_demorado`,
+Emisiones cableadas (28, `domain/catalogo.py`): los cuatro avisos que
+existían migrados desde `users` (`sales.pedido_demorado`,
 `inventory.stock_bajo_minimo`, `inventory.lote_vencido_detectado`,
 `inventory.conteo_vencido`) más `inventory.devolucion_a_proveedor`,
 `inventory.devolucion_de_cliente` (RN-INV-020), `inventory.ajuste_fuera_margen`,
 `sales.descuento_aplicado`, `sales.venta_anulada`, `sales.lineas_anuladas`
-(actos de autoridad, RN-AUD-005), `accounting.cierre_caja_irregular`,
-`accounting.pago_requiere_aprobacion` y
-`production.no_conformidad_detectada` (RN-PRD-015); y las tres de la propia
-cadena de escalamiento (`reports.escalamiento_abierto`, `_elevado`,
-`_resuelto`, ADR-036).
+(actos de autoridad, RN-AUD-005), `sales.lineas_movidas` (RN-COM-043),
+`sales.consumo_personal_registrado` (RN-COM-025),
+`accounting.cierre_caja_irregular`, `accounting.pago_requiere_aprobacion`,
+`production.no_conformidad_detectada` (RN-PRD-015),
+`production.equipo_frio_fuera_rango` (RN-CDP-005),
+`production.cocina_bloqueada` (RN-CDP-002),
+`production.reporte_produccion_generado` (RN-DOC-010),
+`rrhh.salida_sin_marcar` (RN-RRHH-021/022),
+`supervision.informe_diario_generado` (RN-SUP-007), las cinco de `assets`
+(`assets.mantenimiento_proximo`, `_vencido` —RN-MNT-005—,
+`assets.documento_por_vencer`, `assets.documento_vencido` —RN-VIG-001..004—
+y `assets.consumo_anomalo`); y las tres de la propia cadena de escalamiento
+(`reports.escalamiento_abierto`, `_elevado`, `_resuelto`, ADR-036).
 
 ## Escalamiento (ADR-036)
 

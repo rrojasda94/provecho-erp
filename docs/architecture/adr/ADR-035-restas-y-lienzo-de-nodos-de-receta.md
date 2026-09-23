@@ -20,7 +20,7 @@ sino repartidos en el modelo que ADR-018 y ADR-023 dejaron armado:
 | **Restas** | — | **nada** |
 
 Y el empaque, que no es un modificador pero sí sale del mismo plato, vive en
-`producto_comercial.empaque_id` + `modalidades_empaque` (RN-EMP-003).
+`producto_comercial.empaque_id` + `modalidades_empaque` (RN-EMB-003).
 
 Dos huecos, uno de dominio y otro de operación:
 
@@ -211,7 +211,7 @@ encuadre y arrastre son de la **vista**, no de la topología.
    la espina visible de la pantalla. Cada nodo elegido tira una arista al
    plato — la suma de `fusionar`, dibujada. Las restas llegan punteadas en
    ámbar con glifo `−`; el empaque llega punteado cuando la modalidad no lo
-   consume, con lo que RN-EMP-003 deja de ser una nota al pie.
+   consume, con lo que RN-EMB-003 deja de ser una nota al pie.
 3. **Superficie oscura a pantalla completa**, fuera del grupo de rutas
    `(app)`, como ya hacen el PDV y el KDS. Un grafo es un problema de
    figura-fondo: atenuar lo que no está en el camino solo funciona si hay

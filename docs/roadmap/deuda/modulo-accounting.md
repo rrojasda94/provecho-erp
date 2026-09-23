@@ -100,12 +100,11 @@ de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
   Eventos `accounting.pago_ejecutado`/`pago_requiere_aprobacion` ya se
   publican, pero sin consumidor todavía (ver pendiente de `purchases`
   arriba y de `users`/alertas abajo).
-- ⬜ **Resto de eventos → asiento automático**: `sales.pago_registrado` y
-  `purchases.caja_chica_rendida` están documentados en `events.md` pero sus
-  módulos de origen aún no los publican en código (en el caso de `sales`,
-  el evento real ya publicado se llama `sales.venta_pagada`, no
-  `sales.pago_registrado` — desalineación de nombre entre spec y código,
-  revisar). `inventory.ajuste_fuera_margen` sí se publica pero `accounting`
+- ⬜ **Resto de eventos → asiento automático**:
+  `purchases.caja_chica_rendida` está documentado en `events.md` pero
+  `purchases` aún no lo publica. (Corregido 2026-09-18: esta entrada citaba
+  también `sales.pago_registrado`; ese nombre nunca existió en código — el
+  evento es `sales.venta_pagada` y `accounting` lo escucha desde 2026-09-05.) `inventory.ajuste_fuera_margen` sí se publica pero `accounting`
   todavía no lo suscribe. Cuando existan/se suscriban, agregar su extractor
   de monto/empresa en `accounting/application/listeners.py`. Corregido
   2026-09-09: esta entrada incluía `sales.comprobante_emitido`,
@@ -173,12 +172,11 @@ Lo que ADR-081 dejó abierto:
 - ⬜ **`movimiento_dinero.monto` es el total de la OC sin IGV**: el pago a un proveedor gravado se encola por menos de lo que dice su factura. Anterior a ADR-081; ahora se nota más, porque el crédito fiscal sí queda asentado.
 - ⬜ **La casilla de operación gravada es manual**: no se deduce del distrito del cliente ni del domicilio del proveedor. Automatizarlo exige definir qué distritos cuentan como zona exonerada.
 - ⬜ **La conformidad de compras no tiene pantalla**: `gravado_igv` se manda por API. Mientras no exista la pantalla, el crédito fiscal de una compra gravada depende de que quien llame la API lo marque.
-- ⬜ **La cuenta por cobrar de la venta (1212) no se cancela nunca**: el
-  asiento de venta la carga y nada la abona, porque `sales.pago_registrado`
-  no se publica (mismo pendiente de arriba). El balance cuadra —el activo
-  está en «cuentas por cobrar» en vez de en «efectivo»— pero el ciclo de caja
-  y el libro contable siguen sin tocarse. Es hoy el hueco más visible: se ve
-  a simple vista en el Estado de Situación Financiera.
+- ✅ 2026-09-05 **La cuenta por cobrar de la venta (1212) no se cancela nunca**:
+  resuelto — `on_venta_pagada` (`accounting/application/listeners.py`)
+  escucha `sales.venta_pagada` y abona la 1212 contra el medio de cobro.
+  Antes el asiento de venta la cargaba y nada la abonaba, y el efectivo
+  cobrado no aparecía en ninguna cuenta del balance.
 - ⬜ **El costo de ventas (69) no se genera solo**: hace falta un evento de
   consumo **valorizado** por venta. `inventory.stock_consumido` viaja sin
   monto, así que hoy el consumo se refleja por la vía del elemento 6

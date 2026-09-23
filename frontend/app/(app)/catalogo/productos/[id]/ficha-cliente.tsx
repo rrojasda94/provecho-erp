@@ -396,7 +396,7 @@ function SeccionSimple({
 const MODALIDADES = ["mesa", "takeout", "delivery"] as const;
 
 /** Qué empaque consume este producto y en qué modalidades se descuenta
- * (RN-EMP-003). Vive donde el producto ya vende —receta propia o
+ * (RN-EMB-003). Vive donde el producto ya vende —receta propia o
  * presentación— porque un padre sin receta nunca se vende por sí mismo. */
 function SelectorEmpaque({
   producto,
