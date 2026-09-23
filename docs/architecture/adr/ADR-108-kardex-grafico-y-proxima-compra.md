@@ -1,0 +1,56 @@
+# ADR-108 — Kardex gráfico en la ficha del artículo y próxima compra sugerida
+
+Fecha: 2026-09-23
+Estado: aceptada
+
+## Contexto
+
+Para decidir cuándo y a cuánto volver a comprar, quien compra necesitaba
+ver tres cosas juntas: cómo se movió el precio, a qué ritmo entra y sale el
+artículo, y cuándo se va a quedar corto. El kardex existente
+(`GET /inventory/movimientos`) lista movimiento por movimiento y no tiene
+costo; el precio histórico vive en las recepciones de `purchases`, y no había
+endpoint que lo leyera. La ficha del artículo en Inventario era una tabla de
+seis datos y en Compras no existía.
+
+## Decisión
+
+1. **Dos endpoints, uno por módulo dueño del dato**, compuestos en el
+   frontend. Los módulos no se importan entre sí:
+   - `GET /inventory/articulos/{id}/kardex?dias=180` — entradas y salidas por
+     semana, saldo al cierre de cada semana (reconstruido hacia atrás desde el
+     stock actual), stock y mínimo de toda la empresa, consumo diario y
+     próxima compra sugerida. Los traslados internos no cuentan: en el total
+     de la empresa se anulan.
+   - `GET /purchases/articulos/{id}/historial-precios` — cada recepción con
+     fecha, costo unitario, cantidad y proveedor. Del costo de la recepción, no
+     de la OC: es lo que se pagó. Incluye compras directas (ADR-082).
+2. **La predicción es lineal y vive en el dominio de inventario**
+   (`rules.consumo_diario`, `rules.proxima_compra`, RN-INV-027): promedio de
+   salidas de 90 días, mínimo 7 días de historia; fecha en que el stock toca
+   el mínimo. La **frecuencia de compra** (promedio de días entre recepciones)
+   la calcula la pantalla sobre el historial de precios, que es de compras.
+3. **Una sola ficha** (`components/kardex/ficha-kardex.tsx`) en
+   `/inventario/articulos/[id]` y `/compras/articulos/[id]`. A la primera se
+   llega desde el nombre en la lista de artículos; a la segunda, desde cada
+   línea de una OC. Sin `purchases.leer`, la ficha se dibuja sin el gráfico
+   de precio.
+4. **Tres gráficos y no uno con doble eje**: precio (soles), entradas/salidas
+   (barras, misma unidad) y saldo con la línea de mínimo. Colores validados
+   para daltonismo en claro y oscuro (`--kardex-entrada` + `--primary`), con
+   leyenda y una vista de tabla.
+
+## Alternativas descartadas
+
+- **Guardar el costo en `movimiento_inventario`**: habría dado precio y
+  cantidades en una consulta, pero es una migración sobre la tabla más grande
+  del ERP para duplicar un dato que ya está en la recepción.
+- **Modelo con estacionalidad o tendencia**: sin un año de historia real no
+  hay con qué calibrarlo. Queda marcado (`ponytail:`) en `rules.proxima_compra`.
+
+## Consecuencias
+
+- La sugerencia no descuenta el plazo del proveedor: no existe ese dato por
+  proveedor todavía (deuda en `docs/roadmap/deuda/modulo-inventory.md`).
+- Las semanas previas al primer movimiento del período se recortan: un
+  artículo nuevo se grafica desde que empezó a moverse.

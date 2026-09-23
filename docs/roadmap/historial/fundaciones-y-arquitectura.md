@@ -332,6 +332,9 @@ funcionalidad. Un PR por punto, cada uno mergeado antes del siguiente.
 - **Listados sin tope** (enmienda ADR-026): Artículos y Asientos paginan y
   buscan en el servidor; el resto trae todas las páginas. ~45 llamadas
   cortaban en 200 o en 50 sin avisar.
+- **Kardex gráfico** (ADR-108, RN-INV-027): ficha del artículo en Inventario
+  y Compras con precio histórico, entradas/salidas por semana, saldo contra
+  mínimo y próxima compra sugerida.
 
 ## Fuentes
 

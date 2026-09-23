@@ -9,7 +9,10 @@ function servidor(total: number, tamano: number) {
   const pedir = async (page: number): Promise<Pagina<number>> => {
     pedidas.push(page);
     const desde = (page - 1) * tamano;
-    const items = Array.from({ length: Math.max(0, Math.min(tamano, total - desde)) }, (_, i) => desde + i);
+    const items = Array.from(
+      { length: Math.max(0, Math.min(tamano, total - desde)) },
+      (_, i) => desde + i,
+    );
     return { items, total, page, page_size: tamano };
   };
   return { pedir, pedidas };
@@ -33,7 +36,9 @@ test("si el total crece entre páginas no se queda en un bucle", async () => {
   // Una página vacía corta aunque `total` diga que falta: alguien borró
   // filas mientras se recorría.
   const pedir = async (page: number): Promise<Pagina<number>> =>
-    page === 1 ? { items: [1], total: 5, page, page_size: 200 } : { items: [], total: 5, page, page_size: 200 };
+    page === 1
+      ? { items: [1], total: 5, page, page_size: 200 }
+      : { items: [], total: 5, page, page_size: 200 };
   assert.deepEqual(await recorrerPaginas(pedir), [1]);
 });
 
@@ -42,11 +47,18 @@ test("rutaPagina conserva los filtros y pisa la paginación", () => {
     rutaPagina("/api/v1/inventory/articulos?tipo=insumo&page_size=50", 3),
     "/api/v1/inventory/articulos?tipo=insumo&page_size=200&page=3",
   );
-  assert.equal(rutaPagina("/api/v1/users", 1), "/api/v1/users?page=1&page_size=200");
+  assert.equal(
+    rutaPagina("/api/v1/users", 1),
+    "/api/v1/users?page=1&page_size=200",
+  );
 });
 
 test("leerPagina acota lo que llega por la URL", () => {
-  const { query, pagina, tamano, q } = leerPagina({ q: "  harina ", page: "-3", page_size: "9999" });
+  const { query, pagina, tamano, q } = leerPagina({
+    q: "  harina ",
+    page: "-3",
+    page_size: "9999",
+  });
   assert.equal(pagina, 1);
   assert.equal(tamano, 200);
   assert.equal(q, "harina");

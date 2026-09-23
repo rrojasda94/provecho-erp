@@ -402,7 +402,16 @@ function ItemsDeLaOrden({
               const falta = Number(it.cantidad) - Number(it.cantidad_recibida);
               return (
                 <tr key={it.id} className="border-t border-gray/10">
-                  <td className="px-3 py-2">{nombreDe(it.articulo_id)}</td>
+                  <td className="px-3 py-2">
+                    {/* A la ficha del artículo: precio histórico y cuándo
+                        volver a comprar, sin salir de Compras. */}
+                    <Link
+                      href={`/compras/articulos/${it.articulo_id}`}
+                      className="font-medium text-primary hover:underline"
+                    >
+                      {nombreDe(it.articulo_id)}
+                    </Link>
+                  </td>
                   <td className="px-3 py-2">{it.cantidad}</td>
                   <td className="px-3 py-2">{it.cantidad_recibida}</td>
                   <td className={`px-3 py-2 ${falta > 0 ? "font-semibold" : "text-gray"}`}>

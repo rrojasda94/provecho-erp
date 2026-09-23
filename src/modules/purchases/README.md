@@ -117,6 +117,15 @@ esto la OC era inmutable desde el instante en que se creaba, ni en
 borrador se podía corregir un precio tecleado mal sin anular y rehacer
 todo. Desde `emitida` sigue siendo inmutable sin excepción (ver *Reglas*).
 
+## Historial de precios de un artículo (2026-09-23, ADR-108)
+
+`GET /purchases/articulos/{id}/historial-precios` (`application/historial_precios.py`):
+cada recepción del artículo, de la más vieja a la más nueva, con fecha, costo
+unitario **de la recepción** (lo que se pagó, no lo pactado en la OC),
+cantidad y proveedor. Alcance por la empresa del proveedor (ADR-004). La
+ficha del artículo lo grafica y calcula la frecuencia de compra; se llega
+desde cada línea de una OC (`/compras/articulos/[id]`).
+
 ## Compra directa (2026-08-29, ADR-082)
 
 `POST /compras-directas` sustenta un gasto ya incurrido (factura de un

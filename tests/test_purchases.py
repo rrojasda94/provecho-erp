@@ -1159,3 +1159,55 @@ def test_la_compra_directa_guarda_los_datos_de_la_factura(env):
     assert r.json()["fecha_emision"] == "2026-08-20"
     assert Decimal(r.json()["total"]) == Decimal("59.00")
     assert r.json()["emisor_num_doc"] == "20111111111"
+
+
+def test_kardex_e_historial_de_precios_del_articulo(env):
+    """La ficha del artículo grafica a cuánto se compró y cuánto entró/salió."""
+    client, ids, TestSession = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc_id = _crear_oc(client, h, ids, proveedor_id, costo="12.50").json()["id"]
+    client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
+    from src.modules.purchases.infrastructure.models import OrdenCompraItem
+
+    with TestSession() as s:
+        item_id = str(
+            s.scalar(
+                select(OrdenCompraItem.id).where(
+                    OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id)
+                )
+            )
+        )
+    r = client.post(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones",
+        headers=h,
+        json={
+            "idempotency_key": "recep-kardex",
+            "items": [{"orden_compra_item_id": item_id, "cantidad_recibida": "40"}],
+        },
+    )
+    assert r.status_code == 201
+
+    precios = client.get(
+        f"/api/v1/purchases/articulos/{ids['articulo_id']}/historial-precios", headers=h
+    ).json()
+    assert len(precios) == 1
+    assert Decimal(precios[0]["costo_unitario"]) == Decimal("12.50")
+    assert Decimal(precios[0]["cantidad"]) == Decimal("40")
+    assert precios[0]["proveedor"] == "Molinera SAC"
+
+    kardex = client.get(
+        f"/api/v1/inventory/articulos/{ids['articulo_id']}/kardex?dias=30", headers=h
+    ).json()
+    assert Decimal(kardex["stock"]) == Decimal("40")
+    assert sum(Decimal(s["entradas"]) for s in kardex["semanas"]) == Decimal("40")
+    # La última semana cierra con el stock de hoy.
+    assert Decimal(kardex["semanas"][-1]["saldo"]) == Decimal("40")
+    # Un día de historia no alcanza para medir un ritmo de consumo.
+    assert kardex["consumo_diario"] is None
+    assert kardex["proxima_compra"] is None
+
+    otro = client.get(
+        f"/api/v1/inventory/articulos/{uuid.uuid4()}/kardex", headers=h
+    )
+    assert otro.status_code == 404
