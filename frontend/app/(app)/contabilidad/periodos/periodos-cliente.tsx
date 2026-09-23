@@ -58,7 +58,7 @@ export function PeriodosCliente({ periodos }: { periodos: Periodo[] }) {
 
       <form
         action={formAction}
-        className="flex flex-wrap items-end gap-3 rounded border border-gray/20 bg-white p-4"
+        className="flex flex-wrap items-end gap-3 rounded border border-gray/20 bg-card p-4"
       >
         <label className="flex flex-col gap-1 text-sm font-semibold">
           Año
@@ -88,7 +88,7 @@ export function PeriodosCliente({ periodos }: { periodos: Periodo[] }) {
         <button
           type="submit"
           disabled={pendiente}
-          className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
+          className="rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary"
         >
           {pendiente ? "Abriendo..." : "Abrir periodo"}
         </button>

@@ -44,6 +44,7 @@ from src.modules.inventory.application.scope import (
     exigir_reserva,
     exigir_sku,
     exigir_solicitud,
+    exigir_sucursal_de_la_empresa,
     exigir_transferencia,
 )
 from src.modules.users.api.deps import (
@@ -331,15 +332,42 @@ def obtener_articulo(
 def kardex_de_articulo(
     articulo_id: uuid.UUID,
     dias: int = Query(180, ge=7, le=730, description="Cuántos días hacia atrás"),
+    almacen_id: uuid.UUID | None = Query(None, description="Solo este almacén"),
+    sucursal_id: uuid.UUID | None = Query(None, description="Solo los almacenes de esta sede"),
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     session: Session = Depends(get_db),
 ):
     """Entradas y salidas por semana, saldo y próxima compra sugerida del
-    artículo en toda la empresa (ficha del artículo, kardex gráfico)."""
+    artículo: en la empresa entera, en una sede o en un almacén (ADR-108)."""
+    if almacen_id is not None and sucursal_id is not None:
+        raise HTTPException(422, "un almacén o una sede, no los dos")
     exigir_articulo(session, articulo_id, tenant)
-    return kardex_uc.resumen_kardex(
-        session, articulo_id, empresa_id=tenant.filtro_empresa(), dias=dias
+    if almacen_id is not None:
+        exigir_almacen(session, almacen_id, tenant)
+    if sucursal_id is not None:
+        exigir_sucursal_de_la_empresa(session, sucursal_id, tenant)
+    ambito = kardex_uc.Ambito(
+        empresa_id=tenant.filtro_empresa(), almacen_id=almacen_id, sucursal_id=sucursal_id
+    )
+    return kardex_uc.resumen_kardex(session, articulo_id, ambito=ambito, dias=dias)
+
+
+@router.get(
+    "/articulos/{articulo_id}/kardex/por-almacen",
+    response_model=list[schemas.KardexAlmacenOut],
+)
+def kardex_por_almacen(
+    articulo_id: uuid.UUID,
+    _: Usuario = Depends(require_permission(LEER)),
+    tenant: Tenant = Depends(get_tenant),
+    session: Session = Depends(get_db),
+):
+    """Cómo está el artículo en cada almacén que lo maneja: stock, ritmo y
+    próxima reposición, lo que se agota primero arriba."""
+    exigir_articulo(session, articulo_id, tenant)
+    return kardex_uc.kardex_por_almacen(
+        session, articulo_id, empresa_id=tenant.filtro_empresa()
     )
 
 

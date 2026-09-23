@@ -123,12 +123,12 @@ function DialogoNuevoProducto({
       <button
         type="button"
         onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
+        className="rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary"
         disabled={marcas.length === 0}
       >
         + Nuevo producto
       </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
+      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
         <div className="flex flex-col gap-4 p-6">
           <h2 className="font-heading text-lg text-dark">Nuevo producto</h2>
           <label className="flex flex-col gap-1 text-sm font-semibold">
@@ -203,7 +203,7 @@ function DialogoNuevoProducto({
               type="button"
               onClick={crear}
               disabled={guardando || !nombre.trim() || idInterno.length === 0}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
+              className="rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary disabled:opacity-50"
             >
               {guardando ? "Creando..." : "Crear y abrir ficha"}
             </button>

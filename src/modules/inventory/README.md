@@ -231,6 +231,11 @@ compra sugerida (`rules.proxima_compra`, RN-INV-027). Lo consume la ficha del
 artículo en Inventario y en Compras, junto al historial de precios que expone
 `purchases`.
 
+**Por sede y por almacén (enmienda 2026-09-23):** el mismo endpoint acepta
+`almacen_id` o `sucursal_id`; con ámbito los traslados cuentan como
+reposición. `GET /inventory/articulos/{id}/kardex/por-almacen` compara todos
+los almacenes que manejan el artículo.
+
 ## Casos de uso
 
 - CRUD de artículos y categorías.

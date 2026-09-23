@@ -75,7 +75,7 @@ export async function ModuloShell({
         {items.length > 0 && (
           <nav className="flex gap-0.5 overflow-x-auto md:flex-col md:overflow-visible">
             {items.map((item) => (
-              <NavModulo key={item.href} item={item} />
+              <NavModulo key={item.href} item={item} items={items} />
             ))}
           </nav>
         )}

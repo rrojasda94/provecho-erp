@@ -1140,3 +1140,26 @@ def test_listar_asientos_busca_por_glosa_y_pagina(env):
     segunda = client.get("/api/v1/accounting/asientos?page=2&page_size=2", headers=h).json()
     assert segunda["total"] == 3
     assert len(segunda["items"]) == 1
+
+
+def test_un_listener_que_revienta_deja_el_asiento_omitido_con_su_error(env, monkeypatch):
+    """Una excepción en el listener solo quedaba en el log: la pantalla de
+    Asientos no se enteraba y el balance quedaba corto sin decir de qué venta."""
+    client, ids, _ = env
+    h = _token(client)
+
+    def revienta(*_a, **_k):
+        raise RuntimeError("regla corrupta")
+
+    monkeypatch.setattr(accounting_listeners, "_generar", revienta)
+    venta_id = str(uuid.uuid4())
+    accounting_listeners.on_venta_confirmada(
+        {"venta_id": venta_id, "sucursal_id": ids["sucursal_id"], "items": [], "total": "10"}
+    )
+
+    omitidos = client.get("/api/v1/accounting/asientos-omitidos", headers=h).json()
+    assert len(omitidos) == 1
+    assert omitidos[0]["motivo"] == "error"
+    assert omitidos[0]["evento"] == "sales.venta_confirmada"
+    assert omitidos[0]["referencia_origen"] == venta_id
+    assert omitidos[0]["detalle"] == "RuntimeError: regla corrupta"

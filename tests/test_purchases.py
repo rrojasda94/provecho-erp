@@ -1211,3 +1211,98 @@ def test_kardex_e_historial_de_precios_del_articulo(env):
         f"/api/v1/inventory/articulos/{uuid.uuid4()}/kardex", headers=h
     )
     assert otro.status_code == 404
+
+
+def test_kardex_por_sede_cuenta_la_reposicion_del_central(env):
+    """En la empresa un traslado se anula; en el local que lo recibe es su
+    reposición y tiene que verse (enmienda a ADR-108)."""
+    from src.modules.inventory.infrastructure.models import MovimientoInventario, Stock
+
+    client, ids, TestSession = env
+    h = _token(client)
+    ahora = fechas.ahora()
+    with TestSession() as s:
+        sucursal = s.scalar(select(Sucursal))
+        local = Almacen(
+            empresa_id=uuid.UUID(ids["empresa_id"]),
+            nombre="Local",
+            tipo="sucursal",
+            sucursal_id=sucursal.id,
+        )
+        s.add(local)
+        s.flush()
+        central, sku = uuid.UUID(ids["almacen_id"]), uuid.UUID(ids["sku_id"])
+        usuario = s.scalar(select(Usuario).where(Usuario.username == "admin")).id
+        movs = [
+            (central, Decimal(50), "recepcion_compra", 20),
+            (central, Decimal(-20), "transferencia_salida", 10),
+            (local.id, Decimal(20), "transferencia_entrada", 10),
+        ] + [(local.id, Decimal(-2), "consumo_venta", d) for d in range(9, 0, -1)]
+        for almacen, cantidad, tipo, dias in movs:
+            s.add(
+                MovimientoInventario(
+                    almacen_id=almacen, sku_id=sku, cantidad=cantidad, tipo=tipo,
+                    ts=ahora - timedelta(days=dias), usuario_id=usuario,
+                )
+            )
+        s.add_all([
+            Stock(almacen_id=central, sku_id=sku, cantidad=Decimal(30)),
+            Stock(almacen_id=local.id, sku_id=sku, cantidad=Decimal(2), stock_minimo=Decimal(4)),
+        ])
+        s.commit()
+        local_id, sucursal_id = str(local.id), str(sucursal.id)
+
+    base = f"/api/v1/inventory/articulos/{ids['articulo_id']}/kardex"
+    empresa = client.get(base, headers=h).json()
+    assert sum(Decimal(x["entradas"]) for x in empresa["semanas"]) == Decimal(50)
+    assert Decimal(empresa["stock"]) == Decimal(32)
+
+    local = client.get(f"{base}?almacen_id={local_id}", headers=h).json()
+    assert sum(Decimal(x["entradas"]) for x in local["semanas"]) == Decimal(20)
+    assert Decimal(local["stock"]) == Decimal(2)
+    assert local["reposiciones_90_dias"] == 1
+    # 2 por día y ya bajo el mínimo: reponer hoy.
+    assert local["proxima_compra"] == fechas.hoy().isoformat()
+
+    sede = client.get(f"{base}?sucursal_id={sucursal_id}", headers=h).json()
+    assert Decimal(sede["stock"]) == Decimal(2)
+
+    ambos = client.get(f"{base}?almacen_id={local_id}&sucursal_id={sucursal_id}", headers=h)
+    assert ambos.status_code == 422
+    ajeno = client.get(f"{base}?almacen_id={uuid.uuid4()}", headers=h)
+    assert ajeno.status_code == 404
+
+    filas = client.get(f"{base}/por-almacen", headers=h).json()
+    assert [f["almacen"] for f in filas] == ["Local", "Central"]
+    assert filas[0]["sucursal"] == sucursal.nombre
+
+
+def test_historial_de_precios_por_almacen_de_destino(env):
+    from src.modules.purchases.infrastructure.models import OrdenCompraItem
+
+    client, ids, TestSession = env
+    h = _token(client)
+    proveedor_id = _crear_proveedor(client, h, ids).json()["id"]
+    oc = _crear_oc(client, h, ids, proveedor_id, idempotency_key="oc-por-almacen")
+    assert oc.status_code == 201, oc.text
+    oc_id = oc.json()["id"]
+    client.post(f"/api/v1/purchases/ordenes-compra/{oc_id}/emitir", headers=h)
+    with TestSession() as s:
+        item_id = str(
+            s.scalar(
+                select(OrdenCompraItem.id).where(
+                    OrdenCompraItem.orden_compra_id == uuid.UUID(oc_id)
+                )
+            )
+        )
+    client.post(
+        f"/api/v1/purchases/ordenes-compra/{oc_id}/recepciones",
+        headers=h,
+        json={
+            "idempotency_key": "recep-por-almacen",
+            "items": [{"orden_compra_item_id": item_id, "cantidad_recibida": "5"}],
+        },
+    )
+    base = f"/api/v1/purchases/articulos/{ids['articulo_id']}/historial-precios"
+    assert len(client.get(f"{base}?almacen_id={ids['almacen_id']}", headers=h).json()) == 1
+    assert client.get(f"{base}?almacen_id={uuid.uuid4()}", headers=h).json() == []

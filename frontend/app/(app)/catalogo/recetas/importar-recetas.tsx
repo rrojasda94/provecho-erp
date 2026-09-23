@@ -219,7 +219,7 @@ function Revision({
           {aActualizar.map((r) => (
             <div
               key={r.fila}
-              className="rounded border border-borde p-3 text-xs text-gray"
+              className="rounded border border-border p-3 text-xs text-gray"
             >
               <p className="font-semibold text-dark">{r.nombre}</p>
               {r.cambios.length > 0 && <p>{r.cambios.join(" · ")}</p>}
@@ -327,14 +327,14 @@ function ResolverInsumo({
       </div>
 
       {creando && (
-        <div className="flex flex-wrap items-end gap-2 rounded bg-fondo p-2">
+        <div className="flex flex-wrap items-end gap-2 rounded bg-muted p-2">
           <label className="flex flex-col gap-1 text-xs text-gray">
             Código (8)
             <input
               value={codigo}
               maxLength={8}
               onChange={(e) => setCodigo(e.target.value)}
-              className="w-20 rounded border border-borde px-2 py-1 text-sm uppercase"
+              className="w-20 rounded border border-border px-2 py-1 text-sm uppercase"
             />
           </label>
           <label className="flex flex-col gap-1 text-xs text-gray">
@@ -352,7 +352,7 @@ function ResolverInsumo({
             <select
               value={tipo}
               onChange={(e) => setTipo(e.target.value)}
-              className="rounded border border-borde bg-white px-2 py-1 text-sm"
+              className="rounded border border-border bg-card px-2 py-1 text-sm"
             >
               <option value="insumo">Insumo</option>
               <option value="subreceta">Subreceta</option>
@@ -360,7 +360,7 @@ function ResolverInsumo({
           </label>
           <button
             type="button"
-            className="rounded bg-primary px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
+            className="rounded bg-primary px-3 py-1 text-xs font-bold text-primary-foreground disabled:opacity-50"
             disabled={ocupado || !codigo || !unidadId}
             onClick={crear}
           >

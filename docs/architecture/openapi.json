@@ -16160,6 +16160,101 @@
         "title": "ItemPedidoOut",
         "type": "object"
       },
+      "KardexAlmacenOut": {
+        "description": "Una fila de «cómo está cada sede».",
+        "properties": {
+          "almacen": {
+            "title": "Almacen",
+            "type": "string"
+          },
+          "almacen_id": {
+            "format": "uuid",
+            "title": "Almacen Id",
+            "type": "string"
+          },
+          "consumo_diario": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consumo Diario"
+          },
+          "proxima_compra": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proxima Compra"
+          },
+          "reposiciones_90_dias": {
+            "title": "Reposiciones 90 Dias",
+            "type": "integer"
+          },
+          "stock": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Stock",
+            "type": "string"
+          },
+          "stock_minimo": {
+            "anyOf": [
+              {
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Minimo"
+          },
+          "sucursal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal"
+          },
+          "sucursal_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sucursal Id"
+          }
+        },
+        "required": [
+          "stock",
+          "stock_minimo",
+          "consumo_diario",
+          "proxima_compra",
+          "reposiciones_90_dias",
+          "almacen_id",
+          "almacen",
+          "sucursal_id",
+          "sucursal"
+        ],
+        "title": "KardexAlmacenOut",
+        "type": "object"
+      },
       "KardexArticuloOut": {
         "description": "El kardex de un artículo resumido por semana, para graficar.",
         "properties": {
@@ -16192,6 +16287,10 @@
             ],
             "title": "Proxima Compra"
           },
+          "reposiciones_90_dias": {
+            "title": "Reposiciones 90 Dias",
+            "type": "integer"
+          },
           "semanas": {
             "items": {
               "$ref": "#/components/schemas/SemanaKardexOut"
@@ -16218,11 +16317,12 @@
           }
         },
         "required": [
-          "articulo_id",
           "stock",
           "stock_minimo",
           "consumo_diario",
           "proxima_compra",
+          "reposiciones_90_dias",
+          "articulo_id",
           "semanas"
         ],
         "title": "KardexArticuloOut",
@@ -48938,7 +49038,7 @@
     },
     "/api/v1/inventory/articulos/{articulo_id}/kardex": {
       "get": {
-        "description": "Entradas y salidas por semana, saldo y próxima compra sugerida del\nartículo en toda la empresa (ficha del artículo, kardex gráfico).",
+        "description": "Entradas y salidas por semana, saldo y próxima compra sugerida del\nartículo: en la empresa entera, en una sede o en un almacén (ADR-108).",
         "operationId": "kardex_de_articulo_api_v1_inventory_articulos__articulo_id__kardex_get",
         "parameters": [
           {
@@ -48963,6 +49063,44 @@
               "minimum": 7,
               "title": "Dias",
               "type": "integer"
+            }
+          },
+          {
+            "description": "Solo este almacén",
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Solo este almacén",
+              "title": "Almacen Id"
+            }
+          },
+          {
+            "description": "Solo los almacenes de esta sede",
+            "in": "query",
+            "name": "sucursal_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Solo los almacenes de esta sede",
+              "title": "Sucursal Id"
             }
           }
         ],
@@ -48994,6 +49132,59 @@
           }
         ],
         "summary": "Kardex De Articulo",
+        "tags": [
+          "inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/articulos/{articulo_id}/kardex/por-almacen": {
+      "get": {
+        "description": "Cómo está el artículo en cada almacén que lo maneja: stock, ritmo y\npróxima reposición, lo que se agota primero arriba.",
+        "operationId": "kardex_por_almacen_api_v1_inventory_articulos__articulo_id__kardex_por_almacen_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "articulo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Articulo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/KardexAlmacenOut"
+                  },
+                  "title": "Response Kardex Por Almacen Api V1 Inventory Articulos  Articulo Id  Kardex Por Almacen Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorValidacion"
+                }
+              }
+            },
+            "description": "Entrada inválida"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Kardex Por Almacen",
         "tags": [
           "inventory"
         ]
@@ -59009,7 +59200,7 @@
     },
     "/api/v1/purchases/articulos/{articulo_id}/historial-precios": {
       "get": {
-        "description": "A cuánto se compró el artículo en cada recepción (kardex gráfico).\n\nSin paginar: son las recepciones de **un** artículo, decenas por año.",
+        "description": "A cuánto se compró el artículo en cada recepción (kardex gráfico).\nCon `almacen_id`, solo las compras que entraron directo a ese almacén.\n\nSin paginar: son las recepciones de **un** artículo, decenas por año.",
         "operationId": "historial_de_precios_api_v1_purchases_articulos__articulo_id__historial_precios_get",
         "parameters": [
           {
@@ -59037,6 +59228,23 @@
                 }
               ],
               "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "almacen_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Almacen Id"
             }
           }
         ],

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { grupoDe, type ItemSubmenu } from "@/lib/navegacion";
+import { grupoDe, itemActivo, type ItemSubmenu } from "@/lib/navegacion";
 
 /** Ítem del sidebar que sabe si es el activo.
  *
@@ -17,13 +17,11 @@ import { grupoDe, type ItemSubmenu } from "@/lib/navegacion";
  * Coincidencia por prefijo: `/compras/ordenes-compra/OC-12` tiene que marcar
  * "Órdenes de compra". Comparar por igualdad dejaba cualquier ficha de
  * detalle sin ítem activo. */
-export function NavModulo({ item }: { item: ItemSubmenu }) {
+export function NavModulo({ item, items }: { item: ItemSubmenu; items: ItemSubmenu[] }) {
   const pathname = usePathname();
-  // Un grupo con pestañas está activo en cualquiera de ellas: `/inventario/
-  // lotes` marca "Stock" aunque el href del grupo sea `/inventario/stock`.
-  const activo = (item.pestanas ?? [item]).some(
-    (p) => pathname === p.href || pathname.startsWith(`${p.href}/`),
-  );
+  // La coincidencia más larga del sidebar entero, no la de este ítem solo
+  // (`itemActivo`): un grupo con pestañas cuenta todas sus pestañas.
+  const activo = itemActivo(items, pathname) === item;
 
   return (
     <Link href={item.href} className="nav-modulo" aria-current={activo ? "page" : undefined}>

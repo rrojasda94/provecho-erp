@@ -109,7 +109,7 @@ function BotonAccion({
         className={`rounded px-4 py-2 text-sm font-bold disabled:opacity-50 ${
           destructivo
             ? "border border-secondary text-secondary hover:bg-secondary/10"
-            : "bg-primary text-white hover:bg-secondary"
+            : "bg-primary text-primary-foreground hover:bg-secondary"
         }`}
       >
         {pendiente ? "…" : etiqueta}

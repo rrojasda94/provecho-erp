@@ -80,7 +80,7 @@ export function FichaReceta({
         </button>
       </div>
 
-      <section className="rounded-lg border border-gray/20 bg-white p-4">
+      <section className="rounded-lg border border-gray/20 bg-card p-4">
         <RecetaEditor
           recetaId={receta.id}
           nombreSugerido={receta.nombre}
@@ -90,7 +90,7 @@ export function FichaReceta({
         />
       </section>
 
-      <section className="rounded-lg border border-gray/20 bg-white p-4">
+      <section className="rounded-lg border border-gray/20 bg-card p-4">
         <h2 className="mb-1 font-heading text-lg text-dark">
           ¿Qué produce?
         </h2>

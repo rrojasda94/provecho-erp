@@ -335,6 +335,12 @@ funcionalidad. Un PR por punto, cada uno mergeado antes del siguiente.
 - **Kardex gráfico** (ADR-108, RN-INV-027): ficha del artículo en Inventario
   y Compras con precio histórico, entradas/salidas por semana, saldo contra
   mínimo y próxima compra sugerida.
+- **Contraste del modo oscuro** (enmienda ADR-037): utilidades de marca al
+  rol semántico, tokens de estado ajustados, test de contraste AA.
+- **Asientos omitidos con nombre y apellido** (enmienda ADR-089): el aviso
+  lista cada uno con su documento; los fallos de listener se anotan como `error`.
+- **Kardex por sede y por almacén** (enmienda ADR-108): selector de ámbito en
+  la ficha y tabla «Cómo está cada sede».
 - **KDS, PDV y Mi reparto como apps Android** (ADR-109): tres manifests con
   `scope` propio, login dentro de cada app (`/<app>/ingresar`) que vuelve a
   la misma pantalla, y el usuario recordado en la app instalada (solo PIN).

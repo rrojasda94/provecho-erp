@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { MODULOS } from "./modulos.ts";
-import { SUBMENUS, destinos, grupoDe, pantallasDe } from "./navegacion.ts";
+import { SUBMENUS, destinos, grupoDe, itemActivo, pantallasDe } from "./navegacion.ts";
 
 /** Lo que la paleta de comandos ofrece sale de acá. Un error en este archivo
  * no rompe nada visible: simplemente una pantalla deja de poder buscarse, o
@@ -75,4 +75,12 @@ test("una ficha de detalle cae en el grupo de su listado", () => {
   assert.equal(grupoDe(items, "/inventario/devoluciones/abc")?.label, "Movimientos");
   assert.equal(grupoDe(items, "/inventario/lotes")?.label, "Stock");
   assert.equal(grupoDe(items, "/inventario/conteos"), undefined);
+});
+
+test("en el sidebar gana la coincidencia más larga, no la primera", () => {
+  // "Asientos" es `/contabilidad`: en Caja se marcaban los dos.
+  assert.equal(itemActivo(SUBMENUS.contabilidad, "/contabilidad/caja")?.label, "Caja");
+  assert.equal(itemActivo(SUBMENUS.contabilidad, "/contabilidad")?.label, "Asientos");
+  assert.equal(itemActivo(SUBMENUS.inventario, "/inventario/mermas")?.label, "Movimientos");
+  assert.equal(itemActivo(SUBMENUS.inventario, "/otra-cosa"), undefined);
 });

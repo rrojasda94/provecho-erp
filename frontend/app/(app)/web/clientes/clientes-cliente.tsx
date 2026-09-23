@@ -188,7 +188,7 @@ export function ClientesCliente({
       {clientes.length === 0 ? (
         <p className="text-sm text-gray">No hay cuentas que coincidan.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-border bg-white p-4">
+        <div className="overflow-x-auto rounded-lg border border-border bg-card p-4">
           <table className="w-full min-w-[40rem] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-border text-xs uppercase text-gray">

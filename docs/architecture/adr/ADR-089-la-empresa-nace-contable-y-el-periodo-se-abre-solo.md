@@ -120,3 +120,23 @@ convertiría la tabla en ruido que nadie mira.
 - Esto **no** repone los asientos que se perdieron mientras faltaban las
   cuentas y el periodo. Reprocesarlos es otro problema —hay que saber qué
   eventos hubo, no solo qué falta— y va en su propia rama.
+
+## Enmienda 2026-09-23 — el aviso dice cuáles, y el error también se anota
+
+- **El aviso decía cuántos, no cuáles.** Contaba por motivo y no mostraba
+  ni la operación, ni el documento, ni el detalle que la tabla ya guardaba.
+  Ahora trae una tabla desplegable con fecha, operación en palabras («Venta»,
+  «Recepción de compra», «Depreciación mensual»…), el documento con enlace a
+  su ficha cuando la tiene (`frontend/lib/asientos-omitidos.ts`), el motivo y
+  el detalle.
+- **Ventana de 30 días.** El aviso sumaba desde el primer día: un problema
+  resuelto seguía gritando para siempre. Una configuración que sigue rota
+  vuelve a aparecer mañana, que es la señal correcta.
+- **Motivo `error`** (migración `d8e2f4a6b1c3`). Un listener que revienta con
+  una excepción solo dejaba `log.exception`. Ahora `_registrar_fallo` lo anota
+  en una sesión nueva con la clase y el mensaje de la excepción en `detalle`,
+  resolviendo la empresa desde el payload. Si la empresa no se puede
+  resolver, queda solo el log (sin empresa no hay a quién mostrárselo).
+- `_omitir` pasa a ser `anotar_omision` (público dentro del módulo): lo usa
+  también el listener.
+

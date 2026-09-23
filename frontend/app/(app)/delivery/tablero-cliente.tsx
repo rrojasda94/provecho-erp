@@ -31,7 +31,7 @@ function TarjetaSinAsignar({ venta }: { venta: VentaLista }) {
       <div className="flex items-center justify-between gap-2">
         <p className="font-medium">#{venta.numero_orden}</p>
         {!venta.lista ? (
-          <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
+          <span className="shrink-0 rounded bg-status-warning-surface px-1.5 py-0.5 text-xs text-status-warning-texto">
             En cocina
           </span>
         ) : null}

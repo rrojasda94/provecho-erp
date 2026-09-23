@@ -11,14 +11,61 @@ export type SemanaKardex = {
   saldo: string;
 };
 
-export type Kardex = {
-  articulo_id: string;
+type Ritmo = {
   stock: string;
   stock_minimo: string | null;
   consumo_diario: string | null;
+  /** En una sede o un almacén es la próxima reposición, no una compra. */
   proxima_compra: string | null;
-  semanas: SemanaKardex[];
+  reposiciones_90_dias: number;
 };
+
+export type Kardex = Ritmo & { articulo_id: string; semanas: SemanaKardex[] };
+
+/** Una fila de «cómo está cada sede». */
+export type KardexAlmacen = Ritmo & {
+  almacen_id: string;
+  almacen: string;
+  sucursal_id: string | null;
+  sucursal: string | null;
+};
+
+/** Dónde se mira el kardex. `null` es la empresa entera. */
+export type Ambito = { tipo: "almacen" | "sucursal"; id: string } | null;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `?ambito=almacen:<id>` o `sucursal:<id>`. Lo que no se entiende es la
+ * empresa: la URL la escribe cualquiera. */
+export function leerAmbito(param: string | undefined): Ambito {
+  const [tipo, id] = (param ?? "").split(":");
+  if ((tipo === "almacen" || tipo === "sucursal") && UUID.test(id ?? ""))
+    return { tipo, id };
+  return null;
+}
+
+/** El query del kardex para ese ámbito (`almacen_id=` o `sucursal_id=`),
+ * sin el `?`: vacío es la empresa. */
+export function queryDeAmbito(ambito: Ambito): string {
+  return ambito ? `${ambito.tipo}_id=${ambito.id}` : "";
+}
+
+/** Cómo marcar una sede en la tabla: bajo el mínimo es peligro; reponer en
+ * una semana o menos, alerta. */
+export function estadoDeSede(
+  fila: KardexAlmacen,
+  hoy: string,
+): "peligro" | "alerta" | null {
+  if (
+    fila.stock_minimo !== null &&
+    Number(fila.stock) <= Number(fila.stock_minimo)
+  ) {
+    return "peligro";
+  }
+  if (fila.proxima_compra !== null && diasHasta(fila.proxima_compra, hoy) <= 7)
+    return "alerta";
+  return null;
+}
 
 export type PrecioHistorico = {
   fecha: string;

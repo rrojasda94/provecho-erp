@@ -116,7 +116,7 @@ export default async function DevolucionPage({
         <h2 className="font-heading text-sm uppercase text-dark">Qué se devolvió</h2>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-borde text-left text-xs uppercase text-gray">
+            <tr className="border-b border-border text-left text-xs uppercase text-gray">
               <th className="py-2">Artículo</th>
               <th className="py-2 text-right">Cantidad</th>
               <th className="py-2">Lote</th>
@@ -124,7 +124,7 @@ export default async function DevolucionPage({
           </thead>
           <tbody>
             {devolucion.items.map((i) => (
-              <tr key={i.id} className="border-b border-borde/50">
+              <tr key={i.id} className="border-b border-border/50">
                 <td className="py-2">{nombreDe.get(i.sku_id) ?? i.sku_id}</td>
                 <td className="py-2 text-right font-mono">{Number(i.cantidad)}</td>
                 <td className="py-2 text-xs text-gray">{i.lote_id ?? "—"}</td>
