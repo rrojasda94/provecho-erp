@@ -7,6 +7,10 @@ delivery), cobrar (efectivo / Izipay) y emitir comprobantes
 electrónicos vía **Factiliza** (proveedor elegido 2026-07-26, reemplaza a
 Nubefact).
 
+**Navegación (2026-09-23, ADR-106):** el PDV (`/pdv`) tiene ficha propia en
+el home, visible con `sales.crear`; la ficha de Ventas es solo el
+back-office (jornada, clientes, mesas, promociones). El backend no cambia.
+
 ## Entidades
 
 `producto_comercial`, `receta`, `receta_item`, `lista_precio`, `venta`,

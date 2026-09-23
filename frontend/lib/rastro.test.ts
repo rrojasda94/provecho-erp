@@ -44,7 +44,7 @@ test("la sección que es el módulo no se repite", () => {
 });
 
 test("una ruta que no pertenece a ningún módulo no inventa niveles", () => {
-  assert.deepEqual(etiquetas("/pdv"), ["Inicio"]);
+  assert.deepEqual(etiquetas("/nada"), ["Inicio"]);
   assert.deepEqual(etiquetas("/loquesea", "Algo"), ["Inicio", "Algo"]);
 });
 

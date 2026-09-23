@@ -320,6 +320,14 @@ Correcciones aplicadas en la misma sesión:
 - CHANGELOG puesto al día (todo el trabajo del 2026-07-19 + esta sesión).
 - Skill `sop-creator` endurecida para no dejar cabos sueltos (ver skill).
 
+### 2026-09-23 — Simplificación de UX (seis PRs en fila)
+
+Pedido del dueño al cerrar el ERP: simplificar la navegación sin perder
+funcionalidad. Un PR por punto, cada uno mergeado antes del siguiente.
+
+- **PDV como módulo propio** (ADR-106): ficha en el home con permiso exacto
+  `sales.crear`; Ventas queda como back-office.
+
 ## Fuentes
 
 Rangos de línea de `ROADMAP.md` usados (estado del archivo al iniciar esta
