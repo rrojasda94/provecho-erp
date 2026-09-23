@@ -19,6 +19,7 @@
 import { redirect } from "next/navigation";
 
 import { ApiError, apiFetch } from "@/lib/api";
+import { tienePermiso } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
 import { ProveedorConfigMapas } from "@/components/direccion/config-mapas";
 import { configMapas } from "@/lib/mapas";
@@ -141,6 +142,18 @@ export default async function PaginaPdv({
   // contra la base en cada render.
   const { token, usuario } = await obtenerSesion();
   const parametros = await searchParams;
+
+  // Mismo permiso que abre la ficha del módulo (ADR-106). La API igual
+  // rechaza la venta, pero el cajero tiene que leer a quién pedirle qué y no
+  // chocar con un 403 al primer cobro.
+  if (!tienePermiso(usuario.permisos, "sales.crear")) {
+    return (
+      <Bloqueo
+        titulo="Sin permiso"
+        detalle="Tu usuario no puede vender. Pídele a un administrador el permiso `sales.crear`."
+      />
+    );
+  }
 
   const sucursales = await sucursalesDelUsuario(token, usuario.sucursales);
   const sucursalId = sucursalElegida(parametros.sucursal, usuario.sucursales);

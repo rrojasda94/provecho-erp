@@ -168,7 +168,6 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     // Las que se aplican solas (ADR-076). El cupón de la landing y el
     // descuento manual de caja son otra cosa y no viven acá.
     { label: "Promociones", href: "/ventas/promociones" },
-    { label: "Abrir el PDV", href: "/pdv" },
   ],
 };
 
