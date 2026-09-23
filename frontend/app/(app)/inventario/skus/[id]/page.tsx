@@ -126,7 +126,7 @@ export default async function SkuPage({
                     <td className="px-3 py-2">
                       {s.stock_minimo ?? "—"}
                       {s.bajo_minimo && (
-                        <span className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-900">
+                        <span className="ml-2 rounded bg-status-danger-surface px-2 py-0.5 text-xs font-bold text-status-danger">
                           Bajo mínimo
                         </span>
                       )}

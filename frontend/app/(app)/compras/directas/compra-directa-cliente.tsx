@@ -194,7 +194,7 @@ export function CompraDirectaCliente({
         <button
           type="submit"
           disabled={pendiente || articulos.length === 0}
-          className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
+          className="rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary disabled:opacity-50"
         >
           {pendiente ? "Registrando…" : "Registrar la compra"}
         </button>

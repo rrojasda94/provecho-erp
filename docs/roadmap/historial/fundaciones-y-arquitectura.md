@@ -335,6 +335,8 @@ funcionalidad. Un PR por punto, cada uno mergeado antes del siguiente.
 - **Kardex gráfico** (ADR-108, RN-INV-027): ficha del artículo en Inventario
   y Compras con precio histórico, entradas/salidas por semana, saldo contra
   mínimo y próxima compra sugerida.
+- **Contraste del modo oscuro** (enmienda ADR-037): utilidades de marca al
+  rol semántico, tokens de estado ajustados, test de contraste AA.
 
 ## Fuentes
 

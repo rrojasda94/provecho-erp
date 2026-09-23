@@ -139,7 +139,7 @@ function SeccionFoto({
         </form>
       )}
       {tarea.estado === "completada" && tarea.foto_valida === false && (
-        <span className="text-xs font-semibold text-status-warning">
+        <span className="text-xs font-semibold text-status-warning-texto">
           La foto no coincide con el momento en que se completó — revisar.
         </span>
       )}

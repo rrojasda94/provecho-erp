@@ -99,7 +99,7 @@ export function RecetasCliente({
               varias recetas: acá se abre una ficha por vez (ADR-057). */}
           <Link
             href="/catalogo/recetas/matriz"
-            className="rounded border border-borde px-4 py-2 text-sm font-bold text-dark hover:bg-fondo"
+            className="rounded border border-border px-4 py-2 text-sm font-bold text-dark hover:bg-muted"
           >
             Ver en matriz
           </Link>
@@ -108,7 +108,7 @@ export function RecetasCliente({
           <a
             href={RUTA_EXPORTAR_RECETAS}
             download
-            className="rounded border border-borde px-4 py-2 text-sm font-bold text-dark hover:bg-fondo"
+            className="rounded border border-border px-4 py-2 text-sm font-bold text-dark hover:bg-muted"
           >
             Exportar
           </a>
@@ -124,7 +124,7 @@ export function RecetasCliente({
         <label className="flex items-center gap-2 text-xs text-gray">
           Tipo
           <select
-            className="rounded border border-borde bg-white px-2 py-1 text-sm text-dark"
+            className="rounded border border-border bg-card px-2 py-1 text-sm text-dark"
             value={tipo}
             onChange={(e) => filtrar("tipo", e.target.value)}
           >
@@ -206,12 +206,12 @@ function DialogoNuevaReceta({
       <button
         type="button"
         onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
+        className="rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary"
         disabled={unidades.length === 0}
       >
         + Nueva receta
       </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
+      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
         <div className="flex flex-col gap-4 p-6">
           <h2 className="font-heading text-lg text-dark">Nueva receta</h2>
           <p className="-mt-2 text-xs text-gray">
@@ -265,7 +265,7 @@ function DialogoNuevaReceta({
               type="button"
               onClick={crear}
               disabled={guardando || !nombre.trim() || !udmId}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
+              className="rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary disabled:opacity-50"
             >
               {guardando ? "Creando..." : "Crear y abrir"}
             </button>

@@ -44,7 +44,7 @@ export function AvisoSesionExpirada() {
       // Escape no lo cierra: no hay nada que hacer atrás, y cerrarlo dejaría
       // una pantalla que parece viva y no lo está.
       onCancel={(e) => e.preventDefault()}
-      className="w-full max-w-sm rounded-xl border border-border bg-card p-0 text-card-foreground shadow-[var(--sombra-3)] backdrop:bg-dark/50"
+      className="w-full max-w-sm rounded-xl border border-border bg-card p-0 text-card-foreground shadow-[var(--sombra-3)] backdrop:bg-black/50"
     >
       <div className="flex flex-col gap-3 p-5">
         <h2 id="sesion-expirada-titulo" className="text-base leading-tight">

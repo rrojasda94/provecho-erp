@@ -143,7 +143,7 @@ export function RolesCliente({
           const asignados = permisosPorRol[rol.id] ?? [];
           const activo = abierto === rol.id;
           return (
-            <li key={rol.id} className="rounded border border-gray/20 bg-white">
+            <li key={rol.id} className="rounded border border-gray/20 bg-card">
               <button
                 type="button"
                 onClick={() => setAbierto(activo ? null : rol.id)}

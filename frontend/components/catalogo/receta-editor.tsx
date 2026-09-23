@@ -491,7 +491,7 @@ function NuevaLinea({
         type="button"
         onClick={agregar}
         disabled={deshabilitado || !articuloId || !texto.trim()}
-        className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+        className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
       >
         Agregar insumo
       </button>
@@ -534,7 +534,7 @@ function SelectorCondicion({
       <summary className="w-40 cursor-pointer list-none rounded border border-gray/40 px-2 py-1 text-xs font-normal text-dark">
         {etiqueta}
       </summary>
-      <div className="absolute z-10 mt-1 w-56 rounded border border-gray/30 bg-white p-2 shadow-lg">
+      <div className="absolute z-10 mt-1 w-56 rounded border border-gray/30 bg-card p-2 shadow-lg">
         {ejes.map((eje) => (
           <fieldset key={eje.id} className="mb-2">
             <legend className="text-xs font-semibold text-dark">{eje.nombre}</legend>
@@ -598,7 +598,7 @@ function CondicionCelda({
       <summary className="w-full cursor-pointer list-none text-xs text-dark hover:underline">
         {etiqueta}
       </summary>
-      <div className="absolute z-10 mt-1 w-56 rounded border border-gray/30 bg-white p-2 shadow-lg">
+      <div className="absolute z-10 mt-1 w-56 rounded border border-gray/30 bg-card p-2 shadow-lg">
         {ejes.map((eje) => (
           <fieldset key={eje.id} className="mb-2">
             <legend className="text-xs font-semibold text-dark">{eje.nombre}</legend>
@@ -619,7 +619,7 @@ function CondicionCelda({
           type="button"
           onClick={aplicar}
           disabled={deshabilitado}
-          className="mt-1 rounded bg-primary px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
+          className="mt-1 rounded bg-primary px-2 py-1 text-xs font-bold text-primary-foreground disabled:opacity-50"
         >
           Aplicar
         </button>
@@ -736,7 +736,7 @@ function NuevaReceta({
           type="button"
           onClick={crear}
           disabled={!nombre.trim() || !udmId}
-          className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+          className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
         >
           Crear receta
         </button>

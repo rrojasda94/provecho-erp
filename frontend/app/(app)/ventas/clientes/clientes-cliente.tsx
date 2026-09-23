@@ -201,7 +201,7 @@ export function ClientesCliente({
           <a
             href={RUTA_EXPORTAR_CLIENTES}
             download
-            className="rounded border border-borde px-4 py-2 text-sm font-bold text-dark hover:bg-fondo"
+            className="rounded border border-border px-4 py-2 text-sm font-bold text-dark hover:bg-muted"
           >
             Exportar
           </a>

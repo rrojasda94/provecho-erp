@@ -59,7 +59,7 @@ function FormDescripcion({ insumo }: { insumo: Insumo }) {
         <button
           type="submit"
           disabled={pendiente}
-          className="self-start rounded bg-primary px-3 py-1 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-60"
+          className="self-start rounded bg-primary px-3 py-1 text-xs font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
         >
           {pendiente ? "Guardando..." : "Guardar"}
         </button>
@@ -77,7 +77,7 @@ function BotonBorrarFoto({ archivoId }: { archivoId: string }) {
       type="button"
       disabled={pendiente}
       onClick={() => startTransition(() => void borrarFotoAction(archivoId))}
-      className="absolute right-1 top-1 rounded-full bg-dark/70 px-1.5 text-xs text-white hover:bg-secondary"
+      className="absolute right-1 top-1 rounded-full bg-black/70 px-1.5 text-xs text-white hover:bg-secondary"
       aria-label="Quitar foto"
     >
       ×
@@ -141,7 +141,7 @@ export function IngredientesCliente({
         {activos.map((i) => (
           <div
             key={i.id}
-            className="flex flex-col gap-2 rounded-lg border border-border bg-white p-4 sm:flex-row sm:items-start"
+            className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-start"
           >
             <div className="w-full sm:w-40 sm:shrink-0">
               <h3 className="font-semibold text-dark">{i.nombre}</h3>

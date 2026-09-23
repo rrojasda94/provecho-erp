@@ -182,3 +182,26 @@ con fecha de vencimiento — se borra cuando esas pantallas migren al molde.
 | Preferencias en `localStorage` | ui-ux.md pide perfil; en un local la tablet la comparten tres turnos |
 | Reemplazar el `<dialog>` nativo por el `Dialog` de shadcn | Es una decisión documentada con motivo, y el despacho manual de la acción arregla un bug real de React 19 |
 | Migrar las 28 pantallas de tabla una por una | La firma compatible hacia atrás logra lo mismo tocando cinco archivos |
+
+## Enmienda 2026-09-23 — el back office en oscuro no tenía contraste
+
+El tema oscuro redefinía los roles de shadcn (`--foreground`, `--card`…) pero
+las utilidades de marca que usa casi todo el back office —`text-dark` (260
+usos), `text-gray` (475), `bg-cream`, `border-gray`— seguían colgadas de
+`--marca-*`, que no cambia con `.dark`: texto casi negro sobre fondo casi
+negro. Se corrige en la raíz:
+
+- `--color-dark/gray/steel/cream` apuntan al **rol** (`--foreground`,
+  `--muted-foreground`, `--background`, `--superficie-crema`). En claro valen
+  exactamente lo mismo que antes; en oscuro siguen al tema.
+- `bg-white` → `bg-card`, `text-white` sobre `bg-primary`/`bg-secondary` →
+  su `-foreground`, fondos de overlay `bg-dark/NN` → `bg-black/NN`, insignias
+  `amber-*`/`red-*` fijas → tokens de estado. `border-borde` y `bg-fondo` no
+  existían (no pintaban nada): pasan a `border-border` y `bg-muted`.
+- El ámbar de alerta no llega a contraste como texto sobre blanco (1.8:1):
+  la letra usa `--status-warning-texto`. `--status-success`, `--status-info`
+  (claro) y `--secondary`/`--status-danger` (oscuro) se ajustaron un punto.
+- Series de gráfico con valores propios en oscuro (`--chart-1..5`).
+- `frontend/lib/contraste.test.ts` lee `globals.css` y exige 4.5:1 a cada
+  par texto/superficie en los dos temas.
+
