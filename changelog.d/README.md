@@ -38,7 +38,11 @@ dentro de seis meses.
 
 ## Pendiente de corte
 
-Nada. **0.13.0 se cortó el 2026-09-23** y se lleva los 26 fragmentos
+Nada. **0.13.1 se cortó el 2026-09-23**, parche sobre 0.13.0 con un solo
+fragmento: la imagen del frontend no copiaba `public/` y en staging daban
+404 los manifests de las apps instalables y los logos de `marcas/`.
+
+Corte anterior: **0.13.0 se cortó el 2026-09-23** y se lleva los 26 fragmentos
 acumulados desde 0.12.0: PDV
 como módulo propio, inventario en cinco entradas con pestañas, listados sin
 tope, kardex gráfico por sede y almacén, KDS/PDV/reparto como apps
