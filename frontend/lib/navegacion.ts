@@ -251,3 +251,30 @@ export function grupoDe(items: ItemSubmenu[], pathname: string): ItemSubmenu | u
     s.pestanas?.some((p) => pathname === p.href || pathname.startsWith(`${p.href}/`)),
   );
 }
+
+/** Largo del href de `item` (o de su pestaña) que coincide con la ruta; -1 si
+ * ninguno coincide. */
+function coincidencia(item: ItemSubmenu, pathname: string): number {
+  return Math.max(
+    -1,
+    ...(item.pestanas ?? [item])
+      .filter((p) => pathname === p.href || pathname.startsWith(`${p.href}/`))
+      .map((p) => p.href.length),
+  );
+}
+
+/**
+ * La entrada del sidebar que corresponde a la ruta: la de coincidencia **más
+ * larga**, no cualquiera que coincida. "Asientos" es `/contabilidad`, prefijo
+ * de todo el módulo: comparando cada ítem por su cuenta, en `/contabilidad/caja`
+ * se marcaban Asientos y Caja a la vez. Mismo criterio que el rastro.
+ */
+export function itemActivo(items: ItemSubmenu[], pathname: string): ItemSubmenu | undefined {
+  let mejor: ItemSubmenu | undefined;
+  let largo = -1;
+  for (const item of items) {
+    const n = coincidencia(item, pathname);
+    if (n > largo) [mejor, largo] = [item, n];
+  }
+  return mejor;
+}

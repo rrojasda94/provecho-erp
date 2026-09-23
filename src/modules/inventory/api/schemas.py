@@ -307,17 +307,32 @@ class SemanaKardexOut(BaseModel):
     saldo: Decimal
 
 
-class KardexArticuloOut(BaseModel):
-    """El kardex de un artículo resumido por semana, para graficar."""
-
-    articulo_id: uuid.UUID
+class RitmoKardexOut(BaseModel):
     stock: Decimal
     stock_minimo: Decimal | None
     # `None` con menos de una semana de historia: no hay ritmo que medir.
     consumo_diario: Decimal | None
     # Cuándo el stock toca el mínimo al ritmo actual. `None` si no se consume.
+    # En una sede o un almacén es la próxima reposición, no una compra.
     proxima_compra: date | None
+    # Días distintos con entradas en los últimos 90: cuántas veces se repuso.
+    reposiciones_90_dias: int
+
+
+class KardexArticuloOut(RitmoKardexOut):
+    """El kardex de un artículo resumido por semana, para graficar."""
+
+    articulo_id: uuid.UUID
     semanas: list[SemanaKardexOut]
+
+
+class KardexAlmacenOut(RitmoKardexOut):
+    """Una fila de «cómo está cada sede»."""
+
+    almacen_id: uuid.UUID
+    almacen: str
+    sucursal_id: uuid.UUID | None
+    sucursal: str | None
 
 
 class MovimientoKardexOut(BaseModel):
