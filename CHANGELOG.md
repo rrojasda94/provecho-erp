@@ -12,6 +12,414 @@ editando este archivo chocaban siempre — escribían en la misma línea.
 
 Ver [`changelog.d/`](changelog.d/).
 
+## [0.13.0] - 2026-09-23
+
+### Added
+
+- **KDS, PDV y Mi reparto se instalan como apps en Android** (2026-09-23,
+  ADR-109). Cada una tiene su ícono y se abre sola, sin barra de navegador:
+  abrir `/kds`, `/pdv` o `/reparto` en Chrome, entrar y menú ⋮ → "Instalar
+  app". Se entra con el mismo usuario y PIN; si la sesión se pierde, el
+  login aparece dentro de la misma app y vuelve a la pantalla donde se
+  estaba (la cocina, a su estación). En la app instalada se recuerda el
+  último usuario y solo se pide el PIN; "No soy X" lo cambia.
+
+- **Carta por canal y tiempo de preparación por producto** (2026-09-19). La
+  ficha del producto en el ERP suma "Dónde se vende y cuánto tarda": se marca
+  en qué canales se vende (PDV, sitio web, delivery, agente IA; todos
+  marcados = en todos) y cuántos minutos tarda en salir de cocina. Sacar un
+  producto de "Sitio web" lo quita de la carta de la web **y** de lo que el
+  checkout acepta (la carta es la lista blanca del pedido), sin tocar listas
+  de precio: es lo que faltaba para retirar cajas, propinas y otros ítems que
+  solo existen en el mostrador. RN-COM-044 y RN-COM-045; migración
+  `e0abbeea6a86` (dos columnas NULL-ables, sin backfill).
+
+- **El tiempo de espera del sitio depende de lo que se pide** (2026-09-19).
+  Antes era 30 min + 5 por cada orden abierta, igual para una botella de agua
+  que para seis pizzas. Ahora es preparación (el mayor tiempo entre los
+  productos) + cola (solo si hay algo que cocinar) + viaje en delivery, con
+  piso de 5 minutos: recoger una botella de agua dice "5-10 min". El
+  checkout manda el carrito al cotizar. Costo aceptado: hay que cargar el
+  tiempo de cada producto; sin él, se usa la base de 30 min como antes.
+  RN-WEB-011, ADR-105 §4 enmendado.
+
+- **Filtros de la carta del sitio más claros** (2026-09-19). Se quitaron
+  "Precio hasta" (comparaba contra el precio más bajo de las presentaciones y
+  engañaba) y "Solo disponibles" (lo agotado ahora se ve con su etiqueta, al
+  final). "Tamaño" solo aparece si la categoría elegida tiene presentaciones,
+  con los tamaños en el orden de la carta, y ya no deja pasar productos sin
+  presentaciones. Los filtros viven en la URL (`?q=&cat=&tam=`): volver
+  atrás desde un producto no los pierde.
+
+- **Extras y Mitad x Mitad en el sitio, con las mismas reglas que el PDV**
+  (2026-09-19). En el detalle de una pizza el cliente elige tamaño, los sabores de
+  cada mitad (el mismo sabor en las dos mitades no se ofrece) y hasta 3 extras,
+  con el precio a la vista; el carrito distingue la misma pizza con otros
+  sabores o extras y el pedido muestra lo elegido. Antes un producto con sabores
+  obligatorios **no se podía pedir por la web**: la carta pública recortaba los
+  extras y atributos y `crear_venta` rechazaba la línea con "falta elegir…".
+  Ahora la carta pública (solo el detalle de cada producto, no la lista) trae
+  extras, sabores y pares excluidos; la API valida la línea **antes de cobrar**
+  —con Izipay el pago va primero— y el total sale igual al que `sales` cobra
+  (probado contra las líneas de la venta). RN-WEB-017; ADR-105 §6 estaba mal
+  diagnosticado y se corrige (`sales` ya tenía el modelo). Migración
+  `5c1a7e90d4b3` (dos columnas JSON en `storefront_pedido_item`). Costo aceptado:
+  el tope de 3 extras vive en el sitio (regla de la marca), no en el ERP; sin
+  "sin cebolla" todavía.
+
+- **Kardex gráfico en la ficha del artículo** (2026-09-23, ADR-108). Desde
+  Inventario (nombre en la lista de artículos) o desde Compras (cada línea de
+  una OC) se ve: el precio de cada compra recibida, las entradas y salidas
+  por semana, el saldo contra el stock mínimo, cada cuántos días se compra y
+  la **próxima compra sugerida**, el día en que el stock toca el mínimo al
+  ritmo de consumo de los últimos 90 días (RN-INV-027). Dos endpoints nuevos:
+  `GET /inventory/articulos/{id}/kardex` y
+  `GET /purchases/articulos/{id}/historial-precios`. La sugerencia todavía no
+  resta el plazo del proveedor (deuda anotada).
+
+- **El kardex se mira por almacén, por sede o de toda la empresa**
+  (2026-09-23, enmienda a ADR-108). La ficha del artículo suma un selector
+  de ámbito, que queda en la URL para compartir el enlace, y una tabla
+  «Cómo está cada sede» con el stock, el mínimo, el consumo diario, la
+  cobertura y las reposiciones de cada almacén. Aparece en rojo lo que está
+  bajo el mínimo y en ámbar lo que hay que reponer en una semana o menos.
+  En una sede, los traslados del central cuentan como su reposición y la
+  fecha sugerida es la de la próxima reposición. El precio sigue siendo el
+  de la empresa, salvo que se pidan solo las compras directas del almacén.
+
+- **La dirección del checkout ahora se ve en el mapa, igual que en el PDV**
+  (2026-09-20). Al escribirla aparecen las sugerencias de Google y, al elegir
+  una, el pin queda puesto en un mapa que se puede arrastrar hasta la puerta
+  exacta —soltarlo cuenta cuál es la calle más cercana—. Se sigue pudiendo
+  escribir a mano una dirección que Google no conoce, que en Tarapoto son
+  varias.
+- **Quien tiene cuenta ya no vuelve a cargar su dirección** (2026-09-20). La
+  dirección predeterminada entra puesta **con su punto en el mapa**, así que el
+  sitio ya no le pide prender el GPS para cotizarle el delivery. Antes las
+  direcciones guardadas solo copiaban el texto y tiraban las coordenadas, y las
+  que se guardaban desde "Mi cuenta" nacían sin punto.
+- **"Usar mi ubicación actual" ahora escribe la dirección** (2026-09-20). Antes
+  dejaba el campo vacío: el repartidor recibía un punto sin calle. Ahora traduce
+  el punto a una dirección y la deja escrita.
+
+- **"Mis datos" en la cuenta del sitio** (2026-09-20). Quien tiene cuenta puede
+  corregir su nombre, apellido y teléfono desde **Mi cuenta**, y elegir cuál de
+  sus direcciones usar por defecto. El correo y el DNI se muestran pero no se
+  editan solos: uno es la credencial para entrar y el otro va impreso en la
+  boleta. De paso, marcar una dirección como predeterminada ya no le borra el
+  punto que el cliente había fijado en el mapa.
+- **El pie de página se queda abajo y firma el trabajo** (2026-09-20). En una
+  página corta flotaba a media pantalla. Ahora muestra además el año de la
+  última actualización del sitio —la fecha real de la compilación, no la de
+  hoy— y quién lo hizo: TAG Digitales.
+- **Tipografía por papeles** (2026-09-20). El cuerpo de texto pasó a una letra
+  ancha y corriente: Tusker Grotesk es condensada y leer oraciones seguidas en
+  ella cansa. Tusker se queda en títulos, precios y botones, que es donde luce,
+  y el título grande de cada página estrena Isidora Black, la de titulares del
+  brandbook.
+
+- **Nombre para el cliente en insumos y sabores** (2026-09-20). El sitio
+  mostraba los nombres con los que se cargó el catálogo en el ERP —"Americana
+  F", "Mitad 1 F", el nombre de almacén de cada insumo—. Ahora cada insumo,
+  atributo y sabor puede llevar un **nombre para el cliente** (en el ERP,
+  **Sitio web → Ingredientes**) que solo se usa en la web: el almacén y el PDV
+  siguen viendo el suyo, que es el que necesitan para no confundir dos quesos
+  parecidos. Vacío significa "usa el de siempre", así que nada cambia hasta
+  cargarlo.
+- **Las pizzas con tamaños ya muestran sus ingredientes** (2026-09-20). No
+  mostraban ninguno: la receta vive en cada tamaño y el sitio la buscaba en el
+  producto padre, que nunca tiene. Ahora se listan los ingredientes de sus
+  tamaños, ordenados igual en la carta y en el detalle.
+- **Una cuenta por persona** (2026-09-20). Solo el correo era único, así que
+  la misma persona podía abrir varias cuentas con su mismo DNI o teléfono y
+  terminar con los pedidos repartidos entre ellas. Ahora el registro lo
+  rechaza diciendo cuál de los tres datos ya está en uso, e invita a entrar o a
+  recuperar la clave.
+- **El ERP avisa cuando el correo no está saliendo** (2026-09-20). Si al
+  servidor le falta la configuración de correo, el enlace de "olvidé mi
+  contraseña" se genera y no llega a ningún lado, y el sitio responde lo mismo
+  de siempre (no puede delatar qué correos tienen cuenta). En **Sitio web →
+  Clientes** ahora sale un aviso, para atender por teléfono en vez de mandar a
+  esperar un correo que no existe.
+
+- **El efectivo en la web exige cuenta; un invitado paga con Izipay**
+  (2026-09-19). Un invitado que elige efectivo ve un aviso que lo invita a
+  registrarse (el carrito se conserva) y no puede confirmar; la API también lo
+  rechaza. Motivo: nadie a quien reclamar en un pedido contra entrega sin
+  identificar. RN-WEB-013, ADR-105 §2 enmendado. Costo aceptado: quien no tiene
+  tarjeta ni billetera no puede pedir sin registrarse.
+
+- **Pantalla de pago de Izipay y webhook, con pasarela de prueba** (2026-09-19).
+  Antes "pagar con Izipay" aprobaba en el acto, sin pantalla ni webhook, así
+  que el tramo más riesgoso del cobro real jamás se ejercitaba. Ahora el
+  pedido queda pendiente en `/pedido/{id}/pago` y la venta se crea recién
+  cuando el webhook (`POST /storefront/webhooks/izipay`) aprueba el pago:
+  nada llega a cocina sin pagar; un pago rechazado cierra el pedido sin
+  venta; el webhook es idempotente. Sin credenciales de Izipay, la pantalla
+  ofrece aprobar o rechazar el pago de prueba (solo fuera de producción; en
+  producción sin credenciales Izipay no se ofrece). Cuando lleguen las
+  credenciales solo cambia `IzipayReal`. RN-WEB-016, migración `8131c2cb30d2`.
+
+- **"Olvidé mi contraseña" en el sitio, y restablecer la clave desde atención al
+  cliente** (2026-09-19). Quien olvida su clave pide un enlace con su email
+  (vale 30 minutos y una sola vez; la respuesta es la misma exista o no la
+  cuenta) y elige una nueva; al cambiarla se cierran sus otras sesiones. Quien
+  no tiene un correo al que llegue llama al local, y desde el ERP (**Sitio web →
+  Clientes**) se le restablece la clave: sale una **clave temporal que se ve una
+  sola vez**, y el cliente tiene que cambiarla al ingresar. También se puede
+  cambiar la clave estando adentro. Además: el botón de Google no aparecía en
+  staging porque el Client ID nunca llegaba al contenedor del sitio, y sobraba un
+  separador "o" cuando el botón no se dibujaba. RN-WEB-018/019, ADR-104
+  enmendado, migración `cec53f7b2f6e`. Costo aceptado: el correo necesita
+  `SMTP_*` y `STOREFRONT_SITIO_URL` en el servidor (checklist en `staging.md`);
+  sin verificación de email al registrarse todavía.
+
+- **Carrito y checkout en el sitio de Charlie's Pizzas, PR3** (2026-09-17,
+  ADR-105). Carrito en el navegador, checkout de invitado o con
+  cuenta, dirección de entrega con la ubicación del navegador o local
+  elegido para recojo, boleta o factura, y pago en efectivo o Izipay. Al
+  confirmar, el pedido se asigna automáticamente a la sucursal más cercana
+  dentro del radio de delivery, salvo que esté saturada, y muestra un
+  estimado de espera según cuántos pedidos tiene esa sucursal en curso.
+
+- **Canal `web` en `venta`.** `sales.domain.rules.CANALES` admite ahora
+  `web` (antes solo `pdv`, `agente_ia`, `delivery`) — un pedido del sitio
+  se confirma como una `Venta` real, con el mismo motor de precios y
+  promociones que cualquier otro canal. El vínculo entre el pedido del
+  sitio y la venta del ERP es un evento (`storefront.pedido_web_confirmado`
+  → `sales.pedido_web_procesado`), nunca un import directo entre módulos.
+
+- **Efectivo o Izipay, sin exigir caja abierta a la pasarela.** Un pedido en
+  efectivo se cobra al entregar/recoger, con el flujo normal de caja; uno
+  con Izipay se cobra de inmediato y no depende de que haya un turno de
+  caja abierto en el punto de venta web — el dinero ya lo tiene la
+  pasarela. Por ahora Izipay corre con un adaptador de prueba que aprueba
+  cualquier cobro: falta la cuenta de comercio real para completarlo.
+
+- **Cuentas de cliente en el sitio de Charlie's Pizzas, PR2** (2026-09-17,
+  ADR-104). Registro e ingreso con email/clave o con Google, direcciones
+  guardadas (con predeterminada), favoritos y "tu último pedido" en la
+  cuenta y en el home. La cuenta web (`storefront_cuenta`) es una
+  credencial **separada** de la del ERP: JWT propio
+  (`STOREFRONT_JWT_SECRET`, `aud="storefront"`), nunca intercambiable con
+  el del staff — un token de una cuenta web devuelve 401 en cualquier
+  endpoint del ERP, y viceversa.
+
+- **Vínculo automático a `cliente` por evento.** Al registrarse (email o
+  Google), `storefront` publica `storefront.cuenta_registrada`; un
+  listener de `sales` crea o encuentra el `cliente` correspondiente
+  (RENIEC + fallback, idempotente por documento) y publica
+  `sales.cliente_vinculado`, que `storefront` usa para completar
+  `cuenta.cliente_id`. Si faltan datos para crear el cliente, la cuenta
+  queda sin vincular sin romper el registro.
+
+- **Seguridad de la cuenta**: Argon2id, bloqueo tras 5 intentos fallidos
+  (15 minutos), rotación de refresh token con detección de reuso — si un
+  refresh token ya usado vuelve a presentarse, se revoca toda la cadena
+  de sesión, no solo el token robado.
+
+- **Sitio público de Charlie's Pizzas: `charlies.majambo.com.pe`, PR1**
+  (2026-09-17, ADR-103). App Next.js **separada** del ERP (`storefront/`,
+  propia imagen de contenedor y bloque de Caddy) — a diferencia de la
+  landing del QR (ADR-080), este sitio necesita SEO real, tema propio y
+  una superficie de ataque acotada. Solo lectura por ahora: home con
+  hero/promos web, carta con búsqueda en cliente (nombre, mal escrito,
+  ingrediente — sin dependencia nueva) y filtros de precio/tamaño/
+  disponibilidad, ficha de producto con ingredientes clicables (diálogo
+  con foto y descripción), mapa de locales con horario y "abierto ahora",
+  "Nosotros" y "Trabaja con nosotros" (enlaza a `/postular/{token}`).
+  Cuentas de cliente, carrito y pagos con Izipay quedan para los slices
+  siguientes (PR2/PR3).
+
+- **Módulo `storefront`** en el backend: CMS mínimo de contenido por marca
+  (`storefront_contenido`, 6 claves), fotos de catálogo (presign a S3,
+  mismo patrón que `assets.documentos`) y la superficie pública
+  `/api/v1/storefront/publico/*` — sin JWT, rate limit por IP, nunca
+  expone empresa/grupo/costos/personas (RN-WEB-001). Lee a `sales`,
+  `inventory`, `users` y `rrhh` solo por sus contratos
+  `queries_publicas.py`. Columnas nuevas: `producto_comercial.descripcion`,
+  `articulo.descripcion`, `sucursal.telefono`.
+
+- **Pantalla "Sitio web" en el ERP** (`/web`, permisos `storefront.leer`/
+  `.editar`): edita el contenido y sube fotos de producto/ingrediente.
+  `Sucursales` gana teléfono y horario de atención público; `Promociones`
+  gana el canal `web`, para promos exclusivas del sitio.
+
+- **Playwright, SEO y auditoría del sitio de Charlie's Pizzas, PR4**
+  (2026-09-18). Suite `storefront/e2e` (carrito → checkout de invitado →
+  confirmación) con job propio en CI; construyéndola aparecieron y se
+  arreglaron dos bugs reales de hidratación (un `<a>` anidado en la tarjeta
+  de favorito, y el carrito leyendo `localStorage` antes de que el cliente
+  terminara de hidratar) que no eran visibles probando a mano. `sitemap.ts`,
+  metadata Open Graph y JSON-LD (Restaurant, Product) para que el sitio se
+  indexe. Auditoría (`audit_log`) en cambios de contenido, fotos,
+  direcciones, cuenta y pedido.
+
+- **Aislamiento de credenciales del sitio, probado y no solo declarado.**
+  `tests/test_storefront_aislamiento_credenciales.py` fuerza secretos de JWT
+  distintos entre el ERP y el sitio (comparten un placeholder por defecto en
+  desarrollo, que puede hacer pasar una prueba de aislamiento por la razón
+  equivocada) y confirma que ningún token cruza al lado que no le
+  corresponde.
+
+- **Crear una lista de precios desde la ficha del producto.** El endpoint
+  `POST /sales/listas-precio` existía desde el precio server-side
+  (RN-PRC-003), pero no había pantalla para usarlo — solo se podía "fijar"
+  precio en una lista ya creada por API. Ahora `/catalogo/productos/{id}`
+  tiene un "+ Nueva lista" junto al selector de precio, con `canal`
+  (PDV, Agente IA, Delivery, Sitio web). Sirve, por ejemplo, para que
+  Charlie's Pizzas cobre distinto en el sitio de marca sin tocar el precio
+  del PDV — la lista más específica gana (`elegir_lista_precio`).
+
+### Changed
+
+- **Documentación al día con el código (barrido 2026-09-18).** Los slices
+  recientes (delivery, assets, supervision, storefront) actualizaron sus docs
+  propios pero no los transversales, que seguían describiendo 5–8 módulos de
+  13. Ahora `CLAUDE.md`, `README.md`, `overview.md`, `domain-model.md`,
+  `diagrams/modules.md`, `product/modules.md` y `module-guide.md` listan los
+  13; `module-guide` pasa de 7 a 7 + 5 registros condicionales (Celery beat,
+  router público, emisiones de reporte, destinos, settings).
+  `events.md` suma los 10 eventos que se publicaban sin estar catalogados y
+  marca como planificados los 4 que nadie publica; `sales.pago_registrado`
+  nunca existió — es `sales.venta_pagada`, y la deuda de accounting que decía
+  que la 1212 no se cancela estaba resuelta desde 2026-09-05.
+  `data-model.md` documenta 4 tablas faltantes y renumera secciones (9–13).
+  En `business-rules.md` dos series de códigos estaban duplicadas: Empaques
+  pasa a `RN-EMB-*` y Documento de vigencia a `RN-VIG-*`, con sus citas.
+  `authorization.md` suma los 7 roles sembrados que faltaban; `devops.md`
+  lista los 9 jobs del CI y cuáles 6 exige el ruleset; `frontend-architecture`
+  trae el mapa de rutas y la app `storefront/`; el índice de deuda del
+  ROADMAP se recontó y el primer despliegue de staging figura cerrado.
+
+- **Inventario pasa de 13 entradas de menú a 5** (2026-09-23, ADR-107): Stock
+  (+ Lotes, Reservas), Requerimientos, Movimientos (Traslados, Ajustes,
+  Mermas, Devoluciones, Guías de remisión), Conteos y Maestros (Artículos,
+  Categorías, Unidades de medida). Las hermanas se alternan con pestañas
+  arriba del contenido. Ninguna URL cambió, y la paleta de comandos sigue
+  encontrando cada pantalla por su nombre.
+
+- **Logotipos oficiales de Charlie's Pizzas en SVG** (2026-09-19). El sitio, la
+  landing del QR del ERP y la marca de agua del pedido usan los tres SVG que
+  entregó la marca (horizontal, vertical y CH'S): se ven nítidos en pantallas
+  de alta densidad, donde el PNG de 47 px de alto se veía justo. El ícono de la
+  pestaña, el de la app y la imagen al compartir el enlace se regeneraron desde
+  el vector. Tusker Grotesk queda confirmada como de uso libre. Cada logo
+  tiene la tinta de su fondo: aceituna negra sobre fondo claro, crema sobre fondo
+  oscuro (el pie negro ya lleva logo) y verde como original. El ticket térmico del
+  ERP imprime el logo vertical oficial en negro puro, en lugar del texto provisional.
+
+- **El PDV es un módulo propio del home** (2026-09-23, ADR-106). Antes se
+  abría desde Ventas → "Abrir el PDV": el cajero, que no administra la
+  jornada, tenía que pasar por el back-office cada vez que abría la caja.
+  Ahora tiene su ficha en Operación, visible con el permiso exacto
+  `sales.crear`; `/pdv` aplica el mismo gate con un mensaje que dice qué
+  permiso pedir. Ventas queda como back-office (jornada, clientes, mesas,
+  promociones). El backend no cambió.
+
+- **El sitio de Charlie's usa la tipografía y los logos oficiales de la marca**
+  (2026-09-19). Tusker Grotesk (4500 Medium para el texto, 5800 Super para
+  títulos y énfasis, según el brandbook) reemplaza a Anton y Archivo, y se sirve
+  desde el propio sitio: ya no se le pide nada a Google Fonts. La cabecera lleva el
+  logo horizontal; hay favicon, ícono para el celular e imagen propia al compartir
+  el enlace (el logo corto CH'S con el eslogan «A tu manera»), y una marca de agua
+  sutil en la confirmación del pedido. La landing del QR del ERP muestra el logo
+  vertical en vez del texto provisional. Pendiente: Isidora Black (no vino en el
+  paquete), los logos en SVG y en negativo para fondos oscuros, y confirmar la
+  licencia web de Tusker.
+
+### Fixed
+
+- **El aviso de asientos no escritos no decía cuáles** (2026-09-23, enmienda a
+  ADR-089). Contaba por motivo y nada más. Ahora despliega cada uno: fecha,
+  operación en palabras, documento con enlace a su ficha (venta, OC, orden de
+  producción, activo…), motivo y detalle, y cubre los últimos 30 días en vez
+  de acumular desde siempre. Además, un listener contable que fallaba con una
+  excepción solo quedaba en el log: ahora se anota como omisión con motivo
+  **error** y el mensaje, así que aparece en el mismo aviso (migración
+  `d8e2f4a6b1c3`).
+
+- **El modo oscuro no tenía contraste en el back office** (2026-09-23,
+  enmienda a ADR-037). `text-dark`, `text-gray`, `bg-cream` —más de 900 usos—
+  colgaban de colores de marca que no cambian con el tema: texto casi negro
+  sobre fondo casi negro. Ahora apuntan al rol (texto, texto secundario,
+  fondo) y siguen al tema, sin cambiar nada en modo claro. También: tarjetas
+  `bg-white` fijas, botones con `text-white` sobre el naranja claro del tema
+  oscuro, insignias ámbar/rojo fijas, el texto ámbar de alerta (1.8:1 en
+  claro) y dos clases que no existían (`border-borde`, `bg-fondo`). Un test
+  nuevo verifica AA (4.5:1) en cada par texto/superficie de los dos temas.
+
+- **Artículos, y otros ~45 listados, se cortaban en silencio** (2026-09-23,
+  enmienda a ADR-026). La lista de artículos pedía una página de 200 y
+  buscaba en el navegador: el 201 no aparecía ni buscándolo. Ahora pagina y
+  busca en el servidor (URL `?q&page&page_size`), y cada nombre lleva a la
+  ficha del artículo. El libro contable hace lo mismo y ganó búsqueda por
+  glosa en la API (`GET /accounting/asientos?q=`). Donde ni se pasaba
+  `page_size` el corte era en la fila **50**: proveedores, trabajadores,
+  usuarios, traslados, conteos, OCs, planes de producción, informes… Esos
+  listados ahora traen todas las páginas (`apiFetchCompleto`), igual que las
+  ventas del día en el PDV y el catálogo del importador de recetas.
+
+- **El sitio ahora contesta al toque** (2026-09-20). Tocar un producto de la
+  carta parecía no hacer nada: el enlace funcionaba, pero hasta que el servidor
+  contestaba la pantalla se quedaba igual, sin una sola señal. Ahora cada
+  sección muestra un esqueleto apenas se navega, los botones que están
+  trabajando lo dicen (giran y cambian de texto en vez de solo apagarse), lo
+  que se toca se hunde bajo el dedo, y agregar al carrito o marcar un favorito
+  vibran un instante en los teléfonos que lo permiten. Todo se apaga solo si el
+  visitante pidió menos movimiento en su sistema.
+- **Los favoritos se desmarcan** (2026-09-20). El corazón se podía marcar pero
+  no quitar: si la lista del navegador y la del servidor se separaban por un
+  momento —una sesión vencida bastaba—, el servidor rechazaba el toque
+  siguiente y la pantalla volvía atrás sin decir nada. Marcar y desmarcar
+  pasaron a ser órdenes que se pueden repetir sin error, la lista se
+  resincroniza sola y un fallo de verdad ahora se ve.
+- **La clave se puede mostrar al escribirla, y un error ya no borra lo
+  escrito** (2026-09-20). En el celular se tecleaba a ciegas y, si la clave
+  estaba mal, había que volver a escribir también el correo.
+
+- **El sidebar marcaba dos entradas a la vez** (2026-09-23). "Asientos" es
+  `/contabilidad`, prefijo de todo el módulo, así que en Caja, Periodos o
+  Plan de cuentas aparecían dos ítems activos. Ahora gana la coincidencia más
+  larga (`itemActivo`), el mismo criterio que ya usaba el rastro.
+
+- **Lentitud y caídas del ERP y del sitio en staging** (2026-09-19). Tres
+  causas juntas: la API corría con un solo proceso y el pool de conexiones por
+  defecto de SQLAlchemy (5+10); las pantallas `/web/carta` y
+  `/web/ingredientes` del ERP pedían las fotos con una petición por producto
+  (hasta 200 a la vez, cada una con 3 consultas), lo que agotaba el pool
+  (`QueuePool limit reached`); y la carta pública hacía una consulta de fotos
+  por producto. Ahora: `GET /storefront/fotos/{entidad}?ids=` devuelve todas
+  las fotos en una consulta y lo usan el ERP y la carta pública; el pool es
+  configurable (`DB_POOL_SIZE`, `DB_MAX_OVERFLOW`); staging corre la API con 2
+  procesos, Celery con `--concurrency 1` y un tope de memoria por servicio
+  para que un proceso desbocado no tumbe el droplet; el sitio ya no espera
+  indefinidamente a una API colgada (plazo de 8 s). Costo aceptado: el N+1 de
+  precios de `precios.carta` sigue (deuda de `sales`).
+
+- **Categorías de la carta del sitio salían sin nombre** (2026-09-19).
+  `carta_publica` descartaba `categoria_nombre`, así que los chips eran
+  puntos vacíos. Un test lo cubre.
+
+- **El repartidor no veía nombre ni teléfono de quien pidió por la web sin
+  cuenta** (2026-09-19). El teléfono se guardaba en `storefront_pedido` pero
+  nunca llegaba a `sales`, y `delivery` lee el contacto del `cliente`. Ahora
+  el evento lo lleva y la venta se ata a un cliente por teléfono (el
+  existente o uno nuevo con nombre y teléfono). Además el aviso por WhatsApp
+  deja de marcarse `SIN_TELEFONO`.
+
+- **El tiempo de espera del sitio quedaba en 70-80 minutos** (2026-09-19). La
+  carga de cocina contaba toda venta `orden` de la sucursal sin límite de
+  tiempo, así que pedidos de prueba nunca cerrados inflaban la cola para
+  siempre. Ahora solo cuentan las de las últimas 3 horas. (El estimado por
+  tiempo de preparación de cada producto viene en un cambio aparte.)
+
+- **"Trabaja con nosotros" confundía API caída con "sin vacantes"**
+  (2026-09-19), y el tablero de contratación del ERP decía "ninguna
+  convocatoria abierta" aunque listaba borradores y cerradas. Ahora el sitio
+  avisa que no pudo cargar, y el ERP explica que solo las **publicadas** con
+  fecha vigente salen en la web.
+
 ## [0.12.0] - 2026-09-17
 
 ### Added
