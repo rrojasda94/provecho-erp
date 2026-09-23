@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { filtrosDe, queryDeFiltros } from "@/lib/filtros";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -39,7 +39,7 @@ export default async function SolicitudesPage({
   let solicitudes: Solicitud[];
   try {
     solicitudes = (
-      await apiFetch<Pagina<Solicitud>>(
+      await apiFetchCompleto<Solicitud>(
         `/api/v1/inventory/solicitudes?${query}`,
         { token },
       )

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import type { Almacen, Articulo, OrdenCompra, Proveedor } from "../ordenes-compra-cliente";
@@ -55,7 +55,7 @@ export default async function OrdenCompraPage({
     apiFetch<Comprobante[]>(`/api/v1/purchases/ordenes-compra/${id}/comprobantes`, {
       token,
     }).catch(() => [] as Comprobante[]),
-    apiFetch<Pagina<Proveedor>>("/api/v1/purchases/proveedores?page_size=200", {
+    apiFetchCompleto<Proveedor>("/api/v1/purchases/proveedores", {
       token,
     })
       .then((p) => p.items)
@@ -63,7 +63,7 @@ export default async function OrdenCompraPage({
     apiFetch<Almacen[]>("/api/v1/almacenes", { token }).catch(() => [] as Almacen[]),
     // De otro módulo: si inventory niega, la ficha se dibuja igual y los
     // artículos salen por su id. Mismo criterio que el listado.
-    apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?page_size=200", { token })
+    apiFetchCompleto<Articulo>("/api/v1/inventory/articulos", { token })
       .then((p) => p.items)
       .catch(() => [] as Articulo[]),
   ]);

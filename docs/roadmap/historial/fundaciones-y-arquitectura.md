@@ -329,6 +329,9 @@ funcionalidad. Un PR por punto, cada uno mergeado antes del siguiente.
   `sales.crear`; Ventas queda como back-office.
 - **Inventario en cinco entradas** (ADR-107): grupos con pestañas en el
   sidebar (`ItemSubmenu.pestanas`); ninguna URL cambió.
+- **Listados sin tope** (enmienda ADR-026): Artículos y Asientos paginan y
+  buscan en el servidor; el resto trae todas las páginas. ~45 llamadas
+  cortaban en 200 o en 50 sin avisar.
 
 ## Fuentes
 

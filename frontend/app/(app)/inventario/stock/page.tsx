@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, type Pagina, apiFetchCompleto } from "@/lib/api";
 import { tienePermiso } from "@/lib/permisos";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -14,12 +14,6 @@ type Params = Promise<{
 
 type Opcion = { id: string; nombre: string };
 
-/** El tope de `page_size` del contrato (ADR-026). La tabla pagina del lado
- * del cliente sobre lo que recibe; cuando el catálogo pase de esto hará
- * falta cablear los controles al servidor — la deuda ya está anotada en
- * `docs/roadmap/deuda/contrato-de-api.md`. */
-const MAXIMO = 200;
-
 /**
  * Niveles de stock.
  *
@@ -32,7 +26,7 @@ const MAXIMO = 200;
  * la página para no cargarle su complejidad a la función que además hace
  * cinco llamadas y decide qué error mostrar. */
 function queryDeStock(filtros: Awaited<Params>): URLSearchParams {
-  const query = new URLSearchParams({ page_size: String(MAXIMO) });
+  const query = new URLSearchParams();
   const pares: [string, string | undefined][] = [
     ["almacen_id", filtros.almacen],
     ["sucursal_id", filtros.sucursal],
@@ -53,7 +47,7 @@ export default async function StockPage({ searchParams }: { searchParams: Params
 
   let pagina: Pagina<FilaStock>;
   try {
-    pagina = await apiFetch<Pagina<FilaStock>>(
+    pagina = await apiFetchCompleto<FilaStock>(
       `/api/v1/inventory/stock?${query}`,
       { token },
     );

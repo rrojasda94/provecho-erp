@@ -7,7 +7,6 @@ import { useMemo, useState } from "react";
 
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { Insignia } from "@/components/estado/insignia";
-import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox, ComboboxMultiple } from "@/components/ui/combobox";
 
@@ -338,11 +337,6 @@ export function StockCliente({
         </label>
       </div>
 
-      <AvisoRecortado
-        mostrados={filas.length}
-        total={total}
-        sugerencia="Filtra por almacén o categoría para ver el resto."
-      />
 
       {consolidado ? (
         <TablaDatos

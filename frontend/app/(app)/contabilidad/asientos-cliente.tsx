@@ -8,6 +8,7 @@ import { useMemo, useState, useTransition } from "react";
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import type { PaginaServidor } from "@/components/tabla/use-tabla-servidor";
 import { Combobox } from "@/components/ui/combobox";
 import { cuadreDe } from "@/lib/cuadre";
 import { tienePermiso } from "@/lib/permisos";
@@ -267,11 +268,13 @@ function AvisoOmitidos({ omitidos }: { omitidos: AsientoOmitido[] }) {
 
 export function AsientosCliente({
   asientos,
+  pagina,
   cuentas,
   omitidos,
   permisos,
 }: {
   asientos: Asiento[];
+  pagina: PaginaServidor;
   cuentas: Cuenta[];
   omitidos: AsientoOmitido[];
   permisos: string[];
@@ -344,7 +347,12 @@ export function AsientosCliente({
           No hay plan de cuentas todavía: sin cuentas no se puede registrar un asiento.
         </p>
       )}
-      <TablaDatos columnas={columnas} datos={asientos} placeholderBusqueda="Buscar por glosa..." />
+      <TablaDatos
+        columnas={columnas}
+        datos={asientos}
+        servidor={pagina}
+        placeholderBusqueda="Buscar por glosa..."
+      />
     </div>
   );
 }

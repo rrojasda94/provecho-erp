@@ -15,9 +15,16 @@ const TAMANOS = [10, 25, 50, 100];
  * a paginar seis veces para revisar un inventario de sesenta artículos, y la
  * pregunta que se hace en almacén ("¿está todo?") no se responde de a diez.
  */
-export function TablaPaginacion<T>({ tabla }: { tabla: Table<T> }) {
+export function TablaPaginacion<T>({
+  tabla,
+  total: totalServidor,
+}: {
+  tabla: Table<T>;
+  /** El total que contó el servidor, cuando la tabla solo tiene una página. */
+  total?: number;
+}) {
   const { pageIndex, pageSize } = tabla.getState().pagination;
-  const total = tabla.getFilteredRowModel().rows.length;
+  const total = totalServidor ?? tabla.getFilteredRowModel().rows.length;
 
   return (
     <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">

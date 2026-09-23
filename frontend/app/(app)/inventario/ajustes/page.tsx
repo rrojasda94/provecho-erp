@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import {
@@ -30,7 +30,7 @@ export default async function AjustesPage({
   try {
     const query = new URLSearchParams(estado ? { estado } : {});
     ajustes = (
-      await apiFetch<Pagina<Ajuste>>(`/api/v1/inventory/ajustes?${query}`, { token })
+      await apiFetchCompleto<Ajuste>(`/api/v1/inventory/ajustes?${query}`, { token })
     ).items;
   } catch (e) {
     const mensaje =

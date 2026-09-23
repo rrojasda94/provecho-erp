@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { ActivosCliente, type Activo } from "./activos-cliente";
@@ -9,7 +9,7 @@ export default async function ActivosPage() {
   let activos: Activo[];
   try {
     activos = (
-      await apiFetch<Pagina<Activo>>("/api/v1/assets/activos?page_size=200", { token })
+      await apiFetchCompleto<Activo>("/api/v1/assets/activos", { token })
     ).items;
   } catch (e) {
     const mensaje =

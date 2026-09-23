@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { TableroCliente, type Categoria, type Sucursal, type TareaInstancia, type Usuario } from "./tablero-cliente";
@@ -39,7 +39,7 @@ export default async function TableroPage({ searchParams }: { searchParams: Para
     apiFetch<Categoria[]>("/api/v1/supervision/categorias", { token }).catch(
       () => [] as Categoria[],
     ),
-    apiFetch<Pagina<Usuario>>("/api/v1/users?page_size=200", { token })
+    apiFetchCompleto<Usuario>("/api/v1/users", { token })
       .then((p) => p.items)
       .catch(() => [] as Usuario[]),
   ]);

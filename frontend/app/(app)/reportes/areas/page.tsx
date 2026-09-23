@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { AreasCliente, type Area, type Miembro, type Opcion } from "./areas-cliente";
@@ -43,7 +43,7 @@ export default async function AreasPage() {
   // lo que no se puede es sumar por esa vía.
   const [roles, usuarios, sucursales] = await Promise.all([
     apiFetch<{ id: string; nombre: string }[]>("/api/v1/roles", { token }).catch(() => []),
-    apiFetch<Pagina<{ id: string; username: string }>>("/api/v1/users?page_size=200", {
+    apiFetchCompleto<{ id: string; username: string }>("/api/v1/users", {
       token,
     })
       .then((p) => p.items.map((u) => ({ id: u.id, nombre: u.username })))

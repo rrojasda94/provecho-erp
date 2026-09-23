@@ -96,3 +96,22 @@ forma cómoda de tumbar la API con una sola petición autenticada.
 - Fuera de esta pasada, con la misma regla y una línea cada uno cuando su
   pantalla exista: `stock-lote` (devuelve tuplas, no entidades), clientes
   del contrato público de `sales`, arqueos, conteos y movimientos de caja.
+
+## Enmienda 2026-09-23 — el frontend deja de leer una sola página
+
+El contrato no cambió; cambió cómo lo lee el frontend. Pedir `page_size=200`
+y quedarse con `.items` cortaba en silencio: el artículo 201 no aparecía ni
+buscándolo, y donde no se pasaba `page_size` el corte era en la fila 50
+(proveedores, trabajadores, usuarios, el libro contable).
+
+- **Listados que no entran en el navegador** (catálogo de artículos, libro
+  contable): paginación y búsqueda en el servidor. `TablaDatos` recibe
+  `servidor={{ total, page, pageSize, q }}` y guarda el estado en la URL
+  (`?q&page&page_size`); `leerPagina()` acota lo que llega por ella.
+- **Todo lo demás**: `apiFetchCompleto` / `apiFetchTodas` recorren las
+  páginas de a 200 hasta cubrir `total`. Es lineal en el tamaño del listado
+  y está marcado como tal; un listado que pase a decenas de miles migra al
+  primer caso (deuda en `docs/roadmap/deuda/contrato-de-api.md`).
+- `PAGE_SIZE_MAXIMO = 200` se mantiene: el techo protege a la API, y recorrer
+  páginas lo respeta.
+

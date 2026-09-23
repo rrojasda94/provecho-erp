@@ -3,7 +3,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 
-import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
@@ -80,12 +79,9 @@ function DialogoVisar({ reporte }: { reporte: ReporteJornada }) {
 
 export function ReportesCliente({
   reportes,
-  total,
   almacenes,
 }: {
   reportes: ReporteJornada[];
-  /** Cuántos hay en total: la página viene recortada. */
-  total: number;
   almacenes: Almacen[];
 }) {
   const nombreAlmacen = useMemo(
@@ -141,11 +137,6 @@ export function ReportesCliente({
         cocina visa, no redacta (RN-DOC-010). El barrido de cierre lo genera solo pasada la
         hora de cierre de cada empresa.
       </p>
-      <AvisoRecortado
-        mostrados={reportes.length}
-        total={total}
-        sugerencia="Acota por almacén o jornada para ver el resto."
-      />
       <TablaDatos columnas={columnas} datos={reportes} placeholderBusqueda="Buscar reporte..." />
     </div>
   );

@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { EncuestasCliente, type Encuesta } from "./encuestas-cliente";
@@ -18,11 +18,11 @@ export default async function EncuestasPage({
   const { token, usuario } = await obtenerSesion();
   const { estado = "" } = await searchParams;
 
-  const query = new URLSearchParams({ page_size: "100" });
+  const query = new URLSearchParams();
   if (estado) query.set("estado", estado);
 
   try {
-    const pagina = await apiFetch<Pagina<Encuesta>>(
+    const pagina = await apiFetchCompleto<Encuesta>(
       `/api/v1/marketing/encuestas?${query}`,
       { token },
     );

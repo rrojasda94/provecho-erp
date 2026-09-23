@@ -1108,3 +1108,35 @@ def test_quitar_lineas_no_reversa_el_asiento_entero(env):
     assert ingreso_haber == Decimal("80.00")
     assert ingreso_debe == Decimal(0)
 
+
+
+def test_listar_asientos_busca_por_glosa_y_pagina(env):
+    """El libro se pagina en el servidor: la pantalla pedía la primera página
+    (50) y buscaba en el navegador, así que el asiento 51 no aparecía nunca."""
+    client, ids, _ = env
+    h = _token(client)
+    _abrir_periodo_actual(client, h, ids)
+    caja_id, ventas_id = _cuentas_debe_haber(client, h, ids)
+    for glosa in ("Venta mesa 4", "Venta mesa 7", "Compra de harina"):
+        r = client.post(
+            "/api/v1/accounting/asientos",
+            headers=h,
+            json={
+                "empresa_id": ids["empresa_id"],
+                "fecha": fechas.hoy().isoformat(),
+                "glosa": glosa,
+                "lineas": [
+                    {"cuenta_contable_id": caja_id, "tipo": "debe", "monto": "10.00"},
+                    {"cuenta_contable_id": ventas_id, "tipo": "haber", "monto": "10.00"},
+                ],
+            },
+        )
+        assert r.status_code == 201
+
+    ventas = client.get("/api/v1/accounting/asientos?q=mesa", headers=h).json()
+    assert ventas["total"] == 2
+    assert {a["glosa"] for a in ventas["items"]} == {"Venta mesa 4", "Venta mesa 7"}
+
+    segunda = client.get("/api/v1/accounting/asientos?page=2&page_size=2", headers=h).json()
+    assert segunda["total"] == 3
+    assert len(segunda["items"]) == 1
