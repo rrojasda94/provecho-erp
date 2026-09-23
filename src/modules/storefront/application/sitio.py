@@ -1,5 +1,5 @@
 """Compone las respuestas de la superficie pública del sitio de marca
-(ADR-103). Solo llama a `application/queries_publicas.py` de otros
+(ADR-105). Solo llama a `application/queries_publicas.py` de otros
 módulos — nunca a su dominio ni infraestructura (RN-WEB-001).
 """
 
@@ -39,6 +39,13 @@ def _marca_id() -> uuid.UUID:
     return uuid.UUID(str(settings.storefront_marca_id))
 
 
+def marca_actual_id() -> uuid.UUID:
+    """La marca que sirve este sitio, para quien necesite resolverla fuera
+    de una respuesta pública (ej. `application/pedidos.py` al confirmar un
+    checkout). Mismo chequeo que `_marca_id()`, expuesto sin el guion bajo."""
+    return _marca_id()
+
+
 def _sucursal_id(session) -> uuid.UUID:
     if settings.storefront_sucursal_id:
         return uuid.UUID(str(settings.storefront_sucursal_id))
@@ -59,11 +66,59 @@ def contenido(session) -> dict:
     }
 
 
-def _ficha(nodo: dict, ingredientes_por_receta: dict[uuid.UUID, list[dict]]) -> dict:
-    """Un producto o una variante, recortados a lo que RN-WEB-001 permite
-    mostrar: nunca `id_interno`, `margen_contribucion` ni `empaque_id`."""
-    ingredientes = ingredientes_por_receta.get(nodo.get("receta_id"), [])
+def _opciones(nodo: dict) -> dict:
+    """Extras, sabores y pares excluidos de un nodo, con los campos que el
+    cliente necesita para armar su línea (RN-WEB-001: enumerados, no el dict de
+    `sales` tal cual)."""
     return {
+        "extras": [
+            {
+                "id": e["producto_comercial_id"],
+                "nombre": e["nombre"],
+                "precio": e["precio_unitario"],
+                "maximo": e["maximo"],
+                "grupo_id": e["grupo_id"],
+                "grupo_nombre": e["grupo_nombre"],
+                "grupo_minimo": e["grupo_minimo"],
+                "grupo_maximo": e["grupo_maximo"],
+            }
+            for e in nodo.get("extras", [])
+        ],
+        "atributos": [
+            {
+                "id": a["atributo_id"],
+                # El nombre para el cliente si lo cargaron en el ERP, y si no
+                # el interno. Sin esto los sabores salían como "Mitad 1 F" o
+                # "Americana F": el nombre con el que se arma el catálogo.
+                "nombre": a.get("nombre_publico") or a["nombre"],
+                "display": a["display"],
+                "valores": [
+                    {
+                        "id": v["id"],
+                        "nombre": v.get("nombre_publico") or v["nombre"],
+                        "precio_extra": v["precio_extra"],
+                    }
+                    for v in a["valores"]
+                ],
+            }
+            for a in nodo.get("atributos", [])
+        ],
+        "exclusiones": [list(par) for par in nodo.get("exclusiones", [])],
+    }
+
+
+def _ficha(
+    nodo: dict,
+    ingredientes_por_receta: dict[uuid.UUID, list[dict]],
+    *,
+    con_opciones: bool = False,
+) -> dict:
+    """Un producto o una variante, recortados a lo que RN-WEB-001 permite
+    mostrar: nunca `id_interno`, `margen_contribucion` ni `empaque_id`. Las
+    opciones (extras/sabores) solo van en el detalle de un producto: la carta
+    completa las repetiría por cada tamaño de cada pizza."""
+    ingredientes = ingredientes_por_receta.get(nodo.get("receta_id"), [])
+    ficha = {
         "id": nodo["producto_comercial_id"],
         "nombre": nodo["nombre"],
         "descripcion": nodo.get("descripcion"),
@@ -73,9 +128,21 @@ def _ficha(nodo: dict, ingredientes_por_receta: dict[uuid.UUID, list[dict]]) -> 
             {"id": ins["articulo_id"], "nombre": ins["nombre"]} for ins in ingredientes
         ],
     }
+    if con_opciones:
+        ficha.update(_opciones(nodo))
+    return ficha
 
 
-def carta(session) -> dict:
+def _unir_ingredientes(variantes: list[dict]) -> list[dict]:
+    """Los ingredientes de todas las variantes, sin repetir y por nombre."""
+    por_id: dict[uuid.UUID, dict] = {}
+    for v in variantes:
+        for ing in v["ingredientes"]:
+            por_id.setdefault(ing["id"], ing)
+    return sorted(por_id.values(), key=lambda i: i["nombre"])
+
+
+def carta(session, *, con_opciones: bool = False) -> dict:
     marca_id = _marca_id()
     sucursal_id = _sucursal_id(session)
     items = carta_publica(
@@ -91,26 +158,40 @@ def carta(session) -> dict:
             v["receta_id"] for v in item.get("variantes", []) if v.get("receta_id")
         )
     ingredientes_por_receta = insumos_de_recetas(session, list(receta_ids))
+    fotos_por_producto = fotos_uc.fotos_principales_urls(
+        session,
+        entidad="producto",
+        entidad_ids=[i["producto_comercial_id"] for i in items],
+    )
 
     categorias: dict[uuid.UUID, str] = {}
     productos = []
     for item in items:
         if item.get("categoria_id"):
             categorias.setdefault(item["categoria_id"], item.get("categoria_nombre") or "")
-        variantes = [_ficha(v, ingredientes_por_receta) for v in item.get("variantes", [])]
+        variantes = [
+            _ficha(v, ingredientes_por_receta, con_opciones=con_opciones)
+            for v in item.get("variantes", [])
+        ]
         precios_variantes = [v["precio"] for v in variantes]
         precio_desde = min(precios_variantes) if precios_variantes else item["precio_unitario"]
 
-        base = _ficha(item, ingredientes_por_receta)
+        base = _ficha(item, ingredientes_por_receta, con_opciones=con_opciones)
         base.pop("precio")
+        # Un producto con tamaños **nunca** tiene receta propia: el ERP la
+        # obliga a vivir en cada variante (`catalogo.crear_variante`), así que
+        # el nodo padre venía siempre con `ingredientes: []` y en el sitio no
+        # se veía un solo ingrediente. Se arma la unión de las de sus
+        # variantes: los ingredientes de "Pizza Americana" son los mismos sea
+        # personal o familiar, cambia la cantidad, que acá no se muestra.
+        if not base["ingredientes"] and variantes:
+            base["ingredientes"] = _unir_ingredientes(variantes)
         productos.append(
             {
                 **base,
                 "categoria_id": item.get("categoria_id"),
                 "precio_desde": precio_desde,
-                "foto_url": fotos_uc.foto_principal_url(
-                    session, entidad="producto", entidad_id=item["producto_comercial_id"]
-                ),
+                "foto_url": fotos_por_producto.get(item["producto_comercial_id"]),
                 "variantes": variantes,
             }
         )
@@ -122,7 +203,7 @@ def carta(session) -> dict:
 
 
 def producto(session, producto_id: uuid.UUID) -> dict:
-    datos = carta(session)
+    datos = carta(session, con_opciones=True)
     for item in datos["productos"]:
         if item["id"] != producto_id:
             continue
@@ -130,17 +211,24 @@ def producto(session, producto_id: uuid.UUID) -> dict:
         item["fotos"] = [f.url_storage for f in fotos]
         ids_ingrediente = [i["id"] for i in item["ingredientes"]]
         detalle = articulos_publicos(session, ids_ingrediente)
-        item["ingredientes_detalle"] = [
-            {
-                "id": ing_id,
-                "nombre": datos_ing["nombre"],
-                "descripcion": datos_ing["descripcion"],
-                "foto_url": fotos_uc.foto_principal_url(
-                    session, entidad="ingrediente", entidad_id=ing_id
-                ),
-            }
-            for ing_id, datos_ing in detalle.items()
-        ]
+        fotos_ingrediente = fotos_uc.fotos_principales_urls(
+            session, entidad="ingrediente", entidad_ids=list(detalle)
+        )
+        # Ordenados por nombre, como la lista de la carta: sin esto salían en
+        # el orden físico de la tabla y dos pantallas del mismo producto
+        # mostraban los mismos ingredientes en distinto orden.
+        item["ingredientes_detalle"] = sorted(
+            (
+                {
+                    "id": ing_id,
+                    "nombre": datos_ing["nombre"],
+                    "descripcion": datos_ing["descripcion"],
+                    "foto_url": fotos_ingrediente.get(ing_id),
+                }
+                for ing_id, datos_ing in detalle.items()
+            ),
+            key=lambda i: i["nombre"],
+        )
         return item
     raise NoEncontrado("producto no encontrado")
 

@@ -3,6 +3,12 @@
 Parte del backlog de deuda técnica del proyecto. El índice y las reglas
 de uso están en [`ROADMAP.md`](../../../ROADMAP.md) → Deuda técnica.
 
+- ⬜ **La próxima compra sugerida no descuenta el plazo del proveedor**
+  (ADR-108, RN-INV-027). Dice cuándo el stock toca el mínimo, no cuándo
+  hay que emitir la OC: falta un `dias_entrega` por proveedor (o por
+  artículo-proveedor) para restarlo, y el stock de seguridad de RN-INV-013
+  sigue sin calcularse. Tampoco hay estacionalidad: promedio lineal de 90
+  días hasta que haya un año de historia con qué calibrar.
 - ✅ 2026-09-04 **Mermas, reservas y lo que le faltaba a Traslados** (bloque
   `feat/inventario-transferencias-mermas` de la auditoría del 2026-08-30).
   Tres endpoints de merma con ADR-028, pruebas y permisos sembrados tenían

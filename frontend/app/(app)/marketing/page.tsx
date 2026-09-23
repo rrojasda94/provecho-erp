@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { CampanasCliente, type Campana, type Marca } from "./campanas-cliente";
@@ -8,7 +8,7 @@ export default async function MarketingPage() {
 
   try {
     const [campanas, marcas] = await Promise.all([
-      apiFetch<Pagina<Campana>>("/api/v1/marketing/campanas", { token }),
+      apiFetchCompleto<Campana>("/api/v1/marketing/campanas", { token }),
       apiFetch<Marca[]>("/api/v1/marcas", { token }),
     ]);
     return (

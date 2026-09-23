@@ -349,7 +349,7 @@ function ValoresDeAtributo({
           type="button"
           onClick={agregar}
           disabled={guardando || !nuevo.trim()}
-          className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+          className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
         >
           + Valor
         </button>
@@ -392,11 +392,11 @@ function NuevoAtributo({ onCreado }: { onCreado: (atributo: Atributo) => void })
       <button
         type="button"
         onClick={() => dialogRef.current?.showModal()}
-        className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
+        className="rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary"
       >
         + Nuevo atributo
       </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
+      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
         <div className="flex flex-col gap-4 p-6">
           <h2 className="font-heading text-lg text-dark">Nuevo atributo</h2>
           <label className="flex flex-col gap-1 text-sm font-semibold">
@@ -454,7 +454,7 @@ function NuevoAtributo({ onCreado }: { onCreado: (atributo: Atributo) => void })
               type="button"
               onClick={crear}
               disabled={guardando || !nombre.trim()}
-              className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
+              className="rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary disabled:opacity-50"
             >
               {guardando ? "Creando..." : "Crear"}
             </button>

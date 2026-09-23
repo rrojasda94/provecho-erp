@@ -20,6 +20,7 @@ from src.modules.storefront.domain.rules import (
     MIME_FOTO,
     TAMANO_MAXIMO_FOTO_BYTES,
 )
+from src.shared import auditoria
 from src.shared.adjuntos import crear_archivo
 from src.shared.integrations.storage import s3
 from src.shared.models import Archivo
@@ -65,7 +66,7 @@ def registrar(
     subido_por: uuid.UUID,
 ) -> Archivo:
     _validar_entidad(session, entidad, entidad_id)
-    return crear_archivo(
+    archivo = crear_archivo(
         session,
         nombre=nombre,
         mime_type=mime_type,
@@ -77,6 +78,15 @@ def registrar(
         mime_permitidos=MIME_FOTO,
         tamano_maximo_bytes=TAMANO_MAXIMO_FOTO_BYTES,
     )
+    auditoria.registrar(
+        session,
+        usuario_id=subido_por,
+        entidad=ENTIDADES_FOTO[entidad],
+        entidad_id=entidad_id,
+        accion="subir_foto",
+        datos_despues={"archivo_id": str(archivo.id), "nombre": nombre},
+    )
+    return archivo
 
 
 def listar(session, *, entidad: str, entidad_id: uuid.UUID) -> list[Archivo]:
@@ -93,6 +103,30 @@ def listar(session, *, entidad: str, entidad_id: uuid.UUID) -> list[Archivo]:
     )
 
 
+def listar_varias(
+    session, *, entidad: str, entidad_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[Archivo]]:
+    """Las fotos de muchas entidades en UNA consulta (la más reciente primero).
+    Sin esto, listar N productos disparaba N consultas — y N requests desde
+    las pantallas `/web` del ERP. Toda entidad pedida aparece en el dict,
+    con lista vacía si no tiene fotos."""
+    por_entidad: dict[uuid.UUID, list[Archivo]] = {i: [] for i in entidad_ids}
+    if not entidad_ids:
+        return por_entidad
+    filas = session.scalars(
+        select(Archivo)
+        .where(
+            Archivo.entidad_tipo == ENTIDADES_FOTO[entidad],
+            Archivo.entidad_id.in_(entidad_ids),
+            Archivo.deleted_at.is_(None),
+        )
+        .order_by(Archivo.created_at.desc())
+    )
+    for archivo in filas:
+        por_entidad[archivo.entidad_id].append(archivo)
+    return por_entidad
+
+
 def foto_principal_url(session, *, entidad: str, entidad_id: uuid.UUID) -> str | None:
     """La más reciente no borrada. `None` si la entidad no tiene ninguna —
     el sitio público muestra un placeholder en ese caso."""
@@ -100,10 +134,26 @@ def foto_principal_url(session, *, entidad: str, entidad_id: uuid.UUID) -> str |
     return fotos[0].url_storage if fotos else None
 
 
-def borrar(session, *, archivo_id: uuid.UUID) -> None:
+def fotos_principales_urls(
+    session, *, entidad: str, entidad_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, str | None]:
+    """`foto_principal_url` para muchas entidades en una sola consulta."""
+    fotos = listar_varias(session, entidad=entidad, entidad_ids=entidad_ids)
+    return {i: (lista[0].url_storage if lista else None) for i, lista in fotos.items()}
+
+
+def borrar(session, *, archivo_id: uuid.UUID, actor_id: uuid.UUID) -> None:
     archivo = session.scalar(
         select(Archivo).where(Archivo.id == archivo_id, Archivo.deleted_at.is_(None))
     )
     if archivo is None:
         raise NoEncontrado("foto no encontrada")
     archivo.deleted_at = datetime.now(UTC)
+    auditoria.registrar(
+        session,
+        usuario_id=actor_id,
+        entidad=archivo.entidad_tipo,
+        entidad_id=archivo.entidad_id,
+        accion="borrar_foto",
+        datos_antes={"archivo_id": str(archivo.id), "nombre": archivo.nombre},
+    )

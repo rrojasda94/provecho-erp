@@ -78,6 +78,15 @@ class ProductoComercial(Base, UuidPkMixin, TimestampMixin):
     es_extra: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false(), nullable=False
     )
+    # En qué canales se vende (`rules.CANALES`). NULL = en todos. Una variante
+    # sin valor propio hereda el de su padre. Es lo que deja sacar de la web
+    # una caja, una propina o cualquier cosa que solo existe en el PDV.
+    canales: Mapped[list | None] = mapped_column(JsonB, nullable=True)
+    # Minutos que tarda en salir de cocina, para el estimado de espera del
+    # sitio. NULL = no se sabe (se usa la base estándar); 0 = sale al
+    # instante (una botella de agua). Una variante sin valor propio hereda el
+    # del padre.
+    tiempo_preparacion_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     margen_contribucion: Mapped[Decimal | None] = mapped_column(
         Numeric(10, 2), nullable=True
     )

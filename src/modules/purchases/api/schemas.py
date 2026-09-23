@@ -296,3 +296,15 @@ class ComprobanteOut(BaseModel):
     emisor_num_doc: str | None = None
     fecha_emision: date | None = None
     total: Decimal | None = None
+
+
+class PrecioHistoricoOut(BaseModel):
+    """Una recepción del artículo: cuándo entró, a cuánto y de quién."""
+
+    fecha: datetime
+    costo_unitario: Decimal
+    cantidad: Decimal
+    orden_compra_id: uuid.UUID
+    proveedor_id: uuid.UUID
+    proveedor: str | None
+

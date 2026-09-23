@@ -59,7 +59,7 @@ export function PaletaComandos({ destinos }: { destinos: Destino[] }) {
 
       <Dialog.Root open={abierta} onOpenChange={setAbierta}>
         <Dialog.Portal>
-          <Dialog.Backdrop className="fixed inset-0 z-50 bg-dark/40 backdrop-blur-[2px] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 [transition:opacity_160ms]" />
+          <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 [transition:opacity_160ms]" />
           <Dialog.Popup className="fixed top-[18vh] left-1/2 z-50 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-[var(--sombra-3)] data-[ending-style]:scale-98 data-[ending-style]:opacity-0 data-[starting-style]:scale-98 data-[starting-style]:opacity-0 [transition:opacity_180ms,scale_180ms]">
             <Dialog.Title className="sr-only">Buscar pantalla</Dialog.Title>
 

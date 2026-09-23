@@ -112,7 +112,7 @@ function Pendiente({ propuesta }: { propuesta: PropuestaDelivery }) {
         <button
           type="submit"
           disabled={aprobando}
-          className="rounded bg-primary px-3 py-1 text-xs font-bold text-white hover:bg-secondary"
+          className="rounded bg-primary px-3 py-1 text-xs font-bold text-primary-foreground hover:bg-secondary"
         >
           {aprobando ? "Aprobando..." : "Aprobar"}
         </button>
@@ -241,7 +241,7 @@ export function DeliveryCliente({
         <button
           type="submit"
           disabled={guardando}
-          className="self-start rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
+          className="self-start rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary"
         >
           {guardando ? "Proponiendo..." : "Proponer cambio"}
         </button>

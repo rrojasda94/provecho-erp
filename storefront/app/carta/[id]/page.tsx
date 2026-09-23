@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { apiFetch } from "@/lib/api";
+import { URL_SITIO } from "@/lib/sitio";
 
 import { DetalleProducto } from "./detalle-producto";
 
@@ -25,7 +26,37 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
   const producto = await apiFetch<ProductoDetalle>(`/api/v1/storefront/publico/productos/${id}`);
-  return { title: producto?.nombre ?? "Producto" };
+  if (!producto) return { title: "Producto" };
+  const imagen = producto.fotos[0];
+  return {
+    title: producto.nombre,
+    description: producto.descripcion ?? undefined,
+    openGraph: {
+      title: producto.nombre,
+      description: producto.descripcion ?? undefined,
+      url: `${URL_SITIO}/carta/${id}`,
+      images: imagen ? [imagen] : undefined,
+    },
+  };
+}
+
+function jsonLdDe(id: string, producto: ProductoDetalle) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: producto.nombre,
+    description: producto.descripcion ?? undefined,
+    image: producto.fotos[0],
+    url: `${URL_SITIO}/carta/${id}`,
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "PEN",
+      price: producto.precio_desde,
+      availability: producto.disponible
+        ? "https://schema.org/InStock"
+        : "https://schema.org/OutOfStock",
+    },
+  };
 }
 
 export default async function ProductoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,5 +64,14 @@ export default async function ProductoPage({ params }: { params: Promise<{ id: s
   const producto = await apiFetch<ProductoDetalle>(`/api/v1/storefront/publico/productos/${id}`);
   if (!producto) notFound();
 
-  return <DetalleProducto producto={producto} />;
+  return (
+    <>
+      <script
+        type="application/ld+json"
+         
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdDe(id, producto)) }}
+      />
+      <DetalleProducto producto={producto} />
+    </>
+  );
 }

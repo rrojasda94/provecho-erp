@@ -3,10 +3,18 @@
 import Image from "next/image";
 import { useState } from "react";
 
+import { AgregarCarrito } from "@/components/agregar-carrito";
+import type { Opciones } from "@/lib/opciones";
+
 import { IngredienteDialogo, type IngredienteDetalle } from "./ingrediente-dialogo";
 
-type Variante = { id: string; nombre: string; precio: string; disponible: boolean };
-type ProductoDetalle = {
+type Variante = Partial<Opciones> & {
+  id: string;
+  nombre: string;
+  precio: string;
+  disponible: boolean;
+};
+type ProductoDetalle = Partial<Opciones> & {
   id: string;
   nombre: string;
   descripcion: string | null;
@@ -16,6 +24,14 @@ type ProductoDetalle = {
   variantes: Variante[];
   ingredientes_detalle: IngredienteDetalle[];
 };
+
+/** La API manda las opciones siempre, pero un producto viejo en caché podría no
+ * traerlas: sin ellas se vende como antes. */
+const conOpciones = (o: Partial<Opciones>) => ({
+  extras: o.extras ?? [],
+  atributos: o.atributos ?? [],
+  exclusiones: o.exclusiones ?? [],
+});
 
 export function DetalleProducto({ producto }: { producto: ProductoDetalle }) {
   const [ingredienteAbierto, setIngredienteAbierto] = useState<IngredienteDetalle | null>(null);
@@ -33,7 +49,7 @@ export function DetalleProducto({ producto }: { producto: ProductoDetalle }) {
       </div>
 
       <div className="flex flex-col gap-4">
-        <h1 className="font-display text-3xl uppercase text-negro">{producto.nombre}</h1>
+        <h1 className="font-titular text-3xl uppercase text-negro">{producto.nombre}</h1>
         {producto.descripcion && <p className="text-humo">{producto.descripcion}</p>}
 
         {producto.ingredientes_detalle.length > 0 && (
@@ -76,6 +92,23 @@ export function DetalleProducto({ producto }: { producto: ProductoDetalle }) {
         ) : (
           <p className="font-display text-2xl text-verde">S/ {producto.precio_desde}</p>
         )}
+
+        <AgregarCarrito
+          fotoUrl={foto ?? null}
+          opciones={
+            producto.variantes.length > 0
+              ? producto.variantes.map((v) => ({ ...v, ...conOpciones(v) }))
+              : [
+                  {
+                    id: producto.id,
+                    nombre: producto.nombre,
+                    precio: producto.precio_desde,
+                    disponible: producto.disponible,
+                    ...conOpciones(producto),
+                  },
+                ]
+          }
+        />
       </div>
 
       <IngredienteDialogo ingrediente={ingredienteAbierto} onCerrar={() => setIngredienteAbierto(null)} />

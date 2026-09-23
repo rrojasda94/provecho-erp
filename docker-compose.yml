@@ -171,7 +171,10 @@ services:
       API_INTERNAL_URL: http://api:8000
       GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
       GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
+      # Sesga el autocompletado de direcciones del checkout a Perú.
+      GOOGLE_MAPS_PAIS: ${GOOGLE_MAPS_PAIS:-pe}
       STOREFRONT_IMAGENES_HOST: ${STOREFRONT_IMAGENES_HOST:-}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       WATCHPACK_POLLING: "true"
     volumes:
       - ./storefront:/app

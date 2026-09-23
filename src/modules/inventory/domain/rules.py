@@ -154,6 +154,47 @@ def cantidad_a_reponer(cantidad: Decimal, stock_minimo: Decimal | None) -> Decim
     return falta if falta > 0 else stock_minimo
 
 
+# Un traslado entre almacenes de la misma empresa no es ni compra ni consumo:
+# sale de uno y entra en otro. En el kardex del artículo se anulan, y
+# contarlos inflaría las dos barras y el consumo diario.
+TIPOS_INTERNOS = frozenset({"transferencia_salida", "transferencia_entrada"})
+
+# Ventana del consumo promedio: tres meses siguen la estacionalidad de una
+# carta sin que una semana rara la mueva. Menos de una semana de historia no
+# alcanza para predecir nada.
+DIAS_VENTANA_CONSUMO = 90
+DIAS_MINIMOS_CONSUMO = 7
+
+
+def consumo_diario(salidas: Decimal, dias_con_historia: int) -> Decimal | None:
+    """Cuánto sale por día, promedio. `None` si la historia es muy corta."""
+    if dias_con_historia < DIAS_MINIMOS_CONSUMO:
+        return None
+    dias = min(dias_con_historia, DIAS_VENTANA_CONSUMO)
+    return salidas / dias
+
+
+def proxima_compra(
+    stock: Decimal, stock_minimo: Decimal | None, diario: Decimal | None, hoy: date
+) -> date | None:
+    """Cuándo el stock toca el mínimo al ritmo de consumo actual.
+
+    Es el día en que hay que **haber comprado**, no el de pedir: el plazo del
+    proveedor lo resta quien arma la OC. Sin consumo no hay fecha —nada se
+    agota—; sin mínimo declarado se proyecta contra cero. Si ya está en el
+    mínimo o por debajo, es hoy.
+
+    ponytail: promedio lineal de 90 días. Estacionalidad o tendencia se
+    suman cuando haya un año de historia real con qué calibrarlas.
+    """
+    if not diario or diario <= 0:
+        return None
+    margen = stock - (stock_minimo or Decimal(0))
+    if margen <= 0:
+        return hoy
+    return hoy + timedelta(days=int(margen / diario))
+
+
 def disponible(fisico: Decimal, reservado: Decimal) -> Decimal:
     """Stock que se puede comprometer: el físico menos lo ya prometido
     (RN-INV-009). Puede dar negativo si se reservó y después se consumió

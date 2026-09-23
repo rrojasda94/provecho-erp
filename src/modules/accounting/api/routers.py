@@ -4,7 +4,7 @@ y mapeo de asientos automáticos."""
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from src.config.settings import settings
@@ -194,13 +194,14 @@ def crear_asiento_manual(
 @router.get("/asientos", response_model=Pagina[schemas.AsientoOut])
 def listar_asientos(
     empresa_id: uuid.UUID | None = None,
+    q: str | None = Query(None, max_length=100, description="Busca en la glosa"),
     _: Usuario = Depends(require_permission(LEER)),
     tenant: Tenant = Depends(get_tenant),
     p: Paginacion = Depends(paginacion),
     session: Session = Depends(get_db),
 ):
     return paginar(
-        session, AsientoRepo(session).q_list(tenant.filtro_empresa(empresa_id)), p
+        session, AsientoRepo(session).q_list(tenant.filtro_empresa(empresa_id), q), p
     )
 
 

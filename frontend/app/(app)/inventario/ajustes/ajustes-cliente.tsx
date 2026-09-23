@@ -44,7 +44,7 @@ const CONDICIONES = [
 ] as const;
 
 const CLASE_ESTADO: Record<string, string> = {
-  pendiente: "bg-amber-100 text-amber-900",
+  pendiente: "bg-status-warning-surface text-status-warning-texto",
   aprobado: "bg-accent/30 text-dark",
   rechazado: "bg-gray/20 text-gray",
 };
@@ -119,7 +119,7 @@ export function AjustesCliente({
           row.original.dentro_margen ? (
             <span className="text-sm text-gray">Dentro</span>
           ) : (
-            <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-900">
+            <span className="rounded bg-status-danger-surface px-2 py-0.5 text-xs font-bold text-status-danger">
               Fuera de margen
             </span>
           ),
@@ -147,7 +147,7 @@ export function AjustesCliente({
                 type="button"
                 disabled={enviando === row.original.id}
                 onClick={() => decidir(row.original.id, "aprobar")}
-                className="rounded bg-primary px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
+                className="rounded bg-primary px-3 py-1 text-xs font-bold text-primary-foreground disabled:opacity-50"
               >
                 Aprobar
               </button>

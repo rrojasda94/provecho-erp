@@ -49,7 +49,15 @@ def connect_args(url: str, *, statement_timeout_segundos: int) -> dict:
     }
 
 
-def _crear_engine(statement_timeout_segundos: int):
+def pool_args(url: str, *, pool_size: int, max_overflow: int) -> dict:
+    """Tamaño del pool: solo en Postgres. El SQLite en memoria de los tests
+    usa otra clase de pool que no acepta ni `pool_size` ni `max_overflow`."""
+    if not url.startswith("postgresql"):
+        return {}
+    return {"pool_size": pool_size, "max_overflow": max_overflow}
+
+
+def _crear_engine(statement_timeout_segundos: int, *, pool_size: int, max_overflow: int):
     return create_engine(
         settings.database_url,
         pool_pre_ping=True,
@@ -57,20 +65,32 @@ def _crear_engine(statement_timeout_segundos: int):
             settings.database_url,
             statement_timeout_segundos=statement_timeout_segundos,
         ),
+        **pool_args(settings.database_url, pool_size=pool_size, max_overflow=max_overflow),
     )
 
 
 #: El engine de todo el ERP. Plazo corto: una consulta de caja que tarda más
 #: que esto no está lenta, está trabada, y en el mostrador un error se maneja
-#: mejor que una pantalla que no vuelve.
-engine = _crear_engine(settings.db_statement_timeout_segundos)
+#: mejor que una pantalla que no vuelve. Pool más ancho que el de SQLAlchemy
+#: por defecto (5+10): con esos números, una pantalla que disparaba decenas
+#: de requests a la vez dejaba a los demás esperando 30 s y caían con
+#: `QueuePool limit reached`.
+engine = _crear_engine(
+    settings.db_statement_timeout_segundos,
+    pool_size=settings.db_pool_size,
+    max_overflow=settings.db_max_overflow,
+)
 
 #: El engine de los reportes (`src/core/reportes/` y el módulo `reports`).
 #: Mismo destino, plazo largo: un reporte que cruza tres meses de ventas
 #: tarda de verdad, y matarlo con el plazo del cobro sería romper un reporte
 #: sano. Cuesta un pool de conexiones aparte —el precio de que una consulta
 #: pesada tampoco se coma las conexiones que necesita la caja.
-engine_reportes = _crear_engine(settings.db_statement_timeout_reportes_segundos)
+engine_reportes = _crear_engine(
+    settings.db_statement_timeout_reportes_segundos,
+    pool_size=settings.db_pool_size_reportes,
+    max_overflow=settings.db_max_overflow_reportes,
+)
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 SessionReportes = sessionmaker(

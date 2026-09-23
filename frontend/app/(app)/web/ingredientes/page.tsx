@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { IngredientesCliente, type Foto, type Insumo } from "./ingredientes-cliente";
@@ -7,19 +7,19 @@ export default async function WebIngredientesPage() {
   const { token } = await obtenerSesion();
 
   try {
-    const insumos = await apiFetch<Pagina<Insumo>>(
-      "/api/v1/inventory/articulos?tipo=insumo&page_size=200",
+    const insumos = await apiFetchCompleto<Insumo>(
+      "/api/v1/inventory/articulos?tipo=insumo",
       { token },
     );
 
-    const fotos = await Promise.all(
-      insumos.items.map((a) =>
-        apiFetch<Foto[]>(`/api/v1/storefront/fotos/ingrediente/${a.id}`, { token }),
-      ),
-    );
-    const fotosPorInsumo = Object.fromEntries(
-      insumos.items.map((a, i) => [a.id, fotos[i]]),
-    );
+    // Una sola llamada para todas las fotos (antes: hasta 200 en paralelo).
+    const ids = insumos.items.map((a) => `ids=${a.id}`).join("&");
+    const fotosPorInsumo = insumos.items.length
+      ? await apiFetch<Record<string, Foto[]>>(
+          `/api/v1/storefront/fotos?entidad=ingrediente&${ids}`,
+          { token },
+        )
+      : {};
 
     return <IngredientesCliente insumos={insumos.items} fotosPorInsumo={fotosPorInsumo} />;
   } catch (e) {

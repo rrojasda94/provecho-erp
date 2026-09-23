@@ -1108,3 +1108,58 @@ def test_quitar_lineas_no_reversa_el_asiento_entero(env):
     assert ingreso_haber == Decimal("80.00")
     assert ingreso_debe == Decimal(0)
 
+
+
+def test_listar_asientos_busca_por_glosa_y_pagina(env):
+    """El libro se pagina en el servidor: la pantalla pedía la primera página
+    (50) y buscaba en el navegador, así que el asiento 51 no aparecía nunca."""
+    client, ids, _ = env
+    h = _token(client)
+    _abrir_periodo_actual(client, h, ids)
+    caja_id, ventas_id = _cuentas_debe_haber(client, h, ids)
+    for glosa in ("Venta mesa 4", "Venta mesa 7", "Compra de harina"):
+        r = client.post(
+            "/api/v1/accounting/asientos",
+            headers=h,
+            json={
+                "empresa_id": ids["empresa_id"],
+                "fecha": fechas.hoy().isoformat(),
+                "glosa": glosa,
+                "lineas": [
+                    {"cuenta_contable_id": caja_id, "tipo": "debe", "monto": "10.00"},
+                    {"cuenta_contable_id": ventas_id, "tipo": "haber", "monto": "10.00"},
+                ],
+            },
+        )
+        assert r.status_code == 201
+
+    ventas = client.get("/api/v1/accounting/asientos?q=mesa", headers=h).json()
+    assert ventas["total"] == 2
+    assert {a["glosa"] for a in ventas["items"]} == {"Venta mesa 4", "Venta mesa 7"}
+
+    segunda = client.get("/api/v1/accounting/asientos?page=2&page_size=2", headers=h).json()
+    assert segunda["total"] == 3
+    assert len(segunda["items"]) == 1
+
+
+def test_un_listener_que_revienta_deja_el_asiento_omitido_con_su_error(env, monkeypatch):
+    """Una excepción en el listener solo quedaba en el log: la pantalla de
+    Asientos no se enteraba y el balance quedaba corto sin decir de qué venta."""
+    client, ids, _ = env
+    h = _token(client)
+
+    def revienta(*_a, **_k):
+        raise RuntimeError("regla corrupta")
+
+    monkeypatch.setattr(accounting_listeners, "_generar", revienta)
+    venta_id = str(uuid.uuid4())
+    accounting_listeners.on_venta_confirmada(
+        {"venta_id": venta_id, "sucursal_id": ids["sucursal_id"], "items": [], "total": "10"}
+    )
+
+    omitidos = client.get("/api/v1/accounting/asientos-omitidos", headers=h).json()
+    assert len(omitidos) == 1
+    assert omitidos[0]["motivo"] == "error"
+    assert omitidos[0]["evento"] == "sales.venta_confirmada"
+    assert omitidos[0]["referencia_origen"] == venta_id
+    assert omitidos[0]["detalle"] == "RuntimeError: regla corrupta"

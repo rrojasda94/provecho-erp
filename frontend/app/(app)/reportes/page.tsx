@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetchCompleto } from "@/lib/api";
 import type { ReporteEmitido } from "@/lib/reports";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -10,7 +10,7 @@ export default async function MisReportesPage() {
   let reportes: ReporteEmitido[];
   try {
     reportes = (
-      await apiFetch<Pagina<ReporteEmitido>>("/api/v1/reports/mios", { token })
+      await apiFetchCompleto<ReporteEmitido>("/api/v1/reports/mios", { token })
     ).items;
   } catch (e) {
     const mensaje =

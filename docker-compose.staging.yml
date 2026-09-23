@@ -26,6 +26,7 @@ services:
       POSTGRES_USER: provecho
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: provecho
+    mem_limit: 1g
     volumes:
       - pgdata:/var/lib/postgresql/data
     # Vacío = solo loopback (mismo criterio que `api`, abajo): psql desde el
@@ -44,6 +45,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     command: redis-server --save 60 1 --appendonly no
+    mem_limit: 128m
     volumes:
       - redisdata:/data
     healthcheck:
@@ -73,6 +75,12 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://provecho:${POSTGRES_PASSWORD}@db:5432/provecho
       REDIS_URL: redis://redis:6379/0
+      # Dos procesos de uvicorn: con uno solo, una petición lenta bloqueaba a
+      # todos y el ERP "se caía". Uvicorn lee esta variable (`--workers`).
+      WEB_CONCURRENCY: "2"
+    # Tope de memoria por servicio (droplet de 4 GB compartido): sin él, un
+    # proceso desbocado se comía el servidor entero y arrastraba a los demás.
+    mem_limit: 768m
     # Solo loopback: Caddy es la única puerta de entrada desde fuera; el
     # loopback queda para health checks y depuración desde el servidor.
     ports:
@@ -90,7 +98,10 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://provecho:${POSTGRES_PASSWORD}@db:5432/provecho
       REDIS_URL: redis://redis:6379/0
-    command: celery -A src.core.celery_app worker --loglevel=info
+    # `--concurrency 1`: sin él Celery abre un proceso por núcleo (2 acá), cada
+    # uno con su propio pool de conexiones, para un volumen de tareas mínimo.
+    command: celery -A src.core.celery_app worker --loglevel=info --concurrency 1
+    mem_limit: 512m
     # El HEALTHCHECK de la imagen pega a /health, que este proceso no sirve
     # (no levanta servidor HTTP) — ver docker-compose.prod.yml.
     healthcheck:
@@ -111,6 +122,7 @@ services:
     # Una sola instancia por despliegue: dos programadores encolarían cada
     # tarea dos veces.
     command: celery -A src.core.celery_app beat --loglevel=info
+    mem_limit: 192m
     healthcheck:
       disable: true
     depends_on:
@@ -146,6 +158,7 @@ services:
       # URL pública del BI (Superset, ADR-083) — droplet aparte, ver
       # docs/engineering/bi-superset.md.
       BI_URL: ${BI_URL:-}
+    mem_limit: 384m
     depends_on:
       - api
 
@@ -160,7 +173,13 @@ services:
       API_INTERNAL_URL: http://api:8000
       GOOGLE_MAPS_BROWSER_KEY: ${GOOGLE_MAPS_BROWSER_KEY:-}
       GOOGLE_MAPS_MAP_ID: ${GOOGLE_MAPS_MAP_ID:-DEMO_MAP_ID}
+      # Sesga el autocompletado de direcciones del checkout a Perú.
+      GOOGLE_MAPS_PAIS: ${GOOGLE_MAPS_PAIS:-pe}
       STOREFRONT_IMAGENES_HOST: ${STOREFRONT_IMAGENES_HOST:-}
+      # Client ID de "Ingresar con Google" (no es un secreto). Sin él el botón
+      # no se dibuja: faltaba acá y el `.env` del servidor no llegaba al sitio.
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+    mem_limit: 384m
     depends_on:
       - api
 

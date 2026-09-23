@@ -2,9 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, useTransition } from "react";
 
 import { buscar, type Buscable } from "@/lib/busqueda";
+import { vibrar } from "@/lib/haptica";
+import { Girador } from "@/components/boton";
+import { agregarFavoritoAction, quitarFavoritoAction } from "@/app/cuenta/actions";
 
 export type Ingrediente = { id: string; nombre: string };
 export type Variante = {
@@ -37,18 +41,140 @@ function terminosDe(p: Producto): string[] {
   ];
 }
 
-export function CartaCliente({ carta }: { carta: Carta }) {
-  const [consulta, setConsulta] = useState("");
-  const [categoria, setCategoria] = useState<string | null>(null);
-  const [tamano, setTamano] = useState<string>("");
-  const [precioMax, setPrecioMax] = useState<string>("");
-  const [soloDisponibles, setSoloDisponibles] = useState(false);
+export function BotonFavorito({
+  productoId,
+  esFavorito,
+  sesionActiva,
+  onCambio,
+  onError,
+}: {
+  productoId: string;
+  esFavorito: boolean;
+  sesionActiva: boolean;
+  onCambio: (id: string, favorito: boolean) => void;
+  onError?: (mensaje: string) => void;
+}) {
+  const [pendiente, startTransition] = useTransition();
+  const router = useRouter();
 
+  if (!sesionActiva) {
+    return (
+      // `<button>` y no `<Link>`: esta tarjeta ya es un `<Link>` de la
+      // carta, y un `<a>` anidado dentro de otro `<a>` es HTML inválido —
+      // React lo detecta en hidratación y regenera el árbol entero, que es
+      // el tipo de parpadeo que un e2e agarra como carrera y un ojo humano
+      // casi nunca nota.
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          router.push("/cuenta/ingresar");
+        }}
+        className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs"
+        title="Ingresa para guardar favoritos"
+      >
+        ♡
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={pendiente}
+      aria-pressed={esFavorito}
+      aria-busy={pendiente}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const nuevoValor = !esFavorito;
+        onCambio(productoId, nuevoValor);
+        vibrar();
+        startTransition(async () => {
+          try {
+            if (nuevoValor) await agregarFavoritoAction(productoId);
+            else await quitarFavoritoAction(productoId);
+          } catch {
+            // Se revierte Y se avisa: el rollback mudo hacía que un fallo se
+            // viera igual que "el corazón no responde".
+            onCambio(productoId, esFavorito);
+            onError?.("No pudimos guardar tu favorito. Intenta de nuevo.");
+          }
+        });
+      }}
+      className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-base text-rojo transition-transform active:scale-90 disabled:opacity-70"
+      title={esFavorito ? "Quitar de favoritos" : "Agregar a favoritos"}
+    >
+      {pendiente ? <Girador className="h-3.5 w-3.5 text-humo" /> : esFavorito ? "♥" : "♡"}
+    </button>
+  );
+}
+
+export function CartaCliente({
+  carta,
+  sesionActiva = false,
+  favoritosIds = [],
+}: {
+  carta: Carta;
+  sesionActiva?: boolean;
+  favoritosIds?: string[];
+}) {
+  // Los filtros viven en la URL (`?q=&cat=&tam=`): el "atrás" del celular
+  // al volver de un producto no los pierde, y una búsqueda se puede compartir.
+  const params = useSearchParams();
+  const [consulta, setConsulta] = useState(params.get("q") ?? "");
+  const [categoria, setCategoria] = useState<string | null>(params.get("cat"));
+  const [tamano, setTamano] = useState(params.get("tam") ?? "");
+  const [favoritos, setFavoritos] = useState(() => new Set(favoritosIds));
+  const [errorFavorito, setErrorFavorito] = useState("");
+
+  // El `useState` de arriba solo corre en el primer render: sin esto, un
+  // `router.refresh()` o una vuelta atrás traían la lista nueva del servidor y
+  // los corazones seguían mostrando la vieja. Desincronizado, el siguiente
+  // click mandaba el verbo contrario al que el servidor esperaba y quedaba
+  // trabado — el "marco pero no desmarco" del reporte. Se ajusta durante el
+  // render (y no en un efecto) porque es exactamente el caso que React
+  // documenta para eso: estado local que deriva de una prop que cambió.
+  const claveServidor = favoritosIds.join(",");
+  const [claveVista, setClaveVista] = useState(claveServidor);
+  if (claveServidor !== claveVista) {
+    setClaveVista(claveServidor);
+    setFavoritos(new Set(favoritosIds));
+  }
+
+  useEffect(() => {
+    const url = new URLSearchParams();
+    if (consulta) url.set("q", consulta);
+    if (categoria) url.set("cat", categoria);
+    if (tamano) url.set("tam", tamano);
+    const texto = url.toString();
+    window.history.replaceState(null, "", texto ? `?${texto}` : window.location.pathname);
+  }, [consulta, categoria, tamano]);
+
+  function alCambiarFavorito(id: string, favorito: boolean) {
+    setFavoritos((actual) => {
+      const siguiente = new Set(actual);
+      if (favorito) siguiente.add(id);
+      else siguiente.delete(id);
+      return siguiente;
+    });
+  }
+
+  const enCategoria = useMemo(
+    () => carta.productos.filter((p) => !categoria || p.categoria_id === categoria),
+    [carta.productos, categoria],
+  );
+
+  // Los tamaños que ofrece lo que hay en la categoría elegida, en el orden de
+  // la carta (Personal, Mediana, Familiar): sin categoría con variantes, no
+  // hay filtro de tamaño que mostrar.
   const tamanos = useMemo(() => {
     const set = new Set<string>();
-    for (const p of carta.productos) for (const v of p.variantes) set.add(v.nombre);
-    return [...set].sort();
-  }, [carta.productos]);
+    for (const p of enCategoria) for (const v of p.variantes) set.add(v.nombre);
+    return [...set];
+  }, [enCategoria]);
+  const tamanoActivo = tamanos.includes(tamano) ? tamano : "";
 
   const buscables: Buscable[] = useMemo(
     () => carta.productos.map((p) => ({ id: p.id, terminos: terminosDe(p) })),
@@ -58,21 +184,18 @@ export function CartaCliente({ carta }: { carta: Carta }) {
   const idsPorBusqueda = useMemo(() => new Set(buscar(consulta, buscables)), [consulta, buscables]);
 
   const filtrados = useMemo(() => {
-    return carta.productos.filter((p) => {
-      if (!idsPorBusqueda.has(p.id)) return false;
-      if (categoria && p.categoria_id !== categoria) return false;
-      if (tamano && !(p.variantes.length === 0 || p.variantes.some((v) => v.nombre === tamano))) {
-        return false;
-      }
-      if (precioMax && Number(p.precio_desde) > Number(precioMax)) return false;
-      if (soloDisponibles && !p.disponible) return false;
-      return true;
-    });
-  }, [carta.productos, idsPorBusqueda, categoria, tamano, precioMax, soloDisponibles]);
+    return enCategoria
+      .filter((p) => {
+        if (!idsPorBusqueda.has(p.id)) return false;
+        return !tamanoActivo || p.variantes.some((v) => v.nombre === tamanoActivo);
+      })
+      // Lo agotado se ve (con su etiqueta) pero al final: no estorba al pedir.
+      .sort((a, b) => Number(b.disponible) - Number(a.disponible));
+  }, [enCategoria, idsPorBusqueda, tamanoActivo]);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8">
-      <h1 className="font-display text-3xl uppercase text-negro">Carta</h1>
+      <h1 className="font-titular text-3xl uppercase text-negro">Carta</h1>
 
       <div className="flex flex-col gap-3">
         <input
@@ -107,50 +230,39 @@ export function CartaCliente({ carta }: { carta: Carta }) {
         </div>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           {tamanos.length > 0 && (
-            <label className="flex items-center gap-1">
-              Tamaño
-              <select
-                value={tamano}
-                onChange={(e) => setTamano(e.target.value)}
-                className="rounded border border-negro/40 px-2 py-1"
-              >
-                <option value="">Todos</option>
-                {tamanos.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Tamaño">
+              <span className="font-bold">Tamaño</span>
+              {["", ...tamanos].map((t) => (
+                <button
+                  key={t || "todos"}
+                  type="button"
+                  onClick={() => setTamano(t)}
+                  className={`rounded-full border-2 border-negro px-3 py-1 text-xs font-bold uppercase ${
+                    tamanoActivo === t ? "bg-verde text-negro" : "bg-white"
+                  }`}
+                >
+                  {t || "Todos"}
+                </button>
+              ))}
+            </div>
           )}
-          <label className="flex items-center gap-1">
-            Precio hasta
-            <input
-              type="number"
-              min={0}
-              value={precioMax}
-              onChange={(e) => setPrecioMax(e.target.value)}
-              placeholder="S/"
-              className="w-20 rounded border border-negro/40 px-2 py-1"
-            />
-          </label>
-          <label className="flex items-center gap-1">
-            <input
-              type="checkbox"
-              checked={soloDisponibles}
-              onChange={(e) => setSoloDisponibles(e.target.checked)}
-            />
-            Solo disponibles
-          </label>
         </div>
       </div>
+
+      {errorFavorito && (
+        <p role="alert" className="text-sm text-rojo">
+          {errorFavorito}
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {filtrados.map((p) => (
           <Link
             key={p.id}
             href={`/carta/${p.id}`}
-            className="sombra-dura flex flex-col overflow-hidden rounded-lg border-2 border-negro bg-white"
+            prefetch
+            onClick={() => vibrar()}
+            className="sombra-dura revelar flex flex-col overflow-hidden rounded-lg border-2 border-negro bg-white"
           >
             <div className="relative h-40 w-full bg-crema-2">
               {p.foto_url && <Image src={p.foto_url} alt={p.nombre} fill className="object-cover" />}
@@ -159,6 +271,13 @@ export function CartaCliente({ carta }: { carta: Carta }) {
                   No disponible
                 </span>
               )}
+              <BotonFavorito
+                productoId={p.id}
+                esFavorito={favoritos.has(p.id)}
+                sesionActiva={sesionActiva}
+                onCambio={alCambiarFavorito}
+                onError={setErrorFavorito}
+              />
             </div>
             <div className="flex flex-1 flex-col gap-1 p-3">
               <h3 className="font-bold">{p.nombre}</h3>

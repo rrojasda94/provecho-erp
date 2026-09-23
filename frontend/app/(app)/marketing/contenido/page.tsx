@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { ContenidoCliente, type Pieza } from "./contenido-cliente";
@@ -9,10 +9,10 @@ export default async function ContenidoPage() {
 
   try {
     const [piezas, campanas, marcas] = await Promise.all([
-      apiFetch<Pagina<Pieza>>("/api/v1/marketing/piezas", { token }),
+      apiFetchCompleto<Pieza>("/api/v1/marketing/piezas", { token }),
       // Sin `page_size`, el desplegable de campaña se queda en las primeras
       // 50 sin decirlo.
-      apiFetch<Pagina<Campana>>("/api/v1/marketing/campanas?page_size=200", {
+      apiFetchCompleto<Campana>("/api/v1/marketing/campanas", {
         token,
       }),
       apiFetch<Marca[]>("/api/v1/marcas", { token }),
@@ -20,7 +20,6 @@ export default async function ContenidoPage() {
     return (
       <ContenidoCliente
         piezas={piezas.items}
-        total={piezas.total}
         campanas={campanas.items}
         marcas={marcas}
       />

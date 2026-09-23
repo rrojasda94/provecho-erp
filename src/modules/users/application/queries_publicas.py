@@ -21,6 +21,7 @@ from src.modules.users.application.errors import (
 )
 from src.modules.users.domain import rules
 from src.modules.users.infrastructure.models import (
+    Marca,
     Permiso,
     RolPermiso,
     Sucursal,
@@ -169,7 +170,7 @@ def notificar_a(
     )
 
 
-# --- Contrato del sitio de marca (storefront, ADR-103/RN-WEB-001/004) ------
+# --- Contrato del sitio de marca (storefront, ADR-105/RN-WEB-001/004) ------
 
 def sucursales_publicas_de_marca(
     session: Session, marca_id: uuid.UUID
@@ -209,3 +210,45 @@ def empresas_de_marca(session: Session, marca_id: uuid.UUID) -> list[uuid.UUID]:
             .distinct()
         )
     )
+
+
+def grupo_de_marca(session: Session, marca_id: uuid.UUID) -> uuid.UUID | None:
+    """El `grupo_id` dueño de una marca — lo necesita `sales` para crear un
+    `cliente` (transversal al grupo, RN-PTS-001) a partir de una cuenta del
+    sitio de marca, que solo conoce su `marca_id` (ADR-104)."""
+    return session.scalar(select(Marca.grupo_id).where(Marca.id == marca_id))
+
+
+_USERNAME_STOREFRONT = "storefront_web"
+
+
+def usuario_servicio_storefront(session: Session) -> uuid.UUID:
+    """El usuario de servicio (`tipo=agente_ia`) que autoría las ventas que
+    crea el sitio de marca (ADR-104): `Venta.usuario_id` es NOT NULL y
+    ningún cliente del sitio tiene cuenta de trabajador para firmarlas.
+
+    Única excepción de escritura en este archivo, que por lo demás es de
+    solo lectura: se crea la primera vez que hace falta, en vez de exigir
+    un paso de despliegue manual (como `python -m src.seeders.hub`) que el
+    primer pedido web se arriesga a pisar si alguien lo olvida. El PIN es
+    aleatorio y no se usa nunca — este usuario no inicia sesión, solo
+    ancla la columna `usuario_id`."""
+    import secrets
+
+    from src.modules.users.infrastructure.security import hash_pin
+
+    existente = session.scalar(
+        select(Usuario).where(Usuario.username == _USERNAME_STOREFRONT)
+    )
+    if existente is not None:
+        return existente.id
+    usuario = Usuario(
+        username=_USERNAME_STOREFRONT,
+        pin_hash=hash_pin(secrets.token_hex(16)),
+        tipo="agente_ia",
+        nombre_display="Sitio web",
+        activo=True,
+    )
+    session.add(usuario)
+    session.flush()
+    return usuario.id

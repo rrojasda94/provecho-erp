@@ -48,7 +48,7 @@ function ListaParadas({
             </span>
             <span className="flex shrink-0 items-center gap-1.5 text-xs text-gray">
               {!resuelta(p.estado) && !p.lista ? (
-                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-amber-800">
+                <span className="rounded bg-status-warning-surface px-1.5 py-0.5 text-status-warning-texto">
                   En cocina
                 </span>
               ) : null}

@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { GuiasRemisionCliente, type GuiaRemision } from "./guias-remision-cliente";
@@ -9,7 +9,7 @@ export default async function GuiasRemisionPage() {
   let guias: GuiaRemision[];
   try {
     guias = (
-      await apiFetch<Pagina<GuiaRemision>>("/api/v1/inventory/guias-remision", {
+      await apiFetchCompleto<GuiaRemision>("/api/v1/inventory/guias-remision", {
         token,
       })
     ).items;

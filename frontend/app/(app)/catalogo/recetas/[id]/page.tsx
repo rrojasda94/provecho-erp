@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import type { Articulo, RecetaDetalle, UnidadMedida } from "@/lib/catalogo";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -18,7 +18,7 @@ export default async function RecetaPage({
       // Sin `page_size`, la API corta en 50: el selector de "artículo que
       // produce esta receta" (`subrecetas`) se queda sin decirlo en cuanto
       // el catálogo pasa de una página.
-      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?page_size=200", {
+      apiFetchCompleto<Articulo>("/api/v1/inventory/articulos", {
         token,
       }),
       apiFetch<UnidadMedida[]>("/api/v1/inventory/unidades-medida", { token }),

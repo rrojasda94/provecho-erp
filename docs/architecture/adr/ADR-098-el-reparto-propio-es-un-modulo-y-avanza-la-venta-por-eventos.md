@@ -103,3 +103,6 @@ en fallo de transporte).
 - El costo es un salto de proceso más para cerrar una entrega (evento en
   vez de llamada directa) y dos contratos de lectura nuevos que `sales`
   debe mantener estables.
+
+> Nota (2026-09-23): la PWA `/reparto` pasa a ser una de tres apps
+> instalables con `id` y login propios — ver ADR-109.

@@ -13,6 +13,7 @@ import type {
   TicketTexto,
 } from "@/components/impresion/tipos";
 
+import { type Pagina, recorrerPaginas, rutaPagina } from "./api";
 import { pedir } from "./cliente-api";
 
 export { ErrorApi, claveIdempotencia } from "./cliente-api";
@@ -504,18 +505,14 @@ export const api = {
   mediosPago: () => pedir<MedioPago[]>("/sales/medios-pago?direccion=cobro"),
 
   /** El endpoint devuelve el sobre paginado de ADR-026; el PDV quiere la
-   * jornada entera y se le desenvuelve acá. `page_size` al techo (200): una
-   * sucursal que pase de 200 ventas cobradas en un día perdería las más
-   * viejas de la pestaña de cobrados, y ahí recién hace falta paginar la
-   * pestaña en vez de subir un número. */
-  ventasDelDia: async (sucursalId: string, estado?: string): Promise<Venta[]> => {
-    const pagina = await pedir<{ items: Venta[] }>(
-      `/sales/ventas?sucursal_id=${sucursalId}&page_size=200${
-        estado ? `&estado=${estado}` : ""
-      }`,
-    );
-    return pagina.items;
-  },
+   * jornada entera y se le desenvuelve acá, página por página: con una sola
+   * de 200, la venta 201 del día desaparecía de la pestaña de cobrados. */
+  ventasDelDia: (sucursalId: string, estado?: string): Promise<Venta[]> =>
+    recorrerPaginas((page) =>
+      pedir<Pagina<Venta>>(
+        rutaPagina(`/sales/ventas?sucursal_id=${sucursalId}${estado ? `&estado=${estado}` : ""}`, page),
+      ),
+    ),
 
   crearVenta: (cuerpo: VentaNueva) =>
     pedir<Venta>("/sales/ventas", { metodo: "POST", cuerpo }),

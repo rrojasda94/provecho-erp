@@ -190,7 +190,9 @@ importe.
   activos_depreciables` — lineal, un asiento por activo por mes (debe
   `6813`, haber `3913`), idempotente por `<activo_id>:<AAAA-MM>`.
   `activo_depreciacion` lleva lo acumulado; sin las cuentas 6813/3913
-  importadas, queda como `asiento_omitido` (`sin_cuentas`).
+  importadas, queda como `asiento_omitido` (`sin_cuentas`). Un listener que
+  revienta con una excepción también se anota, con motivo `error` y el
+  mensaje en `detalle` (2026-09-23, enmienda a ADR-089).
 
 ## Reglas
 

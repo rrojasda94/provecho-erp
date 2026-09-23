@@ -295,6 +295,41 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  # Mismo criterio que `e2e` (abajo) pero para el sitio de marca: carrito →
+  # checkout de invitado → confirmación, contra su propia API (SQLite
+  # desechable, puertos 8110/3110 — no comparte nada con la suite del ERP,
+  # `docs/engineering/trabajo-en-paralelo.md`). Job aparte y no un paso más
+  # de `storefront` porque prueba cliente+servidor de acuerdo, no solo que
+  # cada uno compile por su lado — la misma razón que separa `e2e` de
+  # `frontend`.
+  storefront-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: pip install -e ".[dev]"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: storefront/package-lock.json
+      - run: npm ci
+        working-directory: storefront
+      - run: npx playwright install --with-deps chromium
+        working-directory: storefront
+      - run: npm run test:e2e
+        working-directory: storefront
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: storefront-e2e-playwright
+          path: storefront/test-results/
+          retention-days: 7
+
   # El flujo del dinero de punta a punta contra la API real. Es el único job
   # que prueba que cliente y servidor estén de acuerdo: los dos bugs que
   # motivaron la suite (apertura de caja mandando el contrato pre-ADR-025,

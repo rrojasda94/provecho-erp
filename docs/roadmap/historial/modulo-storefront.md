@@ -1,15 +1,19 @@
 # Historial — Módulo `storefront`
 
-Estado vigente: 🔶 En curso — PR1 implementado (2026-09-17, ADR-103): sitio
-público de solo lectura para Charlie's Pizzas en `charlies.majambo.com.pe`,
-servido por una app Next.js separada del ERP (`storefront/`). Cuentas de
-cliente, direcciones/favoritos, carrito y checkout con pagos (Izipay) quedan
-para PR2/PR3; Playwright del sitio y SEO (sitemap, OG) para PR4. Ver
+Estado vigente: 🔶 En curso — PR1 (2026-09-17, ADR-105): sitio público de
+solo lectura para Charlie's Pizzas en `charlies.majambo.com.pe`, servido por
+una app Next.js separada del ERP (`storefront/`). PR2 (2026-09-17, ADR-104):
+cuentas de cliente (email/clave + Google), direcciones, favoritos y "tu
+último pedido", con credencial separada de la del ERP. PR3 (2026-09-17,
+ADR-105): carrito, checkout invitado o logueado, asignación
+automática de local, ETA, boleta/factura, efectivo e Izipay (adaptador
+falso), canal `web` en `venta`. Playwright del sitio, SEO (sitemap, OG) y
+hardening de seguridad quedan para PR4. Ver
 `docs/roadmap/deuda/modulo-storefront.md`.
 
 ## Cronología
 
-### 2026-09-17 — PR1: sitio público, CMS y fotos (ADR-103)
+### 2026-09-17 — PR1: sitio público, CMS y fotos (ADR-105)
 
 Encargo del usuario: una web de marca completa para Charlie's Pizzas
 (catálogo con fotos e ingredientes, promos web, locales en mapa, cuentas
@@ -18,7 +22,7 @@ insumos externos: brand guideline de Charlie's (`brand-voice-guidelines.md`,
 `majambo.md` §3.1, `Brandbook_CharliesPizza.pdf`) y un prototipo de
 storefront ya construido con Claude Design, portado a HTML/JS estándar.
 
-Decisión de arquitectura central (ADR-103): el sitio vive en una **app Next
+Decisión de arquitectura central (ADR-105): el sitio vive en una **app Next
 separada** (`storefront/`), no en una ruta más del proceso `web` compartido
 con el ERP como hizo ADR-080 para la landing del QR — el sitio de marca
 necesita SEO real, tema y CSP propios (paleta verde/crema del brandbook de
@@ -70,3 +74,187 @@ Verificado antes de abrir el PR: suite completa de `pytest` en verde
 (2758 pasados), `ruff check` limpio, `npm run lint`/`typecheck`/`test`/
 `build` en verde en `frontend/` y en `storefront/` (sin API arriba para el
 build), `openapi.json` regenerado.
+
+### 2026-09-17 — PR2: cuentas de cliente (ADR-104)
+
+Sobre la rama de PR1, sin pausa (encargo del usuario: PRs encadenados,
+"en automático uno tras otro"). Alcance: cuentas de cliente para el sitio
+de Charlie's Pizzas, separadas de las credenciales del ERP.
+
+- **Tablas nuevas en `storefront`**: `storefront_cuenta` (email único,
+  `password_hash` Argon2id nullable, `google_sub` único nullable,
+  `cliente_id` FK a `cliente`, `intentos_fallidos`, `bloqueado_hasta`),
+  `storefront_direccion` (con `UbicacionMixin`, una predeterminada),
+  `storefront_favorito` (única por cuenta+producto),
+  `storefront_refresh_token` (rotación con detección de reuso, mismo
+  patrón que `users`) — migración `a4f1a2f11b85`.
+- **Aislamiento de credenciales (ADR-104)**: `security.py` propio del
+  módulo, JWT firmado con `STOREFRONT_JWT_SECRET` (nunca `JWT_SECRET`) y
+  `aud="storefront"`; el decoder exige esa audiencia, así que un token de
+  cliente jamás decodifica en un endpoint del ERP y viceversa (probado en
+  `test_token_de_cuenta_web_no_sirve_en_el_erp` /
+  `test_token_del_erp_no_sirve_en_storefront`). Cookies propias del
+  dominio (`charlies_token`, `charlies_refresh`), httpOnly, nunca las de
+  `frontend/` (`provecho_token`).
+- **Login con Google**: verificación server-side del `id_token` contra el
+  JWKS de Google (`PyJWKClient` de PyJWT, sin dependencia nueva). Cuenta
+  nueva por Google exige los mismos datos que el registro por email
+  (RN-WEB-005: nombre, DNI, teléfono, cumpleaños, dirección) antes de
+  poder operar — el frontend resuelve esto con un formulario de
+  "completar datos" tras el primer intento fallido.
+- **Vínculo a `cliente` por evento**: `storefront` publica
+  `storefront.cuenta_registrada`; un listener de `sales` llama a
+  `clientes.crear_o_encontrar_cliente` (RENIEC + fallback, idempotente
+  por documento) y publica `sales.cliente_vinculado`, que un listener de
+  `storefront` usa para completar `cuenta.cliente_id`. Si faltan datos
+  para crear el cliente, el registro de la cuenta no se revierte — solo
+  queda sin vincular.
+- **Seguridad de cuenta**: bloqueo tras `MAX_INTENTOS_FALLIDOS = 5`
+  (`DURACION_BLOQUEO = 15 min`); el commit del intento fallido/la
+  revocación de sesión se hace **antes** de lanzar la excepción HTTP —
+  de lo contrario el `rollback()` automático de `get_db()` deshace el
+  contador (bug encontrado y corregido durante este PR, mismo patrón que
+  `users/api/routers.py::login`).
+- **Frontend `storefront/`**: `/cuenta/registro`, `/cuenta/ingresar`
+  (con botón de Google), `/cuenta` (perfil, direcciones con alta/baja,
+  favoritos, "tu último pedido"); header con enlace "Ingresar"/"Mi
+  cuenta" según sesión; home muestra el último pedido o, si no hay,
+  favoritos en vez de destacados genéricos; corazón de favorito en cada
+  tarjeta de la carta (enlaza a login si no hay sesión).
+- **ERP**: sin cambios de pantalla — PR2 es enteramente cuenta de
+  cliente/API pública.
+
+Verificado antes de abrir el PR: suite completa de `pytest` en verde
+(2786 pasados, 3 saltados), `ruff check` limpio, `openapi.json`
+regenerado, `npm run lint`/`typecheck`/`test`/`build` en verde en
+`storefront/`.
+
+### 2026-09-17 — PR3: carrito, checkout y pago (ADR-105)
+
+Sobre la rama de PR2, sin pausa (mismo encargo de PRs encadenados). Alcance:
+carrito, checkout (invitado o con cuenta), asignación automática de local,
+estimado de espera, boleta/factura, pago en efectivo o Izipay.
+
+- **`venta.canal`/`lista_precio.canal` ganan `web`** (migración
+  `3070159f64bd`): `sales.domain.rules.CANALES` pasa a
+  `{pdv, agente_ia, delivery, web}`. `storefront_canal` (semilla de la
+  carta pública) pasa de `delivery` a `web`.
+- **RN-POS-005 releída por lo que protege**: la autoatención cobra por
+  adelantado porque nadie persigue al cliente — pero en delivery/recojo web
+  el repartidor o el mostrador sí cobran en el momento de la entrega, la
+  misma garantía que un cajero. Efectivo: la `Venta` nace `orden` sin pago,
+  se cobra al entregar/recoger con el flujo normal de caja. Izipay: se cobra
+  de inmediato con `registrar_pago(..., exigir_caja_abierta=False)` —
+  excepción explícita a ADR-025 §1, documentada en ADR-105.
+- **Flujo por eventos** (mismo patrón que ADR-102):
+  `storefront.pedido_web_confirmado` → `sales.application.listeners::
+  on_pedido_web_confirmado` crea la `Venta` (y el pago si es Izipay) →
+  `sales.pedido_web_procesado` → `storefront.application.listeners::
+  on_pedido_web_procesado` marca el pedido `confirmado`/`fallido`. El bus es
+  síncrono en proceso: para cuando el checkout responde, la cadena ya
+  corrió — sin necesidad de polling en el caso normal. Se descartó
+  deliberadamente construir un outbox real + reconciliación por Celery
+  (mismo análisis costo/beneficio que ADR-016 ya hizo).
+- **Asignación automática de local** (`storefront/domain/asignacion.py`,
+  puro): la sucursal más cercana dentro del radio de delivery
+  (`DELIVERY_DISTANCIA_MAXIMA_KM`) con un `PuntoVenta(canal=web)` habilitado
+  para la modalidad pedida, salvo que esté saturada
+  (`STOREFRONT_SATURACION_PEDIDOS`, semilla 4 pedidos `orden` en curso) y
+  otra candidata dentro de radio no lo esté. Recojo: el cliente elige el
+  local. Tres funciones nuevas en el contrato público de `sales`
+  (`carga_activa_por_sucursal`, `puntos_venta_web_de_sucursales`,
+  `cotizar_delivery_publico`, esta última reutiliza `tarifa_delivery`
+  internamente — mismo cálculo que usa `crear_venta`, expuesto de
+  antemano).
+- **ETA**: `base + carga × minutos_por_pedido` (`STOREFRONT_ETA_*`, semilla
+  30/5, con 15 min de colchón en el máximo) — mismo orden que los 30-45/
+  45-55 min que Charlie's ya cotiza por teléfono.
+- **Usuario de servicio**: `users.application.queries_publicas::
+  usuario_servicio_storefront` (única función de escritura en ese archivo,
+  por lo demás de solo lectura) crea/encuentra el usuario `tipo=agente_ia`
+  `storefront_web` que autoría las ventas del sitio — `Venta.usuario_id` es
+  NOT NULL y ningún cliente del sitio tiene cuenta de trabajador.
+- **Izipay**: `src/shared/integrations/izipay/` — `Protocol` `Pasarela`,
+  `IzipayFake` (aprueba siempre) e `IzipayReal` (esqueleto,
+  `NotImplementedError`); `izipay_habilitado()` decide cuál se usa según
+  `IZIPAY_API_KEY`, mismo criterio que `comprobantes.emision_habilitada()`.
+- **Idempotencia**: `storefront_pedido.idempotency_key` (tecleada por el
+  cliente) evita duplicar un pedido si el checkout se reintenta; un
+  invitado sin cuenta consulta su pedido con `token_acceso`
+  (`GET /storefront/publico/pedidos/{id}?token=...`).
+- **Frontend `storefront/`**: `lib/carrito.ts` (carrito en `localStorage`,
+  sin llegar al servidor hasta confirmar), botón "Agregar al carrito" en la
+  ficha de producto, `/carrito`, `/checkout` (modalidad, dirección con
+  geolocalización del navegador o sucursal elegida para recojo, contacto,
+  comprobante, medio de pago) y `/pedido/{id}` (confirmación, con el
+  `token_acceso` en la URL para un invitado).
+- **Simplificación deliberada**: sin extras ni Mitad x Mitad (no existe
+  concepto de extra/combo en `sales` todavía — ver ADR-105 §6), y la
+  boleta/factura elegida en el checkout no llega a la pantalla del cajero
+  para pedidos en efectivo (se vuelve a pedir al cobrar, igual que
+  cualquier pedido telefónico de hoy).
+
+Verificado antes de abrir el PR: suite completa de `pytest` en verde
+(2801 pasados, 3 saltados), `ruff check` limpio, `openapi.json`
+regenerado, `npm run lint`/`typecheck`/`test`/`build` en verde en
+`storefront/`.
+
+### 2026-09-18 — PR4: Playwright, SEO y aislamiento de credenciales
+
+Cierre del sitio de marca: hardening, no funcionalidad nueva. Sin ADR
+propio — nada acá cambia una decisión arquitectónica de PR1-3.
+
+- **`storefront/e2e`** (ADR-047, mismo patrón que `frontend/e2e`/`uso`):
+  suite propia con su SQLite desechable y sus puertos (8110/3110, no
+  8100/3100 — `docs/engineering/trabajo-en-paralelo.md`). Un solo
+  recorrido, mismo criterio que la suite `e2e` del ERP: "el flujo del
+  dinero funciona de punta a punta", nada más — carrito → checkout de
+  invitado → recojo en efectivo → confirmación. Job `storefront-e2e`
+  agregado a `.github/workflows/ci.yml`.
+- **Dos bugs reales encontrados construyendo la suite, no simulados**:
+  - `<a>` anidado dentro de otro `<a>` en la tarjeta de producto de la
+    carta (`BotonFavorito` para un visitante sin sesión era un `Link`
+    dentro del `Link` de la tarjeta) — HTML inválido que React detecta en
+    hidratación y regenera el árbol entero; el e2e lo agarró como carrera
+    de verdad, un ojo humano casi nunca lo nota. Se cambió a `<button>` +
+    `router.push`.
+  - `CheckoutCliente` leía el carrito de `localStorage` directo en el
+    `useState` inicial — en el servidor `localStorage` no existe, así que
+    el primer render del cliente (con datos reales) no coincidía con el
+    HTML del servidor (carrito vacío) y React descartaba el árbol,
+    haciendo desaparecer un instante el botón "Confirmar pedido". Mismo
+    patrón que el bug anterior, causa distinta: arrancar en `[]` y leer el
+    carrito real en un efecto después del montaje.
+  - Ninguno de los dos era visible en desarrollo manual — solo un e2e que
+    espera por el elemento exacto (no solo por la navegación) los agarra.
+- **Trampa de entorno documentada, no un bug de la app**: si `storefront/.next`
+  tiene una build de **producción** vieja (de un `npm run build` de
+  verificación anterior), `next dev` arranca en caliente con ese HTML/RSC
+  ya prerenderizado — sirve la carta/checkout de un `marca_id`/`producto_id`
+  que ya no existe en la base recién sembrada, aunque el sitio y la API
+  arranquen de cero. `e2e/preparar-bd.mjs` ahora borra `storefront/.next`
+  entero antes de cada corrida, no solo `.next/cache` (que no alcanza).
+- **SEO**: `app/sitemap.ts` (una entrada por producto),
+  `metadataBase`/`openGraph`/`twitter` en `app/layout.tsx`, JSON-LD
+  Restaurant en el layout y en `/locales` (una por sucursal, con
+  coordenadas), JSON-LD Product en `/carta/[id]` con `offers.price` y
+  `availability`, `sitemap` agregado a `app/robots.ts`.
+- **Auditoría** (`src.shared.auditoria.registrar`, misma transacción que el
+  cambio): contenido (crear/editar), fotos (subir/borrar), perfil de cuenta,
+  alta de cuenta, direcciones (agregar/borrar), pedido (confirmar). Acción
+  de cliente del sitio (no de staff del ERP) audita con `usuario_id=None`
+  — `audit_log.usuario_id` es FK a `usuario.id`, que no existe para una
+  cuenta web — y pone el id de la propia entidad en `entidad_id`.
+- **Aislamiento de credenciales probado, no solo declarado**
+  (`tests/test_storefront_aislamiento_credenciales.py`, 11 tests): token de
+  cuenta web contra endpoints del ERP, token del ERP contra endpoints de
+  cuenta, decoder cruzado (firma inválida), token sin `aud`, y — el caso que
+  un test ingenuo deja pasar por la razón equivocada— `aud` correcto
+  forjado con el secreto del ERP, con `jwt_secret`/`storefront_jwt_secret`
+  monkeypateados a valores **distintos** a propósito (comparten placeholder
+  por defecto en dev/test).
+- Sección nueva "Sitio de marca (storefront)" en `docs/security/security.md`.
+
+Verificado antes de abrir el PR: `storefront/e2e` en verde de punta a
+punta, `pytest`/`ruff` en verde, `npm run lint`/`typecheck`/`test`/`build`
+en verde en `storefront/` y `frontend/`.

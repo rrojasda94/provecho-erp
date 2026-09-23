@@ -64,7 +64,10 @@ sea correcta y el crédito gratuito esté disponible.
    - `https://staging.majambo.com.pe/*`
    - `https://clientes.majambo.com.pe/*` — la landing del QR (ADR-080)
    - `https://charlies.majambo.com.pe/*` — el sitio de marca (ADR-103),
-     mapa de locales (`storefront/app/locales/`)
+     mapa de locales (`storefront/app/locales/`) y el campo de dirección del
+     checkout (`storefront/components/direccion/`, que usa Places y Geocoding
+     igual que el del ERP — la misma clave del navegador, las mismas APIs
+     habilitadas)
 
    El puerto cuenta. Levantar el front en otro (`npm run dev` cuando 3000 está
    ocupado, que es lo normal con varios worktrees) da
@@ -235,3 +238,26 @@ clave que llegó a un commit se considera quemada.
 La del navegador viaja al cliente por diseño, así que "filtrada" no es motivo de
 rotación por sí solo; lo que se revisa ante un pico de uso es que las
 restricciones de dominio y las cuotas sigan puestas.
+
+## 6. Cliente OAuth para «Ingresar con Google» (sitio de marca)
+
+Es lo que hace aparecer el botón de Google en `charlies.majambo.com.pe/cuenta/ingresar`
+y `/cuenta/registro` (ADR-104). **No es un secreto**: el Client ID viaja al
+navegador y el servidor solo lo usa para comprobar que el token que llega fue
+emitido para este sitio.
+
+1. Google Cloud → **APIs y servicios** → **Pantalla de consentimiento de OAuth**:
+   tipo *Externo*, nombre «Charlie's Pizzas», correo de soporte, y los alcances
+   básicos (`openid`, `email`, `profile`). Publicar la app (en modo «Pruebas»
+   solo entran los correos que se agreguen a mano).
+2. **Credenciales** → *Crear credenciales* → **ID de cliente de OAuth** → tipo
+   **Aplicación web**, nombre `charlies-web`.
+3. **Orígenes de JavaScript autorizados**: `https://charlies.majambo.com.pe` y,
+   para desarrollo, `http://localhost:3001`. No hace falta ningún URI de
+   redirección (el botón devuelve un token, no redirige).
+4. Copiar el **ID de cliente** (`…apps.googleusercontent.com`) al `.env` del
+   servidor como `GOOGLE_OAUTH_CLIENT_ID` y reiniciar (`docker compose up -d`, sin
+   filtro de servicio): lo lee el proceso del sitio (dibuja el botón) y la API
+   (verifica el token).
+5. Probar entrando con una cuenta de Google que **no** tenga cuenta en el sitio:
+   debe pedir DNI, teléfono, cumpleaños y dirección antes de crearla (RN-WEB-005).

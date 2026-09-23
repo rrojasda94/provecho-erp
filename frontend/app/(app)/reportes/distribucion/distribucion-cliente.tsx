@@ -55,7 +55,7 @@ function Regla({ regla }: { regla: MatrizRegla }) {
             : ""}
         </span>
         {regla.fuga ? (
-          <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-900">
+          <span className="rounded bg-status-danger-surface px-2 py-0.5 text-xs font-bold text-status-danger">
             fuga: no llega a nadie
           </span>
         ) : null}
@@ -78,7 +78,7 @@ function Fila({ fila }: { fila: MatrizFila }) {
           {fila.permiso}
         </span>
         {fila.hueco ? (
-          <span className="rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-red-900">
+          <span className="rounded bg-status-danger-surface px-2 py-0.5 text-xs font-bold text-status-danger">
             hueco: ocurre y no se entera nadie
           </span>
         ) : null}

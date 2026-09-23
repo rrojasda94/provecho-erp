@@ -7,6 +7,15 @@ delivery), cobrar (efectivo / Izipay) y emitir comprobantes
 electrónicos vía **Factiliza** (proveedor elegido 2026-07-26, reemplaza a
 Nubefact).
 
+**Navegación (2026-09-23, ADR-106):** el PDV (`/pdv`) tiene ficha propia en
+el home, visible con `sales.crear`; la ficha de Ventas es solo el
+back-office (jornada, clientes, mesas, promociones). El backend no cambia.
+
+**Apps instalables (2026-09-23, ADR-109):** `/pdv` y `/kds` se instalan en
+Android como apps separadas (manifest en `frontend/public/{pdv,kds}/`), con
+login propio (`/pdv/ingresar`, `/kds/ingresar`) que vuelve a la misma
+pantalla —el KDS, a su `?pantalla=`— y el último usuario recordado.
+
 ## Entidades
 
 `producto_comercial`, `receta`, `receta_item`, `lista_precio`, `venta`,
@@ -466,6 +475,11 @@ producto y cantidad, y `crear_venta` resuelve el precio contra
   revertir a mano.
 - **Sin precio vigente no hay venta**: `PrecioNoDefinido` → 409. Un
   producto sin precio tampoco aparece en la carta.
+- **UI**: crear una lista (con `canal`, ej. `web` para el sitio de marca —
+  ADR-105) y fijarle un precio a un producto se hace desde la ficha del
+  producto en `/catalogo/productos/{id}` (`frontend/app/(app)/catalogo/
+  productos/[id]/ficha-cliente.tsx`, componentes `NuevaListaForm`/
+  `PrecioDelProducto`), no hay pantalla aparte para administrar listas.
 - **Descuentos**: salen de listas promocionales, no del cliente; hoy el
   ítem nace en 0.
 

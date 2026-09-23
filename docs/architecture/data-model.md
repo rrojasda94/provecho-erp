@@ -386,7 +386,8 @@ erDiagram
 - **articulo** (inventariable): empresa_id (tenant directo — `categoria_id`
   es opcional, no sirve de puente de tenant por sí solo), id_interno (hasta
   8 alfanuméricos, autogenerado, único en todo el grupo, corregible por
-  pantalla — RN-GEN-005), nombre,
+  pantalla — RN-GEN-005), nombre, **nombre_publico** (opcional — cómo lo ve
+  el cliente en el sitio de marca; vacío = `nombre`, RN-WEB-001),
   categoria_id (opcional), unidad_medida_id, tipo (`insumo` | `subreceta` | `mercaderia` | `empaque`
   | `repuesto` | `suministro` — **enum extensible**: se agregan tipos
   nuevos cuando el negocio lo requiera, sin migración destructiva),
@@ -457,7 +458,10 @@ erDiagram
   se elimina), margen_contribucion (calculado; revisado por comercial/
   contabilidad para pricing), empaque_id (FK articulo tipo=empaque,
   nullable), modalidades_empaque (array `mesa`|`takeout`|`delivery` — en
-  cuáles se descuenta stock del empaque, RN-EMB-003). Precios en
+  cuáles se descuenta stock del empaque, RN-EMB-003), **canales** (array de
+  `pdv`|`web`|`delivery`|`agente_ia`, NULL = todos, RN-COM-044),
+  **tiempo_preparacion_min** (entero 0-240, NULL = no se sabe, RN-COM-045).
+  Precios en
   **lista_precio** / **precio** (por sucursal/canal/modalidad de consumo,
   RN-MDC-003). Puede formar parte de uno o más **combo** (N:N).
 - ~~**modificador**~~ / ~~**variante_producto**~~: **reemplazados por
@@ -529,12 +533,13 @@ revertirla: la variante **sigue siendo** una fila de `producto_comercial`
 con `producto_padre_id`, y por eso precio, margen, KDS, carta y réplica no
 cambian. Lo que se agrega es de dónde salen esas filas y qué las identifica.
 
-- **atributo**: empresa_id, nombre, `modo_variante`
+- **atributo**: empresa_id, nombre, **nombre_publico** (opcional, RN-WEB-001),
+  `modo_variante`
   (`siempre` | `dinamica` | `nunca` — el `create_variant` de Odoo),
   `display` (`radio` | `pildoras` | `select` | `color`), orden,
   ref_externa. UNIQUE(empresa_id, nombre).
-- **atributo_valor**: atributo_id, nombre, orden, activo.
-  UNIQUE(atributo_id, nombre).
+- **atributo_valor**: atributo_id, nombre, **nombre_publico** (opcional,
+  RN-WEB-001), orden, activo. UNIQUE(atributo_id, nombre).
 - **producto_atributo_linea**: producto_comercial_id, atributo_id, orden —
   qué atributo ofrece un producto. UNIQUE(producto_comercial_id, atributo_id).
 - **producto_atributo_valor** (**PTAV**): linea_id, atributo_valor_id,
@@ -2168,7 +2173,7 @@ remuneración).
 (`src/core/tenant.py`, ADR-004): mismas tablas de origen, no una copia. Su
 equivalencia la congela `tests/test_bi_alcance.py` (RN-BI-002).
 
-## 12. Sitio de marca (módulo `storefront`, ADR-103)
+## 12. Sitio de marca (módulo `storefront`, ADR-103 y ADR-105)
 
 Contenido editable y fotos del sitio público de una marca. La superficie
 pública se lee por `storefront/application/queries_publicas` de los demás
@@ -2209,6 +2214,37 @@ redes, horario de delivery).
 
 Lista vacía = cerrado ese día; hasta 2 tramos por día (`HH:MM`, 24h). Filas
 con otra forma (heredadas) se toleran y el sitio muestra "consultar horario".
+
+### Cuenta de cliente del sitio (ADR-104, PR2)
+
+Credencial separada del ERP — ver ADR-104 para el detalle del aislamiento.
+
+| Tabla | Columnas propias | Notas |
+|---|---|---|
+| `storefront_cuenta` | `email` (único), `password_hash` (nullable), `google_sub` (único, nullable), `nombres`, `apellidos`, `tipo_documento`, `numero_documento` (único entre vivas), `telefono` (único entre vivas), `fecha_nacimiento`, `cliente_id` (FK `cliente`, único, nullable), `intentos_fallidos`, `bloqueado_hasta` | `cliente_id` se completa por evento, puede quedar `NULL`. Documento y teléfono con índice único **parcial** (`WHERE deleted_at IS NULL`): una cuenta de baja no reserva el DNI de nadie (RN-WEB-021) |
+| `storefront_direccion` | `cuenta_id` (FK), `etiqueta`, `direccion`, `referencia`, `predeterminada` + `UbicacionMixin` | Varias por cuenta; una sola `predeterminada` a la vez |
+| `storefront_favorito` | `cuenta_id` (FK), `producto_comercial_id` (FK) | `UNIQUE(cuenta_id, producto_comercial_id)`, sin soft delete |
+| `storefront_refresh_token` | `cuenta_id` (FK), `token_hash` (único), `sesion_id`, `expira_en`, `revocado` | Mismo mecanismo de rotación que `refresh_token` del ERP, tabla propia |
+
+### Pedido del sitio de marca (ADR-105, PR3)
+
+`storefront` es dueño del pedido hasta que `sales` lo confirma como
+`Venta` (canal `web`, ver más abajo) — ver ADR-105 para el flujo por
+eventos y por qué el efectivo no llama a `registrar_pago` de inmediato.
+
+| Tabla | Columnas propias | Notas |
+|---|---|---|
+| `storefront_pedido` | `marca_id` (FK), `cuenta_id` (FK, nullable — invitado), `nombre_contacto`, `telefono_contacto`, `email_contacto`, `modalidad` (`takeout`\|`delivery`), `sucursal_id` (FK, nullable hasta asignarse), `direccion_entrega`, `medio_pago` (`efectivo`\|`izipay`), `numero_documento`, `nombre_o_razon_social`, `total_estimado`, `costo_delivery_estimado`, `distancia_km_estimada`, `eta_min`, `eta_max`, `estado` (`pendiente`\|`confirmado`\|`fallido`), `fallo_motivo`, `venta_id` (FK `venta`, único, nullable), `numero_orden`, `idempotency_key` (único), `token_acceso` (único) + `UbicacionMixin` (destino del delivery) | `token_acceso` deja que un invitado sin cuenta consulte su pedido sin login |
+| `storefront_pedido_item` | `pedido_id` (FK), `producto_comercial_id` (FK), `nombre_congelado`, `cantidad`, `precio_unitario_congelado` (con el recargo de los sabores), `extras` (JSON: `producto_comercial_id`, `nombre`, `cantidad` por unidad, `precio`), `valores` (JSON: `id`, `nombre`, `precio_extra` de los sabores elegidos) | Foto del checkout para mostrar; el precio real lo vuelve a fijar `sales` al confirmar (RN-PRC-003). Con Izipay es también la fuente del evento que crea la venta (RN-WEB-016/017) |
+
+### `venta.canal`/`lista_precio.canal` ganan `web` (ADR-105, PR3)
+
+`sales.domain.rules.CANALES` pasa de `{pdv, agente_ia, delivery}` a
+`{pdv, agente_ia, delivery, web}` — el `CheckConstraint`/`Enum` de ambas
+tablas se actualiza en la migración `3070159f64bd` (drop + create del
+`CHECK`, Postgres no permite alterarlo in place). `PuntoVenta.canal` ya
+admitía `web` desde antes (ADR-080/PR1); lo nuevo es que una `Venta` puede
+tener ese mismo valor.
 
 ### `archivo.entidad_tipo` nuevos (tabla `archivo`, `src/shared/models/archivo.py`)
 

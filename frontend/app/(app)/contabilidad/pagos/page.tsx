@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetchCompleto } from "@/lib/api";
 import { primeroElDe } from "@/lib/destinos";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -16,7 +16,7 @@ export default async function PagosPage({
   let pagos: Pago[];
   try {
     pagos = (
-      await apiFetch<Pagina<Pago>>("/api/v1/accounting/pagos-proveedor", { token })
+      await apiFetchCompleto<Pago>("/api/v1/accounting/pagos-proveedor", { token })
     ).items;
   } catch (e) {
     const mensaje =
@@ -33,7 +33,7 @@ export default async function PagosPage({
   let proveedores: Proveedor[] = [];
   try {
     proveedores = (
-      await apiFetch<Pagina<Proveedor>>("/api/v1/purchases/proveedores", { token })
+      await apiFetchCompleto<Proveedor>("/api/v1/purchases/proveedores", { token })
     ).items;
   } catch {
     // silencioso a propósito, ver comentario arriba.

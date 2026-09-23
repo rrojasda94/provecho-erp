@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import {
@@ -17,7 +17,7 @@ export default async function TransferenciasPage() {
   let problema = "";
   try {
     transferencias = (
-      await apiFetch<Pagina<Transferencia>>("/api/v1/inventory/transferencias", {
+      await apiFetchCompleto<Transferencia>("/api/v1/inventory/transferencias", {
         token,
       })
     ).items;

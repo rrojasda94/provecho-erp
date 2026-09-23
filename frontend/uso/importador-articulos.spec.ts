@@ -76,7 +76,7 @@ test("el catálogo se descarga, se llena y se carga de golpe", async ({ page }, 
   await capturar(page, testInfo, "importado");
 
   await dialogo(page).getByRole("button", { name: "Cerrar" }).click();
-  await page.getByLabel("Buscar artículo...").fill(NOMBRE_NUEVO);
+  await page.getByLabel("Buscar por nombre o código...").fill(NOMBRE_NUEVO);
   await expect(page.getByText(NOMBRE_NUEVO, { exact: true })).toBeVisible();
   await capturar(page, testInfo, "listado");
 });

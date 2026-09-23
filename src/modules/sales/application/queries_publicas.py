@@ -575,6 +575,12 @@ def venta_para_reparto(session: Session, venta_id: uuid.UUID) -> dict | None:
 # necesita un horizonte distinto.
 VENTANA_REPARTO_HORAS = 24
 
+#: Cuánto atrás mira `carga_activa_por_sucursal`. Una comanda de más de 3 horas
+#: sin cerrar ya no está en cocina: está olvidada.
+# ponytail: ventana fija; la señal fina sería `venta_item.estado_preparacion`
+# (cuándo la cocina terminó cada línea) cuando el KDS se use en todos los locales.
+VENTANA_CARGA_HORAS = 3
+
 
 def ventas_para_reparto(
     session: Session,
@@ -783,7 +789,7 @@ def categoria_de_productos(
     return dict(filas)
 
 
-# --- Contrato del sitio de marca (storefront, ADR-103/RN-WEB-001..002) -----
+# --- Contrato del sitio de marca (storefront, ADR-105/RN-WEB-001..002) -----
 
 def marca_de_producto(
     session: Session, producto_id: uuid.UUID
@@ -817,9 +823,14 @@ def carta_publica(
 ) -> list[dict]:
     """La carta que ve un cliente del sitio público: mismo motor de precio
     que el PDV (`precios.carta`), recortada a lo que RN-WEB-001 permite
-    mostrar —sin extras, atributos ni exclusiones, que son detalle de
-    configuración del PDV— y enriquecida con `descripcion`/`receta_id` por
-    nodo, que `precios.carta` no trae porque el PDV nunca los necesitó.
+    mostrar y enriquecida con `descripcion`/`receta_id` por nodo, que
+    `precios.carta` no trae porque el PDV nunca los necesitó.
+
+    Trae también lo que hace falta para **vender** un producto con opciones:
+    los extras (con su precio, tope y grupo), los atributos con sus valores —los
+    sabores de la Mitad x Mitad— y los pares excluidos. Antes se recortaban por
+    ser "configuración del PDV", y un producto con sabores obligatorios no se
+    podía pedir por la web: `crear_venta` lo rechazaba por "falta elegir".
     """
     # Import diferido: `precios` importa (transitivamente, vía
     # `inventory.application.recetas`) este mismo módulo — un import al
@@ -855,12 +866,16 @@ def carta_publica(
             "receta_id": producto.receta_id if producto else None,
             "precio_unitario": item["precio_unitario"],
             "stock_bajo": item["stock_bajo"],
+            "extras": item.get("extras", []),
+            "atributos": item.get("atributos", []),
+            "exclusiones": item.get("exclusiones", []),
         }
 
     return [
         {
             **_nodo(item),
             "categoria_id": item["categoria_id"],
+            "categoria_nombre": item.get("categoria_nombre"),
             "variantes": [
                 _nodo(v) | {"orden": v.get("orden", 0)} for v in item.get("variantes", [])
             ],
@@ -914,3 +929,160 @@ def promociones_web_vigentes(
             }
         )
     return resultado
+
+
+def ultimo_pedido_de_cliente(session: Session, cliente_id: uuid.UUID) -> dict | None:
+    """El pedido más reciente de un cliente, para el "tu último pedido" del
+    sitio de marca (ADR-104) — cualquier canal, no solo web (todavía no
+    existe canal `web`; un cliente que ya compró en salón o delivery
+    también quiere ver ese pedido al loguearse). `None` si nunca compró.
+    """
+    venta = session.scalar(
+        select(Venta)
+        .where(Venta.cliente_id == cliente_id, Venta.estado != "anulada")
+        .order_by(Venta.created_at.desc())
+        .limit(1)
+    )
+    if venta is None:
+        return None
+    items = session.execute(
+        select(VentaItem.cantidad, ProductoComercial.nombre)
+        .join(ProductoComercial, ProductoComercial.id == VentaItem.producto_comercial_id)
+        .where(
+            VentaItem.venta_id == venta.id,
+            VentaItem.padre_venta_item_id.is_(None),
+        )
+    )
+    return {
+        "id": venta.id,
+        "numero_orden": venta.numero_orden,
+        "fecha_orden": venta.fecha_orden,
+        "estado": venta.estado,
+        "total": venta.total,
+        "canal": venta.canal,
+        "modalidad": venta.modalidad,
+        "items": [{"nombre": nombre, "cantidad": cantidad} for cantidad, nombre in items],
+    }
+
+
+def carga_activa_por_sucursal(
+    session: Session, sucursal_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """Cuántas ventas siguen `orden` (aún en cocina/mostrador, sin cerrar) por
+    cada sucursal — la señal de "qué tan ocupada está" que usa la asignación
+    automática de local del sitio de marca (ADR-104) y su estimado de tiempo
+    de espera. Una sucursal sin ninguna venta abierta no aparece en el dict
+    (léase como 0, no como "sucursal desconocida").
+
+    Solo cuentan las de las últimas `VENTANA_CARGA_HORAS`: una orden que nadie
+    cerró (pedido de prueba, olvido del cajero) no es cola de cocina, y sin
+    este corte inflaba el estimado del sitio para siempre (70-80 min por una
+    botella de agua)."""
+    if not sucursal_ids:
+        return {}
+    desde = datetime.now(UTC) - timedelta(hours=VENTANA_CARGA_HORAS)
+    filas = session.execute(
+        select(Venta.sucursal_id, func.count(Venta.id))
+        .where(
+            Venta.sucursal_id.in_(list(sucursal_ids)),
+            Venta.estado == "orden",
+            Venta.created_at >= desde,
+        )
+        .group_by(Venta.sucursal_id)
+    )
+    return dict(filas.all())
+
+
+def tiempos_preparacion(
+    session: Session, producto_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, int | None]:
+    """Minutos de preparación de cada producto (`tiempo_preparacion_min`).
+    Una variante sin tiempo propio hereda el de su padre. `None` = no se sabe
+    (distinto de `0`, que es "sale al instante"). Lo usa el sitio de marca
+    para estimar la espera de un pedido según lo que lleva."""
+    if not producto_ids:
+        return {}
+    productos = {
+        p.id: p
+        for p in session.scalars(
+            select(ProductoComercial).where(ProductoComercial.id.in_(list(producto_ids)))
+        )
+    }
+    padres_ids = {
+        p.producto_padre_id
+        for p in productos.values()
+        if p.tiempo_preparacion_min is None and p.producto_padre_id is not None
+    }
+    padres = (
+        {
+            p.id: p
+            for p in session.scalars(
+                select(ProductoComercial).where(ProductoComercial.id.in_(padres_ids))
+            )
+        }
+        if padres_ids
+        else {}
+    )
+    resultado: dict[uuid.UUID, int | None] = {}
+    for producto_id, p in productos.items():
+        tiempo = p.tiempo_preparacion_min
+        if tiempo is None and p.producto_padre_id in padres:
+            tiempo = padres[p.producto_padre_id].tiempo_preparacion_min
+        resultado[producto_id] = tiempo
+    return resultado
+
+
+def puntos_venta_web_de_sucursales(
+    session: Session, sucursal_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, dict]:
+    """El punto de venta `canal=web` de cada sucursal, con las modalidades que
+    admite (ADR-104). El sitio de marca lo usa para saber a qué sucursales
+    les puede enviar un pedido y con qué modalidad — una sucursal sin punto
+    de venta web configurado simplemente no aparece: todavía no hay dónde
+    facturarle el pedido (alta manual en el ERP, ver `sales/README.md`)."""
+    if not sucursal_ids:
+        return {}
+    filas = session.scalars(
+        select(PuntoVenta).where(
+            PuntoVenta.sucursal_id.in_(list(sucursal_ids)),
+            PuntoVenta.canal == "web",
+        )
+    )
+    return {
+        p.sucursal_id: {
+            "punto_venta_id": p.id,
+            # `None` significa las tres modalidades (RN-MDC-001).
+            "modalidades_habilitadas": p.modalidades_habilitadas
+            or ["mesa", "takeout", "delivery"],
+        }
+        for p in filas
+    }
+
+
+def cotizar_delivery_publico(
+    session: Session,
+    *,
+    sucursal_id: uuid.UUID,
+    destino_lat: Decimal,
+    destino_lng: Decimal,
+    destino_distrito: str | None = None,
+) -> dict:
+    """La misma cotización de delivery que hace `crear_venta` al confirmar
+    (`tarifa_delivery.cotizar`), expuesta de antemano para que el checkout
+    del sitio de marca (ADR-104) muestre costo, distancia y elegibilidad
+    ANTES de que el cliente confirme el pedido — y para que la asignación
+    automática de local descarte candidatas fuera de radio."""
+    from src.modules.sales.application import tarifa_delivery
+
+    origen, empresa_id = tarifa_delivery.contexto_de_sucursal(session, sucursal_id)
+    destino = tarifa_delivery.coordenada(destino_lat, destino_lng)
+    tarifa = tarifa_delivery.tarifa_de(session, empresa_id)
+    cotizacion = tarifa_delivery.cotizar(origen, destino, destino_distrito, tarifa)
+    return {
+        "sucursal_id": sucursal_id,
+        "distancia_km": cotizacion.distancia_km,
+        "costo": cotizacion.costo,
+        "aproximada": cotizacion.aproximada,
+        "derivar_a_externo": cotizacion.derivar_a_externo,
+        "motivo": cotizacion.motivo,
+    }

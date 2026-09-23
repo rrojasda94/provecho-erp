@@ -23,7 +23,7 @@ class ListaPrecio(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
 
     __table_args__ = (
         CheckConstraint(
-            "canal IN ('pdv', 'agente_ia', 'delivery')", name="canal_lista_precio"
+            "canal IN ('pdv', 'agente_ia', 'delivery', 'web')", name="canal_lista_precio"
         ),
         CheckConstraint(
             "modalidad IN ('mesa', 'takeout', 'delivery')",
@@ -38,7 +38,7 @@ class ListaPrecio(Base, UuidPkMixin, TimestampMixin, SoftDeleteMixin):
         ForeignKey("sucursal.id"), nullable=True
     )
     canal: Mapped[str | None] = mapped_column(
-        Enum("pdv", "agente_ia", "delivery", name="canal_lista_precio",
+        Enum("pdv", "agente_ia", "delivery", "web", name="canal_lista_precio",
              native_enum=False),
         nullable=True,
     )

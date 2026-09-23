@@ -46,7 +46,7 @@ export default async function ReconocertePage() {
       <header className="reconocerte-hero">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/marcas/charlies.svg"
+          src="/marcas/charlies-vertical.svg"
           alt="Charlie's Pizzas"
           className="reconocerte-marca"
         />

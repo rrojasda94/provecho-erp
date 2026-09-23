@@ -99,6 +99,9 @@ jobs:
           context: ./storefront
           target: runner
           push: true
+          # El pie del sitio muestra el año de la última actualización.
+          build-args: |
+            FECHA_BUILD=${{ github.event.head_commit.timestamp }}
           tags: ${{ steps.meta-charlies.outputs.tags }}
           labels: ${{ steps.meta-charlies.outputs.labels }}
           cache-from: type=gha

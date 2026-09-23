@@ -1,5 +1,8 @@
 # ADR-013 — Arquitectura frontend: Tailwind + shadcn/ui, shell estilo Odoo, gate por permiso
 
+> **2026-09-23:** la entrada al PDV ya no es desde el sidebar de Ventas —
+> tiene ficha propia en el home (ADR-106).
+
 - Estado: aceptado
 - Fecha: 2026-07-27 (actualizado 2026-07-27 y 2026-08-07 — ver notas abajo)
 

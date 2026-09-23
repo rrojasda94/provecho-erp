@@ -210,9 +210,54 @@ accounting.asiento_generado
 > publicaciones con nombre en variable (`rrhh.salida_sin_marcar` e
 > `inventory.devolucion_de_cliente`) sí tienen publicador.
 
-> **Nota (2026-09-17, ADR-103)**: `storefront` no publica ni consume eventos
+> **Nota (2026-09-17, ADR-105)**: `storefront` no publica ni consume eventos
 > en su slice inicial (PR1, solo lectura pública + CMS). PR2 agrega
 > `storefront.cuenta_registrada` (consumido por `sales` para vincular/crear
 > `cliente`) y PR3 agrega `storefront.pedido_web_confirmado` (consumido por
 > `sales` para crear la `venta`). Se documentan aquí al implementarse, no
 > antes.
+
+> **Nota (2026-09-17, ADR-104)**: `storefront` publica `cuenta_registrada`
+> (consumido por `sales.application.listeners.on_cuenta_registrada`, que
+> crea/encuentra el `cliente` y publica `sales.cliente_vinculado`, que a su
+> vez consume `storefront.application.listeners.on_cliente_vinculado` para
+> guardar `cliente_id`). Payload de `storefront.cuenta_registrada`:
+> `{cuenta_id, marca_id, nombres, apellidos, tipo_documento,
+> numero_documento, telefono, email, fecha_nacimiento, direccion,
+> ubicacion}`. Payload de `sales.cliente_vinculado`: `{cuenta_id,
+> cliente_id}`.
+
+> **Nota (2026-09-17, ADR-105)**: `storefront` publica `pedido_web_
+> confirmado` al confirmar el checkout, consumido por `sales.application.
+> listeners.on_pedido_web_confirmado`, que crea la `Venta` (canal `web`) y,
+> si el medio es Izipay, registra el pago. Publica de vuelta `sales.pedido_
+> web_procesado`, que consume `storefront.application.listeners.
+> on_pedido_web_procesado` para marcar el pedido `confirmado`/`fallido`.
+> Payload de `storefront.pedido_web_confirmado`: `{pedido_id,
+> idempotency_key, sucursal_id, punto_venta_id, cliente_id, nombre_
+> contacto, modalidad, items, direccion_entrega, ubicacion, distancia_
+> entrega_km, costo_entrega, medio_pago, numero_documento, nombre_o_razon_
+> social}`. Payload de `sales.pedido_web_procesado`: `{pedido_id, ok,
+> venta_id?, numero_orden?, motivo?}`.
+>
+> **Enmienda (2026-09-19)**: con Izipay, `storefront.pedido_web_confirmado` ya no
+> se publica al confirmar el checkout sino cuando el webhook de la pasarela
+> aprueba el pago (`storefront.application.pagos.registrar_resultado`,
+> RN-WEB-016); en efectivo sigue saliendo al confirmar. El payload se arma desde
+> el `storefront_pedido` guardado —no desde la petición original, que ya
+> terminó— y suma `pago_id_externo` (solo con pago aprobado: `sales` registra el
+> pago con esa referencia) y `telefono_contacto`.
+>
+> **Enmienda (2026-09-19)**: cada elemento de `items` puede traer
+> `valores_variante_ids` (los sabores elegidos, `producto_atributo_valor.id`) y
+> `extras` (`[{producto_comercial_id, cantidad por unidad}]`). `sales.application.
+> listeners.on_pedido_web_confirmado` los pasa tal cual a `crear_venta`, que los
+> valida y cobra igual que las líneas del PDV (RN-WEB-017).
+>
+> **Enmienda (2026-09-19)**: el payload suma `telefono_contacto`. Con él,
+> `on_pedido_web_confirmado` deja de crear la venta de un invitado con
+> `cliente_id=NULL`: reutiliza el `cliente` del grupo con ese teléfono o lo
+> registra solo con nombre y teléfono (`clientes.cliente_de_contacto`,
+> RN-PTS-002). Sin eso `delivery` —que lee nombre y teléfono del `cliente`—
+> mostraba la parada del repartidor sin nombre ni botón de llamar, y el aviso
+> por WhatsApp quedaba en `SIN_TELEFONO`.

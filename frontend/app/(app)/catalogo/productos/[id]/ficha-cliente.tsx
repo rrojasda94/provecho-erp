@@ -47,13 +47,90 @@ export type ListaPrecio = {
  *   completo (RN-COM-022). Cada fila de esa tabla es una tarjeta obligatoria
  *   en el PDV. El padre agrupa y no se vende.
  */
+const CANALES_DE_VENTA = [
+  { clave: "pdv", nombre: "PDV y kiosko" },
+  { clave: "web", nombre: "Sitio web" },
+  { clave: "delivery", nombre: "Delivery" },
+  { clave: "agente_ia", nombre: "Agente IA" },
+];
+
+/** Dónde se vende y cuánto tarda. Sacar un producto de "Sitio web" lo quita
+ * de la carta de la web y de lo que el checkout acepta; el tiempo de
+ * preparación alimenta el estimado de espera que ve el cliente. */
+function SeccionVenta({
+  producto,
+  onGuardar,
+  onError,
+}: {
+  producto: ProductoDetalle;
+  onGuardar: (cuerpo: Parameters<typeof catalogoApi.editarProducto>[1]) => void;
+  onError: (mensaje: string) => void;
+}) {
+  const vigentes = producto.canales?.length
+    ? producto.canales
+    : CANALES_DE_VENTA.map((c) => c.clave);
+
+  function alternar(clave: string, marcado: boolean) {
+    const nuevos = marcado ? [...vigentes, clave] : vigentes.filter((c) => c !== clave);
+    if (nuevos.length === 0) {
+      onError("Tiene que venderse en al menos un canal; para retirarlo de todos, desmarca «Activo».");
+      return;
+    }
+    // Todos marcados se guarda como "todos" (`[]`): un canal nuevo que se
+    // agregue después no deja el producto fuera sin que nadie lo decida.
+    onGuardar({ canales: nuevos.length === CANALES_DE_VENTA.length ? [] : nuevos });
+  }
+
+  return (
+    <section className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
+      <h2 className="font-heading text-base text-dark">Dónde se vende y cuánto tarda</h2>
+      <div className="flex flex-wrap gap-x-5 gap-y-2">
+        {CANALES_DE_VENTA.map((c) => (
+          <label key={c.clave} className="flex items-center gap-2 text-sm font-semibold">
+            <input
+              type="checkbox"
+              checked={vigentes.includes(c.clave)}
+              onChange={(e) => alternar(c.clave, e.target.checked)}
+            />
+            {c.nombre}
+          </label>
+        ))}
+      </div>
+      <label className="flex max-w-xs flex-col gap-1 text-sm font-semibold">
+        Tiempo de preparación (minutos)
+        <input
+          type="number"
+          min={0}
+          max={240}
+          defaultValue={producto.tiempo_preparacion_min ?? ""}
+          placeholder="Sin definir: usa la base del sitio"
+          onBlur={(e) => {
+            const valor = e.target.value.trim();
+            if (valor === "") {
+              if (producto.tiempo_preparacion_min !== null) {
+                onGuardar({ quitar_tiempo_preparacion: true });
+              }
+            } else if (Number(valor) !== producto.tiempo_preparacion_min) {
+              onGuardar({ tiempo_preparacion_min: Number(valor) });
+            }
+          }}
+        />
+      </label>
+      <p className="text-xs text-gray">
+        <strong>0</strong> = sale al instante (una bebida); vacío = el sitio asume su tiempo
+        estándar. Las presentaciones sin tiempo propio heredan el de este producto.
+      </p>
+    </section>
+  );
+}
+
 export function FichaProducto({
   inicial,
   recetas,
   unidades,
   extrasDisponibles,
   empaques,
-  listas,
+  listas: listasIniciales,
 }: {
   inicial: ArbolProducto;
   recetas: Receta[];
@@ -65,6 +142,7 @@ export function FichaProducto({
   const router = useRouter();
   const [producto, setProducto] = useState(inicial);
   const [error, setError] = useState("");
+  const [listas, setListas] = useState(listasIniciales);
 
   const recargar = useCallback(async () => {
     try {
@@ -142,11 +220,18 @@ export function FichaProducto({
         </p>
       )}
 
+      <SeccionVenta
+        producto={producto}
+        onGuardar={(cuerpo) => correr(() => catalogoApi.editarProducto(producto.id, cuerpo))}
+        onError={setError}
+      />
+
       {!conPresentaciones && (
         <SeccionSimple
           producto={producto}
           recetas={recetas}
           listas={listas}
+          onCrearLista={(l) => setListas((actual) => [...actual, l])}
           empaques={empaques}
           onElegirReceta={(recetaId) =>
             correr(() =>
@@ -246,6 +331,7 @@ function SeccionSimple({
   producto,
   recetas,
   listas,
+  onCrearLista,
   empaques,
   onElegirReceta,
   onQuitarReceta,
@@ -255,6 +341,7 @@ function SeccionSimple({
   producto: ProductoDetalle;
   recetas: Receta[];
   listas: ListaPrecio[];
+  onCrearLista: (lista: ListaPrecio) => void;
   empaques: Articulo[];
   onElegirReceta: (recetaId: string) => void;
   onQuitarReceta: () => void;
@@ -265,7 +352,7 @@ function SeccionSimple({
   onError: (mensaje: string) => void;
 }) {
   return (
-    <section className="rounded-lg border border-gray/20 bg-white p-4">
+    <section className="rounded-lg border border-gray/20 bg-card p-4">
       <h2 className="mb-1 font-heading text-lg text-dark">Receta</h2>
       <p className="mb-3 text-xs text-gray">
         Se elige entre las que ya existen. Para armarla o corregirla, ve a{" "}
@@ -292,7 +379,12 @@ function SeccionSimple({
         )}
       </div>
       {producto.receta_id && (
-        <Precio producto={producto} listas={listas} onError={onError} />
+        <PrecioDelProducto
+          producto={producto}
+          listas={listas}
+          onCrearLista={onCrearLista}
+          onError={onError}
+        />
       )}
       {producto.receta_id && (
         <SelectorEmpaque producto={producto} empaques={empaques} onEditar={onEditarEmpaque} />
@@ -418,7 +510,7 @@ function SeccionPresentaciones({
   }
 
   return (
-    <section className="rounded-lg border border-gray/20 bg-white p-4">
+    <section className="rounded-lg border border-gray/20 bg-card p-4">
       <h2 className="mb-1 font-heading text-lg text-dark">
         Presentaciones
       </h2>
@@ -626,7 +718,7 @@ function NuevaPresentacion({
         type="button"
         onClick={crear}
         disabled={deshabilitado || guardando || !nombre.trim() || !idInterno}
-        className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+        className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
       >
         {guardando ? "Creando..." : "+ Presentación"}
       </button>
@@ -662,7 +754,7 @@ function SeccionExtras({
   onDesvincularExtra: (extraId: string) => void;
 }) {
   return (
-    <section className="rounded-lg border border-gray/20 bg-white p-4">
+    <section className="rounded-lg border border-gray/20 bg-card p-4">
       <h2 className="mb-1 font-heading text-lg text-dark">
         Extras y opciones
       </h2>
@@ -827,7 +919,7 @@ function NuevoGrupo({
           setMaximo("");
           setObligatorio(false);
         }}
-        className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+        className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground disabled:opacity-50"
       >
         Crear grupo
       </button>
@@ -947,7 +1039,7 @@ function SeccionAtributos({
   }
 
   return (
-    <section className="rounded-lg border border-gray/20 bg-white p-4">
+    <section className="rounded-lg border border-gray/20 bg-card p-4">
       <h2 className="mb-1 font-heading text-lg text-dark">Atributos</h2>
       <p className="mb-3 text-xs text-gray">
         Para crear un atributo nuevo o agregarle valores, ve a{" "}
@@ -1068,7 +1160,7 @@ function SeccionAtributos({
           type="button"
           onClick={generar}
           disabled={!generable || generando}
-          className="rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary disabled:opacity-50"
+          className="rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary disabled:opacity-50"
           title={
             generable
               ? undefined
@@ -1189,8 +1281,148 @@ function SeccionExclusiones({
   );
 }
 
-/** El precio es inmutable por lista (RN-PRC-005): corregirlo es lista nueva,
- * no edición. Por eso acá solo se puede fijar, nunca cambiar. */
+/** Nombre de cada canal en `sales.domain.rules.CANALES`, para el selector de
+ * "Nueva lista" — vacío en el picker significa "todos los canales" (`null`
+ * en el modelo, RN-PRC-003). */
+const CANALES: { valor: string; etiqueta: string }[] = [
+  { valor: "", etiqueta: "Todos los canales" },
+  { valor: "pdv", etiqueta: "PDV" },
+  { valor: "agente_ia", etiqueta: "Agente IA" },
+  { valor: "delivery", etiqueta: "Delivery" },
+  { valor: "web", etiqueta: "Sitio web" },
+];
+
+/** Formulario para crear una lista de precios nueva — por ejemplo, una
+ * `canal="web"` para que el sitio de marca cobre distinto al PDV
+ * (`sales.domain.rules.elegir_lista_precio`: la más específica gana). */
+function NuevaListaForm({
+  marcaId,
+  onCreada,
+  onCancelar,
+  onError,
+}: {
+  marcaId: string;
+  onCreada: (lista: ListaPrecio) => void;
+  onCancelar: () => void;
+  onError: (mensaje: string) => void;
+}) {
+  const [nombre, setNombre] = useState("");
+  const [canal, setCanal] = useState("");
+  const [creando, setCreando] = useState(false);
+
+  async function crear() {
+    setCreando(true);
+    try {
+      const lista = await pedir<ListaPrecio>("/sales/listas-precio", {
+        metodo: "POST",
+        cuerpo: {
+          marca_id: marcaId,
+          nombre,
+          canal: canal || null,
+          vigente_desde: new Date().toISOString().slice(0, 10),
+        },
+      });
+      onCreada(lista);
+    } catch (e) {
+      onError(e instanceof ErrorApi ? e.message : "No se pudo crear la lista.");
+    } finally {
+      setCreando(false);
+    }
+  }
+
+  return (
+    <>
+      <label className="flex flex-col gap-1 text-xs font-semibold">
+        Nombre de la lista
+        <input
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          placeholder="ej. Web"
+          className="w-32"
+          aria-label="Nombre de la lista de precios"
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-xs font-semibold">
+        Canal
+        <Combobox
+          etiqueta="Canal"
+          value={canal}
+          alCambiar={(v) => setCanal(v ?? "")}
+          opciones={CANALES}
+        />
+      </label>
+      <button
+        type="button"
+        disabled={!nombre || creando}
+        onClick={crear}
+        className="rounded border border-gray px-3 py-1.5 text-xs font-semibold text-dark disabled:opacity-50"
+      >
+        Crear
+      </button>
+      <button
+        type="button"
+        onClick={onCancelar}
+        className="pb-2 text-xs text-gray hover:underline"
+      >
+        Cancelar
+      </button>
+    </>
+  );
+}
+
+/** La fila "monto + Fijar" — separada de `Precio` para no sumar su try/catch
+ * a la complejidad ciclomática del selector/creador de lista. */
+function FijarPrecio({
+  producto,
+  listaId,
+  onError,
+}: {
+  producto: Producto;
+  listaId: string;
+  onError: (mensaje: string) => void;
+}) {
+  const [monto, setMonto] = useState("");
+  const [ok, setOk] = useState(false);
+
+  async function fijar() {
+    setOk(false);
+    try {
+      await pedir(`/sales/listas-precio/${listaId}/precios`, {
+        metodo: "POST",
+        cuerpo: { producto_comercial_id: producto.id, monto },
+      });
+      setOk(true);
+      setMonto("");
+    } catch (e) {
+      onError(e instanceof ErrorApi ? e.message : "No se pudo fijar el precio.");
+    }
+  }
+
+  return (
+    <>
+      <input
+        value={monto}
+        onChange={(e) => setMonto(e.target.value)}
+        inputMode="decimal"
+        placeholder="S/"
+        className="w-20"
+        aria-label={`Precio de ${producto.nombre}`}
+      />
+      <button
+        type="button"
+        disabled={!monto}
+        onClick={fijar}
+        className="rounded border border-gray px-3 py-1.5 text-xs font-semibold text-dark disabled:opacity-50"
+      >
+        Fijar
+      </button>
+      {ok && <span className="pb-2 text-xs text-primary">✓</span>}
+    </>
+  );
+}
+
+/** Selector de lista + "Fijar" — la variante compacta (una fila por
+ * presentación) no ofrece crear lista, solo elegir entre las que ya existen. */
 function Precio({
   producto,
   listas,
@@ -1204,17 +1436,7 @@ function Precio({
 }) {
   const vigentes = listas.filter((l) => l.activa);
   const [listaId, setListaId] = useState(vigentes[0]?.id ?? "");
-  const [monto, setMonto] = useState("");
-  const [ok, setOk] = useState(false);
-
-  if (vigentes.length === 0) {
-    return (
-      <p className="mt-3 text-xs text-gray">
-        No hay lista de precios vigente para esta marca: sin precio, el producto
-        no aparece en la carta.
-      </p>
-    );
-  }
+  if (vigentes.length === 0) return null;
 
   return (
     <div className={`flex flex-wrap items-end gap-2 ${compacto ? "" : "mt-3"}`}>
@@ -1229,40 +1451,70 @@ function Precio({
             opciones={vigentes.map((l) => ({
               valor: l.id,
               etiqueta: l.nombre,
-              pista: l.modalidad ?? undefined,
+              pista: [l.canal, l.modalidad].filter(Boolean).join(" · ") || undefined,
             }))}
           />
         </label>
       )}
-      <input
-        value={monto}
-        onChange={(e) => setMonto(e.target.value)}
-        inputMode="decimal"
-        placeholder="S/"
-        className="w-20"
-        aria-label={`Precio de ${producto.nombre}`}
-      />
+      <FijarPrecio producto={producto} listaId={listaId} onError={onError} />
+    </div>
+  );
+}
+
+/** El precio es inmutable por lista (RN-PRC-005): corregirlo es lista nueva,
+ * no edición. Por eso acá solo se puede fijar, nunca cambiar.
+ *
+ * Envuelve `Precio` (elegir lista y fijar) con el toggle para crear una
+ * lista nueva — separado en su propio componente para que ninguno de los
+ * dos junte demasiadas ramas. */
+function PrecioDelProducto({
+  producto,
+  listas,
+  onCrearLista,
+  onError,
+}: {
+  producto: Producto;
+  listas: ListaPrecio[];
+  onCrearLista: (lista: ListaPrecio) => void;
+  onError: (mensaje: string) => void;
+}) {
+  const vigentes = listas.filter((l) => l.activa);
+  const [creandoLista, setCreandoLista] = useState(false);
+
+  if (creandoLista) {
+    return (
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <NuevaListaForm
+          marcaId={producto.marca_id}
+          onCreada={(l) => {
+            onCrearLista(l);
+            setCreandoLista(false);
+          }}
+          onCancelar={() => setCreandoLista(false)}
+          onError={onError}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-end gap-2">
+      {vigentes.length === 0 ? (
+        <p className="text-xs text-gray">
+          No hay lista de precios vigente para esta marca: sin precio, el
+          producto no aparece en la carta.
+        </p>
+      ) : (
+        <Precio producto={producto} listas={listas} onError={onError} />
+      )}
       <button
         type="button"
-        disabled={!monto}
-        onClick={async () => {
-          setOk(false);
-          try {
-            await pedir(`/sales/listas-precio/${listaId}/precios`, {
-              metodo: "POST",
-              cuerpo: { producto_comercial_id: producto.id, monto },
-            });
-            setOk(true);
-            setMonto("");
-          } catch (e) {
-            onError(e instanceof ErrorApi ? e.message : "No se pudo fijar el precio.");
-          }
-        }}
-        className="rounded border border-gray px-3 py-1.5 text-xs font-semibold text-dark disabled:opacity-50"
+        onClick={() => setCreandoLista(true)}
+        className="pb-2 text-xs text-primary hover:underline"
+        title="Crear una lista nueva — por ejemplo, precios propios para el canal web"
       >
-        Fijar
+        + Nueva lista
       </button>
-      {ok && <span className="pb-2 text-xs text-primary">✓</span>}
     </div>
   );
 }

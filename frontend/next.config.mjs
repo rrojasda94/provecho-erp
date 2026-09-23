@@ -21,6 +21,13 @@ const nextConfig = {
   // arrastrar `node_modules` entero. Inerte en `next dev`.
   output: "standalone",
 
+  // Login dentro del scope de cada app instalable (ADR-109): Android abre lo
+  // que cae fuera del `scope` del manifest con barra de navegador, y un
+  // `/login` fijo sacaba al KDS, al PDV y al reparto de su propia app.
+  async rewrites() {
+    return [{ source: "/:app(kds|pdv|reparto)/ingresar", destination: "/login" }];
+  },
+
   // Cabeceras que no dependen del contenido. La CSP no está acá porque
   // lleva un nonce por request — se arma en `middleware.ts`.
   async headers() {

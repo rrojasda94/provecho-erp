@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { ingresoDesde } from "@/lib/ingreso";
 import { estaMuerta, suscribir } from "@/lib/sesion-muerta";
 
 /**
@@ -44,7 +45,7 @@ export function AvisoSesionExpirada() {
       // Escape no lo cierra: no hay nada que hacer atrás, y cerrarlo dejaría
       // una pantalla que parece viva y no lo está.
       onCancel={(e) => e.preventDefault()}
-      className="w-full max-w-sm rounded-xl border border-border bg-card p-0 text-card-foreground shadow-[var(--sombra-3)] backdrop:bg-dark/50"
+      className="w-full max-w-sm rounded-xl border border-border bg-card p-0 text-card-foreground shadow-[var(--sombra-3)] backdrop:bg-black/50"
     >
       <div className="flex flex-col gap-3 p-5">
         <h2 id="sesion-expirada-titulo" className="text-base leading-tight">
@@ -58,7 +59,8 @@ export function AvisoSesionExpirada() {
         <button
           type="button"
           onClick={() => {
-            window.location.href = "/login";
+            // Dentro de una app instalada, su propio ingreso (ADR-109).
+            window.location.href = ingresoDesde(location.pathname, location.search);
           }}
           className="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/85"
         >

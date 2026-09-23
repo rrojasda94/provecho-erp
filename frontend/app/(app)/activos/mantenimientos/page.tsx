@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import type { Activo } from "../activos/activos-cliente";
@@ -11,11 +11,11 @@ export default async function MantenimientosPage() {
   let activos: Activo[] = [];
   try {
     [ordenes, activos] = await Promise.all([
-      apiFetch<Pagina<OrdenMantenimiento>>(
-        "/api/v1/assets/ordenes-mantenimiento?page_size=200",
+      apiFetchCompleto<OrdenMantenimiento>(
+        "/api/v1/assets/ordenes-mantenimiento",
         { token },
       ).then((p) => p.items),
-      apiFetch<Pagina<Activo>>("/api/v1/assets/activos?page_size=200", { token })
+      apiFetchCompleto<Activo>("/api/v1/assets/activos", { token })
         .then((p) => p.items)
         .catch(() => [] as Activo[]),
     ]);

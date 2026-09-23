@@ -182,7 +182,7 @@ function DialogoResolver({
       >
         Resolver
       </button>
-      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-dark/40">
+      <dialog ref={dialogRef} className="w-full max-w-md rounded-lg p-0 backdrop:bg-black/40">
         <div className="flex flex-col gap-4 p-6">
           <h2 className="font-heading text-lg text-dark">
             {parametro.modulo} · {parametro.codigo}
@@ -214,7 +214,7 @@ function DialogoResolver({
             <button
               type="submit"
               disabled={aprobando}
-              className="self-start rounded bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-secondary"
+              className="self-start rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:bg-secondary"
             >
               {aprobando ? "Aprobando..." : "Aprobar"}
             </button>

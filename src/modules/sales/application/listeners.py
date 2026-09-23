@@ -13,6 +13,7 @@ directamente, publica el evento y este handler hace la llamada real.
 
 import logging
 import uuid
+from datetime import date
 
 from src.core.database import SessionLocal
 from src.core.events import event_bus
@@ -45,6 +46,298 @@ def on_venta_confirmada(payload: dict) -> None:
         # para eso existe.
         log.exception(
             "No se pudo programar la revisión de demora", extra={"venta_id": venta_id}
+        )
+
+
+def on_cuenta_registrada(payload: dict) -> None:
+    """Una cuenta nueva del sitio de marca se enlaza a un `cliente` de
+    `sales` (ADR-104): el sitio no importa `application.clientes` —publica
+    el evento y este handler hace la llamada real, mismo patrón que
+    `on_entrega_registrada`.
+
+    Sin `marca_id` en el payload (sitio sin marca configurada, no debería
+    pasar) o sin poder resolver el grupo, no hay nada que crear: la cuenta
+    se queda sin `cliente_id` hasta que alguien la revise a mano — RN-PTS-001
+    exige el grupo, y RN-PTS-002 el teléfono o RUC para poder registrar.
+    """
+    from src.modules.sales.application import clientes
+    from src.modules.sales.application.errors import ReglaNegocio
+    from src.modules.users.application.queries_publicas import grupo_de_marca
+
+    cuenta_id = payload["cuenta_id"]
+    marca_id = payload.get("marca_id")
+    if not marca_id:
+        log.warning("cuenta_registrada sin marca_id; no se vincula a cliente")
+        return
+
+    ubicacion = payload.get("ubicacion") or {}
+    try:
+        with session_factory() as session:
+            grupo_id = grupo_de_marca(session, uuid.UUID(marca_id))
+            if grupo_id is None:
+                log.warning(
+                    "No se pudo resolver el grupo de la marca del sitio",
+                    extra={"marca_id": marca_id},
+                )
+                return
+            try:
+                cliente = clientes.crear_o_encontrar_cliente(
+                    session,
+                    grupo_id=grupo_id,
+                    nombre=f"{payload['nombres']} {payload['apellidos']}".strip(),
+                    telefono=payload.get("telefono"),
+                    numero_documento=payload.get("numero_documento"),
+                    email=payload.get("email"),
+                    direccion=payload.get("direccion"),
+                    fecha_nacimiento=(
+                        date.fromisoformat(payload["fecha_nacimiento"])
+                        if payload.get("fecha_nacimiento")
+                        else None
+                    ),
+                    tipo_documento=payload.get("tipo_documento") or "dni",
+                    ubicacion_place_id=ubicacion.get("ubicacion_place_id"),
+                    ubicacion_lat=ubicacion.get("ubicacion_lat"),
+                    ubicacion_lng=ubicacion.get("ubicacion_lng"),
+                    ubicacion_plus_code=ubicacion.get("ubicacion_plus_code"),
+                    ubicacion_distrito=ubicacion.get("ubicacion_distrito"),
+                )
+            except ReglaNegocio:
+                # Datos insuficientes para un cliente de `sales` (sin
+                # teléfono ni documento, por ejemplo un registro mínimo).
+                # La cuenta del sitio sigue funcionando sin `cliente_id`.
+                log.info(
+                    "Cuenta del sitio sin datos suficientes para vincular cliente",
+                    extra={"cuenta_id": cuenta_id},
+                )
+                return
+            # Publicar ANTES del commit (`core/events.py`): el evento se
+            # bufferiza en la sesión y recién se despacha en `after_commit`
+            # — publicarlo después de commitear no lo despacharía nunca.
+            event_bus.publish(
+                "sales.cliente_vinculado",
+                {"cuenta_id": cuenta_id, "cliente_id": str(cliente.id)},
+                session=session,
+            )
+            session.commit()
+    except Exception:
+        log.exception(
+            "No se pudo vincular la cuenta del sitio a un cliente",
+            extra={"cuenta_id": cuenta_id},
+        )
+
+
+def _medio_pago_izipay(session, sucursal_id: uuid.UUID) -> uuid.UUID:
+    """El medio de pago 'Izipay' de la empresa de esa sucursal, creándolo la
+    primera vez que hace falta (ADR-105) — igual que el usuario de servicio
+    del sitio, exigir un alta manual antes del primer pedido pagado en
+    línea sería un paso de despliegue más para olvidar."""
+    from sqlalchemy import func, select
+
+    from src.modules.sales.application import catalogo
+    from src.modules.sales.infrastructure.models import MedioPago
+    from src.modules.users.infrastructure.models import Sucursal
+
+    sucursal = session.get(Sucursal, sucursal_id)
+    existente = session.scalar(
+        select(MedioPago).where(
+            MedioPago.empresa_id == sucursal.empresa_id,
+            func.lower(MedioPago.nombre) == "izipay",
+        )
+    )
+    if existente is not None:
+        return existente.id
+    creado = catalogo.crear_medio_pago(
+        session,
+        empresa_id=sucursal.empresa_id,
+        nombre="Izipay",
+        direccion="cobro",
+        tipo="billetera_digital",
+    )
+    return creado.id
+
+
+def _item_de_pedido_web(i: dict) -> dict:
+    """Una línea del pedido web como la espera `crear_venta`: sabores como
+    `valores_variante_ids` y cada extra con su id como UUID, igual que las manda
+    el PDV. Sin opciones, la línea es la de siempre (producto + cantidad)."""
+    item: dict = {
+        "producto_comercial_id": uuid.UUID(i["producto_comercial_id"]),
+        "cantidad": i["cantidad"],
+    }
+    if i.get("valores_variante_ids"):
+        item["valores_variante_ids"] = i["valores_variante_ids"]
+    if i.get("extras"):
+        item["extras"] = [
+            {
+                "producto_comercial_id": uuid.UUID(e["producto_comercial_id"]),
+                "cantidad": e["cantidad"],
+            }
+            for e in i["extras"]
+        ]
+    return item
+
+
+def _cliente_del_pedido_web(session, payload: dict) -> uuid.UUID | None:
+    """El cliente de la venta: el de la cuenta si el comprador iba logueado; si
+    no, el que sale de su teléfono (un invitado). Sin esto el repartidor no ve
+    ni nombre ni teléfono del invitado (delivery los lee del cliente).
+
+    Nunca hace fallar el pedido: si no se puede resolver un cliente, la venta
+    se crea igual —sin contacto en la ruta, pero la comida sale.
+    """
+    if payload.get("cliente_id"):
+        return uuid.UUID(payload["cliente_id"])
+    telefono = (payload.get("telefono_contacto") or "").strip()
+    if not telefono:
+        return None
+    from src.modules.sales.application import clientes
+    from src.modules.sales.application.errors import AppError
+    from src.modules.sales.infrastructure.repositories import PuntoVentaRepo
+
+    try:
+        empresa_id = PuntoVentaRepo(session).empresa_de_sucursal(
+            uuid.UUID(payload["sucursal_id"])
+        )
+        if empresa_id is None:
+            return None
+        grupo_id = clientes.grupo_de_empresa(session, empresa_id)
+        cliente = clientes.cliente_de_contacto(
+            session,
+            grupo_id=grupo_id,
+            nombre=payload.get("nombre_contacto") or "",
+            telefono=telefono,
+        )
+    except AppError:
+        log.warning(
+            "No se pudo registrar el cliente de un pedido web de invitado",
+            extra={"pedido_id": payload.get("pedido_id")},
+        )
+        return None
+    return cliente.id
+
+
+def on_pedido_web_confirmado(payload: dict) -> None:
+    """Un pedido confirmado en el sitio de marca (ADR-105) se
+    convierte en una `Venta` real de canal `web` — el sitio no importa
+    `application.ventas`, publica el evento y este handler hace la llamada
+    real, mismo patrón que `on_cuenta_registrada`.
+
+    Efectivo: la venta queda `orden` y se cobra al entregar/recoger, como
+    cualquier delivery telefónico — no hay pago que registrar acá.
+
+    Izipay: este evento llega recién cuando el webhook de la pasarela aprobó
+    el pago (RN-WEB-016) y acá solo se registra el cobro **sin exigir caja abierta**
+    — excepción explícita a RN-POS-005/ADR-025 documentada en ADR-105: en
+    delivery/recojo web alguien SÍ cobra en el momento de la entrega (el
+    repartidor o el mostrador), la misma garantía que un cajero, así que la
+    razón de ser de "cobra por adelantado" (nadie persigue al cliente) no
+    aplica igual que en un kiosko de autoservicio dentro del local.
+
+    Si `crear_venta` falla (canal cerrado, producto ya no existe, etc.) el
+    pedido del sitio queda `fallido` con el motivo — nunca se reintenta
+    solo, el cliente tiene que volver a intentar desde el sitio.
+    """
+    from decimal import Decimal
+
+    from src.modules.sales.application import ventas
+    from src.modules.sales.application.errors import AppError
+    from src.modules.users.application.queries_publicas import (
+        usuario_servicio_storefront,
+    )
+
+    pedido_id = payload["pedido_id"]
+    ubicacion = payload.get("ubicacion") or {}
+    try:
+        with session_factory() as session:
+            usuario_id = usuario_servicio_storefront(session)
+            try:
+                venta = ventas.crear_venta(
+                    session,
+                    sucursal_id=uuid.UUID(payload["sucursal_id"]),
+                    punto_venta_id=uuid.UUID(payload["punto_venta_id"]),
+                    canal="web",
+                    modalidad=payload["modalidad"],
+                    usuario_id=usuario_id,
+                    idempotency_key=payload["idempotency_key"],
+                    items=[_item_de_pedido_web(i) for i in payload["items"]],
+                    cliente_id=_cliente_del_pedido_web(session, payload),
+                    # `referencia_atencion` es String(50); el nombre del
+                    # formulario admite 150.
+                    referencia_atencion=(payload.get("nombre_contacto") or "")[:50] or None,
+                    direccion_entrega=payload.get("direccion_entrega"),
+                    ubicacion_place_id=ubicacion.get("ubicacion_place_id"),
+                    ubicacion_lat=(
+                        Decimal(ubicacion["ubicacion_lat"])
+                        if ubicacion.get("ubicacion_lat")
+                        else None
+                    ),
+                    ubicacion_lng=(
+                        Decimal(ubicacion["ubicacion_lng"])
+                        if ubicacion.get("ubicacion_lng")
+                        else None
+                    ),
+                    ubicacion_plus_code=ubicacion.get("ubicacion_plus_code"),
+                    ubicacion_distrito=ubicacion.get("ubicacion_distrito"),
+                    distancia_entrega_km=(
+                        Decimal(payload["distancia_entrega_km"])
+                        if payload.get("distancia_entrega_km")
+                        else None
+                    ),
+                    costo_entrega=(
+                        Decimal(payload["costo_entrega"])
+                        if payload.get("costo_entrega")
+                        else None
+                    ),
+                )
+            except AppError as e:
+                event_bus.publish(
+                    "sales.pedido_web_procesado",
+                    {"pedido_id": pedido_id, "ok": False, "motivo": str(e)},
+                    session=session,
+                )
+                session.commit()
+                return
+
+            # Con Izipay la venta se crea DESPUÉS de que la pasarela aprobó el
+            # pago (el webhook dispara este evento), así que acá solo se
+            # registra lo ya cobrado. Sin `pago_id_externo` (efectivo) la
+            # venta queda por cobrar al entregar/recoger.
+            if payload.get("pago_id_externo"):
+                try:
+                    ventas.registrar_pago(
+                        session,
+                        venta_id=venta.id,
+                        medio_pago_id=_medio_pago_izipay(session, venta.sucursal_id),
+                        monto=venta.total,
+                        idempotency_key=f"{payload['idempotency_key']}:pago",
+                        referencia_externa=payload["pago_id_externo"],
+                        receptor_num_doc=payload.get("numero_documento"),
+                        receptor_nombre=payload.get("nombre_o_razon_social"),
+                        exigir_caja_abierta=False,
+                    )
+                except AppError:
+                    # La venta ya existe y sale a cocina igual; el cobro se
+                    # revisa a mano. No se le informa "fallido" al sitio por
+                    # esto — el pedido SÍ se va a preparar.
+                    log.exception(
+                        "No se pudo registrar el pago Izipay de un pedido web",
+                        extra={"venta_id": str(venta.id)},
+                    )
+
+            event_bus.publish(
+                "sales.pedido_web_procesado",
+                {
+                    "pedido_id": pedido_id,
+                    "ok": True,
+                    "venta_id": str(venta.id),
+                    "numero_orden": venta.numero_orden,
+                },
+                session=session,
+            )
+            session.commit()
+    except Exception:
+        log.exception(
+            "No se pudo procesar el pedido web", extra={"pedido_id": pedido_id}
         )
 
 
@@ -87,3 +380,5 @@ def register() -> None:
     _registrado = True
     event_bus.subscribe("sales.venta_confirmada", on_venta_confirmada)
     event_bus.subscribe("delivery.entrega_registrada", on_entrega_registrada)
+    event_bus.subscribe("storefront.cuenta_registrada", on_cuenta_registrada)
+    event_bus.subscribe("storefront.pedido_web_confirmado", on_pedido_web_confirmado)

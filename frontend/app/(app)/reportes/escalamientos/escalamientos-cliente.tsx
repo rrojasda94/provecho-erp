@@ -49,7 +49,7 @@ export function EscalamientosCliente({
             className={`rounded px-2 py-0.5 text-xs font-bold ${
               terminado(row.original.estado)
                 ? "bg-gray/15 text-secondary"
-                : "bg-amber-100 text-amber-900"
+                : "bg-status-warning-surface text-status-warning-texto"
             }`}
           >
             {ETIQUETA_NIVEL[row.original.nivel_actual] ?? row.original.nivel_actual}

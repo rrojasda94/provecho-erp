@@ -46,6 +46,21 @@ test("una ruta protegida sin sesión manda al login", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Ingresar" })).toBeVisible();
 });
 
+/**
+ * Apps instalables (ADR-109): el login queda dentro del `scope` de la app
+ * —si no, Android lo abre con barra de navegador— y al entrar vuelve a la
+ * misma pantalla, con su `?pantalla=`, y no al home del ERP.
+ */
+test("el KDS sin sesión entra por su propio ingreso y vuelve a su pantalla", async ({
+  page,
+}) => {
+  await page.goto("/kds?pantalla=p1");
+  await expect(page).toHaveURL(/\/kds\/ingresar\?next=%2Fkds%3Fpantalla%3Dp1$/);
+  await campoUsuario(page).fill(ADMIN.usuario);
+  await tecleaPinLogin(page, ADMIN.pin);
+  await expect(page).toHaveURL(/\/kds\?pantalla=p1$/, { timeout: 30_000 });
+});
+
 test("el login deja el token en una cookie httpOnly y el logout la borra", async ({
   page,
   context,

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { MODULOS } from "./modulos.ts";
-import { SUBMENUS, destinos } from "./navegacion.ts";
+import { SUBMENUS, destinos, grupoDe, itemActivo, pantallasDe } from "./navegacion.ts";
 
 /** Lo que la paleta de comandos ofrece sale de acá. Un error en este archivo
  * no rompe nada visible: simplemente una pantalla deja de poder buscarse, o
@@ -19,9 +19,9 @@ test("el comodín ve todos los módulos y todas sus pantallas", () => {
   const encontrados = destinos(["*"]);
   const esperados =
     MODULOS.length +
-    Object.entries(SUBMENUS).reduce((n, [clave, items]) => {
+    Object.keys(SUBMENUS).reduce((n, clave) => {
       const modulo = MODULOS.find((m) => m.clave === clave)!;
-      return n + items.filter((i) => i.href !== modulo.href).length;
+      return n + pantallasDe(clave).filter((i) => i.href !== modulo.href).length;
     }, 0);
   assert.equal(encontrados.length, esperados);
 });
@@ -53,4 +53,34 @@ test("cada destino trae la clave de un módulo real", () => {
   for (const d of destinos(["*"])) {
     assert.ok(claves.has(d.clave), `destino ${d.href} apunta a la clave "${d.clave}"`);
   }
+});
+
+test("un grupo abre en su primera pestaña", () => {
+  for (const items of Object.values(SUBMENUS)) {
+    for (const g of items.filter((i) => i.pestanas)) {
+      assert.equal(g.href, g.pestanas![0].href, `el grupo "${g.label}" no abre en su primera pestaña`);
+    }
+  }
+});
+
+test("las pestañas de un grupo siguen buscándose en la paleta", () => {
+  const hrefs = destinos(["*"]).map((d) => d.href);
+  for (const href of ["/inventario/lotes", "/inventario/mermas", "/inventario/categorias"]) {
+    assert.ok(hrefs.includes(href), `${href} dejó de aparecer en la paleta`);
+  }
+});
+
+test("una ficha de detalle cae en el grupo de su listado", () => {
+  const items = SUBMENUS.inventario;
+  assert.equal(grupoDe(items, "/inventario/devoluciones/abc")?.label, "Movimientos");
+  assert.equal(grupoDe(items, "/inventario/lotes")?.label, "Stock");
+  assert.equal(grupoDe(items, "/inventario/conteos"), undefined);
+});
+
+test("en el sidebar gana la coincidencia más larga, no la primera", () => {
+  // "Asientos" es `/contabilidad`: en Caja se marcaban los dos.
+  assert.equal(itemActivo(SUBMENUS.contabilidad, "/contabilidad/caja")?.label, "Caja");
+  assert.equal(itemActivo(SUBMENUS.contabilidad, "/contabilidad")?.label, "Asientos");
+  assert.equal(itemActivo(SUBMENUS.inventario, "/inventario/mermas")?.label, "Movimientos");
+  assert.equal(itemActivo(SUBMENUS.inventario, "/otra-cosa"), undefined);
 });

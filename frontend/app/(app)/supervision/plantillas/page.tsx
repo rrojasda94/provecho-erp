@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import {
@@ -16,7 +16,7 @@ export default async function PlantillasPage() {
   let plantillas: Plantilla[];
   try {
     plantillas = (
-      await apiFetch<Pagina<Plantilla>>("/api/v1/supervision/plantillas", { token })
+      await apiFetchCompleto<Plantilla>("/api/v1/supervision/plantillas", { token })
     ).items;
   } catch (e) {
     const mensaje =
@@ -32,7 +32,7 @@ export default async function PlantillasPage() {
     ),
     apiFetch<Sucursal[]>("/api/v1/sucursales", { token }).catch(() => [] as Sucursal[]),
     apiFetch<Marca[]>("/api/v1/marcas", { token }).catch(() => [] as Marca[]),
-    apiFetch<Pagina<Usuario>>("/api/v1/users?page_size=200", { token })
+    apiFetchCompleto<Usuario>("/api/v1/users", { token })
       .then((p) => p.items)
       .catch(() => [] as Usuario[]),
   ]);

@@ -15,6 +15,7 @@ from src.modules.storefront.application.errors import ReglaNegocio
 from src.modules.storefront.domain.rules import CLAVES_CONTENIDO
 from src.modules.storefront.infrastructure.models import StorefrontContenido
 from src.modules.storefront.infrastructure.repositories import ContenidoRepo
+from src.shared import auditoria
 
 
 class Hero(BaseModel):
@@ -94,10 +95,20 @@ def guardar(
     repo = ContenidoRepo(session)
     existente = repo.get(marca_id, clave)
     if existente is not None:
+        valor_antes = existente.valor
         existente.valor = valor_validado
         existente.updated_by = actor_id
+        auditoria.registrar(
+            session,
+            usuario_id=actor_id,
+            entidad="storefront_contenido",
+            entidad_id=existente.id,
+            accion="editar",
+            datos_antes={"clave": clave, "valor": valor_antes},
+            datos_despues={"clave": clave, "valor": valor_validado},
+        )
         return existente
-    return repo.add(
+    creado = repo.add(
         StorefrontContenido(
             marca_id=marca_id,
             clave=clave,
@@ -105,6 +116,15 @@ def guardar(
             updated_by=actor_id,
         )
     )
+    auditoria.registrar(
+        session,
+        usuario_id=actor_id,
+        entidad="storefront_contenido",
+        entidad_id=creado.id,
+        accion="crear",
+        datos_despues={"clave": clave, "valor": valor_validado},
+    )
+    return creado
 
 
 def contenido_publico(session, marca_id: uuid.UUID) -> dict[str, dict]:

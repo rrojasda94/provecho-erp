@@ -135,7 +135,7 @@ export function Campana() {
           <path d="M13.7 21a2 2 0 0 1-3.4 0" />
         </svg>
         {items.length > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-secondary px-1 text-center text-[10px] font-bold leading-4 text-white">
+          <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-secondary px-1 text-center text-[10px] font-bold leading-4 text-secondary-foreground">
             {items.length > 9 ? "9+" : items.length}
           </span>
         )}

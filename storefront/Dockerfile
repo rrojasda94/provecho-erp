@@ -16,6 +16,10 @@ CMD ["npm", "run", "dev"]
 # --- Build de producción ----------------------------------------------------
 FROM deps AS builder
 COPY . .
+# Fecha de esta compilación: el pie del sitio muestra su año ("© 2026"). Va acá
+# y no en `runner` porque Next la congela en el bundle (`next.config.mjs`).
+ARG FECHA_BUILD=""
+ENV FECHA_BUILD=${FECHA_BUILD}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

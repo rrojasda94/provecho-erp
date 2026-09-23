@@ -11,6 +11,22 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 JWT_SECRET_MIN_LEN = 32
 _PLACEHOLDER_SECRETO = "change-me"
 _PASSWORD_DB_POR_DEFECTO = "provecho:provecho@"
+
+
+def _fallas_de_secreto(
+    nombre: str, valor: str, otro_secreto: str | None = None
+) -> list[str]:
+    """Mismo chequeo para `JWT_SECRET` y `STOREFRONT_JWT_SECRET` (ADR-104):
+    ni el placeholder, ni demasiado corto, y —solo para el segundo— nunca
+    igual al primero, porque de eso depende que un token de cuenta web no
+    decodifique contra el secreto del ERP."""
+    if valor == _PLACEHOLDER_SECRETO:
+        return [f"{nombre} sigue siendo el placeholder"]
+    if len(valor) < JWT_SECRET_MIN_LEN:
+        return [f"{nombre} debe tener al menos {JWT_SECRET_MIN_LEN} caracteres"]
+    if otro_secreto is not None and valor == otro_secreto:
+        return [f"{nombre} no puede ser igual a JWT_SECRET"]
+    return []
 #: Cuando se corre desde el fuente sin instalar el paquete (no pasa ni en la
 #: imagen ni con `pip install -e ".[dev]"`, que es el primer paso del README).
 _VERSION_DESCONOCIDA = "0.0.0"
@@ -70,6 +86,14 @@ class Settings(BaseSettings):
     # matar reportes legítimos o dejar la caja colgada. 0 = sin límite.
     db_statement_timeout_segundos: int = 15
     db_statement_timeout_reportes_segundos: int = 120
+    # Tamaño del pool por PROCESO de la API (con `--workers 2` son el doble).
+    # El tope de conexiones a Postgres es (pool + overflow) × workers × engines:
+    # con estos valores 2 × (20 + 10) = 60 como máximo, bajo el `max_connections`
+    # de 100 de Postgres, con margen para Celery. Se abren de a una, no de golpe.
+    db_pool_size: int = 10
+    db_max_overflow: int = 10
+    db_pool_size_reportes: int = 2
+    db_max_overflow_reportes: int = 3
     # Zona del negocio, no la del servidor: de ella sale "qué día es hoy"
     # para el ERP (`src/shared/fechas.py`). En Docker el sistema corre en UTC,
     # y con eso un cierre de las 20:00 hora Perú caía al día siguiente.
@@ -79,6 +103,21 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 15
     refresh_token_days: int = 7
+    # Secreto y `aud` propios del JWT de cuenta web (storefront, ADR-104):
+    # nunca el mismo que `jwt_secret`. Un token firmado con este secreto no
+    # decodifica contra el del ERP ni viceversa — es la mitad "criptográfica"
+    # del aislamiento de credenciales; la otra mitad es que ningún endpoint
+    # del ERP acepta `aud="storefront"` (y viceversa).
+    storefront_jwt_secret: str = _PLACEHOLDER_SECRETO
+    storefront_access_token_minutes: int = 30
+    storefront_refresh_token_days: int = 30
+    # Client ID de Google Cloud (OAuth 2.0, tipo "Web") para "Continuar con
+    # Google" en el sitio de marca. Es público por diseño —viaja al
+    # navegador para que el botón de Google lo use—, pero el servidor igual
+    # lo valida como `aud` del `id_token` que llega (nunca confía en lo que
+    # el navegador dice que autenticó). Vacío = el botón de Google no se
+    # ofrece; el registro por email/clave sigue funcionando igual.
+    google_oauth_client_id: str = ""
     # Cuánto puede estar quieta una sesión antes de darse por cerrada
     # (ADR-084). El plazo del refresh es el techo absoluto; esto es el de
     # inactividad, y es el que corta la sesión de una PC que se apagó.
@@ -292,7 +331,7 @@ class Settings(BaseSettings):
     sales_promocion_cupon_fin: date = date(2026, 12, 31)
     # Cada cupón vale un mes desde que se emite.
     sales_promocion_cupon_vigencia_dias: int = 30
-    # --- Sitio de marca (storefront, ADR-103) ---------------------------------
+    # --- Sitio de marca (storefront, ADR-105) ---------------------------------
     # Marca que sirve el sitio público. Vacío = los endpoints públicos
     # responden 404 ("sitio no configurado") — no hay una marca por
     # defecto que adivinar en un grupo con varias marcas.
@@ -302,15 +341,39 @@ class Settings(BaseSettings):
     storefront_sucursal_id: str = ""
     # Con qué `canal`/`modalidad` de `lista_precio` se resuelve la carta
     # pública (mismo vocabulario que `sales.domain.rules.CANALES`/
-    # `MODALIDADES`). El canal `web` no existe todavía en `venta` (llega en
-    # un slice posterior) — hasta entonces la carta pública se cotiza con un
-    # canal/modalidad ya existente.
-    storefront_canal: str = "delivery"
+    # `MODALIDADES`). Desde PR3 (ADR-104) `venta.canal` admite `web`: una
+    # lista de precios general (`canal=None`) sigue aplicando igual
+    # (`especificidad_lista`), así que cambiar esto no rompe nada mientras
+    # no se cree una lista específica para otro canal.
+    # De dónde cuelgan los enlaces que se mandan por correo (recuperar clave).
+    storefront_sitio_url: str = "http://localhost:3000"
+    storefront_canal: str = "web"
     storefront_modalidad: str = "delivery"
     # Base del enlace de postulación pública (ADR-087) que arma
     # `GET /storefront/publico/convocatorias`. Vive en `clientes.majambo.com.pe`,
     # no en el sitio de marca — mismo dominio que ya sirve `/postular/{token}`.
     storefront_url_postular_base: str = "https://clientes.majambo.com.pe/postular"
+    # --- Pedidos del sitio de marca (checkout, ADR-105) ---------------
+    # Estimado de espera que ve el cliente: base + minutos por cada pedido
+    # `orden` que ya tiene la sucursal delante del suyo (RN-WEB-011). Semilla
+    # por `.env`, no `parametro_empresa` todavía — a diferencia de la tarifa
+    # de delivery, es una primera versión y se prefirió no sumarle el paso de
+    # aprobación de Gerencia antes de tener un solo pedido real que mirar.
+    # Base para un producto sin `tiempo_preparacion_min` cargado (RN-WEB-011).
+    storefront_eta_base_minutos: int = 30
+    storefront_eta_minutos_por_pedido: int = 5
+    # Trayecto de un delivery, por km de distancia al local.
+    storefront_eta_minutos_por_km: int = 3
+    # A partir de cuántos pedidos `orden` una sucursal se considera saturada:
+    # la asignación automática de local prueba otra candidata dentro del
+    # radio de delivery antes de insistir en la más cercana (RN-WEB-010).
+    storefront_saturacion_pedidos: int = 4
+    # --- Pasarela de pagos Izipay (ADR-003, checkout ADR-105) -----------------
+    # Vacío = el checkout usa `IzipayFake` (aprueba cualquier cobro de
+    # inmediato): no hay cuenta de comercio real todavía. Ver
+    # `src/shared/integrations/izipay/__init__.py`.
+    izipay_api_key: str = ""
+    izipay_webhook_secret: str = ""
     # Cola de emisión de comprobantes (Celery). Por defecto reusa Redis.
     celery_broker_url: str = ""
     # --- Observabilidad -----------------------------------------------------
@@ -446,11 +509,10 @@ class Settings(BaseSettings):
         Un ERP que bootea con `JWT_SECRET=change-me` es un ERP sin auth."""
         if not self.es_produccion:
             return self
-        fallas = []
-        if self.jwt_secret == _PLACEHOLDER_SECRETO:
-            fallas.append("JWT_SECRET sigue siendo el placeholder")
-        elif len(self.jwt_secret) < JWT_SECRET_MIN_LEN:
-            fallas.append(f"JWT_SECRET debe tener al menos {JWT_SECRET_MIN_LEN} caracteres")
+        fallas = _fallas_de_secreto("JWT_SECRET", self.jwt_secret)
+        fallas += _fallas_de_secreto(
+            "STOREFRONT_JWT_SECRET", self.storefront_jwt_secret, self.jwt_secret
+        )
         if self.debug:
             fallas.append("DEBUG debe ser false")
         if _PASSWORD_DB_POR_DEFECTO in self.database_url:

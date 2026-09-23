@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import {
@@ -28,7 +28,7 @@ export default async function UsuariosPage() {
 
   try {
     const [usuarios, roles, sucursales] = await Promise.all([
-      apiFetch<Pagina<Usuario>>("/api/v1/users", { token }),
+      apiFetchCompleto<Usuario>("/api/v1/users", { token }),
       apiFetch<Rol[]>("/api/v1/roles", { token }),
       apiFetch<Sucursal[]>("/api/v1/sucursales", { token }),
     ]);

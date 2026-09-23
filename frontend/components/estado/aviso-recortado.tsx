@@ -31,7 +31,7 @@ export function AvisoRecortado({
   return (
     <p
       role="status"
-      className="rounded-lg bg-status-warning-surface px-3 py-2 text-sm text-status-warning"
+      className="rounded-lg bg-status-warning-surface px-3 py-2 text-sm text-status-warning-texto"
     >
       Se muestran <span className="cifra">{mostrados}</span> de{" "}
       <span className="cifra">{total}</span>. {sugerencia}
