@@ -327,6 +327,8 @@ funcionalidad. Un PR por punto, cada uno mergeado antes del siguiente.
 
 - **PDV como módulo propio** (ADR-106): ficha en el home con permiso exacto
   `sales.crear`; Ventas queda como back-office.
+- **Inventario en cinco entradas** (ADR-107): grupos con pestañas en el
+  sidebar (`ItemSubmenu.pestanas`); ninguna URL cambió.
 
 ## Fuentes
 

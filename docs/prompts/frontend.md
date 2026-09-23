@@ -57,6 +57,8 @@ Leer antes: `/CLAUDE.md`, [product/ui-ux.md](../product/ui-ux.md) y
 - **Registrar la pantalla en `lib/navegacion.ts`**, no en su `layout.tsx`: de
   ahí salen el sidebar y la paleta de comandos. Una pantalla sin registrar
   existe pero no se puede buscar.
+  Si el módulo ya tiene muchas entradas, agrupar pantallas hermanas bajo una
+  sola con `pestanas` (ADR-107) antes que alargar el sidebar.
 - **Un `loading.tsx` por módulo**. Sin él el clic en el sidebar no acusa
   recibo hasta que el servidor termina, y se lee como que la aplicación se
   colgó.

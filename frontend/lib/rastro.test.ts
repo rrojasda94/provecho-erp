@@ -60,3 +60,8 @@ test("el padre es el nivel de arriba, y nunca se sale de la app", () => {
   assert.equal(padreDe(rastroDe("/inventario/lotes/abc", "L-1")), "/inventario/lotes");
   assert.equal(padreDe(rastroDe("/")), "/");
 });
+
+test("una pestaña se nombra a sí misma, no a su grupo", () => {
+  // "Inventario › Stock" para `/inventario/lotes` escondería dónde se está.
+  assert.deepEqual(etiquetas("/inventario/lotes"), ["Inicio", "Inventario", "Lotes"]);
+});

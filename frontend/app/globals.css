@@ -805,6 +805,39 @@ dialog:modal {
     .nav-modulo[aria-current="page"]::before {
         transform: scaleY(1);
     }
+
+    /* Pestañas de un grupo del sidebar (ADR-107): mismo acento que el ítem
+       activo, en línea sobre el contenido. Scroll horizontal en móvil. */
+    .pestanas-seccion {
+        display: flex;
+        gap: 0.25rem;
+        margin-bottom: 1.25rem;
+        overflow-x: auto;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .pestanas-seccion a {
+        white-space: nowrap;
+        padding: 0.5rem 0.8rem;
+        margin-bottom: -1px;
+        border-bottom: 2px solid transparent;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--muted-foreground);
+        transition:
+            color var(--transicion),
+            border-color var(--transicion);
+    }
+
+    .pestanas-seccion a:hover {
+        color: var(--foreground);
+    }
+
+    .pestanas-seccion a[aria-current="page"] {
+        color: var(--hue);
+        font-weight: 600;
+        border-bottom-color: var(--hue);
+    }
 }
 
 /* Quien pidió menos movimiento recibe menos movimiento. No es una cortesía:

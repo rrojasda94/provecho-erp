@@ -13,7 +13,17 @@ import { puedeVerModulo } from "./permisos.ts";
  * El orden de cada lista es el del sidebar, y no es alfabético: es el orden
  * en que se trabaja.
  */
-export type ItemSubmenu = { label: string; href: string };
+export type ItemSubmenu = {
+  label: string;
+  href: string;
+  /**
+   * Pantallas hermanas que comparten una sola entrada del sidebar y se
+   * alternan con pestañas arriba del contenido. El `href` del grupo es el de
+   * su primera pestaña. Cada pestaña conserva su URL: agrupar no rompe
+   * enlaces, favoritos ni e2e.
+   */
+  pestanas?: ItemSubmenu[];
+};
 
 export const SUBMENUS: Record<string, ItemSubmenu[]> = {
   catalogo: [
@@ -55,31 +65,48 @@ export const SUBMENUS: Record<string, ItemSubmenu[]> = {
     { label: "Divisas", href: "/gerencia/divisas" },
   ],
   inventario: [
+    // Trece entradas eran demasiadas para un sidebar: se agrupan por la
+    // pregunta que responden y se alternan con pestañas (ADR-107).
+    //
     // Primera de todas: la pregunta con la que se abre el módulo es qué hay.
-    // Hasta ahora el único saldo visible era el de la ficha de un SKU, a la
-    // que solo se llegaba sabiendo de antemano cuál mirar.
-    { label: "Stock", href: "/inventario/stock" },
+    // Lotes y reservas son la misma pregunta con más detalle: de qué lote, y
+    // cuánto ya tiene dueño.
+    {
+      label: "Stock",
+      href: "/inventario/stock",
+      pestanas: [
+        { label: "Stock", href: "/inventario/stock" },
+        { label: "Lotes", href: "/inventario/lotes" },
+        { label: "Reservas", href: "/inventario/reservas" },
+      ],
+    },
     // Después lo que se hace todos los días: pedir y contar.
     { label: "Requerimientos", href: "/inventario/solicitudes" },
-    // Al lado del requerimiento porque es su continuación: lo que se aprueba
-    // se despacha, y sale de acá hasta que el destino lo recibe.
-    { label: "Traslados", href: "/inventario/transferencias" },
-    // El documento que declara el traslado ante SUNAT — se emite desde la
-    // ficha del traslado o de la devolución a proveedor; esta entrada es
-    // solo para revisar lo ya emitido.
-    { label: "Guías de remisión", href: "/inventario/guias-remision" },
+    // Todo lo que mueve stock fuera de una venta o una compra. La guía de
+    // remisión va al final: se emite desde la ficha del traslado o de la
+    // devolución, esta pestaña es solo para revisar lo ya emitido.
+    {
+      label: "Movimientos",
+      href: "/inventario/transferencias",
+      pestanas: [
+        { label: "Traslados", href: "/inventario/transferencias" },
+        { label: "Ajustes", href: "/inventario/ajustes" },
+        { label: "Mermas", href: "/inventario/mermas" },
+        { label: "Devoluciones", href: "/inventario/devoluciones" },
+        { label: "Guías de remisión", href: "/inventario/guias-remision" },
+      ],
+    },
     { label: "Conteos", href: "/inventario/conteos" },
-    { label: "Artículos", href: "/inventario/articulos" },
-    { label: "Categorías", href: "/inventario/categorias" },
-    { label: "Unidades de medida", href: "/inventario/unidades-medida" },
-    { label: "Lotes", href: "/inventario/lotes" },
-    { label: "Ajustes", href: "/inventario/ajustes" },
-    { label: "Devoluciones", href: "/inventario/devoluciones" },
-    // Las dos mitades de por qué el disponible no es el físico: lo apartado
-    // porque ya no sirve y lo apartado porque ya tiene dueño. La columna
-    // «Reservado» de Stock decía cuánto y no había dónde ver de quién.
-    { label: "Mermas", href: "/inventario/mermas" },
-    { label: "Reservas", href: "/inventario/reservas" },
+    // Los datos maestros: se configuran una vez y se tocan poco.
+    {
+      label: "Maestros",
+      href: "/inventario/articulos",
+      pestanas: [
+        { label: "Artículos", href: "/inventario/articulos" },
+        { label: "Categorías", href: "/inventario/categorias" },
+        { label: "Unidades de medida", href: "/inventario/unidades-medida" },
+      ],
+    },
   ],
   activos: [
     // La pregunta con la que se abre el módulo: qué se me viene, no la
@@ -202,7 +229,7 @@ export function destinos(permisos: string[]): Destino[] {
       modulo: "Módulo",
       clave: m.clave,
     };
-    const hijos = (SUBMENUS[m.clave] ?? [])
+    const hijos = pantallasDe(m.clave)
       // La entrada del módulo ya lleva a su primera pantalla; repetirla como
       // hija haría que buscar "compras" devuelva dos filas con el mismo
       // destino.
@@ -210,4 +237,17 @@ export function destinos(permisos: string[]): Destino[] {
       .map((s) => ({ href: s.href, titulo: s.label, modulo: m.nombre, clave: m.clave }));
     return [propio, ...hijos];
   });
+}
+
+/** Las pantallas de un módulo con los grupos abiertos: cada pestaña cuenta
+ * como pantalla propia para la paleta y el rastro. */
+export function pantallasDe(clave: string): ItemSubmenu[] {
+  return (SUBMENUS[clave] ?? []).flatMap((s) => s.pestanas ?? [s]);
+}
+
+/** Si la ruta cae en una pestaña, el grupo al que pertenece. */
+export function grupoDe(items: ItemSubmenu[], pathname: string): ItemSubmenu | undefined {
+  return items.find((s) =>
+    s.pestanas?.some((p) => pathname === p.href || pathname.startsWith(`${p.href}/`)),
+  );
 }
