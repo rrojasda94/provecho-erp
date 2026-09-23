@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, type Pagina, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { Cambio } from "./cambio";
@@ -59,8 +59,8 @@ function consulta(f: {
  * listado responde 403 se muestra el id y la pantalla sigue sirviendo. */
 async function nombresDeUsuario(token: string): Promise<Map<string, string>> {
   try {
-    const usuarios = await apiFetch<Pagina<{ id: string; username: string }>>(
-      "/api/v1/users?page_size=200",
+    const usuarios = await apiFetchCompleto<{ id: string; username: string }>(
+      "/api/v1/users",
       { token },
     );
     return new Map(usuarios.items.map((u) => [u.id, u.username] as const));

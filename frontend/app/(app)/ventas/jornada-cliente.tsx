@@ -411,7 +411,7 @@ export function JornadaCliente({
         comprobante que SUNAT rechazó y anular una orden que nunca se cobró.
       </p>
 
-      <div className="flex flex-wrap items-end gap-3 rounded border border-gray/20 bg-white p-4">
+      <div className="flex flex-wrap items-end gap-3 rounded border border-gray/20 bg-card p-4">
         <label className="flex flex-col gap-1 text-sm font-semibold">
           Sucursal
           <Combobox

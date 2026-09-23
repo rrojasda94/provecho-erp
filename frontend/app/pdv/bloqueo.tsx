@@ -128,7 +128,7 @@ export default function BloqueoPorInactividad({ username }: { username: string }
         <button
           type="button"
           className="pdv-bloqueo-salir"
-          onClick={() => logoutAction()}
+          onClick={() => logoutAction("/pdv")}
         >
           Cambiar de usuario
         </button>

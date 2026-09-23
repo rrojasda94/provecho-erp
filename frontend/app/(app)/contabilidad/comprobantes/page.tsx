@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { ComprobantesCliente, type ComprobanteEmitido } from "./comprobantes-cliente";
@@ -22,12 +22,12 @@ export default async function ComprobantesPage({
   const { token } = await obtenerSesion();
   const { desde, hasta } = await searchParams;
 
-  const filtros = new URLSearchParams({ page_size: "200" });
+  const filtros = new URLSearchParams();
   if (desde) filtros.set("desde", desde);
   if (hasta) filtros.set("hasta", hasta);
 
   try {
-    const pagina = await apiFetch<Pagina<ComprobanteEmitido>>(
+    const pagina = await apiFetchCompleto<ComprobanteEmitido>(
       `/api/v1/sales/comprobantes?${filtros}`,
       { token },
     );

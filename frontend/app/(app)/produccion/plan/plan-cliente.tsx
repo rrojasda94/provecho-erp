@@ -4,7 +4,6 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useActionState, useMemo } from "react";
 
 import { ArticuloPicker } from "@/components/articulo-picker/articulo-picker";
-import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
@@ -154,13 +153,10 @@ function BotonAccionPlan({
 
 export function PlanCliente({
   planes,
-  total,
   almacenes,
   articulos,
 }: {
   planes: Plan[];
-  /** Cuántos hay en total: la página viene recortada. */
-  total: number;
   almacenes: Almacen[];
   articulos: Articulo[];
 }) {
@@ -242,11 +238,6 @@ export function PlanCliente({
         El cronograma fijo por línea y turno (RN-PRD-007/012): planificado → iniciado
         (reserva los insumos de sus órdenes) → cerrado (libera lo que no se consumió).
       </p>
-      <AvisoRecortado
-        mostrados={planes.length}
-        total={total}
-        sugerencia="Acota por almacén, fecha o estado para ver el resto."
-      />
       <TablaDatos columnas={columnas} datos={planes} placeholderBusqueda="Buscar plan..." />
     </div>
   );

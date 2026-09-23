@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import type { Almacen, Articulo } from "../ordenes-cliente";
@@ -9,14 +9,13 @@ export default async function PlanProduccionPage() {
 
   try {
     const [planes, almacenes, articulos] = await Promise.all([
-      apiFetch<Pagina<Plan>>("/api/v1/production/planes", { token }),
+      apiFetchCompleto<Plan>("/api/v1/production/planes", { token }),
       apiFetch<Almacen[]>("/api/v1/almacenes", { token }),
-      apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?page_size=200", { token }),
+      apiFetchCompleto<Articulo>("/api/v1/inventory/articulos", { token }),
     ]);
     return (
       <PlanCliente
         planes={planes.items}
-        total={planes.total}
         almacenes={almacenes}
         articulos={articulos.items}
       />

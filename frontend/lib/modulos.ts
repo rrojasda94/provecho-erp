@@ -13,6 +13,7 @@ import {
   Inbox,
   KeyRound,
   Megaphone,
+  MonitorSmartphone,
   Package,
   Receipt,
   Route,
@@ -149,12 +150,27 @@ export const MODULOS: Modulo[] = [
     Icono: ClipboardCheck,
   },
   {
+    clave: "pdv",
+    nombre: "Punto de venta",
+    descripcion: "Tomar pedidos, cobrar y emitir el comprobante",
+    // Módulo propio y no un enlace del sidebar de Ventas (ADR-106): quien
+    // vende no administra la jornada, y quien administra no debería tener
+    // que entrar a Ventas para abrir la caja. Pantalla completa táctil fuera
+    // del shell, igual que el KDS (ADR-013). El dominio sigue siendo `sales`.
+    href: "/pdv",
+    prefijoPermiso: "sales.",
+    // Exacto: `sales.leer` sola (un contador, un supervisor de lectura) no
+    // vende, y con el prefijo vería una ficha que termina en 403.
+    permiso: "sales.crear",
+    area: "operacion",
+    Icono: MonitorSmartphone,
+  },
+  {
     clave: "ventas",
     nombre: "Ventas",
-    descripcion: "Jornada, comprobantes y punto de venta",
-    // Entra por el back-office (jornada de la sucursal) y desde su sidebar se
-    // abre el PDV, que es pantalla completa táctil fuera del shell (ADR-013).
-    // Al revés —tile directo al PDV— dejaba sin puerta a lo administrativo.
+    descripcion: "Jornada, clientes, mesas y promociones",
+    // El back-office de la venta. El PDV era un enlace de este sidebar hasta
+    // ADR-106; ahora es su propio módulo.
     href: "/ventas",
     prefijoPermiso: "sales.",
     area: "comercial",

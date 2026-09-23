@@ -1,7 +1,7 @@
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 
-import { NavModulo } from "@/components/shell/nav-modulo";
+import { NavModulo, PestanasSeccion } from "@/components/shell/nav-modulo";
 import type { Modulo } from "@/lib/modulos";
 import { SUBMENUS, type ItemSubmenu } from "@/lib/navegacion";
 import { puedeVerModulo } from "@/lib/permisos";
@@ -75,13 +75,16 @@ export async function ModuloShell({
         {items.length > 0 && (
           <nav className="flex gap-0.5 overflow-x-auto md:flex-col md:overflow-visible">
             {items.map((item) => (
-              <NavModulo key={item.href} href={item.href} label={item.label} />
+              <NavModulo key={item.href} item={item} items={items} />
             ))}
           </nav>
         )}
       </aside>
 
-      <div className="min-w-0 flex-1 overflow-x-auto p-4 md:p-6">{children}</div>
+      <div className="min-w-0 flex-1 overflow-x-auto p-4 md:p-6">
+        <PestanasSeccion items={items} />
+        {children}
+      </div>
     </div>
   );
 }

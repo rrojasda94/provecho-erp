@@ -1,13 +1,14 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
-import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import type { PaginaServidor } from "@/components/tabla/use-tabla-servidor";
 import { Combobox } from "@/components/ui/combobox";
 import { RUTA_EXPORTAR_ARTICULOS } from "@/lib/catalogo";
 import { tienePermiso } from "@/lib/permisos";
@@ -218,14 +219,14 @@ const GESTIONAR_CATALOGO = "inventory.gestionar_catalogo";
 
 export function ArticulosCliente({
   articulos,
-  total,
+  pagina,
   categorias,
   unidadesMedida,
   permisos,
 }: {
   articulos: Articulo[];
-  /** Cuántos hay en total: la página trae 200 y el resto no se ve. */
-  total: number;
+  /** El catálogo son miles: busca y pagina el servidor (`?q`, `?page`). */
+  pagina: PaginaServidor;
   categorias: Categoria[];
   unidadesMedida: UnidadMedida[];
   permisos: string[];
@@ -246,7 +247,19 @@ export function ArticulosCliente({
   const columnas: ColumnDef<Articulo>[] = useMemo(
     () => [
       { accessorKey: "id_interno", header: "Código" },
-      { accessorKey: "nombre", header: "Nombre" },
+      {
+        accessorKey: "nombre",
+        header: "Nombre",
+        // A la ficha: stock, kardex y cuándo volver a comprar.
+        cell: ({ row }) => (
+          <Link
+            href={`/inventario/articulos/${row.original.id}`}
+            className="font-medium text-primary hover:underline"
+          >
+            {row.original.nombre}
+          </Link>
+        ),
+      },
       { accessorKey: "tipo", header: "Tipo" },
       {
         id: "categoria",
@@ -294,7 +307,7 @@ export function ArticulosCliente({
           <a
             href={RUTA_EXPORTAR_ARTICULOS}
             download
-            className="rounded border border-borde px-4 py-2 text-sm font-bold text-dark hover:bg-fondo"
+            className="rounded border border-border px-4 py-2 text-sm font-bold text-dark hover:bg-muted"
           >
             Exportar
           </a>
@@ -306,12 +319,12 @@ export function ArticulosCliente({
           )}
         </div>
       </div>
-      <AvisoRecortado
-        mostrados={articulos.length}
-        total={total}
-        sugerencia="Usá el buscador del listado o exportá a Excel para ver el resto."
+      <TablaDatos
+        columnas={columnas}
+        datos={articulos}
+        servidor={pagina}
+        placeholderBusqueda="Buscar por nombre o código..."
       />
-      <TablaDatos columnas={columnas} datos={articulos} placeholderBusqueda="Buscar artículo..." />
     </div>
   );
 }

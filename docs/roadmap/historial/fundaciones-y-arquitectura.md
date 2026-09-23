@@ -320,6 +320,31 @@ Correcciones aplicadas en la misma sesión:
 - CHANGELOG puesto al día (todo el trabajo del 2026-07-19 + esta sesión).
 - Skill `sop-creator` endurecida para no dejar cabos sueltos (ver skill).
 
+### 2026-09-23 — Simplificación de UX (seis PRs en fila)
+
+Pedido del dueño al cerrar el ERP: simplificar la navegación sin perder
+funcionalidad. Un PR por punto, cada uno mergeado antes del siguiente.
+
+- **PDV como módulo propio** (ADR-106): ficha en el home con permiso exacto
+  `sales.crear`; Ventas queda como back-office.
+- **Inventario en cinco entradas** (ADR-107): grupos con pestañas en el
+  sidebar (`ItemSubmenu.pestanas`); ninguna URL cambió.
+- **Listados sin tope** (enmienda ADR-026): Artículos y Asientos paginan y
+  buscan en el servidor; el resto trae todas las páginas. ~45 llamadas
+  cortaban en 200 o en 50 sin avisar.
+- **Kardex gráfico** (ADR-108, RN-INV-027): ficha del artículo en Inventario
+  y Compras con precio histórico, entradas/salidas por semana, saldo contra
+  mínimo y próxima compra sugerida.
+- **Contraste del modo oscuro** (enmienda ADR-037): utilidades de marca al
+  rol semántico, tokens de estado ajustados, test de contraste AA.
+- **Asientos omitidos con nombre y apellido** (enmienda ADR-089): el aviso
+  lista cada uno con su documento; los fallos de listener se anotan como `error`.
+- **Kardex por sede y por almacén** (enmienda ADR-108): selector de ámbito en
+  la ficha y tabla «Cómo está cada sede».
+- **KDS, PDV y Mi reparto como apps Android** (ADR-109): tres manifests con
+  `scope` propio, login dentro de cada app (`/<app>/ingresar`) que vuelve a
+  la misma pantalla, y el usuario recordado en la app instalada (solo PIN).
+
 ## Fuentes
 
 Rangos de línea de `ROADMAP.md` usados (estado del archivo al iniciar esta

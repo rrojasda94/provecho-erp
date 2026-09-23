@@ -108,7 +108,7 @@ export function DialogoImportar({
 
       <dialog
         ref={dialogo}
-        className="w-full max-w-3xl rounded-lg p-0 backdrop:bg-dark/40"
+        className="w-full max-w-3xl rounded-lg p-0 backdrop:bg-black/40"
       >
         <div className="flex max-h-[80vh] flex-col gap-4 overflow-y-auto p-6">
           <h2 className="font-heading text-lg text-dark">{titulo}</h2>
@@ -142,7 +142,7 @@ export function DialogoImportar({
 
           {!resultado && children}
 
-          <div className="flex justify-end gap-2 border-t border-borde pt-4">
+          <div className="flex justify-end gap-2 border-t border-border pt-4">
             <button
               type="button"
               className="px-4 py-2 text-sm text-gray"
@@ -153,7 +153,7 @@ export function DialogoImportar({
             {!resultado && importables > 0 && (
               <button
                 type="button"
-                className="rounded bg-primary px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                className="rounded bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-50"
                 disabled={ocupado}
                 onClick={confirmar}
               >

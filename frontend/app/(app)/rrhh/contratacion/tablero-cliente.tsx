@@ -152,7 +152,7 @@ function Ficha({
   const descartado = postulante.estado === DESCARTADO;
 
   return (
-    <li className="rounded border border-gray/25 bg-white p-2.5 text-sm">
+    <li className="rounded border border-gray/25 bg-card p-2.5 text-sm">
       <p className="font-semibold text-dark">
         {postulante.nombres} {postulante.apellidos}
       </p>

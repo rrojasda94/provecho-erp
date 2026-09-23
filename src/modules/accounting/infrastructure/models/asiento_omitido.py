@@ -29,7 +29,9 @@ from src.core.model_base import TimestampMixin, UuidPkMixin
 # Por qué se omitió. Cada uno se arregla en un lugar distinto: `periodo_cerrado`
 # es una decisión de contabilidad (el mes ya se cerró y llegó un hecho de ese
 # mes), `sin_cuentas` es plan de cuentas sin importar, y `sin_plantilla` es un
-# evento que nadie mapeó todavía — deuda del ERP, no de la empresa.
+# evento que nadie mapeó todavía — deuda del ERP, no de la empresa. `error` es
+# un listener que reventó con una excepción (2026-09-23): el mensaje queda en
+# `detalle` y el arreglo es del ERP.
 #
 # No están `duplicado` ni `monto_cero`: los dos son omisiones **correctas y
 # esperadas** —el evento se reprocesó, o el hecho no movió plata— y anotarlas
@@ -38,6 +40,7 @@ MOTIVO_OMISION = Enum(
     "periodo_cerrado",
     "sin_cuentas",
     "sin_plantilla",
+    "error",
     name="motivo_asiento_omitido",
     native_enum=False,
 )
@@ -48,7 +51,7 @@ class AsientoOmitido(Base, UuidPkMixin, TimestampMixin):
 
     __table_args__ = (
         CheckConstraint(
-            "motivo IN ('periodo_cerrado', 'sin_cuentas', 'sin_plantilla')",
+            "motivo IN ('periodo_cerrado', 'sin_cuentas', 'sin_plantilla', 'error')",
             name="motivo_asiento_omitido",
         ),
     )

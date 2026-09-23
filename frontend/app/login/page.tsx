@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useActionState, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 
 import Pinpad from "@/components/pinpad/pinpad";
 
@@ -19,10 +19,49 @@ import { loginAction, type EstadoLogin } from "./actions";
 
 const ESTADO_INICIAL: EstadoLogin = { error: "", motivo: "" };
 
+/**
+ * Último usuario de la app instalada (ADR-109). La sesión sigue muriendo al
+ * cerrarse la app (ADR-084) y Android la cierra cuando quiere: sin esto el
+ * repartidor tecleaba su usuario cada vez. Solo el usuario, nunca el PIN
+ * (ADR-050), y solo en la app instalada — en el navegador de una PC
+ * compartida no se recuerda nada.
+ */
+const CLAVE_ULTIMO_USUARIO = "provecho.ultimo_usuario";
+
+function esAppInstalada(): boolean {
+  return window.matchMedia("(display-mode: standalone)").matches;
+}
+
+function recordarUsuario(valor: string | null) {
+  try {
+    if (valor) localStorage.setItem(CLAVE_ULTIMO_USUARIO, valor);
+    else localStorage.removeItem(CLAVE_ULTIMO_USUARIO);
+  } catch {
+    // Almacenamiento bloqueado: se vuelve a escribir el usuario, nada más.
+  }
+}
+
 export default function LoginPage() {
   const [estado, despachar, pendiente] = useActionState(loginAction, ESTADO_INICIAL);
   const usuario = useRef<HTMLInputElement>(null);
   const [pin, setPin] = useState("");
+  const [recordado, setRecordado] = useState("");
+
+  useEffect(() => {
+    if (!esAppInstalada() || !usuario.current || usuario.current.value) return;
+    let valor: string | null = null;
+    try {
+      valor = localStorage.getItem(CLAVE_ULTIMO_USUARIO);
+    } catch {
+      return;
+    }
+    if (!valor) return;
+    usuario.current.value = valor;
+    // Sin foco en el usuario: en el teléfono abriría el teclado encima del
+    // pinpad, que es lo único que queda por tocar.
+    usuario.current.blur();
+    setRecordado(valor);
+  }, []);
 
   // La acción se despacha a mano y **nunca** por `<form action={...}>`: React
   // 19 resetea los campos de un formulario cuando su acción termina, también
@@ -39,6 +78,7 @@ export default function LoginPage() {
     const datos = new FormData();
     datos.set("username", usuario.current?.value ?? "");
     datos.set("pin", candidato);
+    if (esAppInstalada()) recordarUsuario(usuario.current?.value.trim() || null);
     // `?next=` lo agrega `/oauth/authorize` (ADR-083 Fase B) cuando el SSO
     // del BI encuentra a alguien sin sesión de Provecho todavía. Leído del
     // `location` y no de un hook de router: esta página es enteramente
@@ -75,6 +115,22 @@ export default function LoginPage() {
             Usuario
             <input ref={usuario} name="username" autoComplete="username" required autoFocus />
           </label>
+          {recordado && (
+            <button
+              type="button"
+              className="login-no-soy-yo"
+              onClick={() => {
+                recordarUsuario(null);
+                setRecordado("");
+                if (usuario.current) {
+                  usuario.current.value = "";
+                  usuario.current.focus();
+                }
+              }}
+            >
+              No soy {recordado}
+            </button>
+          )}
           <div className="login-pin">
             <span className="login-pin-titulo">PIN</span>
             {/* Al sexto dígito entra solo: en una tablet un botón más es un

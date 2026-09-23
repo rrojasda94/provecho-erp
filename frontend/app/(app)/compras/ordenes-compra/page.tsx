@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, type Pagina, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import {
@@ -21,8 +21,8 @@ export default async function OrdenesCompraPage() {
     // porque el campo filtra sobre lo que recibió y lo que no vino no existe
     // para quien busca.
     [ordenes, proveedores, almacenes] = await Promise.all([
-      apiFetch<Pagina<OrdenCompra>>("/api/v1/purchases/ordenes-compra", { token }),
-      apiFetch<Pagina<Proveedor>>("/api/v1/purchases/proveedores?page_size=200", {
+      apiFetchCompleto<OrdenCompra>("/api/v1/purchases/ordenes-compra", { token }),
+      apiFetchCompleto<Proveedor>("/api/v1/purchases/proveedores", {
         token,
       }),
       apiFetch<Almacen[]>("/api/v1/almacenes", { token }),
@@ -42,7 +42,7 @@ export default async function OrdenesCompraPage() {
   let avisoArticulos: string | null = null;
   try {
     articulos = (
-      await apiFetch<Pagina<Articulo>>("/api/v1/inventory/articulos?page_size=200", { token })
+      await apiFetchCompleto<Articulo>("/api/v1/inventory/articulos", { token })
     ).items;
   } catch (e) {
     avisoArticulos =
@@ -54,7 +54,6 @@ export default async function OrdenesCompraPage() {
   return (
     <OrdenesCompraCliente
       ordenes={ordenes.items}
-      total={ordenes.total}
       proveedores={proveedores.items}
       almacenes={almacenes}
       articulos={articulos}

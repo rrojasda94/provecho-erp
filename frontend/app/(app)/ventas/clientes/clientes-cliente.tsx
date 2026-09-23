@@ -9,7 +9,6 @@ import { BuscarDocumento } from "@/components/consulta/buscar-documento";
 import { CampoDireccion } from "@/components/direccion/campo-direccion";
 import type { Ubicacion } from "@/components/direccion/ubicacion";
 import { BOTON_FILA, DialogoFormulario } from "@/components/formulario/dialogo-formulario";
-import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { RUTA_EXPORTAR_CLIENTES } from "@/lib/clientes";
@@ -155,12 +154,9 @@ function AccionesCliente({ cliente, permisos }: { cliente: Cliente; permisos: st
 
 export function ClientesCliente({
   clientes,
-  total,
   permisos,
 }: {
   clientes: Cliente[];
-  /** Cuántos hay en total: la página viene recortada. */
-  total: number;
   permisos: string[];
 }) {
   // La pantalla se renderiza en el servidor: tras importar hay que pedirle
@@ -205,7 +201,7 @@ export function ClientesCliente({
           <a
             href={RUTA_EXPORTAR_CLIENTES}
             download
-            className="rounded border border-borde px-4 py-2 text-sm font-bold text-dark hover:bg-fondo"
+            className="rounded border border-border px-4 py-2 text-sm font-bold text-dark hover:bg-muted"
           >
             Exportar
           </a>
@@ -219,11 +215,6 @@ export function ClientesCliente({
         <strong>natural</strong> solo se completa el documento: su nombre, teléfono y
         dirección viven en su ficha de persona, fuente única (RN-GEN-007).
       </p>
-      <AvisoRecortado
-        mostrados={clientes.length}
-        total={total}
-        sugerencia="Buscá por nombre o documento para encontrar el que falta."
-      />
       <TablaDatos
         columnas={columnas}
         datos={clientes}

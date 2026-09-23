@@ -23,7 +23,7 @@ from src.modules.inventory.infrastructure.models import (
     SolicitudInsumos,
     Transferencia,
 )
-from src.modules.users.infrastructure.models import Almacen
+from src.modules.users.infrastructure.models import Almacen, Sucursal
 
 
 def exigir_almacen(session: Session, almacen_id: uuid.UUID, tenant: Tenant) -> Almacen:
@@ -32,6 +32,19 @@ def exigir_almacen(session: Session, almacen_id: uuid.UUID, tenant: Tenant) -> A
         raise NoEncontrado("almacén no encontrado")
     tenant.exigir_empresa(almacen.empresa_id)
     return almacen
+
+
+def exigir_sucursal_de_la_empresa(
+    session: Session, sucursal_id: uuid.UUID, tenant: Tenant
+) -> Sucursal:
+    """Una sede de la empresa del usuario, aunque no sea una de las suyas:
+    comparar sedes es mirar las demás. `tenant.exigir_sucursal` exigiría que
+    le estuviera asignada."""
+    sucursal = session.get(Sucursal, sucursal_id)
+    if sucursal is None:
+        raise NoEncontrado("sucursal no encontrada")
+    tenant.exigir_empresa(sucursal.empresa_id)
+    return sucursal
 
 
 def exigir_articulo(

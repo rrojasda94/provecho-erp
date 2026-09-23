@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { filtrosDe, queryDeFiltros } from "@/lib/filtros";
 import { obtenerSesion } from "@/lib/sesion";
 
@@ -36,7 +36,7 @@ export default async function ConteosPage({
   let conteos: Conteo[];
   try {
     conteos = (
-      await apiFetch<Pagina<Conteo>>(`/api/v1/inventory/conteos?${query}`, { token })
+      await apiFetchCompleto<Conteo>(`/api/v1/inventory/conteos?${query}`, { token })
     ).items;
   } catch (e) {
     const mensaje =

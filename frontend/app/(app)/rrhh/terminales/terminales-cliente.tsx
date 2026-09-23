@@ -89,7 +89,7 @@ function FormularioNuevoTerminal({ sucursales }: { sucursales: Sucursal[] }) {
       >
         {pendiente ? "Creando..." : "+ Nuevo terminal"}
       </button>
-      {estado.error && <p className="w-full text-sm text-red-600">{estado.error}</p>}
+      {estado.error && <p className="w-full text-sm text-status-danger">{estado.error}</p>}
     </form>
   );
 }

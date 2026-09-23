@@ -44,7 +44,7 @@ function Seccion({
   return (
     <form
       action={formAction}
-      className="flex flex-col gap-2 rounded-lg border border-border bg-white p-4"
+      className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4"
     >
       <input type="hidden" name="marca_id" value={marcaId} />
       <input type="hidden" name="clave" value={clave} />
@@ -55,7 +55,7 @@ function Seccion({
         <button
           type="submit"
           disabled={pendiente}
-          className="self-start rounded bg-primary px-4 py-1.5 text-sm font-bold text-white hover:bg-primary/90 disabled:opacity-60"
+          className="self-start rounded bg-primary px-4 py-1.5 text-sm font-bold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
         >
           {pendiente ? "Guardando..." : "Guardar"}
         </button>

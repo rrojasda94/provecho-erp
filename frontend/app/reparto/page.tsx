@@ -14,6 +14,7 @@ import { redirect } from "next/navigation";
 import { ApiError, apiFetch } from "@/lib/api";
 import { type RutaConParadas } from "@/lib/delivery";
 import { tienePermiso } from "@/lib/permisos";
+import { urlIngreso } from "@/lib/ingreso";
 import { obtenerSesion } from "@/lib/sesion";
 
 import RepartoCliente from "./reparto-cliente";
@@ -34,7 +35,8 @@ function Bloqueo({ titulo, detalle }: { titulo: string; detalle: string }) {
 }
 
 export default async function PaginaReparto() {
-  const { token, usuario } = await obtenerSesion();
+  const ingreso = urlIngreso("/reparto");
+  const { token, usuario } = await obtenerSesion(ingreso);
 
   if (!tienePermiso(usuario.permisos, "delivery.repartir")) {
     return (
@@ -49,7 +51,7 @@ export default async function PaginaReparto() {
   try {
     rutas = await apiFetch<RutaConParadas[]>("/api/v1/delivery/mi/rutas", { token });
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401) redirect("/login");
+    if (e instanceof ApiError && e.status === 401) redirect(ingreso);
     return (
       <Bloqueo
         titulo="No se pudo cargar tu reparto"

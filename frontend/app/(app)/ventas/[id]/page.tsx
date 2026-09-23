@@ -92,7 +92,7 @@ export default async function VentaPage({
       </dl>
 
       {venta.descuento_modo && (
-        <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm">
+        <p className="rounded border border-status-warning/40 bg-status-warning-surface p-3 text-sm">
           Descuento {venta.descuento_modo} de {venta.descuento_valor}
           {venta.descuento_motivo ? ` — ${venta.descuento_motivo}` : ""}
         </p>

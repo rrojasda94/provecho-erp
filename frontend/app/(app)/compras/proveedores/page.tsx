@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { ProveedoresCliente, type Persona, type Proveedor } from "./proveedores-cliente";
@@ -9,7 +9,7 @@ export default async function ProveedoresPage() {
   let proveedores: Proveedor[];
   try {
     proveedores = (
-      await apiFetch<Pagina<Proveedor>>("/api/v1/purchases/proveedores", { token })
+      await apiFetchCompleto<Proveedor>("/api/v1/purchases/proveedores", { token })
     ).items;
   } catch (e) {
     const mensaje =

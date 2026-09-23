@@ -40,17 +40,20 @@ export const PREFERENCIAS_POR_DEFECTO = {
  * la memoización de `fetch` de Next.js (mismo GET + mismos headers, mismo
  * render pass) las reduce a una sola llamada real de red. Si `apiFetch`
  * cambia de forma (headers dinámicos, etc.) esa dedup se pierde en
- * silencio — no hay nada en el código que lo garantice. */
-export async function obtenerSesion(): Promise<Sesion> {
+ * silencio — no hay nada en el código que lo garantice.
+ *
+ * `ingreso`: las apps instalables (ADR-109) pasan su `/<app>/ingresar` para
+ * que el login quede dentro de su scope y vuelva a ellas (`lib/ingreso.ts`). */
+export async function obtenerSesion(ingreso = "/login"): Promise<Sesion> {
   const store = await cookies();
   const token = store.get(COOKIE_TOKEN)?.value;
-  if (!token) redirect("/login");
+  if (!token) redirect(ingreso);
 
   try {
     const usuario = await apiFetch<Usuario>("/api/v1/users/me", { token });
     return { token, usuario };
   } catch (e) {
-    if (e instanceof ApiError && e.status === 401) redirect("/login");
+    if (e instanceof ApiError && e.status === 401) redirect(ingreso);
     throw e;
   }
 }

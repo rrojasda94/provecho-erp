@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import {
@@ -18,7 +18,7 @@ export default async function TrabajadoresPage() {
     // mismo esta pantalla ya no pide `/api/v1/users` (ADR-070): la cuenta
     // con la que un trabajador marca se vincula y se ve en Usuarios, no acá.
     const [trabajadores, personas, sucursales] = await Promise.all([
-      apiFetch<Pagina<Trabajador>>("/api/v1/rrhh/trabajadores", { token }),
+      apiFetchCompleto<Trabajador>("/api/v1/rrhh/trabajadores", { token }),
       apiFetch<Persona[]>("/api/v1/personas/buscar", { token }),
       // Catálogo de referencia: lo puede leer cualquier autenticado que tenga
       // que elegir una sucursal, no hace falta `organizacion.gestionar`.

@@ -1,5 +1,5 @@
 import { MODULOS } from "./modulos.ts";
-import { SUBMENUS } from "./navegacion.ts";
+import { pantallasDe } from "./navegacion.ts";
 
 /**
  * El rastro de una pantalla: Inicio / Módulo / Sección / lo que se está viendo.
@@ -20,7 +20,7 @@ export type Miga = { label: string; href: string };
  * `/contabilidad/caja`, y con el primero toda pantalla de contabilidad diría
  * "Asientos". */
 function seccionDe(clave: string, pathname: string): Miga | null {
-  const candidatas = (SUBMENUS[clave] ?? []).filter(
+  const candidatas = pantallasDe(clave).filter(
     (s) => pathname === s.href || pathname.startsWith(`${s.href}/`),
   );
   if (candidatas.length === 0) return null;

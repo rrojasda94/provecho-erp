@@ -3,7 +3,6 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 
-import { AvisoRecortado } from "@/components/estado/aviso-recortado";
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
 import { Combobox } from "@/components/ui/combobox";
@@ -189,12 +188,9 @@ function DialogoNuevoChecklist({ almacenes }: { almacenes: Almacen[] }) {
 
 export function InocuidadCliente({
   checklists,
-  total,
   almacenes,
 }: {
   checklists: Checklist[];
-  /** Cuántos hay en total: la página viene recortada. */
-  total: number;
   almacenes: Almacen[];
 }) {
   const nombreAlmacen = useMemo(
@@ -248,11 +244,6 @@ export function InocuidadCliente({
         consumo (RN-CDP-002/005): un equipo de frío fuera de rango o indicio de plaga bloquea
         todo hasta el próximo checklist aprobado.
       </p>
-      <AvisoRecortado
-        mostrados={checklists.length}
-        total={total}
-        sugerencia="Acota por almacén, fecha o estado para ver el resto."
-      />
       <TablaDatos
         columnas={columnas}
         datos={checklists}

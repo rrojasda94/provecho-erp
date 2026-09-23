@@ -110,10 +110,15 @@
        Regla que los acompaña y que el token solo no puede imponer: ningún
        estado se comunica SOLO por color (ui-ux.md). El ícono obligatorio
        viaja junto al token en `lib/estados.tsx`. */
-    --status-success: var(--marca-accent);
+    /* Un punto más oscuro que `--marca-accent`: sobre su propia superficie
+       tintada el verde de marca daba 3.9:1. */
+    --status-success: #11703e;
     --status-danger: var(--marca-secondary);
     --status-warning: #ffb300;
-    --status-info: #1976d2;
+    /* El ámbar es para el ícono y el fondo: como texto sobre blanco da 1.8:1.
+       La letra de una alerta va en su versión tostada. */
+    --status-warning-texto: #8a5a00;
+    --status-info: #1565c0;
 
     /* 3. Roles de shadcn sobre la marca */
     --background: var(--marca-steel);
@@ -148,6 +153,13 @@
     --chart-3: var(--marca-secondary);
     --chart-4: #3730a3;
     --chart-5: #15803d;
+    /* Entradas del kardex (azul) contra salidas en `--primary`: el par pasa
+       las pruebas de daltonismo en claro (#0284c7/#c6390f) y en oscuro
+       (#3b8fe8/#f4511e) con `validate_palette.js`. */
+    --kardex-entrada: #0284c7;
+    /* La crema como superficie de marca (`bg-cream`): resaltados y tarjetas
+       cálidas. En oscuro se vuelve una superficie apenas tibia. */
+    --superficie-crema: var(--marca-cream);
 
     --sidebar: #ffffff;
     --sidebar-foreground: var(--marca-dark);
@@ -200,11 +212,22 @@ html {
      3.6:1 y el naranja de origen sube a 5.4:1. Es el mismo criterio de
      siempre aplicado al fondo contrario.
    - `--secondary` sube de rescoldo (#7a1414, invisible en oscuro) a un rojo
-     que se lee: 4.8:1.
+     que se lee sobre la tarjeta: 4.8:1 (#f06a6e; el #e5484d anterior daba
+     4.4). Todos los pares texto/superficie los verifica
+     `lib/contraste.test.ts` en los dos temas.
 
    No está en docs/product/ui-ux.md porque el brandboard nunca contempló
    pantallas oscuras fuera del PDV/KDS. Ver ADR-037. */
 .dark {
+    --kardex-entrada: #3b8fe8;
+    --superficie-crema: color-mix(in srgb, var(--primary) 10%, var(--card));
+    /* Series de gráficos: la marca brillante del tema y tonos aclarados para
+       que ninguna serie se hunda en la superficie oscura. */
+    --chart-1: var(--primary);
+    --chart-2: #3b8fe8;
+    --chart-3: var(--secondary);
+    --chart-4: #8b8cf0;
+    --chart-5: #2ea86a;
     --background: #101216;
     --foreground: #e6e9ee;
     --card: #191c22;
@@ -213,21 +236,22 @@ html {
     --popover-foreground: var(--foreground);
     --primary: #f4511e;
     --primary-foreground: #16181d;
-    --secondary: #e5484d;
+    --secondary: #f06a6e;
     --secondary-foreground: #16181d;
     --muted: #22262e;
     --muted-foreground: #98a2b3;
     --accent: #2ea86a;
     --accent-foreground: #10141a;
-    --destructive: #e5484d;
+    --destructive: #f06a6e;
     --destructive-foreground: #16181d;
     --border: #2a2f38;
     --input: #3a4150;
     --ring: var(--primary);
 
     --status-success: #2ea86a;
-    --status-danger: #e5484d;
+    --status-danger: #f06a6e;
     --status-warning: #ffb300;
+    --status-warning-texto: var(--status-warning);
     --status-info: #4d94ff;
 
     /* En oscuro la elevación no se lee por sombra —negro sobre negro no
@@ -318,11 +342,16 @@ html {
     --color-input: var(--input);
     --color-ring: var(--ring);
 
-    /* Nombres de marca que el código ya usa (`text-cream`, `text-gray`). */
-    --color-dark: var(--marca-dark);
-    --color-cream: var(--marca-cream);
-    --color-gray: var(--marca-gray);
-    --color-steel: var(--marca-steel);
+    /* Nombres de marca que el código ya usa (`text-dark`, `text-gray`,
+       `bg-cream`) —más de 900 veces—. Apuntan al **rol** y no al hex de la
+       marca: en claro valen exactamente lo mismo que antes (`--foreground`
+       es `--marca-dark`, etc.), y en oscuro siguen al tema. Colgados de
+       `--marca-*`, que no cambia con `.dark`, dejaban texto casi negro sobre
+       fondo casi negro en todo el back office. */
+    --color-dark: var(--foreground);
+    --color-cream: var(--superficie-crema);
+    --color-gray: var(--muted-foreground);
+    --color-steel: var(--background);
 
     /* Estados como utilidades: `bg-status-danger-surface text-status-danger`
        es la insignia completa, sin un hex a la vista. */
@@ -332,6 +361,7 @@ html {
     --color-status-danger-surface: var(--status-danger-surface);
     --color-status-warning: var(--status-warning);
     --color-status-warning-surface: var(--status-warning-surface);
+    --color-status-warning-texto: var(--status-warning-texto);
     --color-status-info: var(--status-info);
     --color-status-info-surface: var(--status-info-surface);
 
@@ -805,6 +835,39 @@ dialog:modal {
     .nav-modulo[aria-current="page"]::before {
         transform: scaleY(1);
     }
+
+    /* Pestañas de un grupo del sidebar (ADR-107): mismo acento que el ítem
+       activo, en línea sobre el contenido. Scroll horizontal en móvil. */
+    .pestanas-seccion {
+        display: flex;
+        gap: 0.25rem;
+        margin-bottom: 1.25rem;
+        overflow-x: auto;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .pestanas-seccion a {
+        white-space: nowrap;
+        padding: 0.5rem 0.8rem;
+        margin-bottom: -1px;
+        border-bottom: 2px solid transparent;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--muted-foreground);
+        transition:
+            color var(--transicion),
+            border-color var(--transicion);
+    }
+
+    .pestanas-seccion a:hover {
+        color: var(--foreground);
+    }
+
+    .pestanas-seccion a[aria-current="page"] {
+        color: var(--hue);
+        font-weight: 600;
+        border-bottom-color: var(--hue);
+    }
 }
 
 /* Quien pidió menos movimiento recibe menos movimiento. No es una cortesía:
@@ -1014,6 +1077,16 @@ dialog:modal {
         text-transform: uppercase;
         letter-spacing: 0.07em;
         color: var(--muted-foreground);
+    }
+
+    .login-no-soy-yo {
+        align-self: flex-end;
+        margin-top: -0.5rem;
+        background: none;
+        border: none;
+        font-size: 0.8125rem;
+        color: var(--muted-foreground);
+        text-decoration: underline;
     }
 
     .login-nota {

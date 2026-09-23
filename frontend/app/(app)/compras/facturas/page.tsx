@@ -1,14 +1,10 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, type Pagina, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import type { Proveedor } from "../ordenes-compra/ordenes-compra-cliente";
 import { FacturasCliente, type ComprobanteRecibido } from "./facturas-cliente";
 
 type Params = Promise<{ proveedor?: string; desde?: string; hasta?: string; tipo?: string }>;
-
-/** Tope del contrato (ADR-026). La tabla pagina en el navegador sobre lo que
- * recibe; el filtro por proveedor y por fecha es lo que la mantiene corta. */
-const MAXIMO = 200;
 
 /**
  * El registro de compras: qué facturas recibió la empresa.
@@ -22,7 +18,7 @@ export default async function FacturasPage({ searchParams }: { searchParams: Par
   const { token } = await obtenerSesion();
   const filtros = await searchParams;
 
-  const query = new URLSearchParams({ page_size: String(MAXIMO) });
+  const query = new URLSearchParams();
   const pares: [string, string | undefined][] = [
     ["proveedor_id", filtros.proveedor],
     ["desde", filtros.desde],
@@ -33,7 +29,7 @@ export default async function FacturasPage({ searchParams }: { searchParams: Par
 
   let pagina: Pagina<ComprobanteRecibido>;
   try {
-    pagina = await apiFetch<Pagina<ComprobanteRecibido>>(
+    pagina = await apiFetchCompleto<ComprobanteRecibido>(
       `/api/v1/purchases/comprobantes?${query}`,
       { token },
     );
@@ -45,8 +41,8 @@ export default async function FacturasPage({ searchParams }: { searchParams: Par
     return <p className="text-secondary">{mensaje}</p>;
   }
 
-  const proveedores = await apiFetch<Pagina<Proveedor>>(
-    "/api/v1/purchases/proveedores?page_size=200",
+  const proveedores = await apiFetchCompleto<Proveedor>(
+    "/api/v1/purchases/proveedores",
     { token },
   )
     .then((p) => p.items)
@@ -55,7 +51,6 @@ export default async function FacturasPage({ searchParams }: { searchParams: Par
   return (
     <FacturasCliente
       facturas={pagina.items}
-      total={pagina.total}
       proveedores={proveedores}
       filtros={{
         proveedor: filtros.proveedor ?? "",

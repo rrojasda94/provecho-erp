@@ -8,6 +8,8 @@ import { useMemo, useState, useTransition } from "react";
 import { DialogoFormulario } from "@/components/formulario/dialogo-formulario";
 import { Insignia } from "@/components/estado/insignia";
 import { TablaDatos } from "@/components/tabla/tabla-datos";
+import { NOMBRE_MOTIVO, QUE_HACER, origenDe } from "@/lib/asientos-omitidos";
+import type { PaginaServidor } from "@/components/tabla/use-tabla-servidor";
 import { Combobox } from "@/components/ui/combobox";
 import { cuadreDe } from "@/lib/cuadre";
 import { tienePermiso } from "@/lib/permisos";
@@ -48,7 +50,12 @@ export type Cuenta = {
  * (RN-CTB-002), o sea escribe en el libro igual que registrar. */
 const ASIENTO_MANUAL = "accounting.asiento_manual";
 
-type LineaForm = { clave: number; cuenta: string; tipo: "debe" | "haber"; monto: string };
+type LineaForm = {
+  clave: number;
+  cuenta: string;
+  tipo: "debe" | "haber";
+  monto: string;
+};
 
 const LINEAS_INICIALES: LineaForm[] = [
   { clave: 1, cuenta: "", tipo: "debe", monto: "" },
@@ -96,7 +103,12 @@ function DialogoNuevoAsiento({ cuentas }: { cuentas: Cuenta[] }) {
         </label>
         <label className="flex flex-1 flex-col gap-1 text-sm font-semibold">
           Glosa
-          <input name="glosa" required maxLength={255} placeholder="Qué documenta el asiento" />
+          <input
+            name="glosa"
+            required
+            maxLength={255}
+            placeholder="Qué documenta el asiento"
+          />
         </label>
       </div>
 
@@ -142,7 +154,9 @@ function DialogoNuevoAsiento({ cuentas }: { cuentas: Cuenta[] }) {
               type="button"
               aria-label="Quitar línea"
               disabled={lineas.length <= 2}
-              onClick={() => setLineas((prev) => prev.filter((l) => l.clave !== linea.clave))}
+              onClick={() =>
+                setLineas((prev) => prev.filter((l) => l.clave !== linea.clave))
+              }
               className="pb-1.5 text-muted-foreground hover:text-status-danger disabled:opacity-30"
             >
               ×
@@ -174,12 +188,16 @@ function DialogoNuevoAsiento({ cuentas }: { cuentas: Cuenta[] }) {
           contra 0.30 mostraba «Diferencia: 0.00» con el botón apagado. */}
       <div
         className={`flex justify-end gap-6 rounded px-3 py-2 text-sm font-semibold ${
-          cuadra ? "bg-status-success/15 text-foreground" : "bg-status-warning/15 text-foreground"
+          cuadra
+            ? "bg-status-success/15 text-foreground"
+            : "bg-status-warning/15 text-foreground"
         }`}
       >
         <span>Debe: {debe.toFixed(2)}</span>
         <span>Haber: {haber.toFixed(2)}</span>
-        <span>{cuadra ? "Cuadra" : `Diferencia: ${(debe - haber).toFixed(2)}`}</span>
+        <span>
+          {cuadra ? "Cuadra" : `Diferencia: ${(debe - haber).toFixed(2)}`}
+        </span>
       </div>
     </DialogoFormulario>
   );
@@ -215,27 +233,25 @@ function BotonAnular({ asiento }: { asiento: Asiento }) {
   );
 }
 
-/** Qué hacer con cada motivo. El aviso sirve si dice dónde arreglarlo: un
- * cartel que solo avisa que algo falló manda a abrir un ticket. */
-const QUE_HACER: Record<string, string> = {
-  periodo_cerrado:
-    "el mes ya estaba cerrado cuando llegó la operación: se registra con un asiento manual en el periodo abierto",
-  sin_cuentas:
-    "a la empresa le falta plan de cuentas: importalo en Plan de cuentas y volvé a registrar la operación",
-  sin_plantilla:
-    "ese evento todavía no tiene asiento definido en el ERP: hay que reportarlo",
-};
-
-/** El aviso que faltaba.
+/** El aviso que faltaba, y después el que decía cuál.
  *
  * El asiento automático nunca bloquea la operación que lo originó, y eso está
  * bien. El costo es que el balance puede quedarse vacío sin que nadie se
  * entere — pasó: durante meses ninguna empresa tenía plan de cuentas ni
- * periodo abierto y el único rastro era una línea de log que además decía el
- * motivo equivocado. Acá se ve, con qué hacer al lado. */
-function AvisoOmitidos({ omitidos }: { omitidos: AsientoOmitido[] }) {
+ * periodo abierto. El primer aviso contaba por motivo y no decía de qué
+ * operación era cada asiento: se sabía que faltaban, no cuáles. Ahora cada
+ * uno trae su operación, su documento (con enlace si tiene ficha), el motivo
+ * y el detalle que dejó el backend. */
+function AvisoOmitidos({
+  omitidos,
+  dias,
+}: {
+  omitidos: AsientoOmitido[];
+  dias: number;
+}) {
   const porMotivo = new Map<string, number>();
-  for (const o of omitidos) porMotivo.set(o.motivo, (porMotivo.get(o.motivo) ?? 0) + 1);
+  for (const o of omitidos)
+    porMotivo.set(o.motivo, (porMotivo.get(o.motivo) ?? 0) + 1);
 
   return (
     <div
@@ -245,8 +261,8 @@ function AvisoOmitidos({ omitidos }: { omitidos: AsientoOmitido[] }) {
       <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
         <AlertTriangle size={16} strokeWidth={1.75} aria-hidden />
         {omitidos.length === 1
-          ? "Hay 1 asiento que no se escribió"
-          : `Hay ${omitidos.length} asientos que no se escribieron`}
+          ? `1 asiento no se escribió en los últimos ${dias} días`
+          : `${omitidos.length} asientos no se escribieron en los últimos ${dias} días`}
       </p>
       <p className="text-xs text-muted-foreground">
         La operación se registró igual —contabilidad nunca la bloquea— pero su
@@ -256,24 +272,87 @@ function AvisoOmitidos({ omitidos }: { omitidos: AsientoOmitido[] }) {
         {[...porMotivo].map(([motivo, n]) => (
           <li key={motivo} className="text-xs text-foreground">
             <span className="cifra font-semibold">{n}</span> por{" "}
-            <span className="font-semibold">{motivo.replace("_", " ")}</span> —{" "}
-            {QUE_HACER[motivo] ?? "revisar la configuración contable"}
+            <span className="font-semibold">
+              {NOMBRE_MOTIVO[motivo] ?? motivo}
+            </span>{" "}
+            — {QUE_HACER[motivo] ?? "revisar la configuración contable"}
           </li>
         ))}
       </ul>
+      <details className="mt-1 text-xs">
+        <summary className="cursor-pointer font-semibold text-foreground">
+          Ver cuáles
+        </summary>
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="py-1 pr-3 font-semibold">Fecha</th>
+                <th className="py-1 pr-3 font-semibold">Operación</th>
+                <th className="py-1 pr-3 font-semibold">Documento</th>
+                <th className="py-1 pr-3 font-semibold">Motivo</th>
+                <th className="py-1 font-semibold">Detalle</th>
+              </tr>
+            </thead>
+            <tbody>
+              {omitidos.map((o) => (
+                <FilaOmitido key={o.id} omitido={o} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
+  );
+}
+
+function FilaOmitido({ omitido }: { omitido: AsientoOmitido }) {
+  const { operacion, ruta } = origenDe(
+    omitido.evento,
+    omitido.referencia_origen,
+  );
+  // El id entero no le dice nada a nadie; los primeros 8 caracteres bastan
+  // para reconocerlo y el enlace lleva al documento.
+  const corto = omitido.referencia_origen.slice(0, 8);
+  return (
+    <tr className="border-t border-border align-top text-foreground">
+      <td className="cifra py-1 pr-3 whitespace-nowrap">{omitido.fecha}</td>
+      <td className="py-1 pr-3">{operacion}</td>
+      <td className="py-1 pr-3 font-mono">
+        {ruta ? (
+          <Link
+            href={ruta}
+            className="text-primary hover:underline"
+            title={omitido.referencia_origen}
+          >
+            {corto}
+          </Link>
+        ) : (
+          <span title={omitido.referencia_origen}>{corto}</span>
+        )}
+      </td>
+      <td className="py-1 pr-3 whitespace-nowrap">
+        {NOMBRE_MOTIVO[omitido.motivo] ?? omitido.motivo}
+      </td>
+      <td className="py-1 text-muted-foreground">{omitido.detalle ?? "—"}</td>
+    </tr>
   );
 }
 
 export function AsientosCliente({
   asientos,
+  pagina,
   cuentas,
   omitidos,
+  diasOmitidos,
   permisos,
 }: {
   asientos: Asiento[];
+  pagina: PaginaServidor;
   cuentas: Cuenta[];
   omitidos: AsientoOmitido[];
+  /** La ventana del aviso: lo omitido hace más no se arrastra para siempre. */
+  diasOmitidos: number;
   permisos: string[];
 }) {
   const puedeAsentar = tienePermiso(permisos, ASIENTO_MANUAL);
@@ -299,7 +378,10 @@ export function AsientosCliente({
       {
         id: "origen",
         header: "Origen",
-        accessorFn: (a) => (a.origen === "automatico" ? (a.evento_origen ?? "automático") : "manual"),
+        accessorFn: (a) =>
+          a.origen === "automatico"
+            ? (a.evento_origen ?? "automático")
+            : "manual",
       },
       {
         accessorKey: "estado",
@@ -307,7 +389,9 @@ export function AsientosCliente({
         cell: ({ getValue }) => {
           const estado = getValue<string>();
           return (
-            <Insignia tono={estado === "anulado" ? "neutro" : "exito"}>{estado}</Insignia>
+            <Insignia tono={estado === "anulado" ? "neutro" : "exito"}>
+              {estado}
+            </Insignia>
           );
         },
       },
@@ -335,16 +419,25 @@ export function AsientosCliente({
         {puedeAsentar && <DialogoNuevoAsiento cuentas={cuentas} />}
       </div>
       <p className="text-sm text-gray">
-        El libro. Los asientos automáticos los genera un evento del ERP (venta, compra,
-        pago); los manuales se registran acá y siempre cuadran debe contra haber.
+        El libro. Los asientos automáticos los genera un evento del ERP (venta,
+        compra, pago); los manuales se registran acá y siempre cuadran debe
+        contra haber.
       </p>
-      {omitidos.length > 0 && <AvisoOmitidos omitidos={omitidos} />}
+      {omitidos.length > 0 && (
+        <AvisoOmitidos omitidos={omitidos} dias={diasOmitidos} />
+      )}
       {puedeAsentar && cuentas.length === 0 && (
         <p className="rounded bg-secondary/10 px-3 py-2 text-sm font-semibold text-secondary">
-          No hay plan de cuentas todavía: sin cuentas no se puede registrar un asiento.
+          No hay plan de cuentas todavía: sin cuentas no se puede registrar un
+          asiento.
         </p>
       )}
-      <TablaDatos columnas={columnas} datos={asientos} placeholderBusqueda="Buscar por glosa..." />
+      <TablaDatos
+        columnas={columnas}
+        datos={asientos}
+        servidor={pagina}
+        placeholderBusqueda="Buscar por glosa..."
+      />
     </div>
   );
 }

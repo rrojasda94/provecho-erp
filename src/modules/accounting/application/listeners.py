@@ -56,6 +56,53 @@ def _empresa_de_sucursal(session, sucursal_id: str) -> uuid.UUID | None:
     return sucursal.empresa_id if sucursal is not None else None
 
 
+# Claves del payload que dicen de qué empresa es el hecho, en orden de
+# preferencia. Cada evento trae una distinta y ninguno las trae todas.
+_CLAVES_DE_EMPRESA = (
+    ("empresa_id", None),
+    ("sucursal_id", _empresa_de_sucursal),
+    ("almacen_id", _empresa_de_almacen),
+    ("almacen_destino_id", _empresa_de_almacen),
+    ("origen_almacen_id", _empresa_de_almacen),
+)
+
+
+def _empresa_del_payload(session, payload: dict) -> uuid.UUID | None:
+    for clave, resolver in _CLAVES_DE_EMPRESA:
+        valor = payload.get(clave)
+        if valor:
+            return uuid.UUID(valor) if resolver is None else resolver(session, valor)
+    return None
+
+
+def _registrar_fallo(evento: str, payload: dict, clave: str, exc: Exception) -> None:
+    """Un listener que revienta también es un asiento que no se escribió.
+
+    Hasta acá solo quedaba en el log: la pantalla de Asientos no se enteraba y
+    el balance quedaba corto sin que nadie supiera de qué operación. Se anota
+    en `asiento_omitido` con motivo `error` y el mensaje de la excepción, en
+    una sesión nueva —la del listener se deshizo con el fallo—. Si esto
+    también falla, queda el `log.exception` que el llamador ya escribió.
+    """
+    try:
+        with session_factory() as session:
+            empresa_id = _empresa_del_payload(session, payload)
+            if empresa_id is None:
+                return
+            asientos_uc.anotar_omision(
+                session,
+                empresa_id=empresa_id,
+                evento=evento,
+                referencia_origen=str(payload.get(clave) or "?")[:64],
+                motivo="error",
+                fecha=fechas.hoy(),
+                detalle=f"{type(exc).__name__}: {exc}"[:300],
+            )
+            session.commit()
+    except Exception:
+        log.exception("tampoco se pudo anotar el fallo de %s", evento)
+
+
 def _generar(
     session,
     *,
@@ -72,7 +119,7 @@ def _generar(
     # en que el asiento sale `None` — periodo cerrado, plan de cuentas sin
     # importar, evento sin plantilla, duplicado, monto cero—, así que quien
     # buscaba por qué el balance estaba vacío encontraba una pista falsa. Los
-    # motivos que importan los anota ahora `asientos._omitir`, con su fila en
+    # motivos que importan los anota ahora `asientos.anotar_omision`, con su fila en
     # `asiento_omitido` y un `warning` que dice cuál es (ADR-089); los otros
     # dos son omisiones correctas y no ensucian nada.
     asientos_uc.crear_asiento_automatico_si_hay_regla(
@@ -171,8 +218,9 @@ def on_oc_emitida(payload: dict) -> None:
                 glosa=f"Provisión OC {payload['orden_compra_id']}",
             )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception("fallo generando asiento de OC %s", payload.get("orden_compra_id"))
+        _registrar_fallo("purchases.oc_emitida", payload, "orden_compra_id", exc)
 
 
 def on_compra_recibida(payload: dict) -> None:
@@ -202,8 +250,9 @@ def on_compra_recibida(payload: dict) -> None:
                     desglose=_desglose_de_compra(session, payload["items"]),
                 )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception("fallo generando asiento de recepción %s", payload.get("orden_compra_id"))
+        _registrar_fallo("purchases.compra_recibida", payload, "orden_compra_id", exc)
 
 
 def on_venta_confirmada(payload: dict) -> None:
@@ -225,8 +274,9 @@ def on_venta_confirmada(payload: dict) -> None:
                     desglose=_desglose_de_venta(session, payload.get("items") or []),
                 )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception("fallo generando asiento de venta %s", payload.get("venta_id"))
+        _registrar_fallo("sales.venta_confirmada", payload, "venta_id", exc)
 
 
 def on_venta_pagada(payload: dict) -> None:
@@ -274,8 +324,9 @@ def on_venta_pagada(payload: dict) -> None:
                 cobrado=cobrado,
             )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception("fallo generando asiento de cobro de %s", payload.get("venta_id"))
+        _registrar_fallo("sales.venta_pagada", payload, "venta_id", exc)
 
 
 def on_venta_anulada(payload: dict) -> None:
@@ -308,10 +359,11 @@ def on_venta_anulada(payload: dict) -> None:
                 referencia_origen=payload["venta_id"],
             )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception(
             "fallo reversando el asiento de la venta %s", payload.get("venta_id")
         )
+        _registrar_fallo("sales.venta_anulada", payload, "venta_id", exc)
 
 
 def on_consumo_personal_valorizado(payload: dict) -> None:
@@ -343,11 +395,12 @@ def on_consumo_personal_valorizado(payload: dict) -> None:
                     glosa=f"Consumo de personal ({motivo}) {payload['venta_id']}",
                 )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception(
             "fallo generando asiento de consumo de personal %s",
             payload.get("venta_id"),
         )
+        _registrar_fallo("inventory.consumo_personal_valorizado", payload, "venta_id", exc)
 
 
 def on_consumo_personal_reversado(payload: dict) -> None:
@@ -364,11 +417,12 @@ def on_consumo_personal_reversado(payload: dict) -> None:
                     referencia_origen=payload["venta_id"],
                 )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception(
             "fallo reversando el asiento de consumo de personal %s",
             payload.get("venta_id"),
         )
+        _registrar_fallo("inventory.consumo_personal_reversado", payload, "venta_id", exc)
 
 
 def on_comprobante_conforme(payload: dict) -> None:
@@ -403,10 +457,11 @@ def on_comprobante_conforme(payload: dict) -> None:
                 gravado_igv=payload.get("gravado_igv"),
             )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception(
             "fallo encolando pago del comprobante %s", payload.get("comprobante_id")
         )
+        _registrar_fallo("purchases.comprobante_conforme", payload, "comprobante_id", exc)
 
 
 def on_comprobante_emitido(payload: dict) -> None:
@@ -438,11 +493,12 @@ def on_comprobante_emitido(payload: dict) -> None:
                 gravado_igv=payload.get("gravado_igv"),
             )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception(
             "fallo generando asiento de IGV del comprobante %s",
             payload.get("comprobante_id"),
         )
+        _registrar_fallo("sales.comprobante_emitido", payload, "comprobante_id", exc)
 
 
 def on_transferencia_recibida(payload: dict) -> None:
@@ -480,10 +536,11 @@ def on_transferencia_recibida(payload: dict) -> None:
                     ),
                 )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception(
             "fallo generando asiento de traslado %s", payload.get("transferencia_id")
         )
+        _registrar_fallo("inventory.transferencia_recibida", payload, "transferencia_id", exc)
 
 
 def on_merma_registrada(payload: dict) -> None:
@@ -514,8 +571,9 @@ def on_merma_registrada(payload: dict) -> None:
                     glosa=f"Merma desechada por {payload['motivo']}",
                 )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception("fallo generando asiento de merma de %s", payload.get("sku_id"))
+        _registrar_fallo("inventory.merma_registrada", payload, "sku_id", exc)
 
 
 def on_orden_desechada(payload: dict) -> None:
@@ -551,11 +609,12 @@ def on_orden_desechada(payload: dict) -> None:
                     desglose=_desglose_de_produccion(session, payload["articulo_id"], monto),
                 )
             session.commit()
-    except Exception:
+    except Exception as exc:
         log.exception(
             "fallo generando asiento de desecho de producción %s",
             payload.get("orden_produccion_id"),
         )
+        _registrar_fallo("production.orden_desechada", payload, "orden_produccion_id", exc)
 
 
 def on_empresa_creada(payload: dict) -> None:

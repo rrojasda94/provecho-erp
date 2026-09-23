@@ -1,4 +1,4 @@
-import { ApiError, apiFetch, type Pagina } from "@/lib/api";
+import { ApiError, apiFetch, apiFetchCompleto } from "@/lib/api";
 import { obtenerSesion } from "@/lib/sesion";
 
 import { InformesCliente, type InformeDiario, type Sucursal } from "./informes-cliente";
@@ -9,7 +9,7 @@ export default async function InformesPage() {
   let informes: InformeDiario[];
   try {
     informes = (
-      await apiFetch<Pagina<InformeDiario>>("/api/v1/supervision/informes", { token })
+      await apiFetchCompleto<InformeDiario>("/api/v1/supervision/informes", { token })
     ).items;
   } catch (e) {
     const mensaje =

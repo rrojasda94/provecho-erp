@@ -221,6 +221,21 @@ lo aprobado no tenía botón para despacharse y lo despachado se quedaba
 - `/inventario/transferencias` — los traslados en tránsito y el botón de
   recibir.
 
+## Kardex gráfico y próxima compra (2026-09-23, ADR-108)
+
+`GET /inventory/articulos/{id}/kardex?dias=180` (`application/kardex.py`):
+entradas y salidas por semana (sin traslados internos), saldo al cierre de
+cada semana reconstruido desde el stock actual, stock y suma de mínimos de
+toda la empresa, consumo diario (90 días, mínimo 7 de historia) y próxima
+compra sugerida (`rules.proxima_compra`, RN-INV-027). Lo consume la ficha del
+artículo en Inventario y en Compras, junto al historial de precios que expone
+`purchases`.
+
+**Por sede y por almacén (enmienda 2026-09-23):** el mismo endpoint acepta
+`almacen_id` o `sucursal_id`; con ámbito los traslados cuentan como
+reposición. `GET /inventory/articulos/{id}/kardex/por-almacen` compara todos
+los almacenes que manejan el artículo.
+
 ## Casos de uso
 
 - CRUD de artículos y categorías.
