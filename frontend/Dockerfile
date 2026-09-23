@@ -63,6 +63,9 @@ COPY --from=builder --chown=provecho:provecho /app/.next/standalone ./
 # `standalone` no incluye los estáticos ni las fuentes self-hosted que
 # `next/font` descarga en build: van aparte o la app carga sin CSS.
 COPY --from=builder --chown=provecho:provecho /app/.next/static ./.next/static
+# Tampoco `public/`: sin esta línea los manifests e íconos de las apps
+# instalables (ADR-109) y los logos de `marcas/` daban 404 en staging.
+COPY --from=builder --chown=provecho:provecho /app/public ./public
 
 USER provecho
 
